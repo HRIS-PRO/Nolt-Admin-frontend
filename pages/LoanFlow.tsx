@@ -143,11 +143,11 @@ const LoanFlow: React.FC<LoanFlowProps> = ({ initialStep, onComplete, navigate, 
         has_active_loans: hasActiveLoans === 'yes',
         average_monthly_income: parseFloat(monthlyIncome.replace(/[^0-9.]/g, '')) || 0,
 
-        // Docs (Using simulated URLs for now as upload logic wasn't fully inspected, but assuming strings)
-        govt_id_url: uploadedDocs.national_id ? 'simulated_url_national_id' : null,
-        statement_of_account_url: uploadedDocs.bank_statement ? 'simulated_url_statement' : null,
-        proof_of_residence_url: uploadedDocs.proof_address ? 'simulated_url_proof' : null,
-        selfie_verification_url: uploadedDocs.selfie ? 'simulated_url_selfie' : null,
+        // Docs (Using real URLs from Supabase)
+        govt_id_url: uploadedDocs.national_id?.url || null,
+        statement_of_account_url: uploadedDocs.bank_statement?.url || null,
+        proof_of_residence_url: uploadedDocs.proof_address?.url || null,
+        selfie_verification_url: uploadedDocs.selfie?.url || null,
 
         references: references.map(r => ({
           fullName: r.name,
@@ -253,24 +253,61 @@ const LoanFlow: React.FC<LoanFlowProps> = ({ initialStep, onComplete, navigate, 
     setHasSigned(false);
   };
 
-  const simulateUpload = (id: string) => {
-    if (uploadedDocs[id]) return;
-    setUploadProgress(prev => ({ ...prev, [id]: 1 }));
-    let progress = 0;
-    const interval = setInterval(() => {
-      progress += Math.random() * 30;
-      if (progress >= 100) {
-        progress = 100;
-        setUploadProgress(prev => ({ ...prev, [id]: 100 }));
-        setUploadedDocs(prev => ({
-          ...prev,
-          [id]: { name: `${id}_document_${Math.floor(Math.random() * 1000)}.pdf`, size: `${(Math.random() * 2 + 0.5).toFixed(1)} MB` }
-        }));
-        clearInterval(interval);
-      } else {
-        setUploadProgress(prev => ({ ...prev, [id]: progress }));
-      }
-    }, 300);
+  const uploadFile = async (id: string, file: File) => {
+    // Optimistic UI Update
+    setUploadProgress(prev => ({ ...prev, [id]: 10 }));
+
+    // Determine document_type
+    const docTypes: Record<string, string> = {
+      'national_id': 'govt_id',
+      'bank_statement': 'bank_statement',
+      'proof_address': 'proof_of_residence',
+      'selfie': 'selfie_verification'
+    };
+
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('loan_id', draftId); // Using draftId as temporary loan_id or strictly the text
+    formData.append('document_type', docTypes[id] || 'other');
+
+    try {
+      setUploadProgress(prev => ({ ...prev, [id]: 30 }));
+      const backendUrl = import.meta.env.VITE_BACKEND_URL;
+
+      const response = await axios.post(`${backendUrl}/api/upload`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+        withCredentials: true,
+        onUploadProgress: (progressEvent) => {
+          const percentCompleted = Math.round((progressEvent.loaded * 100) / (progressEvent.total || 100));
+          setUploadProgress(prev => ({ ...prev, [id]: percentCompleted }));
+        }
+      });
+
+      setUploadedDocs(prev => ({
+        ...prev,
+        [id]: {
+          name: file.name,
+          size: `${(file.size / (1024 * 1024)).toFixed(2)} MB`,
+          url: response.data.document.file_url
+        }
+      }));
+
+    } catch (error) {
+      console.error("Upload failed", error);
+      alert("Upload failed. Please try again.");
+      setUploadProgress(prev => { const next = { ...prev }; delete next[id]; return next; });
+    }
+  };
+
+  const handleFileSelect = (id: string) => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*,application/pdf';
+    input.onchange = (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (file) uploadFile(id, file);
+    };
+    input.click();
   };
 
   const removeDoc = (id: string, e: React.MouseEvent) => {
@@ -648,7 +685,7 @@ const LoanFlow: React.FC<LoanFlowProps> = ({ initialStep, onComplete, navigate, 
                   { id: 'proof_address', label: 'Proof of Residence', icon: 'home_pin' },
                   { id: 'selfie', label: 'Selfie Verification', icon: 'add_a_photo' }
                 ].map(doc => (
-                  <div key={doc.id} onClick={() => simulateUpload(doc.id)} className={`relative group p-6 rounded-3xl border-2 border-dashed transition-all cursor-pointer flex flex-col items-center gap-4 text-center ${uploadedDocs[doc.id] ? 'border-green-500 bg-green-500/5' : 'border-slate-200 dark:border-slate-700 hover:border-primary'}`}>
+                  <div key={doc.id} onClick={() => handleFileSelect(doc.id)} className={`relative group p-6 rounded-3xl border-2 border-dashed transition-all cursor-pointer flex flex-col items-center gap-4 text-center ${uploadedDocs[doc.id] ? 'border-green-500 bg-green-500/5' : 'border-slate-200 dark:border-slate-700 hover:border-primary'}`}>
                     {uploadedDocs[doc.id] ? (
                       <div className="size-12 rounded-full bg-green-500 text-white flex items-center justify-center shadow-lg shadow-green-500/20"><span className="material-symbols-outlined">check</span></div>
                     ) : (
