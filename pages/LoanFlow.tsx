@@ -3,6 +3,7 @@ import axios from 'axios';
 import { AppStep, SavedDraft } from '../types';
 import { getFinancialAdvice } from '../services/geminiService';
 import { storageService } from '../services/storageService';
+import SuccessScreen from './SuccessScreen';
 
 interface LoanFlowProps {
   initialStep: 'TYPE' | 'IDENTITY';
@@ -12,10 +13,16 @@ interface LoanFlowProps {
   initialDraft?: SavedDraft | null;
 }
 
+const isValidEmail = (email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+const isValidPhone = (phone: string) => /^\+?[0-9]{10,15}$/.test(phone.replace(/[^0-9+]/g, ''));
+const isValidBVN = (bvn: string) => /^[0-9]{11}$/.test(bvn);
+const isValidNIN = (nin: string) => /^[0-9]{11}$/.test(nin);
+
 const LoanFlow: React.FC<LoanFlowProps> = ({ initialStep, onComplete, navigate, formatMoney, initialDraft }) => {
   const [subStep, setSubStep] = useState(initialDraft?.subStep ?? (initialStep === 'TYPE' ? 0 : 1));
   const [loading, setLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isSuccess, setIsSuccess] = useState(false);
 
   // Form State
   const [draftId] = useState(initialDraft?.id ?? `L-${Math.floor(Math.random() * 9000) + 1000}`);
@@ -71,6 +78,7 @@ const LoanFlow: React.FC<LoanFlowProps> = ({ initialStep, onComplete, navigate, 
 
   // New Fields
   const [mda, setMda] = useState(initialDraft?.data?.mda ?? '');
+  const [customMda, setCustomMda] = useState(initialDraft?.data?.customMda ?? '');
   const [ippisNumber, setIppisNumber] = useState(initialDraft?.data?.ippisNumber ?? '');
   const [staffId, setStaffId] = useState(initialDraft?.data?.staffId ?? '');
   const [referralCode, setReferralCode] = useState(initialDraft?.data?.referralCode ?? '');
@@ -150,27 +158,32 @@ const LoanFlow: React.FC<LoanFlowProps> = ({ initialStep, onComplete, navigate, 
         proof_of_residence_url: uploadedDocs.proof_address?.url || null,
         selfie_verification_url: uploadedDocs.selfie?.url || null,
 
-        references: references.map(r => ({
-          fullName: r.name,
-          phoneNumber: r.phone,
-          relationship: r.relationship
-        })),
+        references: references
+          .filter(r => r.name && r.phone) // Only include valid references
+          .map(r => ({
+            fullName: r.name,
+            phoneNumber: r.phone,
+            relationship: r.relationship
+          })),
 
         requested_loan_amount: parseFloat(desiredAmount.replace(/[^0-9.]/g, '')) || 0,
         loan_tenure_months: repaymentPeriod,
         signatures: [signatureUrl], // Array format
 
-        mda_tertiary: mda,
+        mda_tertiary: mda === 'Other' ? customMda : mda,
         ippis_number: ippisNumber,
         staff_id: staffId,
         referral_code: referralCode
       };
 
+      console.log("Submitting Loan Payload:", payload);
+
       const backendUrl = import.meta.env.VITE_BACKEND_URL;
       await axios.post(`${backendUrl}/api/loans`, payload, { withCredentials: true });
 
       storageService.deleteDraft(draftId);
-      onComplete();
+      setIsSuccess(true);
+      // onComplete();
     } catch (error) {
       console.error("Error submitting loan:", error);
       alert("Failed to submit loan application. Please try again.");
@@ -192,7 +205,7 @@ const LoanFlow: React.FC<LoanFlowProps> = ({ initialStep, onComplete, navigate, 
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const handleSaveAndExit = () => {
+  const saveDraft = () => {
     setIsSaving(true);
     console.log("Saving draft...");
     const draft: SavedDraft = {
@@ -206,15 +219,23 @@ const LoanFlow: React.FC<LoanFlowProps> = ({ initialStep, onComplete, navigate, 
         countryCode, mobileNumber, contactEmail, bvn, nin, stateOfOrigin, stateOfResidence,
         homeAddress, residentialStatus, dependents, hasActiveLoans, monthlyIncome, uploadedDocs,
         references, desiredAmount, repaymentPeriod, hasSigned, acceptedIndemnity,
-        mda, ippisNumber, staffId, referralCode
+        mda, customMda, ippisNumber, staffId, referralCode
       }
     };
     storageService.saveDraft(draft);
-    setTimeout(() => {
-      setIsSaving(false);
-      navigate('DASHBOARD');
-    }, 800);
+    return draft;
   };
+
+  const handleSaveAndExit = () => {
+    saveDraft();
+    navigate('DASHBOARD');
+  };
+
+  useEffect(() => {
+    if (subStep > 0 && (subStep % 2 === 0)) {
+      saveDraft();
+    }
+  }, [subStep]);
 
   const startDrawing = (e: React.MouseEvent | React.TouchEvent) => {
     const canvas = canvasRef.current;
@@ -338,21 +359,51 @@ const LoanFlow: React.FC<LoanFlowProps> = ({ initialStep, onComplete, navigate, 
 
   const NavActions = ({ nextLabel = "Continue", onNext = handleNext, isNextDisabled = false }: { nextLabel?: string, onNext?: () => void, isNextDisabled?: boolean }) => (
     <div className="pt-8 flex flex-wrap items-center justify-between border-t border-slate-100 dark:border-slate-700 gap-4 mt-8">
-      <div className="flex gap-2">
-        <button onClick={handleBack} className="px-8 py-4 text-slate-500 font-bold hover:bg-slate-50 dark:hover:bg-slate-900 rounded-full transition-all flex items-center gap-2">
-          <span className="material-symbols-outlined text-lg">arrow_back</span> Back
+      {subStep > 0 ? (
+        <button onClick={handleBack} className="px-8 py-4 rounded-full text-slate-500 hover:text-slate-800 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-all font-bold flex items-center gap-2">
+          <span className="material-symbols-outlined">arrow_back</span>
+          Back
         </button>
-        <button onClick={handleSaveAndExit} disabled={isSaving} className="px-6 py-4 text-primary font-bold hover:bg-primary/5 rounded-full transition-all flex items-center gap-2">
-          {isSaving ? <div className="size-4 border-2 border-primary border-t-transparent rounded-full animate-spin"></div> : <span className="material-symbols-outlined text-lg">save_as</span>}
-          {isSaving ? 'Saving...' : 'Save & Exit'}
+      ) : (
+        <button onClick={() => navigate('PRODUCT_SELECT')} className="px-8 py-4 rounded-full text-slate-500 hover:text-slate-800 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-all font-bold flex items-center gap-2">
+          Cancel
+        </button>
+      )}
+
+      <div className="flex items-center gap-4">
+        {subStep > 0 && (
+          <button onClick={handleSaveAndExit} className="px-6 py-4 rounded-full text-primary hover:bg-primary/5 transition-all font-black text-sm uppercase tracking-widest hidden md:block">
+            Save & Exit
+          </button>
+        )}
+        <button onClick={onNext} disabled={isNextDisabled || loading} className={`px-12 py-4 bg-primary text-white font-black text-lg rounded-full shadow-xl shadow-primary/20 hover:-translate-y-1 transition-all flex items-center gap-2 ${isNextDisabled || loading ? 'opacity-50 grayscale cursor-not-allowed' : ''}`}>
+          {loading ? 'Processing...' : nextLabel}
+          {!loading && <span className="material-symbols-outlined">arrow_forward</span>}
         </button>
       </div>
-      <button onClick={onNext} disabled={isNextDisabled || loading} className={`px-12 py-4 bg-primary text-white font-black text-lg rounded-full shadow-xl shadow-primary/20 hover:-translate-y-1 transition-all flex items-center gap-2 ${isNextDisabled || loading ? 'opacity-50 grayscale cursor-not-allowed' : ''}`}>
-        {loading ? 'Processing...' : nextLabel}
-        {!loading && <span className="material-symbols-outlined">arrow_forward</span>}
-      </button>
     </div>
   );
+
+  if (isSuccess) {
+    return (
+      <SuccessScreen
+        onDashboard={() => {
+          onComplete();
+          navigate('DASHBOARD');
+        }}
+        loan={{
+          type: currentLoanLabel,
+          amount: parseFloat(desiredAmount.replace(/[^0-9.]/g, '')) || 0,
+          term: repaymentPeriod,
+          interestRate: calculation.rate,
+          monthlyPayment: calculation.monthly,
+          status: 'SUBMITTED'
+        }}
+        formatMoney={formatMoney}
+        productType="LOAN"
+      />
+    );
+  }
 
   return (
     <div className="max-w-7xl mx-auto px-6 py-8 md:py-12">
@@ -546,7 +597,7 @@ const LoanFlow: React.FC<LoanFlowProps> = ({ initialStep, onComplete, navigate, 
                   </div>
                   <div className="flex-1 space-y-2">
                     <label className="text-sm font-black text-slate-500 uppercase">Mobile Number</label>
-                    <input type="tel" className="w-full h-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-6 text-lg font-bold dark:text-white focus:border-primary outline-none" value={mobileNumber} onChange={e => setMobileNumber(e.target.value)} placeholder="800-000-0000" />
+                    <input type="tel" className="w-full h-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-6 text-lg font-bold dark:text-white focus:border-primary outline-none" value={mobileNumber} onChange={e => setMobileNumber(e.target.value.replace(/[^0-9]/g, ''))} placeholder="08000000000" maxLength={11} />
                   </div>
                 </div>
                 <div className="space-y-2">
@@ -554,7 +605,7 @@ const LoanFlow: React.FC<LoanFlowProps> = ({ initialStep, onComplete, navigate, 
                   <input type="email" className="w-full h-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-6 text-lg font-bold dark:text-white focus:border-primary outline-none" value={contactEmail} onChange={e => setContactEmail(e.target.value)} placeholder="name@example.com" />
                 </div>
               </div>
-              <NavActions isNextDisabled={!mobileNumber || !contactEmail} />
+              <NavActions isNextDisabled={!isValidPhone(mobileNumber) || !isValidEmail(contactEmail)} />
             </div>
           )}
 
@@ -565,14 +616,14 @@ const LoanFlow: React.FC<LoanFlowProps> = ({ initialStep, onComplete, navigate, 
               <div className="grid gap-6">
                 <div className="space-y-2">
                   <label className="text-sm font-black text-slate-500 uppercase">Bank Verification Number (BVN)</label>
-                  <input className="w-full h-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-6 text-lg font-bold dark:text-white focus:border-primary outline-none" value={bvn} onChange={e => setBvn(e.target.value)} placeholder="11 digits" maxLength={11} />
+                  <input className="w-full h-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-6 text-lg font-bold dark:text-white focus:border-primary outline-none" value={bvn} onChange={e => setBvn(e.target.value.replace(/[^0-9]/g, ''))} placeholder="11 digits" maxLength={11} />
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-black text-slate-500 uppercase">National Identity Number (NIN)</label>
-                  <input className="w-full h-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-6 text-lg font-bold dark:text-white focus:border-primary outline-none" value={nin} onChange={e => setNin(e.target.value)} placeholder="11 digits" maxLength={11} />
+                  <input className="w-full h-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-6 text-lg font-bold dark:text-white focus:border-primary outline-none" value={nin} onChange={e => setNin(e.target.value.replace(/[^0-9]/g, ''))} placeholder="11 digits" maxLength={11} />
                 </div>
               </div>
-              <NavActions isNextDisabled={bvn.length < 11 || nin.length < 11} />
+              <NavActions isNextDisabled={!isValidBVN(bvn) || !isValidNIN(nin)} />
             </div>
           )}
 
@@ -642,12 +693,12 @@ const LoanFlow: React.FC<LoanFlowProps> = ({ initialStep, onComplete, navigate, 
                 <div className="space-y-2">
                   <label className="text-sm font-black text-slate-500 uppercase">Average Monthly Income (USD)</label>
                   <div className="relative">
-                    <span className="absolute left-6 top-1/2 -translate-y-1/2 font-black text-slate-400">$</span>
-                    <input className="w-full h-16 pl-12 pr-6 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 text-lg font-bold dark:text-white focus:border-primary outline-none" value={monthlyIncome} onChange={e => setMonthlyIncome(e.target.value)} placeholder="0.00" />
+                    <span className="absolute left-6 top-1/2 -translate-y-1/2 font-black text-slate-400">₦</span>
+                    <input className="w-full h-16 pl-12 pr-6 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 text-lg font-bold dark:text-white focus:border-primary outline-none" value={monthlyIncome} onChange={e => setMonthlyIncome(e.target.value.replace(/[^0-9.]/g, ''))} placeholder="0.00" />
                   </div>
                 </div>
               </div>
-              <NavActions isNextDisabled={!monthlyIncome} />
+              <NavActions isNextDisabled={!monthlyIncome || (selectedLoanId === 'public_sector' && (!mda || !ippisNumber || (mda === 'Other' && !customMda)))} />
             </div>
           )}
 
@@ -667,9 +718,15 @@ const LoanFlow: React.FC<LoanFlowProps> = ({ initialStep, onComplete, navigate, 
                     <option value="Other">Other</option>
                   </select>
                 </div>
+                {mda === 'Other' && (
+                  <div className="space-y-2 animate-in fade-in slide-in-from-top-2">
+                    <label className="text-sm font-black text-slate-500 uppercase">Specify MDA</label>
+                    <input className="w-full h-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-6 text-lg font-bold dark:text-white focus:border-primary outline-none" value={customMda} onChange={e => setCustomMda(e.target.value)} placeholder="Enter MDA Name" />
+                  </div>
+                )}
                 <div className="space-y-2">
                   <label className="text-sm font-black text-slate-500 uppercase">IPPIS Number</label>
-                  <input className="w-full h-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-6 text-lg font-bold dark:text-white focus:border-primary outline-none" value={ippisNumber} onChange={e => setIppisNumber(e.target.value)} placeholder="000000" />
+                  <input className="w-full h-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-6 text-lg font-bold dark:text-white focus:border-primary outline-none" value={ippisNumber} onChange={e => setIppisNumber(e.target.value.replace(/[^0-9]/g, ''))} placeholder="000000" />
                 </div>
               </div>
             </div>
@@ -741,7 +798,7 @@ const LoanFlow: React.FC<LoanFlowProps> = ({ initialStep, onComplete, navigate, 
                   </div>
                 ))}
               </div>
-              <NavActions isNextDisabled={references.some(r => !r.name || !r.phone || !r.relationship)} />
+              <NavActions isNextDisabled={false} />
             </div>
           )}
 
@@ -755,8 +812,8 @@ const LoanFlow: React.FC<LoanFlowProps> = ({ initialStep, onComplete, navigate, 
                     <div className="space-y-4">
                       <label className="text-lg font-black text-slate-900 dark:text-white ml-1">Requested Amount</label>
                       <div className="relative group">
-                        <span className="absolute left-6 top-1/2 -translate-y-1/2 text-3xl font-black text-slate-400">$</span>
-                        <input className="w-full h-20 pl-12 pr-16 rounded-3xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 text-3xl font-black text-slate-900 dark:text-white focus:outline-none focus:border-primary transition-all" value={desiredAmount} onChange={(e) => setDesiredAmount(e.target.value)} />
+                        <span className="absolute left-6 top-1/2 -translate-y-1/2 text-3xl font-black text-slate-400">₦</span>
+                        <input className="w-full h-20 pl-12 pr-16 rounded-3xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 text-3xl font-black text-slate-900 dark:text-white focus:outline-none focus:border-primary transition-all" value={desiredAmount} onChange={(e) => setDesiredAmount(e.target.value.replace(/[^0-9.]/g, ''))} />
                       </div>
                     </div>
                     <div className="space-y-6">
@@ -769,7 +826,7 @@ const LoanFlow: React.FC<LoanFlowProps> = ({ initialStep, onComplete, navigate, 
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div className="space-y-2">
                           <label className="text-sm font-black text-slate-500 uppercase">Staff ID / Officer Code</label>
-                          <input className="w-full h-14 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-4 font-bold dark:text-white focus:border-primary outline-none" value={staffId} onChange={e => setStaffId(e.target.value)} placeholder="Optional" />
+                          <input className="w-full h-14 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-4 font-bold dark:text-white focus:border-primary outline-none" value={staffId} onChange={e => setStaffId(e.target.value)} placeholder="Required" />
                         </div>
                         <div className="space-y-2">
                           <label className="text-sm font-black text-slate-500 uppercase">Referral Code</label>
@@ -778,7 +835,7 @@ const LoanFlow: React.FC<LoanFlowProps> = ({ initialStep, onComplete, navigate, 
                       </div>
                     </div>
                   </div>
-                  <NavActions nextLabel="Submit Application" />
+                  <NavActions nextLabel="Submit Application" isNextDisabled={!staffId} />
                 </div>
                 <div className="lg:col-span-5"><div className="bg-slate-900 text-white rounded-[2.5rem] p-10 flex flex-col gap-8 shadow-2xl overflow-hidden relative"><div className="absolute top-0 right-0 w-64 h-64 bg-primary/10 rounded-full blur-3xl -mr-24 -mt-24 pointer-events-none"></div><h3 className="text-xl font-black text-white/90 uppercase tracking-widest">Summary</h3><div className="bg-white/5 backdrop-blur-md rounded-3xl p-8 border border-white/10"><p className="text-slate-400 text-xs font-black uppercase tracking-widest mb-3">Est. Monthly Payment</p><span className="text-5xl font-black text-primary tracking-tighter">{formatMoney(calculation.monthly)}</span></div><div className="space-y-4 pt-4 text-sm font-bold"><div className="flex justify-between py-4 border-b border-white/10"><span className="text-slate-400 uppercase tracking-widest">Rate (APR)</span><span className="text-primary">{calculation.rate}%</span></div><div className="flex justify-between pt-6"><span className="text-white uppercase tracking-widest">Total Repayment</span><span className="text-2xl text-primary">{formatMoney(calculation.total)}</span></div></div></div></div>
               </div>

@@ -44,7 +44,7 @@ const Navigation: React.FC<NavigationProps> = ({
             <h1 className="text-xl font-black tracking-tight text-slate-900 dark:text-white">NOLT Finance</h1>
           </div>
 
-          <nav className="hidden sm:flex items-center">
+          {/* <nav className="hidden sm:flex items-center">
             <button
               onClick={onDashboard}
               className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-black text-slate-600 dark:text-slate-300 hover:text-primary dark:hover:text-primary hover:bg-primary/5 transition-all active:scale-95"
@@ -52,7 +52,7 @@ const Navigation: React.FC<NavigationProps> = ({
               <span className="material-symbols-outlined text-[20px]">grid_view</span>
               Dashboard
             </button>
-          </nav>
+          </nav> */}
         </div>
 
         <div className="flex items-center gap-2 sm:gap-4">
