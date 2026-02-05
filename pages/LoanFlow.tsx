@@ -104,10 +104,11 @@ const LoanFlow: React.FC<LoanFlowProps> = ({ initialStep, onComplete, navigate, 
   const currentLoanLabel = categories.flatMap(c => c.loans).find(l => l.id === selectedLoanId)?.label || 'Personal Loan';
 
   const handleNext = async () => {
+    console.log("Saving draft...");
+    console.log(subStep)
     if (subStep < 12) {
       setSubStep(prev => prev + 1);
       window.scrollTo({ top: 0, behavior: 'smooth' });
-    } else if (subStep === 12) {
     } else if (subStep === 12) {
       setLoading(true);
       await submitLoan();
@@ -193,6 +194,7 @@ const LoanFlow: React.FC<LoanFlowProps> = ({ initialStep, onComplete, navigate, 
 
   const handleSaveAndExit = () => {
     setIsSaving(true);
+    console.log("Saving draft...");
     const draft: SavedDraft = {
       id: draftId,
       type: 'LOAN',
