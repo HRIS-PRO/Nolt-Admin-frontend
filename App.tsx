@@ -180,9 +180,23 @@ const AppContent: React.FC = () => {
     );
   };
 
-  const navigateMock = (path: string) => {
-    // Compatibility for legacy components that use 'navigate' prop expecting AppStep
-    console.log("Legacy navigation requested to:", path);
+  const handleLegacyNavigate = (step: string, draft?: SavedDraft | null) => {
+    if (draft) {
+      setResumeDraft(draft);
+    }
+
+    // Map legacy steps to routes
+    const routeMap: Record<string, string> = {
+      'DASHBOARD': '/dashboard',
+      'PRODUCT_SELECT': '/products',
+      'APPLICATIONS_LIST': '/applications',
+      'CALCULATOR': '/calculator',
+      'LOAN_TYPE': '/loan',
+      'INVESTMENT_FLOW': '/investment'
+    };
+
+    const route = routeMap[step] || '/dashboard';
+    navigateRouter(route);
   };
 
   return (
@@ -232,25 +246,25 @@ const AppContent: React.FC = () => {
         {/* Protected Routes */}
         <Route path="/dashboard" element={
           <ProtectedRoute>
-            <Dashboard navigate={(step) => navigateMock(step.toLowerCase())} />
+            <Dashboard navigate={(step) => handleLegacyNavigate(step)} />
           </ProtectedRoute>
         } />
 
         <Route path="/products" element={
           <ProtectedRoute>
-            <ProductSelect navigate={navigateMock} />
+            <ProductSelect navigate={handleLegacyNavigate} />
           </ProtectedRoute>
         } />
 
         <Route path="/applications" element={
           <ProtectedRoute>
-            <ApplicationsList navigate={navigateMock} formatMoney={formatMoney} />
+            <ApplicationsList navigate={handleLegacyNavigate} formatMoney={formatMoney} />
           </ProtectedRoute>
         } />
 
         <Route path="/calculator" element={
           <ProtectedRoute>
-            <Calculator navigate={navigateMock} formatMoney={formatMoney} />
+            <Calculator navigate={handleLegacyNavigate} formatMoney={formatMoney} />
           </ProtectedRoute>
         } />
 
@@ -259,7 +273,7 @@ const AppContent: React.FC = () => {
             <LoanFlow
               initialStep="TYPE"
               onComplete={handleLoanComplete}
-              navigate={navigateMock}
+              navigate={handleLegacyNavigate}
               formatMoney={formatMoney}
               initialDraft={resumeDraft}
             />
@@ -269,7 +283,7 @@ const AppContent: React.FC = () => {
         <Route path="/investment/*" element={
           <ProtectedRoute>
             <InvestmentFlow
-              navigate={navigateMock}
+              navigate={handleLegacyNavigate}
               onComplete={handleInvestmentComplete}
               formatMoney={formatMoney}
               initialDraft={resumeDraft}

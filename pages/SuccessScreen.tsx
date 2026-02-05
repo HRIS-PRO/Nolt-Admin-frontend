@@ -1,6 +1,7 @@
 
 import React from 'react';
 import { LoanState } from '../types';
+import { useNavigate } from 'react-router-dom';
 
 interface SuccessProps {
   onDashboard: () => void;
@@ -11,6 +12,7 @@ interface SuccessProps {
 
 const SuccessScreen: React.FC<SuccessProps> = ({ onDashboard, loan, formatMoney, productType = 'LOAN' }) => {
   const isInvestment = productType === 'INVESTMENT';
+  const navigate = useNavigate();
 
   const handleDownload = () => {
     const link = document.createElement('a');
@@ -113,7 +115,7 @@ const SuccessScreen: React.FC<SuccessProps> = ({ onDashboard, loan, formatMoney,
 
       {/* Main Action Button */}
       <button
-        onClick={onDashboard}
+        onClick={() => navigate('/dashboard')}
         className="w-full max-w-[480px] h-14 bg-primary text-white font-black rounded-full shadow-2xl shadow-primary/40 hover:-translate-y-1 transition-all flex items-center justify-center gap-3 mt-12 active:scale-95 text-lg group"
       >
         Go to Dashboard
