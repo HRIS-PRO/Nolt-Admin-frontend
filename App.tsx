@@ -17,6 +17,7 @@ import VerifyPage from './pages/auth/VerifyPage';
 import OnboardingPage from './pages/auth/OnboardingPage';
 import RestrictedAccessPage from './pages/RestrictedAccessPage';
 import StaffDashboard from './pages/StaffDashboard';
+import StaffPlaceholderPage from './pages/StaffPlaceholderPage';
 import axios from 'axios';
 
 const AppContent: React.FC = () => {
@@ -256,6 +257,63 @@ const AppContent: React.FC = () => {
         <Route path="/staff-dashboard" element={
           isLoading ? null : (user.isLoggedIn && user.role !== 'customer' ? (
             <StaffDashboard
+              user={user}
+              onLogout={handleLogout}
+              toggleTheme={toggleTheme}
+              theme={theme}
+            />
+          ) : <Navigate to="/login" />)
+        } />
+
+        {/* Staff Routes */}
+        <Route path="/staff/loans" element={
+          isLoading ? null : (user.isLoggedIn && user.role !== 'customer' ? (
+            <StaffPlaceholderPage
+              title="Loans"
+              user={user}
+              onLogout={handleLogout}
+              toggleTheme={toggleTheme}
+              theme={theme}
+            />
+          ) : <Navigate to="/login" />)
+        } />
+        <Route path="/staff/reports" element={
+          isLoading ? null : (user.isLoggedIn && user.role !== 'customer' ? (
+            <StaffPlaceholderPage
+              title="Reports"
+              user={user}
+              onLogout={handleLogout}
+              toggleTheme={toggleTheme}
+              theme={theme}
+            />
+          ) : <Navigate to="/login" />)
+        } />
+        <Route path="/staff/settings" element={
+          isLoading ? null : (user.isLoggedIn && user.role !== 'customer' ? (
+            <StaffPlaceholderPage
+              title="Settings"
+              user={user}
+              onLogout={handleLogout}
+              toggleTheme={toggleTheme}
+              theme={theme}
+            />
+          ) : <Navigate to="/login" />)
+        } />
+        <Route path="/staff/users" element={
+          isLoading ? null : (user.isLoggedIn && user.role !== 'customer' ? (
+            <StaffPlaceholderPage
+              title="Users"
+              user={user}
+              onLogout={handleLogout}
+              toggleTheme={toggleTheme}
+              theme={theme}
+            />
+          ) : <Navigate to="/login" />)
+        } />
+        <Route path="/staff/audit" element={
+          isLoading ? null : (user.isLoggedIn && user.role !== 'customer' ? (
+            <StaffPlaceholderPage
+              title="Audit"
               user={user}
               onLogout={handleLogout}
               toggleTheme={toggleTheme}
