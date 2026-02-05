@@ -4,6 +4,8 @@ import { AppStep, SavedDraft } from '../types';
 import { getFinancialAdvice } from '../services/geminiService';
 import { storageService } from '../services/storageService';
 import SuccessScreen from './SuccessScreen';
+import { useNavigate } from 'react-router-dom';
+import MdaTertiarySelect from '../components/MdaTertiarySelect';
 
 interface LoanFlowProps {
   initialStep: 'TYPE' | 'IDENTITY';
@@ -708,15 +710,11 @@ const LoanFlow: React.FC<LoanFlowProps> = ({ initialStep, onComplete, navigate, 
               <h3 className="text-xl font-black dark:text-white">Public Sector Details</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
-                  <label className="text-sm font-black text-slate-500 uppercase">MDA (Ministry/Dept/Agency)</label>
-                  <select className="w-full h-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-6 text-lg font-bold dark:text-white focus:border-primary outline-none" value={mda} onChange={e => setMda(e.target.value)}>
-                    <option value="">Select MDA</option>
-                    <option value="Education">Education</option>
-                    <option value="Health">Health</option>
-                    <option value="Defense">Defense</option>
-                    <option value="Agriculture">Agriculture</option>
-                    <option value="Other">Other</option>
-                  </select>
+                  <MdaTertiarySelect
+                    value={mda}
+                    onChange={setMda}
+                    label="MDA / Tertiary Institution"
+                  />
                 </div>
                 {mda === 'Other' && (
                   <div className="space-y-2 animate-in fade-in slide-in-from-top-2">

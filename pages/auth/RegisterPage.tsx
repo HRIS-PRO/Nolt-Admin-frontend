@@ -1,17 +1,46 @@
 
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import axios from 'axios';
 
 const RegisterPage: React.FC = () => {
     const [email, setEmail] = useState('');
+    const [fullName, setFullName] = useState('');
     const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
     const navigate = useNavigate();
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const [error, setError] = useState('');
+    const [isLoading, setIsLoading] = useState(false);
+    // navigate is already declared above
+
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        // Navigate to verification page with email in state
-        navigate('/verify', { state: { email } });
+
+        if (password !== confirmPassword) {
+            setError("Passwords do not match");
+            return;
+        }
+
+        setIsLoading(true);
+        setError('');
+
+        try {
+            const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000';
+            const { data } = await axios.post(`${backendUrl}/auth/register`, {
+                email,
+                password,
+                full_name: fullName
+            }, { withCredentials: true });
+
+            if (data.requireOtp) {
+                navigate('/verify', { state: { email } });
+            }
+        } catch (err: any) {
+            setError(err.response?.data?.message || 'Registration failed.');
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     const handleGoogleLogin = () => {
@@ -37,6 +66,21 @@ const RegisterPage: React.FC = () => {
             </div>
 
             <form onSubmit={handleSubmit} className="flex flex-col gap-5 animate-in fade-in slide-in-from-bottom-4 duration-300">
+                <div className="space-y-2">
+                    <label className="text-sm font-semibold text-slate-700 dark:text-white ml-1">Full Name</label>
+                    <div className="relative group">
+                        <span className="absolute left-4 top-1/2 -translate-y-1/2 material-symbols-outlined text-slate-400 group-focus-within:text-primary transition-colors">person</span>
+                        <input
+                            className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 pl-12 py-3.5 text-slate-900 dark:text-white focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all"
+                            placeholder="John Doe"
+                            required
+                            type="text"
+                            value={fullName}
+                            onChange={(e) => setFullName(e.target.value)}
+                        />
+                    </div>
+                </div>
+
                 <div className="space-y-2">
                     <label className="text-sm font-semibold text-slate-700 dark:text-white ml-1">Email Address</label>
                     <div className="relative group">
@@ -89,9 +133,21 @@ const RegisterPage: React.FC = () => {
                     </label>
                 </div>
 
-                <button type="submit" className="w-full bg-primary hover:bg-primary-dark text-white font-bold py-4 rounded-full transition-all transform active:scale-[0.98] shadow-lg shadow-primary/20 mt-2 flex items-center justify-center gap-2">
-                    Create Account
-                    <span className="material-symbols-outlined">arrow_forward</span>
+                {error && (
+                    <div className="p-4 bg-red-50 text-red-500 text-sm font-bold rounded-xl border border-red-100 mb-4 animate-in fade-in">
+                        {error}
+                    </div>
+                )}
+
+                <button type="submit" disabled={isLoading} className="w-full bg-primary hover:bg-primary-dark text-white font-bold py-4 rounded-full transition-all transform active:scale-[0.98] shadow-lg shadow-primary/20 mt-2 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
+                    {isLoading ? (
+                        <div className="size-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    ) : (
+                        <>
+                            Create Account
+                            <span className="material-symbols-outlined">arrow_forward</span>
+                        </>
+                    )}
                 </button>
 
                 <div className="relative flex py-4 items-center">
@@ -111,7 +167,7 @@ const RegisterPage: React.FC = () => {
                         Log in
                     </Link>
                 </p>
-            </form>
+            </form >
         </>
     );
 };
