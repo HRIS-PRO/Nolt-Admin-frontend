@@ -18,6 +18,8 @@ import OnboardingPage from './pages/auth/OnboardingPage';
 import RestrictedAccessPage from './pages/RestrictedAccessPage';
 import StaffDashboard from './pages/StaffDashboard';
 import StaffPlaceholderPage from './pages/StaffPlaceholderPage';
+import LoanQueuePage from './pages/LoanQueuePage';
+import LoanDetailsPage from './pages/LoanDetailsPage';
 import axios from 'axios';
 
 const AppContent: React.FC = () => {
@@ -268,8 +270,17 @@ const AppContent: React.FC = () => {
         {/* Staff Routes */}
         <Route path="/staff/loans" element={
           isLoading ? null : (user.isLoggedIn && user.role !== 'customer' ? (
-            <StaffPlaceholderPage
-              title="Loans"
+            <LoanQueuePage
+              user={user}
+              onLogout={handleLogout}
+              toggleTheme={toggleTheme}
+              theme={theme}
+            />
+          ) : <Navigate to="/login" />)
+        } />
+        <Route path="/staff/loans/:id" element={
+          isLoading ? null : (user.isLoggedIn && user.role !== 'customer' ? (
+            <LoanDetailsPage
               user={user}
               onLogout={handleLogout}
               toggleTheme={toggleTheme}
