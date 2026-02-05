@@ -1,13 +1,18 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import axios from 'axios';
 
-const VerifyPage: React.FC = () => {
+interface VerifyPageProps {
+    onLogin: (email: string, userData?: any) => void;
+}
+
+const VerifyPage: React.FC<VerifyPageProps> = ({ onLogin }) => {
     const navigate = useNavigate();
     const location = useLocation();
     const email = location.state?.email || 'your email';
 
-    const [code, setCode] = useState(['', '', '', '']);
+    const [code, setCode] = useState(['', '', '', '', '', '']); // 6 digits
     const [resendTimer, setResendTimer] = useState(30);
     const [isResending, setIsResending] = useState(false);
 
@@ -23,9 +28,32 @@ const VerifyPage: React.FC = () => {
         return () => clearInterval(interval);
     }, [resendTimer]);
 
-    const handleVerify = () => {
-        if (code.every(digit => digit !== '')) {
-            navigate('/onboarding', { state: { email } });
+    const [error, setError] = useState('');
+    const [isLoading, setIsLoading] = useState(false);
+
+    const handleVerify = async () => {
+        const otpToken = code.join('');
+        if (otpToken.length !== 4 && otpToken.length !== 6) return; // Allow 4 or 6 depending on setup (we set 6 digits in logic)
+
+        // Wait, code array is size 4. We generated 6 digits in backend. 
+        // We need to update the code array to be size 6.
+        setIsLoading(true);
+        setError('');
+
+        try {
+            const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000';
+            const { data } = await axios.post(`${backendUrl}/auth/verify-email-otp`, {
+                email,
+                otp: otpToken
+            }, { withCredentials: true });
+
+            console.log("Verify Response:", data);
+            onLogin(email, data.user);
+            navigate('/dashboard'); // App.tsx will redirect based on state, but we help it along
+        } catch (err: any) {
+            setError(err.response?.data?.message || 'Invalid verification code.');
+        } finally {
+            setIsLoading(false);
         }
     };
 
@@ -38,7 +66,7 @@ const VerifyPage: React.FC = () => {
 
         setResendTimer(30);
         setIsResending(false);
-        setCode(['', '', '', '']);
+        setCode(['', '', '', '', '', '']);
         codeInputs.current[0]?.focus();
     };
 
@@ -48,7 +76,7 @@ const VerifyPage: React.FC = () => {
         newCode[index] = value.slice(-1);
         setCode(newCode);
 
-        if (value && index < 3) {
+        if (value && index < 5) {
             codeInputs.current[index + 1]?.focus();
         }
     };
@@ -69,6 +97,13 @@ const VerifyPage: React.FC = () => {
                     We sent a verification code to {email}
                 </p>
             </div>
+
+            {/* Error Message */}
+            {error && (
+                <div className="p-3 bg-red-50 text-red-500 text-sm font-bold rounded-xl border border-red-100 animate-in fade-in">
+                    {error}
+                </div>
+            )}
 
             <div className="flex items-center gap-2 mb-2 justify-center">
                 <span className="h-1.5 w-12 rounded-full transition-all duration-300 bg-primary shadow-[0_0_8px_rgba(2,143,245,0.4)]"></span>
@@ -103,7 +138,11 @@ const VerifyPage: React.FC = () => {
                     onClick={handleVerify}
                     className="w-full bg-primary hover:bg-primary-dark text-white font-bold py-4 rounded-full transition-all transform active:scale-[0.98] shadow-lg shadow-primary/20"
                 >
-                    Verify Email
+                    {isLoading ? (
+                        <div className="size-5 border-2 border-white border-t-transparent rounded-full animate-spin mx-auto"></div>
+                    ) : (
+                        "Verify Email"
+                    )}
                 </button>
 
                 <div className="mt-2 p-4 bg-primary/5 dark:bg-primary/10 rounded-2xl border border-primary/20 flex items-center gap-4 text-left">

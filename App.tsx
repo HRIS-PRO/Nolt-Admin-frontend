@@ -16,6 +16,7 @@ import RegisterPage from './pages/auth/RegisterPage';
 import VerifyPage from './pages/auth/VerifyPage';
 import OnboardingPage from './pages/auth/OnboardingPage';
 import RestrictedAccessPage from './pages/RestrictedAccessPage';
+import StaffDashboard from './pages/StaffDashboard';
 import axios from 'axios';
 
 const AppContent: React.FC = () => {
@@ -48,7 +49,9 @@ const AppContent: React.FC = () => {
           isLoggedIn: true,
           avatar_url: data.avatar_url,
           role: data.role,
-          new_comer: data.new_comer
+          new_comer: data.new_comer,
+          // Map full_name to name for frontend consistency
+          full_name: data.full_name,
         });
       } catch (error) {
         console.error("Failed to fetch user", error);
@@ -87,8 +90,15 @@ const AppContent: React.FC = () => {
     setTheme(prev => prev === 'light' ? 'dark' : 'light');
   }, []);
 
-  const handleLogin = useCallback((email: string) => {
-    setUser(prev => ({ ...prev, email, isLoggedIn: true }));
+  const handleLogin = useCallback((email: string, userData?: Partial<UserState>) => {
+    setUser(prev => ({
+      ...prev,
+      email,
+      isLoggedIn: true,
+      ...userData,
+      // Ensure name falls back to prev or default if not provided
+      name: userData?.name || (userData as any)?.full_name || prev.name || 'User'
+    }));
   }, []);
 
   // Handle Google Login Callback
@@ -153,7 +163,7 @@ const AppContent: React.FC = () => {
     }
 
     if (user.role && user.role !== 'customer') {
-      return <Navigate to="/restricted" replace />;
+      return <Navigate to="/staff-dashboard" replace />;
     }
     return (
       <>
@@ -220,7 +230,7 @@ const AppContent: React.FC = () => {
         <Route path="/verify" element={
           isLoading ? null : (user.isLoggedIn && user.new_comer ? <Navigate to="/onboarding" /> : (
             <AuthLayout>
-              <VerifyPage />
+              <VerifyPage onLogin={handleLogin} />
             </AuthLayout>
           ))
         } />
@@ -241,6 +251,12 @@ const AppContent: React.FC = () => {
               }} />
             </AuthLayout>
           )))
+        } />
+
+        <Route path="/staff-dashboard" element={
+          isLoading ? null : (user.isLoggedIn && user.role !== 'customer' ? (
+            <StaffDashboard user={user} onLogout={handleLogout} />
+          ) : <Navigate to="/login" />)
         } />
 
         {/* Protected Routes */}

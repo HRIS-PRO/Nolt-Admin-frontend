@@ -1,6 +1,7 @@
 
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import axios from 'axios';
 
 interface LoginPageProps {
     onLogin: (email: string) => void;
@@ -10,9 +11,33 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const [error, setError] = useState('');
+    const [isLoading, setIsLoading] = useState(false);
+    const navigate = useNavigate();
+
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        onLogin(email);
+        setIsLoading(true);
+        setError('');
+
+        try {
+            const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000';
+            const { data } = await axios.post(`${backendUrl}/auth/login`, {
+                email,
+                password
+            }, { withCredentials: true });
+
+            if (data.requireOtp) {
+                navigate('/verify', { state: { email } });
+            } else {
+                // Fallback if no OTP required (though our backend enforces it)
+                onLogin(email);
+            }
+        } catch (err: any) {
+            setError(err.response?.data?.message || 'Login failed. Please check your credentials.');
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     const handleGoogleLogin = () => {
@@ -62,9 +87,21 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
                     </div>
                 </div>
 
-                <button type="submit" className="w-full bg-primary hover:bg-primary-dark text-white font-bold py-4 rounded-full transition-all transform active:scale-[0.98] shadow-lg shadow-primary/20 mt-2 flex items-center justify-center gap-2">
-                    Sign In
-                    <span className="material-symbols-outlined">arrow_forward</span>
+                {error && (
+                    <div className="p-4 bg-red-50 text-red-500 text-sm font-bold rounded-xl border border-red-100 mb-4 animate-in fade-in">
+                        {error}
+                    </div>
+                )}
+
+                <button type="submit" disabled={isLoading} className="w-full bg-primary hover:bg-primary-dark text-white font-bold py-4 rounded-full transition-all transform active:scale-[0.98] shadow-lg shadow-primary/20 mt-2 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
+                    {isLoading ? (
+                        <div className="size-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    ) : (
+                        <>
+                            Sign In
+                            <span className="material-symbols-outlined">arrow_forward</span>
+                        </>
+                    )}
                 </button>
 
                 <div className="relative flex py-4 items-center">
