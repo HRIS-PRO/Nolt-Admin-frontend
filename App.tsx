@@ -255,7 +255,12 @@ const AppContent: React.FC = () => {
 
         <Route path="/staff-dashboard" element={
           isLoading ? null : (user.isLoggedIn && user.role !== 'customer' ? (
-            <StaffDashboard user={user} onLogout={handleLogout} />
+            <StaffDashboard
+              user={user}
+              onLogout={handleLogout}
+              toggleTheme={toggleTheme}
+              theme={theme}
+            />
           ) : <Navigate to="/login" />)
         } />
 
