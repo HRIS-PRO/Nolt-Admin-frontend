@@ -13,11 +13,13 @@ export default defineConfig(({ mode }) => {
           target: 'https://nolt-admin-backend-production.up.railway.app',
           changeOrigin: true,
           secure: false,
+          cookieDomainRewrite: "localhost"
         },
         '/auth': {
           target: 'https://nolt-admin-backend-production.up.railway.app',
           changeOrigin: true,
           secure: false,
+          cookieDomainRewrite: "localhost"
         }
       }
     },
