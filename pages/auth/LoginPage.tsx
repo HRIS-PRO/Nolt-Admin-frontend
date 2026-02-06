@@ -43,7 +43,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
     const handleGoogleLogin = () => {
         // Use relative path for proxy (dev & prod) or fallback to env/localhost
         const backendUrl = import.meta.env.VITE_BACKEND_URL || '';
-        window.location.href = `${backendUrl}/auth/google`;
+        window.location.href = `/auth/google`;
     };
 
     return (
