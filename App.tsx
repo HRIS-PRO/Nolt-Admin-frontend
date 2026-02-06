@@ -32,7 +32,8 @@ const AppContent: React.FC = () => {
   });
   const [lastProduct, setLastProduct] = useState<'LOAN' | 'INVESTMENT'>('LOAN');
   const [resumeDraft, setResumeDraft] = useState<SavedDraft | null>(null);
-  const backendUrl = import.meta.env.VITE_BACKEND_URL;
+  // Use relative path (proxy) by default if env var is not set
+  const backendUrl = import.meta.env.VITE_BACKEND_URL || '';
   const [isLoading, setIsLoading] = useState(true);
   const [user, setUser] = useState<UserState>({
     email: '',
@@ -119,12 +120,12 @@ const AppContent: React.FC = () => {
 
   const handleLogout = useCallback(async () => {
     try {
-      const backendUrl = import.meta.env.VITE_BACKEND_URL;
-      if (backendUrl) {
-        await fetch(`${backendUrl}/auth/logout`, {
-          credentials: 'include'
-        });
-      }
+      const backendUrl = import.meta.env.VITE_BACKEND_URL || '';
+      // If backendUrl is empty, it means we are using proxy (relative path)
+      const url = backendUrl ? `${backendUrl}/auth/logout` : '/auth/logout';
+      await fetch(url, {
+        credentials: 'include'
+      });
     } catch (e) {
       console.error("Logout failed", e);
     } finally {

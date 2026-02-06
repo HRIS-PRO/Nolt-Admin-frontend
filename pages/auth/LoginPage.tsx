@@ -21,7 +21,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
         setError('');
 
         try {
-            const backendUrl = import.meta.env.VITE_BACKEND_URL || 'https://nolt-admin-backend-production.up.railway.app';
+            const backendUrl = import.meta.env.VITE_BACKEND_URL || '';
             const { data } = await axios.post(`${backendUrl}/auth/login`, {
                 email,
                 password
@@ -41,8 +41,9 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
     };
 
     const handleGoogleLogin = () => {
-        const backendUrl = import.meta.env.VITE_BACKEND_URL || 'https://localhost:5000';
-        window.location.href = `https://nolt-admin-backend-production.up.railway.app/auth/google`;
+        // Use relative path for proxy (dev & prod) or fallback to env/localhost
+        const backendUrl = import.meta.env.VITE_BACKEND_URL || '';
+        window.location.href = `${backendUrl}/auth/google`;
     };
 
     return (
