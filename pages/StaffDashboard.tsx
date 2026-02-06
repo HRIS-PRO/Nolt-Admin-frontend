@@ -23,7 +23,7 @@ const StaffDashboard: React.FC<StaffDashboardProps> = ({ user, onLogout, toggleT
             try {
                 const [statsRes, loansRes] = await Promise.all([
                     axios.get(`${import.meta.env.VITE_BACKEND_URL}/api/stats/dashboard`, { withCredentials: true }),
-                    axios.get(`${import.meta.env.VITE_BACKEND_URL}/api/staff/loans/pending`, { withCredentials: true })
+                    axios.get(`${import.meta.env.VITE_BACKEND_URL}/api/staff/loans`, { withCredentials: true }) // Fetch ALL loans
                 ]);
                 setStats(statsRes.data);
                 setLoans(loansRes.data);
@@ -36,6 +36,10 @@ const StaffDashboard: React.FC<StaffDashboardProps> = ({ user, onLogout, toggleT
 
         fetchData();
     }, []);
+
+    const navigate = (path: string) => {
+        window.location.href = path; // Simple navigation
+    };
 
     return (
         <StaffLayout user={user} onLogout={onLogout} toggleTheme={toggleTheme} theme={theme}>
@@ -112,7 +116,7 @@ const StaffDashboard: React.FC<StaffDashboardProps> = ({ user, onLogout, toggleT
                 <div className="p-6 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-[#0f172a]/50">
                     <div>
                         <h3 className="font-black text-lg text-slate-900 dark:text-white">Review Queue</h3>
-                        <p className="text-slate-500 text-xs font-medium">Incoming requests awaiting validation and assessment.</p>
+                        <p className="text-slate-500 text-xs font-medium">From All Loan Applications.</p>
                     </div>
                     <button className="px-4 py-2 rounded-lg bg-blue-500 text-white text-xs font-bold hover:bg-blue-600 transition-all flex items-center gap-2 shadow-lg shadow-blue-500/20">
                         View Full Queue
@@ -140,12 +144,16 @@ const StaffDashboard: React.FC<StaffDashboardProps> = ({ user, onLogout, toggleT
                             {loans.length === 0 ? (
                                 <tr>
                                     <td colSpan={10} className="p-8 text-center text-slate-500 font-medium">
-                                        No pending loans found.
+                                        No loans found.
                                     </td>
                                 </tr>
                             ) : (
                                 loans.map((loan, i) => (
-                                    <tr key={i} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group">
+                                    <tr
+                                        key={i}
+                                        onClick={() => navigate(`/staff/loans/${loan.id}`)}
+                                        className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group cursor-pointer"
+                                    >
                                         <td className="p-4"><div className="size-4 rounded border border-slate-300 dark:border-slate-700 group-hover:border-slate-500"></div></td>
                                         <td className="p-4 font-mono text-slate-500 dark:text-slate-400 text-xs text-nowrap">LOAN-{loan.id}</td>
                                         <td className="p-4">

@@ -18,10 +18,10 @@ const LoanQueuePage: React.FC<LoanQueuePageProps> = ({ user, onLogout, toggleThe
     useEffect(() => {
         const fetchLoans = async () => {
             try {
-                const response = await axios.get(`${import.meta.env.VITE_BACKEND_URL}/api/staff/loans/pending`, { withCredentials: true });
+                const response = await axios.get(`${import.meta.env.VITE_BACKEND_URL}/api/staff/loans`, { withCredentials: true });
                 setLoans(response.data);
             } catch (error) {
-                console.error("Failed to fetch pending loans", error);
+                console.error("Failed to fetch loans", error);
             } finally {
                 setIsLoading(false);
             }
@@ -35,7 +35,7 @@ const LoanQueuePage: React.FC<LoanQueuePageProps> = ({ user, onLogout, toggleThe
             <div className="flex justify-between items-end mb-8">
                 <div>
                     <h1 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight leading-tight">
-                        Loan
+                        Loan Queue
                     </h1>
                     <p className="text-slate-500 dark:text-slate-400 font-medium">
                         Comprehensive management of historical and ongoing loan transactions.
@@ -56,7 +56,7 @@ const LoanQueuePage: React.FC<LoanQueuePageProps> = ({ user, onLogout, toggleThe
             <div className="bg-white dark:bg-[#1e293b] rounded-3xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm">
                 <div className="p-6 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-[#0f172a]/50">
                     <div>
-                        <h3 className="font-black text-lg text-slate-900 dark:text-white">Pending Applications</h3>
+                        <h3 className="font-black text-lg text-slate-900 dark:text-white">All Applications</h3>
                         <p className="text-slate-500 text-xs font-medium"> Total: {loans.length} applications</p>
                     </div>
                 </div>
@@ -85,12 +85,16 @@ const LoanQueuePage: React.FC<LoanQueuePageProps> = ({ user, onLogout, toggleThe
                             ) : loans.length === 0 ? (
                                 <tr>
                                     <td colSpan={10} className="p-8 text-center text-slate-500 font-medium">
-                                        No pending loans found.
+                                        No loans found.
                                     </td>
                                 </tr>
                             ) : (
                                 loans.map((loan, i) => (
-                                    <tr key={i} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group">
+                                    <tr
+                                        key={i}
+                                        onClick={() => navigate(`/staff/loans/${loan.id}`)}
+                                        className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group cursor-pointer"
+                                    >
                                         <td className="p-4"><div className="size-4 rounded border border-slate-300 dark:border-slate-700 group-hover:border-slate-500"></div></td>
                                         <td className="p-4 font-mono text-slate-500 dark:text-slate-400 text-xs text-nowrap">LOAN-{loan.id}</td>
                                         <td className="p-4">
@@ -130,7 +134,6 @@ const LoanQueuePage: React.FC<LoanQueuePageProps> = ({ user, onLogout, toggleThe
                                         </td>
                                         <td className="p-4 text-right">
                                             <button
-                                                onClick={() => navigate(`/staff/loans/${loan.id}`)}
                                                 className="px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 text-xs font-bold transition-all">
                                                 View Details
                                             </button>
