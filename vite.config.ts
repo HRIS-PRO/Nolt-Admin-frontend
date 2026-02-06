@@ -10,12 +10,12 @@ export default defineConfig(({ mode }) => {
       host: '0.0.0.0',
       proxy: {
         '/api': {
-          target: 'http://localhost:5000',
+          target: 'https://nolt-admin-backend-production.up.railway.app',
           changeOrigin: true,
           secure: false,
         },
         '/auth': {
-          target: 'http://localhost:5000',
+          target: 'https://nolt-admin-backend-production.up.railway.app',
           changeOrigin: true,
           secure: false,
         }
