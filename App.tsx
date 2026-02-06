@@ -32,7 +32,8 @@ const AppContent: React.FC = () => {
   });
   const [lastProduct, setLastProduct] = useState<'LOAN' | 'INVESTMENT'>('LOAN');
   const [resumeDraft, setResumeDraft] = useState<SavedDraft | null>(null);
-  // Revert: Use relative path (proxy) for reliable First-Party Cookies on Vercel
+  // Use relative path (proxy) by default for First-Party Cookies on Vercel
+  // Only use VITE_BACKEND_URL if explicitly set (e.g. for local dev without proxy)
   const backendUrl = import.meta.env.VITE_BACKEND_URL || '';
   const [isLoading, setIsLoading] = useState(true);
   const [user, setUser] = useState<UserState>({
@@ -153,7 +154,7 @@ const AppContent: React.FC = () => {
     setResumeDraft(null);
   }, []);
 
-  const ProtectedRoute = ({ children }: { children: JSX.Element }) => {
+  const ProtectedRoute = ({ children }: { children: React.ReactElement }) => {
     if (isLoading) {
       return (
         <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900">
