@@ -20,13 +20,16 @@ import StaffDashboard from './pages/StaffDashboard';
 import StaffPlaceholderPage from './pages/StaffPlaceholderPage';
 import LoanQueuePage from './pages/LoanQueuePage';
 import LoanDetailsPage from './pages/LoanDetailsPage';
+import UsersPage from './pages/UsersPage';
 import axios from 'axios';
 
 const AppContent: React.FC = () => {
   const [searchParams] = useSearchParams();
   const navigateRouter = useNavigate();
 
-  const [theme, setTheme] = useState<Theme>('light');
+  const [theme, setTheme] = useState<Theme>(() => {
+    return (localStorage.getItem('theme') as Theme) || 'light';
+  });
   const [lastProduct, setLastProduct] = useState<'LOAN' | 'INVESTMENT'>('LOAN');
   const [resumeDraft, setResumeDraft] = useState<SavedDraft | null>(null);
   const backendUrl = import.meta.env.VITE_BACKEND_URL;
@@ -82,6 +85,7 @@ const AppContent: React.FC = () => {
 
   // Dark mode effect
   useEffect(() => {
+    localStorage.setItem('theme', theme);
     if (theme === 'dark') {
       document.documentElement.classList.add('dark');
     } else {
@@ -312,8 +316,7 @@ const AppContent: React.FC = () => {
         } />
         <Route path="/staff/users" element={
           isLoading ? null : (user.isLoggedIn && user.role !== 'customer' ? (
-            <StaffPlaceholderPage
-              title="Users"
+            <UsersPage
               user={user}
               onLogout={handleLogout}
               toggleTheme={toggleTheme}
