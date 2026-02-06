@@ -32,10 +32,8 @@ const AppContent: React.FC = () => {
   });
   const [lastProduct, setLastProduct] = useState<'LOAN' | 'INVESTMENT'>('LOAN');
   const [resumeDraft, setResumeDraft] = useState<SavedDraft | null>(null);
-  // Use relative path (proxy) by default if env var is not set
-  // BUT if in PROD and no env var, default to the known Railway Backend
-  const backendUrl = import.meta.env.VITE_BACKEND_URL ||
-    (import.meta.env.PROD ? 'https://nolt-admin-backend-production.up.railway.app' : '');
+  // Revert: Use relative path (proxy) for reliable First-Party Cookies on Vercel
+  const backendUrl = import.meta.env.VITE_BACKEND_URL || '';
   const [isLoading, setIsLoading] = useState(true);
   const [user, setUser] = useState<UserState>({
     email: '',
