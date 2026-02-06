@@ -1,6 +1,7 @@
 
 import React from 'react';
 import { UserState, Theme } from '../types';
+import { Link } from 'react-router-dom';
 
 interface NavigationProps {
   user: UserState;
@@ -34,15 +35,18 @@ const Navigation: React.FC<NavigationProps> = ({
     <header className="sticky top-0 z-50 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 px-6 py-4">
       <div className="max-w-7xl mx-auto flex items-center justify-between">
         <div className="flex items-center gap-8">
-          <div
-            onClick={onDashboard}
-            className="flex items-center gap-3 select-none cursor-pointer group"
-          >
-            <div className="size-9 bg-primary rounded-xl flex items-center justify-center text-white shadow-lg shadow-primary/30 group-hover:rotate-12 transition-transform duration-300">
-              <span className="material-symbols-outlined text-2xl">finance_chip</span>
-            </div>
-            <h1 className="text-xl font-black tracking-tight text-slate-900 dark:text-white">NOLT Finance</h1>
+        <Link to="/" className="flex items-center gap-3 cursor-pointer">
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center overflow-hidden">
+            <img
+              src="https://isswlcllytiltgjbysjv.supabase.co/storage/v1/object/public/template-images/logo%20file-02%20(1).png"
+              alt="NOLT Finance Logo"
+              className="w-full h-full object-contain"
+            />
           </div>
+          <h1 className="text-xl font-black tracking-tighter text-slate-900 dark:text-white uppercase">
+            NOLT Finance
+          </h1>
+        </Link>
 
           {/* <nav className="hidden sm:flex items-center">
             <button

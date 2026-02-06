@@ -1,5 +1,5 @@
 import React from 'react';
-import { NavLink } from 'react-router-dom';
+import { Link, NavLink } from 'react-router-dom';
 import { Theme } from '../../types';
 
 interface StaffLayoutProps {
@@ -35,14 +35,18 @@ const StaffLayout: React.FC<StaffLayoutProps> = ({ children, user, onLogout, tog
             {/* Sidebar */}
             <aside className="w-72 bg-[#0f172a] text-white flex flex-col fixed h-full z-20 transition-all duration-300 border-r border-[#1e293b]">
                 {/* Brand */}
-                <div className="p-8">
-                    <div className="flex items-center gap-3">
-                        <div className="size-10 bg-blue-500 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/30">
-                            <span className="material-symbols-outlined text-white">account_balance_wallet</span>
-                        </div>
-                        <span className="text-xl font-black tracking-tight text-white">NOLT FINANCE</span>
+                <Link to="/" className="flex items-center gap-3 p-8 cursor-pointer">
+                    <div className="w-10 h-10 rounded-xl flex items-center justify-center overflow-hidden">
+                        <img
+                        src="https://isswlcllytiltgjbysjv.supabase.co/storage/v1/object/public/template-images/logo%20file-02%20(1).png"
+                        alt="NOLT Finance Logo"
+                        className="w-full h-full object-contain"
+                        />
                     </div>
-                </div>
+                    <h1 className="text-xl font-black tracking-tighter text-slate-900 text-white uppercase">
+                        NOLT Finance
+                    </h1>
+                </Link>
 
                 {/* Navigation */}
                 <nav className="flex-1 px-4 flex flex-col gap-8 overflow-y-auto">

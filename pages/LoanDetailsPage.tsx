@@ -349,17 +349,17 @@ const LoanDetailsPage: React.FC<LoanDetailsPageProps> = ({ user, onLogout, toggl
             </div>
 
             {/* Stage Tracker */}
-            <div className="bg-[#0f172a] rounded-[32px] p-8 md:p-12 mb-10 shadow-2xl relative overflow-hidden group border border-slate-800">
-                <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-blue-600/10 blur-[120px] rounded-full translate-x-1/2 -translate-y-1/2 pointer-events-none"></div>
+            <div className="bg-white dark:bg-[#0f172a] rounded-[24px] p-8 mb-8 shadow-sm border border-slate-200 dark:border-slate-800 relative overflow-hidden group transition-colors duration-300">
+                <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-blue-500/5 dark:bg-blue-600/10 blur-[120px] rounded-full translate-x-1/2 -translate-y-1/2 pointer-events-none"></div>
 
                 <div className="relative z-10 overflow-x-auto pb-4 md:pb-0 scrollbar-hide">
-                    <div className="flex justify-between items-start relative min-w-[700px] px-8">
+                    <div className="flex justify-between items-start relative min-w-[700px] px-4">
                         {/* Connecting Line */}
-                        <div className="absolute top-[26px] left-0 w-full h-1.5 bg-slate-800 rounded-full z-0 block"></div>
+                        <div className="absolute top-[26px] left-0 w-full h-1 bg-slate-100 dark:bg-slate-800 rounded-full z-0 block"></div>
 
                         {/* Progressive Fill Line */}
                         <div
-                            className="absolute top-[26px] left-0 h-1.5 bg-gradient-to-r from-blue-600 via-indigo-500 to-emerald-400 rounded-full z-0 block transition-all duration-1000 ease-out shadow-[0_0_20px_rgba(59,130,246,0.5)]"
+                            className="absolute top-[26px] left-0 h-1 bg-gradient-to-r from-blue-600 via-indigo-500 to-emerald-400 rounded-full z-0 block transition-all duration-1000 ease-out shadow-[0_0_20px_rgba(59,130,246,0.3)]"
                             style={{ width: `${(activeIndex / (stages.length - 1)) * 100}%` }}
                         ></div>
 
@@ -369,22 +369,22 @@ const LoanDetailsPage: React.FC<LoanDetailsPageProps> = ({ user, onLogout, toggl
                             const isPending = idx > activeIndex;    // Future stages
 
                             return (
-                                <div key={stage.id} className="relative z-10 flex flex-col items-center gap-4 w-24 group/stage">
+                                <div key={stage.id} className="relative z-10 flex flex-col items-center gap-3 w-24 group/stage">
                                     {/* Icon Circle */}
                                     <div className={`
-                                        size-14 rounded-2xl flex items-center justify-center transition-all duration-500 border-[3px] relative
-                                        ${isCompleted ? 'bg-emerald-500 border-emerald-500 text-white shadow-lg shadow-emerald-500/30' : ''}
-                                        ${isActive ? 'bg-white border-white text-blue-600 shadow-[0_0_0_6px_rgba(59,130,246,0.2)] scale-110 z-20' : ''}
-                                        ${isPending ? 'bg-slate-900 border-slate-700 text-slate-600' : ''}
+                                        size-12 rounded-xl flex items-center justify-center transition-all duration-500 border-[3px] relative
+                                        ${isCompleted ? 'bg-emerald-500 border-emerald-500 text-white shadow-md shadow-emerald-500/20' : ''}
+                                        ${isActive ? 'bg-white dark:bg-slate-900 border-white dark:border-slate-800 text-blue-600 shadow-[0_0_0_4px_rgba(59,130,246,0.1)] scale-110 z-20 ring-2 ring-blue-100 dark:ring-blue-900/30' : ''}
+                                        ${isPending ? 'bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-300 dark:text-slate-600' : ''}
                                     `}>
-                                        <span className={`material-symbols-outlined text-2xl ${isActive ? 'animate-pulse' : ''}`}>
+                                        <span className={`material-symbols-outlined text-xl ${isActive ? 'animate-pulse' : ''}`}>
                                             {isCompleted ? 'check' : stage.icon}
                                         </span>
                                     </div>
 
                                     {/* Label */}
                                     <div className={`text-center transition-all duration-500 flex flex-col items-center gap-1 ${isActive ? '-translate-y-1' : ''}`}>
-                                        <p className={`text-[10px] font-black uppercase tracking-widest ${isActive ? 'text-white' : isCompleted ? 'text-emerald-400' : 'text-slate-600 group-hover/stage:text-slate-400'}`}>
+                                        <p className={`text-[10px] font-black uppercase tracking-widest ${isActive ? 'text-blue-600 dark:text-blue-400' : isCompleted ? 'text-emerald-500' : 'text-slate-400 dark:text-slate-600 group-hover/stage:text-slate-500 dark:group-hover/stage:text-slate-500'}`}>
                                             {stage.label}
                                         </p>
                                     </div>
@@ -400,53 +400,53 @@ const LoanDetailsPage: React.FC<LoanDetailsPageProps> = ({ user, onLogout, toggl
                 {/* Left Column: Loan Summary & Form Data */}
                 <div className="xl:col-span-8 space-y-8 animate-in slide-in-from-bottom-8 duration-700 delay-100">
 
-                    {/* Key Info Card - Darker, Professional Theme - REPLACED */}
-                    <div className="bg-slate-900 rounded-[32px] p-10 text-white shadow-xl relative overflow-hidden border border-slate-800 group">
+                    {/* Key Info Card - Adaptive Theme */}
+                    <div className="bg-white dark:bg-slate-900 rounded-[24px] p-8 text-slate-900 dark:text-white shadow-sm hover:shadow-md transition-all relative overflow-hidden border border-slate-200 dark:border-slate-800 group">
                         {/* Subtle top light */}
-                        <div className="absolute -top-24 right-0 w-[500px] h-[500px] bg-slate-800/50 blur-[100px] rounded-full pointer-events-none"></div>
+                        <div className="absolute -top-24 right-0 w-[500px] h-[500px] bg-blue-50/50 dark:bg-slate-800/50 blur-[80px] rounded-full pointer-events-none transition-colors duration-300"></div>
 
-                        <div className="relative z-10 flex flex-col md:flex-row gap-10 items-start md:items-center justify-between">
-                            <div className="flex items-center gap-8">
-                                <div className="size-24 rounded-[2rem] bg-slate-800 border border-slate-700 flex items-center justify-center shadow-2xl group-hover:scale-105 transition-transform duration-500">
-                                    <span className="material-symbols-outlined text-5xl text-slate-400 group-hover:text-white transition-colors">account_balance_wallet</span>
+                        <div className="relative z-10 flex flex-col md:flex-row gap-8 items-start md:items-center justify-between">
+                            <div className="flex items-center gap-6">
+                                <div className="size-20 rounded-[1.5rem] bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 flex items-center justify-center shadow-sm group-hover:scale-105 transition-transform duration-500">
+                                    <span className="material-symbols-outlined text-4xl text-slate-400 dark:text-slate-500 group-hover:text-blue-500 dark:group-hover:text-white transition-colors">account_balance_wallet</span>
                                 </div>
                                 <div>
-                                    <div className="flex items-center gap-3 mb-3">
-                                        <span className="px-3 py-1 rounded-lg bg-slate-800 text-[10px] font-black uppercase tracking-widest border border-slate-700 text-slate-400">
+                                    <div className="flex items-center gap-3 mb-2">
+                                        <span className="px-2 py-1 rounded-md bg-slate-100 dark:bg-slate-800 text-[10px] font-black uppercase tracking-widest border border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400">
                                             {loan.id ? `REF-${loan.id}` : 'PENDING-ID'}
                                         </span>
-                                        <span className="px-3 py-1 rounded-lg bg-emerald-500/10 text-emerald-400 text-[10px] font-black uppercase tracking-widest border border-emerald-500/20 animate-pulse-slow">
+                                        <span className="px-2 py-1 rounded-md bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400 text-[10px] font-black uppercase tracking-widest border border-emerald-100 dark:border-emerald-500/20 animate-pulse-slow">
                                             Active Application
                                         </span>
                                     </div>
-                                    <h2 className="text-4xl font-black mb-1 tracking-tight text-white">{loan.applicant_full_name}</h2>
-                                    <p className="text-slate-400 font-medium text-sm flex items-center gap-2">
-                                        <span className="material-symbols-outlined text-base">calendar_today</span>
+                                    <h2 className="text-3xl font-black mb-1 tracking-tight text-slate-900 dark:text-white">{loan.applicant_full_name}</h2>
+                                    <p className="text-slate-500 dark:text-slate-400 font-medium text-xs flex items-center gap-2">
+                                        <span className="material-symbols-outlined text-sm">calendar_today</span>
                                         Applied on {new Date(loan.created_at || Date.now()).toLocaleDateString('en-US', { dateStyle: 'long' })}
                                     </p>
                                 </div>
                             </div>
 
-                            <div className="flex flex-col gap-6 min-w-[240px]">
+                            <div className="flex flex-col gap-4 min-w-[200px]">
                                 {/* Requested Amount */}
-                                <div className="bg-slate-800/50 rounded-2xl p-5 border border-slate-700/50 hover:bg-slate-800 transition-colors">
+                                <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl p-4 border border-slate-100 dark:border-slate-700/50 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
                                     <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Requested</p>
-                                    <h3 className="text-3xl font-black text-white tracking-tight flex items-baseline gap-1">
+                                    <h3 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight flex items-baseline gap-1">
                                         ₦{Number(loan.requested_loan_amount).toLocaleString()}
-                                        <span className="text-sm font-bold text-slate-500 ml-1">NGN</span>
+                                        <span className="text-xs font-bold text-slate-400 ml-1">NGN</span>
                                     </h3>
                                 </div>
 
                                 {/* Eligible Amount (Only show if approved/set) */}
                                 {loan.eligible_amount && (
-                                    <div className="bg-emerald-900/20 rounded-2xl p-5 border border-emerald-500/20 hover:bg-emerald-900/30 transition-colors">
+                                    <div className="bg-emerald-50 dark:bg-emerald-900/20 rounded-xl p-4 border border-emerald-100 dark:border-emerald-500/20 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 transition-colors">
                                         <div className="flex justify-between items-center mb-1">
-                                            <p className="text-[10px] font-black uppercase tracking-widest text-emerald-400">Approved Amount</p>
+                                            <p className="text-[10px] font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-400">Approved Amount</p>
                                             <span className="material-symbols-outlined text-emerald-500 text-sm">check_circle</span>
                                         </div>
-                                        <h3 className="text-4xl font-black text-white tracking-tight flex items-baseline gap-1">
+                                        <h3 className="text-3xl font-black text-emerald-700 dark:text-white tracking-tight flex items-baseline gap-1">
                                             ₦{Number(loan.eligible_amount).toLocaleString()}
-                                            <span className="text-sm font-bold text-emerald-500/70 ml-1">NGN</span>
+                                            <span className="text-xs font-bold text-emerald-600/70 dark:text-emerald-500/70 ml-1">NGN</span>
                                         </h3>
                                     </div>
                                 )}
@@ -522,6 +522,28 @@ const LoanDetailsPage: React.FC<LoanDetailsPageProps> = ({ user, onLogout, toggl
                                                 {ref.phoneNumber}
                                             </a>
                                         </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Signatures Section */}
+                    {loan.signatures && loan.signatures.length > 0 && (
+                        <div className="bg-white dark:bg-[#1e293b] rounded-[24px] border border-slate-200 dark:border-slate-800 p-8 shadow-sm">
+                            <div className="flex items-center gap-3 border-b border-slate-100 dark:border-slate-800 pb-4 mb-6">
+                                <div className="size-8 rounded-lg bg-indigo-50 dark:bg-indigo-900/20 flex items-center justify-center text-indigo-600 dark:text-indigo-400">
+                                    <span className="material-symbols-outlined text-lg">ink_pen</span>
+                                </div>
+                                <h3 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight">Signatures</h3>
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                {(loan.signatures as string[]).map((sig, idx) => (
+                                    <div key={idx} className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-700/50 flex flex-col items-center gap-4 hover:border-slate-300 dark:hover:border-slate-600 transition-colors group/sig">
+                                        <div className="w-full h-32 flex items-center justify-center bg-white dark:bg-slate-900 rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700">
+                                            <img src={sig} alt={`Signature ${idx + 1}`} className="max-w-full max-h-full object-contain" />
+                                        </div>
+                                        <p className="text-xs font-black text-slate-400 uppercase tracking-widest">Signed by Applicant</p>
                                     </div>
                                 ))}
                             </div>
