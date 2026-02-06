@@ -154,7 +154,7 @@ const AppContent: React.FC = () => {
     setResumeDraft(null);
   }, []);
 
-  const ProtectedRoute = ({ children }: { children: JSX.Element }) => {
+  const ProtectedRoute = ({ children }: { children: React.ReactElement }) => {
     if (isLoading) {
       return (
         <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900">
