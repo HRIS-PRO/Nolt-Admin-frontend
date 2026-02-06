@@ -32,7 +32,8 @@ const AppContent: React.FC = () => {
   });
   const [lastProduct, setLastProduct] = useState<'LOAN' | 'INVESTMENT'>('LOAN');
   const [resumeDraft, setResumeDraft] = useState<SavedDraft | null>(null);
-  // Revert: Use relative path (proxy) for reliable First-Party Cookies on Vercel
+  // Use relative path (proxy) by default for First-Party Cookies on Vercel
+  // Only use VITE_BACKEND_URL if explicitly set (e.g. for local dev without proxy)
   const backendUrl = import.meta.env.VITE_BACKEND_URL || '';
   const [isLoading, setIsLoading] = useState(true);
   const [user, setUser] = useState<UserState>({
