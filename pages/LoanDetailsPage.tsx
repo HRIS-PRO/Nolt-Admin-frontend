@@ -25,7 +25,7 @@ const ActionCard = ({ loan, userRole, onActionComplete }: { loan: any, userRole:
         setActionLoading(true);
         try {
             await axios.post(
-                `${import.meta.env.VITE_BACKEND_URL}/api/staff/loans/${loan.id}/action`,
+                `${''}/api/staff/loans/${loan.id}/action`,
                 { action, data: { eligible_amount: eligibleAmount } },
                 { withCredentials: true }
             );
@@ -46,7 +46,7 @@ const ActionCard = ({ loan, userRole, onActionComplete }: { loan: any, userRole:
         formData.append('document_type', 'proof_of_address'); // Defaulting, could be improved with select
 
         try {
-            await axios.post(`${import.meta.env.VITE_BACKEND_URL}/api/upload`, formData, {
+            await axios.post(`${''}/api/upload`, formData, {
                 headers: { 'Content-Type': 'multipart/form-data' },
                 withCredentials: true
             });
@@ -194,7 +194,7 @@ const LoanDetailsPage: React.FC<LoanDetailsPageProps> = ({ user, onLogout, toggl
     useEffect(() => {
         const fetchLoan = async () => {
             try {
-                const response = await axios.get(`${import.meta.env.VITE_BACKEND_URL}/api/staff/loans/${id}`, { withCredentials: true });
+                const response = await axios.get(`${''}/api/staff/loans/${id}`, { withCredentials: true });
                 setLoan(response.data);
             } catch (error) {
                 console.error("Failed to fetch loan details", error);
@@ -560,7 +560,7 @@ const LoanDetailsPage: React.FC<LoanDetailsPageProps> = ({ user, onLogout, toggl
                         onActionComplete={() => {
                             const fetchLoan = async () => {
                                 try {
-                                    const response = await axios.get(`${import.meta.env.VITE_BACKEND_URL}/api/staff/loans/${id}`, { withCredentials: true });
+                                    const response = await axios.get(`${''}/api/staff/loans/${id}`, { withCredentials: true });
                                     setLoan(response.data);
                                 } catch (error) { console.error("Refresh failed", error); }
                             };

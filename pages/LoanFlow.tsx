@@ -180,7 +180,7 @@ const LoanFlow: React.FC<LoanFlowProps> = ({ initialStep, onComplete, navigate, 
 
       console.log("Submitting Loan Payload:", payload);
 
-      const backendUrl = import.meta.env.VITE_BACKEND_URL;
+      const backendUrl = ''; // Use proxy
       await axios.post(`${backendUrl}/api/loans`, payload, { withCredentials: true });
 
       storageService.deleteDraft(draftId);
@@ -297,7 +297,7 @@ const LoanFlow: React.FC<LoanFlowProps> = ({ initialStep, onComplete, navigate, 
 
     try {
       setUploadProgress(prev => ({ ...prev, [id]: 30 }));
-      const backendUrl = import.meta.env.VITE_BACKEND_URL;
+      const backendUrl = ''; // Use proxy
 
       const response = await axios.post(`${backendUrl}/api/upload`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' },

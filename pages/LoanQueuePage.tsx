@@ -18,7 +18,7 @@ const LoanQueuePage: React.FC<LoanQueuePageProps> = ({ user, onLogout, toggleThe
     useEffect(() => {
         const fetchLoans = async () => {
             try {
-                const response = await axios.get(`${import.meta.env.VITE_BACKEND_URL}/api/staff/loans`, { withCredentials: true });
+                const response = await axios.get(`${''}/api/staff/loans`, { withCredentials: true });
                 setLoans(response.data);
             } catch (error) {
                 console.error("Failed to fetch loans", error);

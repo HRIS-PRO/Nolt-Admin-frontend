@@ -19,7 +19,7 @@ const DocumentsList: React.FC<{ loanId: string | undefined; refreshTrigger?: num
         const fetchDocuments = async () => {
             if (!loanId) return;
             try {
-                const response = await axios.get(`${import.meta.env.VITE_BACKEND_URL}/api/staff/loans/${loanId}/documents`, { withCredentials: true });
+                const response = await axios.get(`${''}/api/staff/loans/${loanId}/documents`, { withCredentials: true });
                 setDocuments(response.data);
             } catch (error) {
                 console.error("Failed to fetch documents:", error);

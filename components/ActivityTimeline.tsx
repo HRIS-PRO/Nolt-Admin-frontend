@@ -25,7 +25,7 @@ const ActivityTimeline: React.FC<ActivityTimelineProps> = ({ loanId }) => {
         const fetchActivities = async () => {
             if (!loanId) return;
             try {
-                const response = await axios.get(`${import.meta.env.VITE_BACKEND_URL}/api/staff/loans/${loanId}/activities`, { withCredentials: true });
+                const response = await axios.get(`${''}/api/staff/loans/${loanId}/activities`, { withCredentials: true });
                 setActivities(response.data);
             } catch (error) {
                 console.error("Failed to fetch activities:", error);

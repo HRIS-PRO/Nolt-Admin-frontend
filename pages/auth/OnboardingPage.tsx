@@ -19,7 +19,7 @@ const OnboardingPage: React.FC<OnboardingPageProps> = ({ onComplete }) => {
     const [isValidating, setIsValidating] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
 
-    const backendUrl = import.meta.env.VITE_BACKEND_URL;
+    const backendUrl = ''; // Use proxy
 
     const handleReferralBlur = async () => {
         if (!referralCode.trim()) {
