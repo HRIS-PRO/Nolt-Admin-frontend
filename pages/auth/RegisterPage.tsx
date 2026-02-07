@@ -26,7 +26,7 @@ const RegisterPage: React.FC = () => {
         setError('');
 
         try {
-            const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000';
+            const backendUrl = ''; // Use proxy
             const { data } = await axios.post(`${backendUrl}/auth/register`, {
                 email,
                 password,
@@ -44,7 +44,7 @@ const RegisterPage: React.FC = () => {
     };
 
     const handleGoogleLogin = () => {
-        const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000';
+        const backendUrl = ''; // Use proxy
         window.location.href = `${backendUrl}/auth/google`;
     };
 

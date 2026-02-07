@@ -22,7 +22,7 @@ const UsersPage: React.FC<UsersPageProps> = ({ user, onLogout, toggleTheme, them
 
     const fetchUsers = async () => {
         try {
-            const response = await axios.get(`${import.meta.env.VITE_BACKEND_URL}/api/staff/users`, { withCredentials: true });
+            const response = await axios.get(`${''}/api/staff/users`, { withCredentials: true });
             setUsers(response.data);
         } catch (error) {
             console.error("Failed to fetch users", error);
@@ -39,7 +39,7 @@ const UsersPage: React.FC<UsersPageProps> = ({ user, onLogout, toggleTheme, them
         e.preventDefault();
         setRecruiting(true);
         try {
-            await axios.post(`${import.meta.env.VITE_BACKEND_URL}/api/staff/invite`, inviteForm, { withCredentials: true });
+            await axios.post(`${''}/api/staff/invite`, inviteForm, { withCredentials: true });
             alert("Invitation sent successfully!");
             setShowInviteModal(false);
             setInviteForm({ email: '', full_name: '', role: 'staff', password: '' });
@@ -54,7 +54,7 @@ const UsersPage: React.FC<UsersPageProps> = ({ user, onLogout, toggleTheme, them
     const handleRevoke = async (userId: number) => {
         if (!confirm("Are you sure you want to revoke access? They will no longer be able to log in.")) return;
         try {
-            await axios.post(`${import.meta.env.VITE_BACKEND_URL}/api/staff/revoke-access`, { userId }, { withCredentials: true });
+            await axios.post(`${''}/api/staff/revoke-access`, { userId }, { withCredentials: true });
             setUsers(users.map(u => u.id === userId ? { ...u, is_active: false } : u));
         } catch (error) {
             alert("Failed to revoke access");
@@ -63,7 +63,7 @@ const UsersPage: React.FC<UsersPageProps> = ({ user, onLogout, toggleTheme, them
 
     const handleGenerateReferral = async (userId: number) => {
         try {
-            const res = await axios.post(`${import.meta.env.VITE_BACKEND_URL}/api/staff/referral-code`, { userId }, { withCredentials: true });
+            const res = await axios.post(`${''}/api/staff/referral-code`, { userId }, { withCredentials: true });
             setUsers(users.map(u => u.id === userId ? { ...u, referral_code: res.data.referral_code } : u));
         } catch (error) {
             alert("Failed to generate code");
@@ -72,7 +72,7 @@ const UsersPage: React.FC<UsersPageProps> = ({ user, onLogout, toggleTheme, them
 
     const handleRoleUpdate = async (userId: number, newRole: string) => {
         try {
-            await axios.put(`${import.meta.env.VITE_BACKEND_URL}/api/staff/users/${userId}/role`, { role: newRole }, { withCredentials: true });
+            await axios.put(`${''}/api/staff/users/${userId}/role`, { role: newRole }, { withCredentials: true });
             setUsers(users.map(u => u.id === userId ? { ...u, role: newRole } : u));
             setEditingRoleId(null);
         } catch (error) {

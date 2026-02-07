@@ -22,8 +22,8 @@ const StaffDashboard: React.FC<StaffDashboardProps> = ({ user, onLogout, toggleT
         const fetchData = async () => {
             try {
                 const [statsRes, loansRes] = await Promise.all([
-                    axios.get(`${import.meta.env.VITE_BACKEND_URL}/api/stats/dashboard`, { withCredentials: true }),
-                    axios.get(`${import.meta.env.VITE_BACKEND_URL}/api/staff/loans`, { withCredentials: true }) // Fetch ALL loans
+                    axios.get(`${''}/api/stats/dashboard`, { withCredentials: true }),
+                    axios.get(`${''}/api/staff/loans`, { withCredentials: true }) // Fetch ALL loans
                 ]);
                 setStats(statsRes.data);
                 setLoans(loansRes.data);

@@ -7,10 +7,6 @@
         {
             "source": "/auth/:path*",
             "destination": "https://nolt-admin-backend-production.up.railway.app/auth/:path*"
-        },
-        {
-            "source": "/(.*)",
-            "destination": "/index.html"
         }
     ]
 }
