@@ -18,6 +18,7 @@ import OnboardingPage from './pages/auth/OnboardingPage';
 import RestrictedAccessPage from './pages/RestrictedAccessPage';
 import StaffDashboard from './pages/StaffDashboard';
 import StaffPlaceholderPage from './pages/StaffPlaceholderPage';
+import SettingsPage from './pages/SettingsPage';
 import LoanQueuePage from './pages/LoanQueuePage';
 import LoanDetailsPage from './pages/LoanDetailsPage';
 import UsersPage from './pages/UsersPage';
@@ -309,8 +310,7 @@ const AppContent: React.FC = () => {
         } />
         <Route path="/staff/settings" element={
           isLoading ? null : (user.isLoggedIn && user.role !== 'customer' ? (
-            <StaffPlaceholderPage
-              title="Settings"
+            <SettingsPage
               user={user}
               onLogout={handleLogout}
               toggleTheme={toggleTheme}
