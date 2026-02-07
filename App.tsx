@@ -38,7 +38,7 @@ const AppContent: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [user, setUser] = useState<UserState>({
     email: '',
-    name: 'Alex Morgan',
+    name: '',
     isLoggedIn: false
   });
 
@@ -113,7 +113,7 @@ const AppContent: React.FC = () => {
   // Handle Google Login Callback
   useEffect(() => {
     if (searchParams.get('login') === 'success') {
-      handleLogin('google-user@example.com');
+      // handleLogin('google-user@example.com');
       // Remove query param
       navigateRouter('/dashboard', { replace: true });
     }
