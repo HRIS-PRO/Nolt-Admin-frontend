@@ -16,16 +16,25 @@ import RegisterPage from './pages/auth/RegisterPage';
 import VerifyPage from './pages/auth/VerifyPage';
 import OnboardingPage from './pages/auth/OnboardingPage';
 import RestrictedAccessPage from './pages/RestrictedAccessPage';
+import StaffDashboard from './pages/StaffDashboard';
+import StaffPlaceholderPage from './pages/StaffPlaceholderPage';
+import LoanQueuePage from './pages/LoanQueuePage';
+import LoanDetailsPage from './pages/LoanDetailsPage';
+import UsersPage from './pages/UsersPage';
 import axios from 'axios';
 
 const AppContent: React.FC = () => {
   const [searchParams] = useSearchParams();
   const navigateRouter = useNavigate();
 
-  const [theme, setTheme] = useState<Theme>('light');
+  const [theme, setTheme] = useState<Theme>(() => {
+    return (localStorage.getItem('theme') as Theme) || 'light';
+  });
   const [lastProduct, setLastProduct] = useState<'LOAN' | 'INVESTMENT'>('LOAN');
   const [resumeDraft, setResumeDraft] = useState<SavedDraft | null>(null);
-  const backendUrl = import.meta.env.VITE_BACKEND_URL;
+  // Use relative path (proxy) by default for First-Party Cookies on Vercel
+  // Only use VITE_BACKEND_URL if explicitly set (e.g. for local dev without proxy)
+  const backendUrl = import.meta.env.VITE_BACKEND_URL || '';
   const [isLoading, setIsLoading] = useState(true);
   const [user, setUser] = useState<UserState>({
     email: '',
@@ -48,7 +57,9 @@ const AppContent: React.FC = () => {
           isLoggedIn: true,
           avatar_url: data.avatar_url,
           role: data.role,
-          new_comer: data.new_comer
+          new_comer: data.new_comer,
+          // Map full_name to name for frontend consistency
+          full_name: data.full_name,
         });
       } catch (error) {
         console.error("Failed to fetch user", error);
@@ -76,6 +87,7 @@ const AppContent: React.FC = () => {
 
   // Dark mode effect
   useEffect(() => {
+    localStorage.setItem('theme', theme);
     if (theme === 'dark') {
       document.documentElement.classList.add('dark');
     } else {
@@ -87,8 +99,15 @@ const AppContent: React.FC = () => {
     setTheme(prev => prev === 'light' ? 'dark' : 'light');
   }, []);
 
-  const handleLogin = useCallback((email: string) => {
-    setUser(prev => ({ ...prev, email, isLoggedIn: true }));
+  const handleLogin = useCallback((email: string, userData?: Partial<UserState>) => {
+    setUser(prev => ({
+      ...prev,
+      email,
+      isLoggedIn: true,
+      ...userData,
+      // Ensure name falls back to prev or default if not provided
+      name: userData?.name || (userData as any)?.full_name || prev.name || 'User'
+    }));
   }, []);
 
   // Handle Google Login Callback
@@ -102,12 +121,12 @@ const AppContent: React.FC = () => {
 
   const handleLogout = useCallback(async () => {
     try {
-      const backendUrl = import.meta.env.VITE_BACKEND_URL;
-      if (backendUrl) {
-        await fetch(`${backendUrl}/auth/logout`, {
-          credentials: 'include'
-        });
-      }
+      const backendUrl = import.meta.env.VITE_BACKEND_URL || '';
+      // If backendUrl is empty, it means we are using proxy (relative path)
+      const url = backendUrl ? `${backendUrl}/auth/logout` : '/auth/logout';
+      await fetch(url, {
+        credentials: 'include'
+      });
     } catch (e) {
       console.error("Logout failed", e);
     } finally {
@@ -135,7 +154,7 @@ const AppContent: React.FC = () => {
     setResumeDraft(null);
   }, []);
 
-  const ProtectedRoute = ({ children }: { children: JSX.Element }) => {
+  const ProtectedRoute = ({ children }: { children: React.ReactElement }) => {
     if (isLoading) {
       return (
         <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900">
@@ -153,7 +172,7 @@ const AppContent: React.FC = () => {
     }
 
     if (user.role && user.role !== 'customer') {
-      return <Navigate to="/restricted" replace />;
+      return <Navigate to="/staff-dashboard" replace />;
     }
     return (
       <>
@@ -180,9 +199,23 @@ const AppContent: React.FC = () => {
     );
   };
 
-  const navigateMock = (path: string) => {
-    // Compatibility for legacy components that use 'navigate' prop expecting AppStep
-    console.log("Legacy navigation requested to:", path);
+  const handleLegacyNavigate = (step: string, draft?: SavedDraft | null) => {
+    if (draft) {
+      setResumeDraft(draft);
+    }
+
+    // Map legacy steps to routes
+    const routeMap: Record<string, string> = {
+      'DASHBOARD': '/dashboard',
+      'PRODUCT_SELECT': '/products',
+      'APPLICATIONS_LIST': '/applications',
+      'CALCULATOR': '/calculator',
+      'LOAN_TYPE': '/loan',
+      'INVESTMENT_FLOW': '/investment'
+    };
+
+    const route = routeMap[step] || '/dashboard';
+    navigateRouter(route);
   };
 
   return (
@@ -206,7 +239,7 @@ const AppContent: React.FC = () => {
         <Route path="/verify" element={
           isLoading ? null : (user.isLoggedIn && user.new_comer ? <Navigate to="/onboarding" /> : (
             <AuthLayout>
-              <VerifyPage />
+              <VerifyPage onLogin={handleLogin} />
             </AuthLayout>
           ))
         } />
@@ -229,28 +262,104 @@ const AppContent: React.FC = () => {
           )))
         } />
 
+        <Route path="/staff-dashboard" element={
+          isLoading ? null : (user.isLoggedIn && user.role !== 'customer' ? (
+            <StaffDashboard
+              user={user}
+              onLogout={handleLogout}
+              toggleTheme={toggleTheme}
+              theme={theme}
+            />
+          ) : <Navigate to="/login" />)
+        } />
+
+        {/* Staff Routes */}
+        <Route path="/staff/loans" element={
+          isLoading ? null : (user.isLoggedIn && user.role !== 'customer' ? (
+            <LoanQueuePage
+              user={user}
+              onLogout={handleLogout}
+              toggleTheme={toggleTheme}
+              theme={theme}
+            />
+          ) : <Navigate to="/login" />)
+        } />
+        <Route path="/staff/loans/:id" element={
+          isLoading ? null : (user.isLoggedIn && user.role !== 'customer' ? (
+            <LoanDetailsPage
+              user={user}
+              onLogout={handleLogout}
+              toggleTheme={toggleTheme}
+              theme={theme}
+            />
+          ) : <Navigate to="/login" />)
+        } />
+        <Route path="/staff/reports" element={
+          isLoading ? null : (user.isLoggedIn && user.role !== 'customer' ? (
+            <StaffPlaceholderPage
+              title="Reports"
+              user={user}
+              onLogout={handleLogout}
+              toggleTheme={toggleTheme}
+              theme={theme}
+            />
+          ) : <Navigate to="/login" />)
+        } />
+        <Route path="/staff/settings" element={
+          isLoading ? null : (user.isLoggedIn && (user.role === 'superadmin' || user.role === 'super_admin') ? (
+            <StaffPlaceholderPage
+              title="Settings"
+              user={user}
+              onLogout={handleLogout}
+              toggleTheme={toggleTheme}
+              theme={theme}
+            />
+          ) : <Navigate to="/staff-dashboard" />)
+        } />
+        <Route path="/staff/users" element={
+          isLoading ? null : (user.isLoggedIn && user.role !== 'customer' ? (
+            <UsersPage
+              user={user}
+              onLogout={handleLogout}
+              toggleTheme={toggleTheme}
+              theme={theme}
+            />
+          ) : <Navigate to="/login" />)
+        } />
+        <Route path="/staff/audit" element={
+          isLoading ? null : (user.isLoggedIn && user.role !== 'customer' ? (
+            <StaffPlaceholderPage
+              title="Audit"
+              user={user}
+              onLogout={handleLogout}
+              toggleTheme={toggleTheme}
+              theme={theme}
+            />
+          ) : <Navigate to="/login" />)
+        } />
+
         {/* Protected Routes */}
         <Route path="/dashboard" element={
           <ProtectedRoute>
-            <Dashboard navigate={(step) => navigateMock(step.toLowerCase())} />
+            <Dashboard navigate={(step) => handleLegacyNavigate(step)} />
           </ProtectedRoute>
         } />
 
         <Route path="/products" element={
           <ProtectedRoute>
-            <ProductSelect navigate={navigateMock} />
+            <ProductSelect navigate={handleLegacyNavigate} />
           </ProtectedRoute>
         } />
 
         <Route path="/applications" element={
           <ProtectedRoute>
-            <ApplicationsList navigate={navigateMock} formatMoney={formatMoney} />
+            <ApplicationsList navigate={handleLegacyNavigate} formatMoney={formatMoney} />
           </ProtectedRoute>
         } />
 
         <Route path="/calculator" element={
           <ProtectedRoute>
-            <Calculator navigate={navigateMock} formatMoney={formatMoney} />
+            <Calculator navigate={handleLegacyNavigate} formatMoney={formatMoney} />
           </ProtectedRoute>
         } />
 
@@ -259,7 +368,7 @@ const AppContent: React.FC = () => {
             <LoanFlow
               initialStep="TYPE"
               onComplete={handleLoanComplete}
-              navigate={navigateMock}
+              navigate={handleLegacyNavigate}
               formatMoney={formatMoney}
               initialDraft={resumeDraft}
             />
@@ -269,7 +378,7 @@ const AppContent: React.FC = () => {
         <Route path="/investment/*" element={
           <ProtectedRoute>
             <InvestmentFlow
-              navigate={navigateMock}
+              navigate={handleLegacyNavigate}
               onComplete={handleInvestmentComplete}
               formatMoney={formatMoney}
               initialDraft={resumeDraft}
