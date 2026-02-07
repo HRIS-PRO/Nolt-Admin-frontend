@@ -143,7 +143,7 @@ const UsersPage: React.FC<UsersPageProps> = ({ user, onLogout, toggleTheme, them
                             <tr>
                                 <th className="p-6 pl-8">Administrator</th>
                                 <th className="p-6 py-4">Role & Permissions</th>
-                                <th className="p-6 py-4">Reports To</th>
+
                                 <th className="p-6 py-4">Referral Code</th>
                                 <th className="p-6 py-4 text-center">Account Status</th>
                                 <th className="p-6 py-4 pr-8 text-right">Descriptive Actions</th>
@@ -190,9 +190,7 @@ const UsersPage: React.FC<UsersPageProps> = ({ user, onLogout, toggleTheme, them
                                             </div>
                                         )}
                                     </td>
-                                    <td className="p-6 py-4">
-                                        <p className="text-xs font-black text-slate-400 uppercase tracking-wider">{u.manager_name || 'Global / None'}</p>
-                                    </td>
+
                                     <td className="p-6 py-4">
                                         {u.referral_code ? (
                                             <span className="font-mono text-xs text-blue-600 dark:text-blue-400 font-bold bg-blue-50 dark:bg-blue-500/10 px-2 py-1 rounded border border-blue-200 dark:border-blue-500/20">{u.referral_code}</span>
