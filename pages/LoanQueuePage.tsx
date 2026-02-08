@@ -30,6 +30,14 @@ const LoanQueuePage: React.FC<LoanQueuePageProps> = ({ user, onLogout, toggleThe
         fetchLoans();
     }, []);
 
+    const getInitials = (str: string) => {
+        if (!str) return 'PSL'; // Default fallback
+        return str.split(' ')
+            .filter(word => word.length > 0)
+            .map(word => word[0].toUpperCase())
+            .join('');
+    };
+
     return (
         <StaffLayout user={user} onLogout={onLogout} toggleTheme={toggleTheme} theme={theme}>
             <div className="flex justify-between items-end mb-8">
@@ -46,10 +54,10 @@ const LoanQueuePage: React.FC<LoanQueuePageProps> = ({ user, onLogout, toggleThe
                         <span className="material-symbols-outlined text-sm">filter_list</span>
                         Filter
                     </button>
-                    <button className="px-4 py-2 rounded-lg bg-blue-500 text-white text-xs font-bold uppercase tracking-wider flex items-center gap-2 hover:bg-blue-600 transition-all shadow-lg shadow-blue-500/20">
+                    {/* <button className="px-4 py-2 rounded-lg bg-blue-500 text-white text-xs font-bold uppercase tracking-wider flex items-center gap-2 hover:bg-blue-600 transition-all shadow-lg shadow-blue-500/20">
                         <span className="material-symbols-outlined text-sm">add</span>
                         New Application
-                    </button>
+                    </button> */}
                 </div>
             </div>
 
@@ -109,8 +117,8 @@ const LoanQueuePage: React.FC<LoanQueuePageProps> = ({ user, onLogout, toggleThe
                                             </div>
                                         </td>
                                         <td className="p-4">
-                                            <span className={`px-2 py-1 rounded border text-[10px] font-black uppercase tracking-wider border-blue-500/20 bg-blue-500/10 text-blue-500 dark:text-blue-400`}>
-                                                LOAN
+                                            <span className={`px-2 py-1 rounded border text-[10px] font-black uppercase tracking-wider border-blue-500/20 bg-blue-500/10 text-blue-500 dark:text-blue-400`} title={loan.product_type || 'Public Sector Loan'}>
+                                                {getInitials(loan.product_type || 'Public Sector Loan')}
                                             </span>
                                         </td>
                                         <td className="p-4">

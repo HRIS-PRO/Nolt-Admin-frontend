@@ -1,6 +1,6 @@
 
-import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 
 const RegisterPage: React.FC = () => {
@@ -12,7 +12,14 @@ const RegisterPage: React.FC = () => {
 
     const [error, setError] = useState('');
     const [isLoading, setIsLoading] = useState(false);
-    // navigate is already declared above
+    const [searchParams] = useSearchParams();
+
+    useEffect(() => {
+        const ref = searchParams.get('ref');
+        if (ref) {
+            localStorage.setItem('nolt_referral_code', ref);
+        }
+    }, [searchParams]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();

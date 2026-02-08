@@ -4,6 +4,7 @@ import StaffLayout from '../components/layouts/StaffLayout';
 import ActivityTimeline from '../components/ActivityTimeline';
 import DocumentsList from '../components/DocumentsList';
 import axios from 'axios';
+import SensitiveDataField from '../components/SensitiveDataField';
 
 
 interface LoanDetailsPageProps {
@@ -411,9 +412,12 @@ const LoanDetailsPage: React.FC<LoanDetailsPageProps> = ({ user, onLogout, toggl
                                     <span className="material-symbols-outlined text-4xl text-slate-400 dark:text-slate-500 group-hover:text-blue-500 dark:group-hover:text-white transition-colors">account_balance_wallet</span>
                                 </div>
                                 <div>
-                                    <div className="flex items-center gap-3 mb-2">
+                                    <div className="flex items-center gap-3 mb-2 flex-wrap">
                                         <span className="px-2 py-1 rounded-md bg-slate-100 dark:bg-slate-800 text-[10px] font-black uppercase tracking-widest border border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400">
                                             {loan.id ? `REF-${loan.id}` : 'PENDING-ID'}
+                                        </span>
+                                        <span className="px-2 py-1 rounded-md bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-400 text-[10px] font-black uppercase tracking-widest border border-blue-100 dark:border-blue-500/20">
+                                            {loan.product_type || 'Public Sector Loan'}
                                         </span>
                                         <span className="px-2 py-1 rounded-md bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400 text-[10px] font-black uppercase tracking-widest border border-emerald-100 dark:border-emerald-500/20 animate-pulse-slow">
                                             Active Application
@@ -458,7 +462,7 @@ const LoanDetailsPage: React.FC<LoanDetailsPageProps> = ({ user, onLogout, toggl
                     <DetailGroup title="Personal Information" icon="person">
                         <Field label="Full Name" value={loan.applicant_full_name} copy />
                         <Field label="Gender" value={loan.gender} />
-                        <Field label="Date of Birth" value={loan.date_of_birth} />
+                        <Field label="Date of Birth" value={loan.date_of_birth ? new Date(loan.date_of_birth).toLocaleDateString('en-GB') : null} />
                         <Field label="Marital Status" value={loan.marital_status} />
                         <Field label="Religion" value={loan.religion} />
                         <Field label="Mother's Maiden Name" value={loan.mothers_maiden_name} />
@@ -479,8 +483,8 @@ const LoanDetailsPage: React.FC<LoanDetailsPageProps> = ({ user, onLogout, toggl
                         <Field label="Monthly Income" value={`₦${Number(loan.average_monthly_income).toLocaleString()}`} />
                         <Field label="Number of Dependents" value={loan.number_of_dependents} />
                         <Field label="Has Active Loans?" value={loan.has_active_loans ? 'Yes' : 'No'} />
-                        <Field label="Bank Verification Number (BVN)" value={loan.bvn} copy />
-                        <Field label="National ID (NIN)" value={loan.nin} copy />
+                        <SensitiveDataField loanId={loan.id} field="bvn" label="Bank Verification Number (BVN)" initialValue={loan.bvn} />
+                        <SensitiveDataField loanId={loan.id} field="nin" label="National ID (NIN)" initialValue={loan.nin} />
                         {loan.mda_tertiary && (
                             <>
                                 <Field label="MDA / Tertiary Institution" value={loan.mda_tertiary} />

@@ -13,7 +13,7 @@ const OnboardingPage: React.FC<OnboardingPageProps> = ({ onComplete }) => {
 
     const [source, setSource] = useState('');
     const [officerName, setOfficerName] = useState('');
-    const [referralCode, setReferralCode] = useState('');
+    const [referralCode, setReferralCode] = useState(localStorage.getItem('nolt_referral_code') || '');
     const [referralError, setReferralError] = useState('');
     const [isOfficerDisabled, setIsOfficerDisabled] = useState(false);
     const [isValidating, setIsValidating] = useState(false);
@@ -44,6 +44,13 @@ const OnboardingPage: React.FC<OnboardingPageProps> = ({ onComplete }) => {
             setIsValidating(false);
         }
     };
+
+    // Auto-validate if prefilled
+    React.useEffect(() => {
+        if (referralCode && !officerName) {
+            handleReferralBlur();
+        }
+    }, []);
 
     const handleAcquisitionSubmit = async (e: React.FormEvent) => {
         e.preventDefault();

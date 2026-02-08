@@ -26,6 +26,8 @@ export interface UserState {
   avatar_url?: string;
   role?: string;
   new_comer?: boolean;
+  full_name?: string;
+  referral_code_used?: string;
 }
 
 export interface LoanState {

@@ -41,6 +41,16 @@ const StaffDashboard: React.FC<StaffDashboardProps> = ({ user, onLogout, toggleT
         window.location.href = path; // Simple navigation
     };
 
+    const getInitials = (str: string) => {
+        if (!str) return 'PSL'; // Default fallback
+        return str.split(' ')
+            .filter(word => word.length > 0)
+            .map(word => word[0].toUpperCase())
+            .join('');
+    };
+
+
+
     return (
         <StaffLayout user={user} onLogout={onLogout} toggleTheme={toggleTheme} theme={theme}>
             <header className="flex justify-between items-end mb-8">
@@ -137,7 +147,7 @@ const StaffDashboard: React.FC<StaffDashboardProps> = ({ user, onLogout, toggleT
                                 <th className="p-4">Ref. Code</th>
                                 <th className="p-4">Requested Amount</th>
                                 <th className="p-4">Status</th>
-                                <th className="p-4">Actions</th>
+                                <th className="p-4">product type</th>
                             </tr>
                         </thead>
                         <tbody className="text-sm divide-y divide-slate-100 dark:divide-slate-800">
@@ -190,9 +200,9 @@ const StaffDashboard: React.FC<StaffDashboardProps> = ({ user, onLogout, toggleT
                                             </div>
                                         </td>
                                         <td className="p-4">
-                                            <button className="size-8 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center justify-center text-slate-400 hover:text-slate-600 dark:hover:text-white transition-all">
-                                                <span className="material-symbols-outlined text-sm">more_vert</span>
-                                            </button>
+                                            <span className={`px-2 py-1 rounded border text-[10px] font-black uppercase tracking-wider border-blue-500/20 bg-blue-500/10 text-blue-500 dark:text-blue-400`} title={loan.product_type || 'Public Sector Loan'}>
+                                                {getInitials(loan.product_type || 'Public Sector Loan')}
+                                            </span>
                                         </td>
                                     </tr>
                                 ))

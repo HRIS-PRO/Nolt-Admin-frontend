@@ -63,6 +63,7 @@ const AppContent: React.FC = () => {
           new_comer: data.new_comer,
           // Map full_name to name for frontend consistency
           full_name: data.full_name,
+          referral_code_used: data.referral_code_used
         });
       } catch (error) {
         console.error("Failed to fetch user", error);
@@ -373,6 +374,7 @@ const AppContent: React.FC = () => {
               navigate={handleLegacyNavigate}
               formatMoney={formatMoney}
               initialDraft={resumeDraft}
+              referralCodeUsed={user.referral_code_used}
             />
           </ProtectedRoute>
         } />
