@@ -13,6 +13,7 @@ interface LoanFlowProps {
   navigate: (step: AppStep) => void;
   formatMoney: (amount: number) => string;
   initialDraft?: SavedDraft | null;
+  referralCodeUsed?: string;
 }
 
 const isValidEmail = (email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
@@ -20,7 +21,7 @@ const isValidPhone = (phone: string) => /^\+?[0-9]{10,15}$/.test(phone.replace(/
 const isValidBVN = (bvn: string) => /^[0-9]{11}$/.test(bvn);
 const isValidNIN = (nin: string) => /^[0-9]{11}$/.test(nin);
 
-const LoanFlow: React.FC<LoanFlowProps> = ({ initialStep, onComplete, navigate, formatMoney, initialDraft }) => {
+const LoanFlow: React.FC<LoanFlowProps> = ({ initialStep, onComplete, navigate, formatMoney, initialDraft, referralCodeUsed }) => {
   const [subStep, setSubStep] = useState(initialDraft?.subStep ?? (initialStep === 'TYPE' ? 0 : 1));
   const [loading, setLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -83,7 +84,7 @@ const LoanFlow: React.FC<LoanFlowProps> = ({ initialStep, onComplete, navigate, 
   const [customMda, setCustomMda] = useState(initialDraft?.data?.customMda ?? '');
   const [ippisNumber, setIppisNumber] = useState(initialDraft?.data?.ippisNumber ?? '');
   const [staffId, setStaffId] = useState(initialDraft?.data?.staffId ?? '');
-  const [referralCode, setReferralCode] = useState(initialDraft?.data?.referralCode ?? '');
+  const [referralCode, setReferralCode] = useState(referralCodeUsed || initialDraft?.data?.referralCode || '');
 
   const categories = [
     // {
@@ -828,7 +829,7 @@ const LoanFlow: React.FC<LoanFlowProps> = ({ initialStep, onComplete, navigate, 
                         </div>
                         <div className="space-y-2">
                           <label className="text-sm font-black text-slate-500 uppercase">Referral Code</label>
-                          <input className="w-full h-14 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-4 font-bold dark:text-white focus:border-primary outline-none" value={referralCode} onChange={e => setReferralCode(e.target.value)} placeholder="Optional" />
+                          <input className={`w-full h-14 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-4 font-bold dark:text-white focus:border-primary outline-none ${referralCodeUsed ? 'opacity-50 cursor-not-allowed' : ''}`} value={referralCode} onChange={e => setReferralCode(e.target.value)} placeholder="Optional" disabled={!!referralCodeUsed} title={referralCodeUsed ? "Referral code applied from signup" : ""} />
                         </div>
                       </div>
                     </div>
