@@ -24,6 +24,62 @@ import LoanDetailsPage from './pages/LoanDetailsPage';
 import UsersPage from './pages/UsersPage';
 import axios from 'axios';
 
+
+// ProtectedRoute Component extracted to prevent re-renders
+interface ProtectedRouteProps {
+  children: React.ReactElement;
+  user: UserState;
+  isLoading: boolean;
+  theme: Theme;
+  onLogout: () => void;
+  onToggleTheme: () => void;
+}
+
+const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, user, isLoading, theme, onLogout, onToggleTheme }) => {
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  if (!user.isLoggedIn) {
+    return <Navigate to="/login" replace />;
+  }
+
+  if (user.new_comer) {
+    return <Navigate to="/onboarding" replace />;
+  }
+
+  if (user.role && user.role !== 'customer') {
+    return <Navigate to="/staff-dashboard" replace />;
+  }
+  return (
+    <>
+      <Navigation
+        user={user}
+        theme={theme}
+        onLogout={onLogout}
+        onDashboard={() => { }} // Navigation handled by Links in Navigation component ideally, or ignored here
+        onToggleTheme={onToggleTheme}
+      />
+      <main className="flex-1">
+        {children}
+      </main>
+      <footer className="py-8 border-t border-slate-200 dark:border-slate-800">
+        <div className="max-w-7xl mx-auto px-6 flex flex-col md:flex-row justify-between items-center gap-4 text-sm text-slate-500 dark:text-slate-400">
+          <p>© 2024 NOLT Finance. All rights reserved.</p>
+          <div className="flex gap-6">
+            <a href="#" className="hover:text-primary transition-colors">Privacy Policy</a>
+            <a href="#" className="hover:text-primary transition-colors">Terms of Service</a>
+          </div>
+        </div>
+      </footer>
+    </>
+  );
+};
+
 const AppContent: React.FC = () => {
   const [searchParams] = useSearchParams();
   const navigateRouter = useNavigate();
@@ -33,8 +89,6 @@ const AppContent: React.FC = () => {
   });
   const [lastProduct, setLastProduct] = useState<'LOAN' | 'INVESTMENT'>('LOAN');
   const [resumeDraft, setResumeDraft] = useState<SavedDraft | null>(null);
-  // Use relative path (proxy) by default for First-Party Cookies on Vercel
-  // Only use VITE_BACKEND_URL if explicitly set (e.g. for local dev without proxy)
   // Use relative path (proxy) by default for First-Party Cookies on Vercel
   // Only use VITE_BACKEND_URL if explicitly set (e.g. for local dev without proxy)
   const backendUrl = ''; // Force relative path to use Vercel Rewrites
@@ -157,51 +211,6 @@ const AppContent: React.FC = () => {
     setLastProduct('INVESTMENT');
     setResumeDraft(null);
   }, []);
-
-  const ProtectedRoute = ({ children }: { children: React.ReactElement }) => {
-    if (isLoading) {
-      return (
-        <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-        </div>
-      );
-    }
-
-    if (!user.isLoggedIn) {
-      return <Navigate to="/login" replace />;
-    }
-
-    if (user.new_comer) {
-      return <Navigate to="/onboarding" replace />;
-    }
-
-    if (user.role && user.role !== 'customer') {
-      return <Navigate to="/staff-dashboard" replace />;
-    }
-    return (
-      <>
-        <Navigation
-          user={user}
-          theme={theme}
-          onLogout={handleLogout}
-          onDashboard={() => { }} // Navigation handled by Links in Navigation component ideally, or ignored here
-          onToggleTheme={toggleTheme}
-        />
-        <main className="flex-1">
-          {children}
-        </main>
-        <footer className="py-8 border-t border-slate-200 dark:border-slate-800">
-          <div className="max-w-7xl mx-auto px-6 flex flex-col md:flex-row justify-between items-center gap-4 text-sm text-slate-500 dark:text-slate-400">
-            <p>© 2024 NOLT Finance. All rights reserved.</p>
-            <div className="flex gap-6">
-              <a href="#" className="hover:text-primary transition-colors">Privacy Policy</a>
-              <a href="#" className="hover:text-primary transition-colors">Terms of Service</a>
-            </div>
-          </div>
-        </footer>
-      </>
-    );
-  };
 
   const handleLegacyNavigate = (step: string, draft?: SavedDraft | null) => {
     if (draft) {
@@ -343,31 +352,31 @@ const AppContent: React.FC = () => {
 
         {/* Protected Routes */}
         <Route path="/dashboard" element={
-          <ProtectedRoute>
+          <ProtectedRoute user={user} isLoading={isLoading} theme={theme} onLogout={handleLogout} onToggleTheme={toggleTheme}>
             <Dashboard navigate={(step) => handleLegacyNavigate(step)} />
           </ProtectedRoute>
         } />
 
         <Route path="/products" element={
-          <ProtectedRoute>
+          <ProtectedRoute user={user} isLoading={isLoading} theme={theme} onLogout={handleLogout} onToggleTheme={toggleTheme}>
             <ProductSelect navigate={handleLegacyNavigate} />
           </ProtectedRoute>
         } />
 
         <Route path="/applications" element={
-          <ProtectedRoute>
+          <ProtectedRoute user={user} isLoading={isLoading} theme={theme} onLogout={handleLogout} onToggleTheme={toggleTheme}>
             <ApplicationsList navigate={handleLegacyNavigate} formatMoney={formatMoney} />
           </ProtectedRoute>
         } />
 
         <Route path="/calculator" element={
-          <ProtectedRoute>
+          <ProtectedRoute user={user} isLoading={isLoading} theme={theme} onLogout={handleLogout} onToggleTheme={toggleTheme}>
             <Calculator navigate={handleLegacyNavigate} formatMoney={formatMoney} />
           </ProtectedRoute>
         } />
 
         <Route path="/loan/*" element={
-          <ProtectedRoute>
+          <ProtectedRoute user={user} isLoading={isLoading} theme={theme} onLogout={handleLogout} onToggleTheme={toggleTheme}>
             <LoanFlow
               initialStep="TYPE"
               onComplete={handleLoanComplete}
@@ -380,7 +389,7 @@ const AppContent: React.FC = () => {
         } />
 
         <Route path="/investment/*" element={
-          <ProtectedRoute>
+          <ProtectedRoute user={user} isLoading={isLoading} theme={theme} onLogout={handleLogout} onToggleTheme={toggleTheme}>
             <InvestmentFlow
               navigate={handleLegacyNavigate}
               onComplete={handleInvestmentComplete}
@@ -391,7 +400,7 @@ const AppContent: React.FC = () => {
         } />
 
         <Route path="/success" element={
-          <ProtectedRoute>
+          <ProtectedRoute user={user} isLoading={isLoading} theme={theme} onLogout={handleLogout} onToggleTheme={toggleTheme}>
             <SuccessScreen
               onDashboard={() => { }}
               loan={loan}

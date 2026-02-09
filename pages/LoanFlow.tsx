@@ -21,7 +21,15 @@ const isValidPhone = (phone: string) => /^\+?[0-9]{10,15}$/.test(phone.replace(/
 const isValidBVN = (bvn: string) => /^[0-9]{11}$/.test(bvn);
 const isValidNIN = (nin: string) => /^[0-9]{11}$/.test(nin);
 
+const NIGERIAN_STATES = [
+  "Abia", "Adamawa", "Akwa Ibom", "Anambra", "Bauchi", "Bayelsa", "Benue", "Borno", "Cross River",
+  "Delta", "Ebonyi", "Edo", "Ekiti", "Enugu", "FCT - Abuja", "Gombe", "Imo", "Jigawa", "Kaduna",
+  "Kano", "Katsina", "Kebbi", "Kogi", "Kwara", "Lagos", "Nasarawa", "Niger", "Ogun", "Ondo",
+  "Osun", "Oyo", "Plateau", "Rivers", "Sokoto", "Taraba", "Yobe", "Zamfara"
+];
+
 const LoanFlow: React.FC<LoanFlowProps> = ({ initialStep, onComplete, navigate, formatMoney, initialDraft, referralCodeUsed }) => {
+
   const [subStep, setSubStep] = useState(initialDraft?.subStep ?? (initialStep === 'TYPE' ? 0 : 1));
   const [loading, setLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -106,8 +114,8 @@ const LoanFlow: React.FC<LoanFlowProps> = ({ initialStep, onComplete, navigate, 
     // {
     //   title: 'Niche',
     //   loans: [
-    //     { id: 'travel_loan', label: 'Travel Loan', icon: 'flight_takeoff', description: 'Finance your travel plans, vacations, or business trips.' },
-    //     { id: 'annuitant_loan', label: 'Annuitant Loan', icon: 'elderly', description: 'Special financing options designed for retirees.' },
+    //     {id: 'travel_loan', label: 'Travel Loan', icon: 'flight_takeoff', description: 'Finance your travel plans, vacations, or business trips.' },
+    //     {id: 'annuitant_loan', label: 'Annuitant Loan', icon: 'elderly', description: 'Special financing options designed for retirees.' },
     //   ]
     // }
   ];
@@ -638,11 +646,29 @@ const LoanFlow: React.FC<LoanFlowProps> = ({ initialStep, onComplete, navigate, 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-2">
                     <label className="text-sm font-black text-slate-500 uppercase">State of Origin</label>
-                    <input className="w-full h-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-6 text-lg font-bold dark:text-white focus:border-primary outline-none" value={stateOfOrigin} onChange={e => setStateOfOrigin(e.target.value)} />
+                    <select
+                      className="w-full h-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-6 text-lg font-bold dark:text-white focus:border-primary outline-none appearance-none"
+                      value={stateOfOrigin}
+                      onChange={e => setStateOfOrigin(e.target.value)}
+                    >
+                      <option value="">Select State</option>
+                      {NIGERIAN_STATES.map(state => (
+                        <option key={state} value={state}>{state}</option>
+                      ))}
+                    </select>
                   </div>
                   <div className="space-y-2">
                     <label className="text-sm font-black text-slate-500 uppercase">State of Residence</label>
-                    <input className="w-full h-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-6 text-lg font-bold dark:text-white focus:border-primary outline-none" value={stateOfResidence} onChange={e => setStateOfResidence(e.target.value)} />
+                    <select
+                      className="w-full h-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-6 text-lg font-bold dark:text-white focus:border-primary outline-none appearance-none"
+                      value={stateOfResidence}
+                      onChange={e => setStateOfResidence(e.target.value)}
+                    >
+                      <option value="">Select State</option>
+                      {NIGERIAN_STATES.map(state => (
+                        <option key={state} value={state}>{state}</option>
+                      ))}
+                    </select>
                   </div>
                 </div>
                 <div className="space-y-2">
@@ -694,40 +720,42 @@ const LoanFlow: React.FC<LoanFlowProps> = ({ initialStep, onComplete, navigate, 
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-black text-slate-500 uppercase">Average Monthly Income (USD)</label>
+                  <label className="text-sm font-black text-slate-500 uppercase">Average Monthly Income (NGN)</label>
                   <div className="relative">
                     <span className="absolute left-6 top-1/2 -translate-y-1/2 font-black text-slate-400">₦</span>
                     <input className="w-full h-16 pl-12 pr-6 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 text-lg font-bold dark:text-white focus:border-primary outline-none" value={monthlyIncome} onChange={e => setMonthlyIncome(e.target.value.replace(/[^0-9.]/g, ''))} placeholder="0.00" />
                   </div>
                 </div>
               </div>
-              <NavActions isNextDisabled={!monthlyIncome || (selectedLoanId === 'public_sector' && (!mda || !ippisNumber || (mda === 'Other' && !customMda)))} />
-            </div>
-          )}
-
-          {/* Step 8b: Public Sector Details (Conditional) */}
-          {selectedLoanId === 'public_sector' && subStep === 8 && (
-            <div className="space-y-8 animate-in fade-in slide-in-from-right-4 duration-500 border-t border-slate-100 dark:border-slate-700 pt-8 mt-8">
-              <h3 className="text-xl font-black dark:text-white">Public Sector Details</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-2">
-                  <MdaTertiarySelect
-                    value={mda}
-                    onChange={setMda}
-                    label="MDA / Tertiary Institution"
-                  />
-                </div>
-                {mda === 'Other' && (
-                  <div className="space-y-2 animate-in fade-in slide-in-from-top-2">
-                    <label className="text-sm font-black text-slate-500 uppercase">Specify MDA</label>
-                    <input className="w-full h-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-6 text-lg font-bold dark:text-white focus:border-primary outline-none" value={customMda} onChange={e => setCustomMda(e.target.value)} placeholder="Enter MDA Name" />
+              {selectedLoanId === 'public_sector' && (
+                <div className="space-y-8 animate-in fade-in slide-in-from-right-4 duration-500 border-t border-slate-100 dark:border-slate-700 pt-8 mt-8">
+                  <h3 className="text-xl font-black dark:text-white">Public Sector Details</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                      <MdaTertiarySelect
+                        value={mda}
+                        onChange={setMda}
+                        label="MDA / Tertiary Institution"
+                      />
+                    </div>
+                    {mda === 'Other' && (
+                      <div className="space-y-2 animate-in fade-in slide-in-from-top-2">
+                        <label className="text-sm font-black text-slate-500 uppercase">Specify MDA</label>
+                        <input className="w-full h-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-6 text-lg font-bold dark:text-white focus:border-primary outline-none" value={customMda} onChange={e => setCustomMda(e.target.value)} placeholder="Enter MDA Name" />
+                      </div>
+                    )}
+                    <div className="space-y-2">
+                      <label className="text-sm font-black text-slate-500 uppercase">IPPIS Number</label>
+                      <input className="w-full h-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-6 text-lg font-bold dark:text-white focus:border-primary outline-none" value={ippisNumber} onChange={e => setIppisNumber(e.target.value.replace(/[^0-9]/g, ''))} placeholder="000000" />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-black text-slate-500 uppercase">Staff ID (Optional)</label>
+                      <input className="w-full h-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-6 text-lg font-bold dark:text-white focus:border-primary outline-none" value={staffId} onChange={e => setStaffId(e.target.value)} placeholder="Optional" />
+                    </div>
                   </div>
-                )}
-                <div className="space-y-2">
-                  <label className="text-sm font-black text-slate-500 uppercase">IPPIS Number</label>
-                  <input className="w-full h-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-6 text-lg font-bold dark:text-white focus:border-primary outline-none" value={ippisNumber} onChange={e => setIppisNumber(e.target.value.replace(/[^0-9]/g, ''))} placeholder="000000" />
                 </div>
-              </div>
+              )}
+              <NavActions isNextDisabled={!monthlyIncome || (selectedLoanId === 'public_sector' && (!mda || !ippisNumber || (mda === 'Other' && !customMda)))} />
             </div>
           )}
 
@@ -822,11 +850,7 @@ const LoanFlow: React.FC<LoanFlowProps> = ({ initialStep, onComplete, navigate, 
 
                     {/* Additional Info */}
                     <div className="space-y-6 pt-6 border-t border-slate-100 dark:border-slate-700">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div className="space-y-2">
-                          <label className="text-sm font-black text-slate-500 uppercase">Staff ID / Officer Code</label>
-                          <input className="w-full h-14 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-4 font-bold dark:text-white focus:border-primary outline-none" value={staffId} onChange={e => setStaffId(e.target.value)} placeholder="Required" />
-                        </div>
+                      <div className="grid grid-cols-1 gap-6">
                         <div className="space-y-2">
                           <label className="text-sm font-black text-slate-500 uppercase">Referral Code</label>
                           <input className={`w-full h-14 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-4 font-bold dark:text-white focus:border-primary outline-none ${referralCodeUsed ? 'opacity-50 cursor-not-allowed' : ''}`} value={referralCode} onChange={e => setReferralCode(e.target.value)} placeholder="Optional" disabled={!!referralCodeUsed} title={referralCodeUsed ? "Referral code applied from signup" : ""} />
@@ -834,9 +858,9 @@ const LoanFlow: React.FC<LoanFlowProps> = ({ initialStep, onComplete, navigate, 
                       </div>
                     </div>
                   </div>
-                  <NavActions nextLabel="Submit Application" isNextDisabled={!staffId} />
+                  <NavActions nextLabel="Submit Application" />
                 </div>
-                <div className="lg:col-span-5"><div className="bg-slate-900 text-white rounded-[2.5rem] p-10 flex flex-col gap-8 shadow-2xl overflow-hidden relative"><div className="absolute top-0 right-0 w-64 h-64 bg-primary/10 rounded-full blur-3xl -mr-24 -mt-24 pointer-events-none"></div><h3 className="text-xl font-black text-white/90 uppercase tracking-widest">Summary</h3><div className="bg-white/5 backdrop-blur-md rounded-3xl p-8 border border-white/10"><p className="text-slate-400 text-xs font-black uppercase tracking-widest mb-3">Est. Monthly Payment</p><span className="text-5xl font-black text-primary tracking-tighter">{formatMoney(calculation.monthly)}</span></div><div className="space-y-4 pt-4 text-sm font-bold"><div className="flex justify-between py-4 border-b border-white/10"><span className="text-slate-400 uppercase tracking-widest">Rate (APR)</span><span className="text-primary">{calculation.rate}%</span></div><div className="flex justify-between pt-6"><span className="text-white uppercase tracking-widest">Total Repayment</span><span className="text-2xl text-primary">{formatMoney(calculation.total)}</span></div></div></div></div>
+                {/* <div className="lg:col-span-5"><div className="bg-slate-900 text-white rounded-[2.5rem] p-10 flex flex-col gap-8 shadow-2xl overflow-hidden relative"><div className="absolute top-0 right-0 w-64 h-64 bg-primary/10 rounded-full blur-3xl -mr-24 -mt-24 pointer-events-none"></div><h3 className="text-xl font-black text-white/90 uppercase tracking-widest">Summary</h3><div className="bg-white/5 backdrop-blur-md rounded-3xl p-8 border border-white/10"><p className="text-slate-400 text-xs font-black uppercase tracking-widest mb-3">Est. Monthly Payment</p><span className="text-5xl font-black text-primary tracking-tighter">{formatMoney(calculation.monthly)}</span></div><div className="space-y-4 pt-4 text-sm font-bold"><div className="flex justify-between py-4 border-b border-white/10"><span className="text-slate-400 uppercase tracking-widest">Rate (APR)</span><span className="text-primary">{calculation.rate}%</span></div><div className="flex justify-between pt-6"><span className="text-white uppercase tracking-widest">Total Repayment</span><span className="text-2xl text-primary">{formatMoney(calculation.total)}</span></div></div></div></div> */}
               </div>
             </div>
           )}
