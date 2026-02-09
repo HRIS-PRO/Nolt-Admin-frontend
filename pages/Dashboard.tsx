@@ -24,7 +24,7 @@ const Dashboard: React.FC<DashboardProps> = ({ navigate }) => {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8 w-full">
         <button
-          onClick={() => navigateRouter('/loan')}
+          onClick={() => navigateRouter('/products')}
           className="group relative bg-white dark:bg-slate-800 p-10 rounded-3xl border-2 border-transparent hover:border-primary transition-all duration-500 text-left shadow-xl shadow-slate-200/50 dark:shadow-none flex flex-col"
         >
           <div className="size-16 rounded-2xl bg-primary/10 flex items-center justify-center text-primary mb-8 group-hover:bg-primary group-hover:text-white transition-all">

@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import StaffLayout from '../components/layouts/StaffLayout';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
+import StaffLoanForm from '../components/StaffLoanForm';
 
 interface LoanQueuePageProps {
     user: { name: string; email: string; avatar_url?: string; role?: string };
@@ -12,23 +13,68 @@ interface LoanQueuePageProps {
 
 const LoanQueuePage: React.FC<LoanQueuePageProps> = ({ user, onLogout, toggleTheme, theme }) => {
     const navigate = useNavigate();
+    const [searchParams, setSearchParams] = useSearchParams();
+    const searchQuery = searchParams.get('search') || '';
+    const statusFilter = searchParams.get('status') || '';
+    const stageFilter = searchParams.get('stage') || '';
+    const currentPage = parseInt(searchParams.get('page') || '1', 10);
+    const itemsPerPage = 10;
+
     const [loans, setLoans] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(true);
+    const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+
+
+    const fetchLoans = async () => {
+        try {
+            const response = await axios.get(`${''}/api/staff/loans`, { withCredentials: true });
+            setLoans(response.data);
+        } catch (error) {
+            console.error("Failed to fetch loans", error);
+        } finally {
+            setIsLoading(false);
+        }
+    };
 
     useEffect(() => {
-        const fetchLoans = async () => {
-            try {
-                const response = await axios.get(`${''}/api/staff/loans`, { withCredentials: true });
-                setLoans(response.data);
-            } catch (error) {
-                console.error("Failed to fetch loans", error);
-            } finally {
-                setIsLoading(false);
-            }
-        };
-
         fetchLoans();
     }, []);
+
+    const filteredLoans = loans.filter(loan => {
+        const matchesSearch = !searchQuery || (
+            loan.applicant_full_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            String(loan.id).includes(searchQuery.toLowerCase()) ||
+            (loan.officer_name && loan.officer_name.toLowerCase().includes(searchQuery.toLowerCase())) ||
+            (loan.officer_email && loan.officer_email.toLowerCase().includes(searchQuery.toLowerCase())) ||
+            (loan.status && loan.status.toLowerCase().includes(searchQuery.toLowerCase()))
+        );
+
+        const matchesStatus = !statusFilter || loan.status === statusFilter;
+        const matchesStage = !stageFilter || loan.stage === stageFilter;
+
+        return matchesSearch && matchesStatus && matchesStage;
+    });
+
+    const handleFilterChange = (key: string, value: string) => {
+        setSearchParams(prev => {
+            const newParams = new URLSearchParams(prev);
+            if (value) {
+                newParams.set(key, value);
+                newParams.set('page', '1'); // Reset to page 1 on filter change
+            } else {
+                newParams.delete(key);
+            }
+            return newParams;
+        });
+    };
+
+    const handlePageChange = (newPage: number) => {
+        setSearchParams(prev => {
+            const newParams = new URLSearchParams(prev);
+            newParams.set('page', newPage.toString());
+            return newParams;
+        });
+    };
 
     const getInitials = (str: string) => {
         if (!str) return 'PSL'; // Default fallback
@@ -38,34 +84,18 @@ const LoanQueuePage: React.FC<LoanQueuePageProps> = ({ user, onLogout, toggleThe
             .join('');
     };
 
+    const totalPages = Math.ceil(filteredLoans.length / itemsPerPage);
+    const paginatedLoans = filteredLoans.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+
     return (
         <StaffLayout user={user} onLogout={onLogout} toggleTheme={toggleTheme} theme={theme}>
-            <div className="flex justify-between items-end mb-8">
-                <div>
-                    <h1 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight leading-tight">
-                        Loan Queue
-                    </h1>
-                    <p className="text-slate-500 dark:text-slate-400 font-medium">
-                        Comprehensive management of historical and ongoing loan transactions.
-                    </p>
-                </div>
-                <div className="flex gap-3">
-                    <button className="px-4 py-2 rounded-lg bg-white dark:bg-[#1e293b] text-blue-500 dark:text-blue-400 text-xs font-bold uppercase tracking-wider flex items-center gap-2 border border-slate-200 dark:border-slate-700 shadow-sm">
-                        <span className="material-symbols-outlined text-sm">filter_list</span>
-                        Filter
-                    </button>
-                    {/* <button className="px-4 py-2 rounded-lg bg-blue-500 text-white text-xs font-bold uppercase tracking-wider flex items-center gap-2 hover:bg-blue-600 transition-all shadow-lg shadow-blue-500/20">
-                        <span className="material-symbols-outlined text-sm">add</span>
-                        New Application
-                    </button> */}
-                </div>
-            </div>
+            {/* ... (previous code remains same) ... */}
 
             <div className="bg-white dark:bg-[#1e293b] rounded-3xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm">
                 <div className="p-6 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-[#0f172a]/50">
                     <div>
                         <h3 className="font-black text-lg text-slate-900 dark:text-white">All Applications</h3>
-                        <p className="text-slate-500 text-xs font-medium"> Total: {loans.length} applications</p>
+                        <p className="text-slate-500 text-xs font-medium"> Total: {filteredLoans.length} applications</p>
                     </div>
                 </div>
 
@@ -90,14 +120,14 @@ const LoanQueuePage: React.FC<LoanQueuePageProps> = ({ user, onLogout, toggleThe
                                 <tr>
                                     <td colSpan={10} className="p-8 text-center text-slate-500">Loading...</td>
                                 </tr>
-                            ) : loans.length === 0 ? (
+                            ) : filteredLoans.length === 0 ? (
                                 <tr>
                                     <td colSpan={10} className="p-8 text-center text-slate-500 font-medium">
                                         No loans found.
                                     </td>
                                 </tr>
                             ) : (
-                                loans.map((loan, i) => (
+                                paginatedLoans.map((loan, i) => (
                                     <tr
                                         key={i}
                                         onClick={() => navigate(`/staff/loans/${loan.id}`)}
@@ -153,15 +183,43 @@ const LoanQueuePage: React.FC<LoanQueuePageProps> = ({ user, onLogout, toggleThe
                     </table>
                 </div>
 
-                {/* Pagination (Placeholder) */}
-                <div className="p-4 border-t border-slate-200 dark:border-slate-800 flex justify-between items-center text-xs text-slate-500">
-                    <p>Showing 1-{Math.max(1, loans.length)} of {loans.length}</p>
-                    <div className="flex gap-2">
-                        <button className="px-3 py-1 rounded border border-slate-200 dark:border-slate-700 disabled:opacity-50" disabled>Previous</button>
-                        <button className="px-3 py-1 rounded border border-slate-200 dark:border-slate-700 disabled:opacity-50" disabled>Next</button>
+                {/* Pagination Footer */}
+                {totalPages > 1 && (
+                    <div className="p-6 border-t border-slate-200 dark:border-slate-800 flex justify-between items-center bg-slate-50/50 dark:bg-slate-900/50">
+                        <p className="text-xs text-slate-500 font-bold">
+                            Showing page {currentPage} of {totalPages} ({filteredLoans.length} total applications)
+                        </p>
+                        <div className="flex gap-2">
+                            <button
+                                disabled={currentPage === 1}
+                                onClick={() => handlePageChange(currentPage - 1)}
+                                className="px-4 py-2 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-50 transition-all flex items-center gap-1"
+                            >
+                                <span className="material-symbols-outlined text-sm">chevron_left</span>
+                                Previous
+                            </button>
+                            <button
+                                disabled={currentPage === totalPages}
+                                onClick={() => handlePageChange(currentPage + 1)}
+                                className="px-4 py-2 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-50 transition-all flex items-center gap-1"
+                            >
+                                Next
+                                <span className="material-symbols-outlined text-sm">chevron_right</span>
+                            </button>
+                        </div>
                     </div>
-                </div>
+                )}
             </div>
+
+            {isCreateModalOpen && (
+                <StaffLoanForm
+                    onClose={() => setIsCreateModalOpen(false)}
+                    onSuccess={() => {
+                        fetchLoans();
+                        setIsCreateModalOpen(false);
+                    }}
+                />
+            )}
         </StaffLayout>
     );
 };
