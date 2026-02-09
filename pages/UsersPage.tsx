@@ -23,7 +23,9 @@ const UsersPage: React.FC<UsersPageProps> = ({ user, onLogout, toggleTheme, them
     const fetchUsers = async () => {
         try {
             const response = await axios.get(`${''}/api/staff/users`, { withCredentials: true });
-            setUsers(response.data);
+            // Filter out customers
+            const staffUsers = response.data.filter((u: any) => u.role !== 'customer');
+            setUsers(staffUsers);
         } catch (error) {
             console.error("Failed to fetch users", error);
         } finally {
