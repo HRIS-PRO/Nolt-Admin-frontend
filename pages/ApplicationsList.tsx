@@ -22,30 +22,30 @@ const ApplicationsList: React.FC<ApplicationsListProps> = ({ navigate, formatMon
   }, []);
 
   const completed = [
-    {
-      id: 'C-1002',
-      type: 'NOLT Vault Investment',
-      amount: 15000,
-      submittedAt: 'Jan 15, 2024',
-      status: 'PENDING_PAYMENT',
-      icon: 'lock_clock',
-      requiresReceipt: true,
-      data: { isOnBehalf: false }
-    },
-    {
-      id: 'C-0988',
-      type: 'Working Capital Loan',
-      amount: 12000,
-      submittedAt: 'Jan 10, 2024',
-      status: 'UNDER_REVIEW',
-      icon: 'verified',
-      requiresReceipt: false,
-      data: { 
-        isOnBehalf: true, 
-        fullName: 'Sarah Jenkins',
-        representativeRelation: 'Business Partner'
-      }
-    }
+    // {
+    //   id: 'C-1002',
+    //   type: 'NOLT Vault Investment',
+    //   amount: 15000,
+    //   submittedAt: 'Jan 15, 2024',
+    //   status: 'PENDING_PAYMENT',
+    //   icon: 'lock_clock',
+    //   requiresReceipt: true,
+    //   data: { isOnBehalf: false }
+    // },
+    // {
+    //   id: 'C-0988',
+    //   type: 'Working Capital Loan',
+    //   amount: 12000,
+    //   submittedAt: 'Jan 10, 2024',
+    //   status: 'UNDER_REVIEW',
+    //   icon: 'verified',
+    //   requiresReceipt: false,
+    //   data: { 
+    //     isOnBehalf: true, 
+    //     fullName: 'Sarah Jenkins',
+    //     representativeRelation: 'Business Partner'
+    //   }
+    // }
   ];
 
   const handleUploadReceipt = (id: string) => {
