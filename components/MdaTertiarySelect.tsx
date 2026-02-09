@@ -11,61 +11,61 @@ interface MdaTertiarySelectProps {
 
 
 const TERTIARY_LIST = [
-  'AHMADU BELLO UNIVERSITY ZARIA',
-  'AKANU IBIAM FEDERAL POLYTECHNIC',
-  'ALVAN IKOKU COLLEGE OF EDUCATION',
-  'BAYERO UNIVERSITY KANO',
-  'DIVISION OF AGRICULTURAL COLLEGES, ABU ZARIA',
-  'FEDERAL COLLEGE OF EDUCATION (TECHNICAL) BICHI',
-  'FEDERAL COLLEGE OF EDUCATION IWO OSUN',
-  'FEDERAL COLLEGE OF EDUCATION ODUGBO, BENUE',
-  'FEDERAL COLLEGE OF EDUCATION PANKSHIN',
-  'FEDERAL COLLEGE OF EDUCATION ZARIA',
-  'FEDERAL COLLEGE OF FORESTRY JOS',
-  'FEDERAL POLYTECHNIC BAYELSA',
-  'FEDERAL POLYTECHNIC BIDA',
-  'FEDERAL POLYTECHNIC KAURA NAMODA',
-  'FEDERAL POLYTECHNIC MUBI ADAMAWA',
-  'FEDERAL POLYTECHNIC NASARAWA',
-  'FEDERAL POLYTECHNIC NEKEDE',
-  'FEDERAL POLYTECHNIC OFFA',
-  'FEDERAL POLYTECHNIC OHODO, ENUGU',
-  'FEDERAL POLYTECHNIC OKO ANAMBRA',
-  'FEDERAL POLYTECHNIC WANNUNE, BENUE',
-  'FEDERAL POLYTECHNIC, AUCHI',
-  'FEDERAL POLYTECHNICS ADO EKITI ADO',
-  'FEDERAL POLYTECHNICS EDE OSUN STATE',
-  'FEDERAL UNIVERSITY BIRNIN KEBBI',
-  'FEDERAL UNIVERSITY DUTSIN-MA',
-  'FEDERAL UNIVERSITY GASHUA',
-  'FEDERAL UNIVERSITY GUSAU',
-  'FEDERAL UNIVERSITY KASHERE GOMBE STATE',
-  'FEDERAL UNIVERSITY OF TECHNOLOGY MINNA',
-  'FEDERAL UNIVERSITY OTUOKE BAYELSA',
-  'FEDERAL UNIVERSITY TECHNOLOGY OWERRI',
-  'FEDERAL UNIVERSITY WUKARI TARABA STATE',
-  'INSTITUTE FOR AGRICULTURAL RESEARCH IAR ZARIA',
-  'KADUNA POLYTECHNIC KADUNA',
-  'MICHAEL OKPARA UNI. OF AGRIC. UMUDIKE',
-  'MODIBBO ADAMA UNIVERSITY YOLA',
-  'NATIONAL AGRICULTURAL EXTENSION AND RESEARCH LIAISON SERVICES',
-  'NATIONAL ANIMAL PRODUCTION RESEARCH INSTITUTE ABU ZARIA',
-  'NATIONAL OPEN UNIVERSITY OF NIGERIA',
-  'NIGERIAN ARMY UNIVERSITY BIU',
-  'NIGERIAN DEFENCE ACADEMY KADUNA',
-  'NIGERIAN MARITIME UNIVERSITY OKERENKONKO',
-  'NNAMDI AZIKIWE UNIVERSITY AWKA',
-  'UNIVERSITY OF ABUJA GWAGWALADA',
-  'UNIVERSITY OF AGRICULTURE MAKURDI',
-  'UNIVERSITY OF CALABAR',
-  'UNIVERSITY OF ILORIN',
-  'UNIVERSITY OF JOS',
-  'UNIVERSITY OF LAGOS',
-  'UNIVERSITY OF MAIDUGURI',
-  'UNIVERSITY OF NIGERIA NSUKKA',
-  'USMANU DANFODIYO UNIVERSITY',
-  'WAZIRI UMARU FEDERAL POLYTECHNIC BIRNIN KEBBI',
-  'YABA COLLEGE OF TECHNOLOGY'
+    'AHMADU BELLO UNIVERSITY ZARIA',
+    'AKANU IBIAM FEDERAL POLYTECHNIC',
+    'ALVAN IKOKU COLLEGE OF EDUCATION',
+    'BAYERO UNIVERSITY KANO',
+    'DIVISION OF AGRICULTURAL COLLEGES, ABU ZARIA',
+    'FEDERAL COLLEGE OF EDUCATION (TECHNICAL) BICHI',
+    'FEDERAL COLLEGE OF EDUCATION IWO OSUN',
+    'FEDERAL COLLEGE OF EDUCATION ODUGBO, BENUE',
+    'FEDERAL COLLEGE OF EDUCATION PANKSHIN',
+    'FEDERAL COLLEGE OF EDUCATION ZARIA',
+    'FEDERAL COLLEGE OF FORESTRY JOS',
+    'FEDERAL POLYTECHNIC BAYELSA',
+    'FEDERAL POLYTECHNIC BIDA',
+    'FEDERAL POLYTECHNIC KAURA NAMODA',
+    'FEDERAL POLYTECHNIC MUBI ADAMAWA',
+    'FEDERAL POLYTECHNIC NASARAWA',
+    'FEDERAL POLYTECHNIC NEKEDE',
+    'FEDERAL POLYTECHNIC OFFA',
+    'FEDERAL POLYTECHNIC OHODO, ENUGU',
+    'FEDERAL POLYTECHNIC OKO ANAMBRA',
+    'FEDERAL POLYTECHNIC WANNUNE, BENUE',
+    'FEDERAL POLYTECHNIC, AUCHI',
+    'FEDERAL POLYTECHNICS ADO EKITI ADO',
+    'FEDERAL POLYTECHNICS EDE OSUN STATE',
+    'FEDERAL UNIVERSITY BIRNIN KEBBI',
+    'FEDERAL UNIVERSITY DUTSIN-MA',
+    'FEDERAL UNIVERSITY GASHUA',
+    'FEDERAL UNIVERSITY GUSAU',
+    'FEDERAL UNIVERSITY KASHERE GOMBE STATE',
+    'FEDERAL UNIVERSITY OF TECHNOLOGY MINNA',
+    'FEDERAL UNIVERSITY OTUOKE BAYELSA',
+    'FEDERAL UNIVERSITY TECHNOLOGY OWERRI',
+    'FEDERAL UNIVERSITY WUKARI TARABA STATE',
+    'INSTITUTE FOR AGRICULTURAL RESEARCH IAR ZARIA',
+    'KADUNA POLYTECHNIC KADUNA',
+    'MICHAEL OKPARA UNI. OF AGRIC. UMUDIKE',
+    'MODIBBO ADAMA UNIVERSITY YOLA',
+    'NATIONAL AGRICULTURAL EXTENSION AND RESEARCH LIAISON SERVICES',
+    'NATIONAL ANIMAL PRODUCTION RESEARCH INSTITUTE ABU ZARIA',
+    'NATIONAL OPEN UNIVERSITY OF NIGERIA',
+    'NIGERIAN ARMY UNIVERSITY BIU',
+    'NIGERIAN DEFENCE ACADEMY KADUNA',
+    'NIGERIAN MARITIME UNIVERSITY OKERENKONKO',
+    'NNAMDI AZIKIWE UNIVERSITY AWKA',
+    'UNIVERSITY OF ABUJA GWAGWALADA',
+    'UNIVERSITY OF AGRICULTURE MAKURDI',
+    'UNIVERSITY OF CALABAR',
+    'UNIVERSITY OF ILORIN',
+    'UNIVERSITY OF JOS',
+    'UNIVERSITY OF LAGOS',
+    'UNIVERSITY OF MAIDUGURI',
+    'UNIVERSITY OF NIGERIA NSUKKA',
+    'USMANU DANFODIYO UNIVERSITY',
+    'WAZIRI UMARU FEDERAL POLYTECHNIC BIRNIN KEBBI',
+    'YABA COLLEGE OF TECHNOLOGY'
 ];
 
 
@@ -90,6 +90,17 @@ const MdaTertiarySelect: React.FC<MdaTertiarySelectProps> = ({
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
 
+    const [dropUp, setDropUp] = useState(false);
+
+    const toggleDropdown = () => {
+        if (!isOpen && dropdownRef.current) {
+            const rect = dropdownRef.current.getBoundingClientRect();
+            const spaceBelow = window.innerHeight - rect.bottom;
+            setDropUp(spaceBelow < 350); // specific threshold for dropdown height
+        }
+        setIsOpen(!isOpen);
+    };
+
     const filteredItems = (activeTab === 'MDA' ? MDAS_LIST : TERTIARY_LIST).filter(item =>
         item.toLowerCase().includes(searchQuery.toLowerCase())
     );
@@ -107,7 +118,7 @@ const MdaTertiarySelect: React.FC<MdaTertiarySelectProps> = ({
             {/* Trigger Button */}
             <button
                 type="button"
-                onClick={() => setIsOpen(!isOpen)}
+                onClick={toggleDropdown}
                 className={`w-full h-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 px-6 text-lg font-bold flex items-center justify-between transition-all outline-none ${error ? 'border-red-300 bg-red-50' : isOpen ? 'border-primary ring-4 ring-primary/10' : 'border-slate-100 dark:border-slate-700 hover:border-primary/50'
                     } dark:text-white`}
             >
@@ -121,7 +132,7 @@ const MdaTertiarySelect: React.FC<MdaTertiarySelectProps> = ({
 
             {/* Dropdown Panel */}
             {isOpen && (
-                <div className="absolute z-50 top-full left-0 right-0 mt-2 bg-white dark:bg-slate-800 rounded-3xl shadow-xl shadow-slate-200/50 dark:shadow-black/50 border border-slate-100 dark:border-slate-700 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+                <div className={`absolute z-50 left-0 right-0 bg-white dark:bg-slate-800 rounded-3xl shadow-xl shadow-slate-200/50 dark:shadow-black/50 border border-slate-100 dark:border-slate-700 overflow-hidden animate-in fade-in zoom-in-95 duration-200 ${dropUp ? 'bottom-full mb-2' : 'top-full mt-2'}`}>
 
                     {/* Tabs */}
                     <div className="flex border-b border-slate-100 dark:border-slate-700">
@@ -168,8 +179,8 @@ const MdaTertiarySelect: React.FC<MdaTertiarySelectProps> = ({
                                         type="button"
                                         onClick={() => handleSelect(item)}
                                         className={`w-full text-left px-4 py-3 rounded-xl font-bold transition-all text-sm ${value === item
-                                                ? 'bg-primary text-white shadow-lg shadow-primary/20'
-                                                : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 hover:text-primary'
+                                            ? 'bg-primary text-white shadow-lg shadow-primary/20'
+                                            : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 hover:text-primary'
                                             }`}
                                     >
                                         {item}

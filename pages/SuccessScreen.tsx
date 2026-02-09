@@ -76,19 +76,19 @@ const SuccessScreen: React.FC<SuccessProps> = ({ onDashboard, loan, formatMoney,
               <div className="flex-1 text-center md:text-left">
                 <h4 className="text-lg font-black text-primary uppercase tracking-tight mb-0.5">Loan Agreement</h4>
                 <p className="text-xs text-slate-500 dark:text-slate-400 font-bold leading-relaxed">
-                  Your official loan agreement will be sent to you when it is ready. Please{' '}
-                  <span className="text-primary cursor-pointer font-black underline" onClick={handleDownload}>
+                  Your official loan agreement will be sent to you when it is ready.
+                  {/* <span className="text-primary cursor-pointer font-black underline" onClick={handleDownload}>
                     download
-                  </span>{' '}
-                  and keep a copy for your records and future reference.
+                  </span>{' '} */}
+                  {/* and keep a copy for your records and future reference. */}
                 </p>
               </div>
-              <button
+              {/* <button
                 onClick={handleDownload}
                 className="w-full md:w-auto px-8 py-3.5 bg-primary text-white rounded-2xl text-[13px] font-black uppercase tracking-widest hover:bg-primary-dark transition-all shadow-lg shadow-primary/20 active:scale-95"
               >
                 Download
-              </button>
+              </button> */}
             </div>
           </div>
         )}
