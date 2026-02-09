@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import StaffLayout from '../components/layouts/StaffLayout';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 
 interface UsersPageProps {
@@ -10,9 +11,14 @@ interface UsersPageProps {
 }
 
 const UsersPage: React.FC<UsersPageProps> = ({ user, onLogout, toggleTheme, theme }) => {
+    const navigate = useNavigate();
+    const [searchParams, setSearchParams] = useSearchParams();
+    const searchQuery = searchParams.get('search') || '';
+    const currentPage = parseInt(searchParams.get('page') || '1', 10);
+    const itemsPerPage = 10;
+
     const [users, setUsers] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(true);
-    const [searchTerm, setSearchTerm] = useState('');
 
     // Actions State
     const [showInviteModal, setShowInviteModal] = useState(false);
@@ -101,11 +107,36 @@ const UsersPage: React.FC<UsersPageProps> = ({ user, onLogout, toggleTheme, them
         );
     };
 
+    const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const value = e.target.value;
+        setSearchParams(prev => {
+            const newParams = new URLSearchParams(prev);
+            if (value) {
+                newParams.set('search', value);
+                newParams.set('page', '1');
+            } else {
+                newParams.delete('search');
+            }
+            return newParams;
+        });
+    };
+
+    const handlePageChange = (newPage: number) => {
+        setSearchParams(prev => {
+            const newParams = new URLSearchParams(prev);
+            newParams.set('page', newPage.toString());
+            return newParams;
+        });
+    };
+
     const filteredUsers = users.filter(u =>
-        u.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        u.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        u.referral_code?.toLowerCase().includes(searchTerm.toLowerCase())
+        u.full_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        u.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        u.referral_code?.toLowerCase().includes(searchQuery.toLowerCase())
     );
+
+    const totalPages = Math.ceil(filteredUsers.length / itemsPerPage);
+    const paginatedUsers = filteredUsers.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
     return (
         <StaffLayout user={user} onLogout={onLogout} toggleTheme={toggleTheme} theme={theme}>
@@ -134,8 +165,8 @@ const UsersPage: React.FC<UsersPageProps> = ({ user, onLogout, toggleTheme, them
                     <input
                         type="text"
                         placeholder="Search by name, email or referral code..."
-                        value={searchTerm}
-                        onChange={e => setSearchTerm(e.target.value)}
+                        value={searchQuery}
+                        onChange={handleSearch}
                         className="bg-transparent text-slate-700 dark:text-white text-sm font-medium placeholder:text-slate-400 outline-none w-full"
                     />
                 </div>
@@ -157,7 +188,7 @@ const UsersPage: React.FC<UsersPageProps> = ({ user, onLogout, toggleTheme, them
                                 <tr>
                                     <td colSpan={6} className="p-8 text-center text-slate-500">Loading users...</td>
                                 </tr>
-                            ) : filteredUsers.map((u) => (
+                            ) : paginatedUsers.map((u) => (
                                 <tr key={u.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/30 transition-colors group">
                                     <td className="p-6 pl-8">
                                         <div className="flex items-center gap-4">
@@ -248,6 +279,33 @@ const UsersPage: React.FC<UsersPageProps> = ({ user, onLogout, toggleTheme, them
                         </tbody>
                     </table>
                 </div>
+
+                {/* Pagination Footer */}
+                {totalPages > 1 && (
+                    <div className="p-6 border-t border-slate-200 dark:border-slate-800 flex justify-between items-center bg-slate-50/50 dark:bg-slate-900/50">
+                        <p className="text-xs text-slate-500 font-bold">
+                            Showing page {currentPage} of {totalPages} ({filteredUsers.length} total users)
+                        </p>
+                        <div className="flex gap-2">
+                            <button
+                                disabled={currentPage === 1}
+                                onClick={() => handlePageChange(currentPage - 1)}
+                                className="px-4 py-2 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-50 transition-all flex items-center gap-1"
+                            >
+                                <span className="material-symbols-outlined text-sm">chevron_left</span>
+                                Previous
+                            </button>
+                            <button
+                                disabled={currentPage === totalPages}
+                                onClick={() => handlePageChange(currentPage + 1)}
+                                className="px-4 py-2 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-50 transition-all flex items-center gap-1"
+                            >
+                                Next
+                                <span className="material-symbols-outlined text-sm">chevron_right</span>
+                            </button>
+                        </div>
+                    </div>
+                )}
             </div>
 
             {/* Invite Modal */}

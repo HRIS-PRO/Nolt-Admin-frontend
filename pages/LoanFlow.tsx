@@ -47,7 +47,9 @@ const LoanFlow: React.FC<LoanFlowProps> = ({ initialStep, onComplete, navigate, 
 
   // Form Fields
   const [title, setTitle] = useState(initialDraft?.data?.title ?? 'Mr');
-  const [fullName, setFullName] = useState(initialDraft?.data?.fullName ?? '');
+  const [surname, setSurname] = useState(initialDraft?.data?.surname ?? '');
+  const [firstName, setFirstName] = useState(initialDraft?.data?.firstName ?? '');
+  const [middleName, setMiddleName] = useState(initialDraft?.data?.middleName ?? '');
   const [isOnBehalf, setIsOnBehalf] = useState<boolean>(initialDraft?.data?.isOnBehalf ?? false);
   const [representativeRelation, setRepresentativeRelation] = useState(initialDraft?.data?.representativeRelation ?? '');
   const [isPep, setIsPep] = useState<boolean | null>(initialDraft?.data?.isPep ?? null);
@@ -73,15 +75,15 @@ const LoanFlow: React.FC<LoanFlowProps> = ({ initialStep, onComplete, navigate, 
       national_id: null,
       bank_statement: null,
       proof_address: null,
-      selfie: null
+      selfie: null,
+      work_id: null,
+      payslip: null
     }
   );
   const [uploadProgress, setUploadProgress] = useState<Record<string, number>>({});
   const [references, setReferences] = useState(
     initialDraft?.data?.references ?? [
-      { name: '', phone: '', relationship: '' },
-      { name: '', phone: '', relationship: '' },
-      { name: '', phone: '', relationship: '' },
+      { name: '', phone: '', relationship: '' }
     ]
   );
   const [desiredAmount, setDesiredAmount] = useState(initialDraft?.data?.desiredAmount ?? '25000');
@@ -143,7 +145,10 @@ const LoanFlow: React.FC<LoanFlowProps> = ({ initialStep, onComplete, navigate, 
       const payload = {
         applying_for_others: isOnBehalf,
         relationship_to_applicant: isOnBehalf ? representativeRelation : null,
-        applicant_full_name: fullName,
+        surname,
+        first_name: firstName,
+        middle_name: middleName,
+        applicant_full_name: `${surname} ${firstName} ${middleName}`.trim(),
         title,
         is_politically_exposed: isPep,
         gender,
@@ -168,6 +173,8 @@ const LoanFlow: React.FC<LoanFlowProps> = ({ initialStep, onComplete, navigate, 
         statement_of_account_url: uploadedDocs.bank_statement?.url || null,
         proof_of_residence_url: uploadedDocs.proof_address?.url || null,
         selfie_verification_url: uploadedDocs.selfie?.url || null,
+        work_id_url: uploadedDocs.work_id?.url || null,
+        payslip_url: uploadedDocs.payslip?.url || null,
 
         references: references
           .filter(r => r.name && r.phone) // Only include valid references
@@ -226,7 +233,7 @@ const LoanFlow: React.FC<LoanFlowProps> = ({ initialStep, onComplete, navigate, 
       subStep,
       label: currentLoanLabel,
       data: {
-        selectedLoanId, title, fullName, isOnBehalf, representativeRelation, isPep, gender, dob, maidenName, maritalStatus, religion,
+        selectedLoanId, title, surname, firstName, middleName, isOnBehalf, representativeRelation, isPep, gender, dob, maidenName, maritalStatus, religion,
         countryCode, mobileNumber, contactEmail, bvn, nin, stateOfOrigin, stateOfResidence,
         homeAddress, residentialStatus, dependents, hasActiveLoans, monthlyIncome, uploadedDocs,
         references, desiredAmount, repaymentPeriod, hasSigned, acceptedIndemnity,
@@ -296,7 +303,9 @@ const LoanFlow: React.FC<LoanFlowProps> = ({ initialStep, onComplete, navigate, 
       'national_id': 'govt_id',
       'bank_statement': 'bank_statement',
       'proof_address': 'proof_of_residence',
-      'selfie': 'selfie_verification'
+      'selfie': 'selfie_verification',
+      'work_id': 'work_id',
+      'payslip': 'payslip'
     };
 
     const formData = new FormData();
@@ -354,6 +363,16 @@ const LoanFlow: React.FC<LoanFlowProps> = ({ initialStep, onComplete, navigate, 
     const newRefs = [...references];
     newRefs[index] = { ...newRefs[index], [field]: value };
     setReferences(newRefs);
+  };
+
+  const addReference = () => {
+    setReferences([...references, { name: '', phone: '', relationship: '' }]);
+  };
+
+  const removeReference = (index: number) => {
+    if (references.length > 1) {
+      setReferences(references.filter((_, i) => i !== index));
+    }
   };
 
   const calculation = useMemo(() => {
@@ -476,7 +495,7 @@ const LoanFlow: React.FC<LoanFlowProps> = ({ initialStep, onComplete, navigate, 
             <div className="space-y-8 animate-in fade-in slide-in-from-right-4 duration-500">
               <h2 className="text-3xl font-black dark:text-white">Identity Basics</h2>
               <div className="grid gap-6">
-                <div className="flex flex-col md:flex-row md:items-center justify-between p-6 bg-slate-50 dark:bg-slate-900/50 rounded-2xl border border-slate-100 dark:border-slate-700 gap-4">
+                {/* <div className="flex flex-col md:flex-row md:items-center justify-between p-6 bg-slate-50 dark:bg-slate-900/50 rounded-2xl border border-slate-100 dark:border-slate-700 gap-4">
                   <div className="space-y-1">
                     <p className="font-black text-slate-900 dark:text-white uppercase tracking-tight">Applying for someone else?</p>
                     <p className="text-xs text-slate-500 font-bold">Enable this if you are filling this form as a representative.</p>
@@ -487,7 +506,7 @@ const LoanFlow: React.FC<LoanFlowProps> = ({ initialStep, onComplete, navigate, 
                   >
                     <div className={`absolute top-1 size-6 bg-white rounded-full transition-all duration-300 shadow-md ${isOnBehalf ? 'left-9' : 'left-1'}`}></div>
                   </button>
-                </div>
+                </div> */}
 
                 {isOnBehalf && (
                   <div className="space-y-2 animate-in slide-in-from-top-4 duration-300">
@@ -504,8 +523,16 @@ const LoanFlow: React.FC<LoanFlowProps> = ({ initialStep, onComplete, navigate, 
                 )}
 
                 <div className="space-y-2">
-                  <label className="text-sm font-black text-slate-500 uppercase">{isOnBehalf ? 'Applicant Full Name' : 'Your Full Legal Name'}</label>
-                  <input className="w-full h-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-6 text-lg font-bold dark:text-white focus:border-primary outline-none transition-all" value={fullName} onChange={e => setFullName(e.target.value)} placeholder="Enter full name" />
+                  <label className="text-sm font-black text-slate-500 uppercase">{isOnBehalf ? 'Applicant Surname' : 'Your Surname'}</label>
+                  <input className="w-full h-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-6 text-lg font-bold dark:text-white focus:border-primary outline-none transition-all" value={surname} onChange={e => setSurname(e.target.value)} placeholder="Surname" />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-black text-slate-500 uppercase">{isOnBehalf ? 'Applicant First Name' : 'Your First Name'}</label>
+                  <input className="w-full h-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-6 text-lg font-bold dark:text-white focus:border-primary outline-none transition-all" value={firstName} onChange={e => setFirstName(e.target.value)} placeholder="First Name" />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-black text-slate-500 uppercase">{isOnBehalf ? 'Applicant Middle Name' : 'Your Middle Name'} (Optional)</label>
+                  <input className="w-full h-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-6 text-lg font-bold dark:text-white focus:border-primary outline-none transition-all" value={middleName} onChange={e => setMiddleName(e.target.value)} placeholder="Middle Name" />
                 </div>
 
                 <div className="space-y-2">
@@ -535,7 +562,7 @@ const LoanFlow: React.FC<LoanFlowProps> = ({ initialStep, onComplete, navigate, 
                   </div>
                 </div>
               </div>
-              <NavActions isNextDisabled={!fullName || isPep === null || (isOnBehalf && !representativeRelation)} />
+              <NavActions isNextDisabled={!surname || !firstName || isPep === null || (isOnBehalf && !representativeRelation)} />
             </div>
           )}
 
@@ -769,7 +796,9 @@ const LoanFlow: React.FC<LoanFlowProps> = ({ initialStep, onComplete, navigate, 
                   { id: 'national_id', label: 'Government Issued ID', icon: 'badge' },
                   { id: 'bank_statement', label: 'Last 3 Mo. Statements', icon: 'account_balance' },
                   { id: 'proof_address', label: 'Proof of Residence', icon: 'home_pin' },
-                  { id: 'selfie', label: 'Selfie Verification', icon: 'add_a_photo' }
+                  { id: 'selfie', label: 'Selfie Verification', icon: 'add_a_photo' },
+                  { id: 'work_id', label: 'Work ID', icon: 'badge' },
+                  { id: 'payslip', label: 'Recent Payslip', icon: 'receipt' }
                 ].map(doc => (
                   <div key={doc.id} onClick={() => handleFileSelect(doc.id)} className={`relative group p-6 rounded-3xl border-2 border-dashed transition-all cursor-pointer flex flex-col items-center gap-4 text-center ${uploadedDocs[doc.id] ? 'border-green-500 bg-green-500/5' : 'border-slate-200 dark:border-slate-700 hover:border-primary'}`}>
                     {uploadedDocs[doc.id] ? (
@@ -792,40 +821,54 @@ const LoanFlow: React.FC<LoanFlowProps> = ({ initialStep, onComplete, navigate, 
                   </div>
                 ))}
               </div>
-              <NavActions isNextDisabled={!uploadedDocs.national_id || !uploadedDocs.bank_statement} />
+              <NavActions isNextDisabled={!uploadedDocs.national_id || !uploadedDocs.work_id || !uploadedDocs.payslip} />
             </div>
           )}
 
           {/* Step 10: References */}
           {subStep === 10 && (
             <div className="space-y-8 animate-in fade-in slide-in-from-right-4 duration-500">
-              <h2 className="text-3xl font-black dark:text-white">References</h2>
+              <h2 className="text-3xl font-black dark:text-white">References / Next of kin</h2>
               <p className="text-slate-500 font-medium">Please provide 3 professional or personal contacts.</p>
               <div className="space-y-6">
+                <div className="flex justify-between items-center mb-4">
+                  <button onClick={addReference} className="text-sm font-bold text-primary flex items-center gap-1 hover:text-primary/80 transition-colors">
+                    <span className="material-symbols-outlined text-lg">add_circle</span>
+                    Add Reference
+                  </button>
+                </div>
                 {references.map((ref, idx) => (
-                  <div key={idx} className="p-6 rounded-3xl bg-slate-50 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-700 grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="space-y-2">
-                      <label className="text-xs font-black text-slate-500 uppercase">Ref {idx + 1} Name</label>
-                      <input className="w-full h-12 rounded-xl bg-white dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 px-4 font-bold dark:text-white outline-none focus:border-primary" value={ref.name} onChange={e => updateRef(idx, 'name', e.target.value)} placeholder="Full Name" />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-xs font-black text-slate-500 uppercase">Phone Number</label>
-                      <input className="w-full h-12 rounded-xl bg-white dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 px-4 font-bold dark:text-white outline-none focus:border-primary" value={ref.phone} onChange={e => updateRef(idx, 'phone', e.target.value)} placeholder="000-000-0000" />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-xs font-black text-slate-500 uppercase">Relationship</label>
-                      <select className="w-full h-12 rounded-xl bg-white dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 px-4 font-bold dark:text-white outline-none focus:border-primary" value={ref.relationship} onChange={e => updateRef(idx, 'relationship', e.target.value)}>
-                        <option value="">Select Relation</option>
-                        <option value="Family">Family</option>
-                        <option value="Colleague">Colleague</option>
-                        <option value="Friend">Friend</option>
-                        <option value="Manager">Manager</option>
-                      </select>
+                  <div key={idx} className="relative p-6 rounded-3xl bg-slate-50 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-700 space-y-4">
+                    {references.length > 1 && (
+                      <button onClick={() => removeReference(idx)} className="absolute top-4 right-4 text-slate-400 hover:text-red-500 transition-colors">
+                        <span className="material-symbols-outlined">delete</span>
+                      </button>
+                    )}
+                    <h4 className="font-bold text-base text-slate-900 dark:text-white uppercase tracking-wider">Reference {idx === 0 && '(Required)'}</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className="space-y-2">
+                        <label className="text-xs font-black text-slate-500 uppercase">Ref Name</label>
+                        <input className="w-full h-12 rounded-xl bg-white dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 px-4 font-bold dark:text-white outline-none focus:border-primary" value={ref.name} onChange={e => updateRef(idx, 'name', e.target.value)} placeholder="Full Name" />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-xs font-black text-slate-500 uppercase">Phone Number</label>
+                        <input className="w-full h-12 rounded-xl bg-white dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 px-4 font-bold dark:text-white outline-none focus:border-primary" value={ref.phone} onChange={e => updateRef(idx, 'phone', e.target.value)} placeholder="000-000-0000" />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-xs font-black text-slate-500 uppercase">Relationship</label>
+                        <select className="w-full h-12 rounded-xl bg-white dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 px-4 font-bold dark:text-white outline-none focus:border-primary" value={ref.relationship} onChange={e => updateRef(idx, 'relationship', e.target.value)}>
+                          <option value="">Select Relation</option>
+                          <option value="Family">Family</option>
+                          <option value="Colleague">Colleague</option>
+                          <option value="Friend">Friend</option>
+                          <option value="Manager">Manager</option>
+                        </select>
+                      </div>
                     </div>
                   </div>
                 ))}
               </div>
-              <NavActions isNextDisabled={false} />
+              <NavActions isNextDisabled={!references[0]?.name || !references[0]?.phone || !references[0]?.relationship} />
             </div>
           )}
 

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Link, NavLink } from 'react-router-dom';
+import { Link, NavLink, useSearchParams } from 'react-router-dom';
 import { Theme } from '../../types';
 
 interface StaffLayoutProps {
@@ -11,6 +11,20 @@ interface StaffLayoutProps {
 }
 
 const StaffLayout: React.FC<StaffLayoutProps> = ({ children, user, onLogout, toggleTheme, theme }) => {
+    const [searchParams, setSearchParams] = useSearchParams();
+    const searchQuery = searchParams.get('search') || '';
+
+    const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const value = e.target.value;
+        if (value) {
+            setSearchParams({ ...Object.fromEntries(searchParams), search: value });
+        } else {
+            const newParams = Object.fromEntries(searchParams);
+            delete newParams.search;
+            setSearchParams(newParams);
+        }
+    };
+
     const navGroups = [
         {
             title: 'MANAGEMENT',
@@ -38,9 +52,9 @@ const StaffLayout: React.FC<StaffLayoutProps> = ({ children, user, onLogout, tog
                 <Link to="/" className="flex items-center gap-3 p-8 cursor-pointer">
                     <div className="w-10 h-10 rounded-xl flex items-center justify-center overflow-hidden">
                         <img
-                        src="https://isswlcllytiltgjbysjv.supabase.co/storage/v1/object/public/template-images/logo%20file-02%20(1).png"
-                        alt="NOLT Finance Logo"
-                        className="w-full h-full object-contain"
+                            src="https://isswlcllytiltgjbysjv.supabase.co/storage/v1/object/public/template-images/logo%20file-02%20(1).png"
+                            alt="NOLT Finance Logo"
+                            className="w-full h-full object-contain"
                         />
                     </div>
                     <h1 className="text-xl font-black tracking-tighter text-slate-900 text-white uppercase">
@@ -111,6 +125,8 @@ const StaffLayout: React.FC<StaffLayoutProps> = ({ children, user, onLogout, tog
                             <input
                                 type="text"
                                 placeholder="Search transactions, users, or loans..."
+                                value={searchQuery}
+                                onChange={handleSearch}
                                 className="w-full h-12 pl-12 pr-4 rounded-xl bg-slate-200 dark:bg-[#1e293b] border-none outline-none font-medium text-slate-900 dark:text-white focus:ring-2 focus:ring-primary/50 transition-all placeholder:text-slate-500"
                             />
                         </div>
