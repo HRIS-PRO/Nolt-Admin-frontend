@@ -60,18 +60,9 @@ const LoanQueuePage: React.FC<LoanQueuePageProps> = ({ user, onLogout, toggleThe
             const newParams = new URLSearchParams(prev);
             if (value) {
                 newParams.set(key, value);
-                newParams.set('page', '1'); // Reset to page 1 on filter change
             } else {
                 newParams.delete(key);
             }
-            return newParams;
-        });
-    };
-
-    const handlePageChange = (newPage: number) => {
-        setSearchParams(prev => {
-            const newParams = new URLSearchParams(prev);
-            newParams.set('page', newPage.toString());
             return newParams;
         });
     };
@@ -84,12 +75,56 @@ const LoanQueuePage: React.FC<LoanQueuePageProps> = ({ user, onLogout, toggleThe
             .join('');
     };
 
-    const totalPages = Math.ceil(filteredLoans.length / itemsPerPage);
-    const paginatedLoans = filteredLoans.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
-
     return (
         <StaffLayout user={user} onLogout={onLogout} toggleTheme={toggleTheme} theme={theme}>
-            {/* ... (previous code remains same) ... */}
+            <div className="flex justify-between items-end mb-8">
+                <div>
+                    <h1 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight leading-tight">
+                        Loan Queue
+                    </h1>
+                    <p className="text-slate-500 dark:text-slate-400 font-medium">
+                        Comprehensive management of historical and ongoing loan transactions.
+                    </p>
+                </div>
+                <div className="flex gap-3">
+                    <select
+                        value={statusFilter}
+                        onChange={(e) => handleFilterChange('status', e.target.value)}
+                        className="px-4 py-2 rounded-lg bg-white dark:bg-[#1e293b] text-slate-600 dark:text-slate-300 text-xs font-bold uppercase tracking-wider border border-slate-200 dark:border-slate-700 shadow-sm outline-none cursor-pointer"
+                    >
+                        <option value="">All Status</option>
+                        <option value="pending">Pending</option>
+                        <option value="approved">Approved</option>
+                        <option value="rejected">Rejected</option>
+                        <option value="disbursed">Disbursed</option>
+                    </select>
+
+                    <select
+                        value={stageFilter}
+                        onChange={(e) => handleFilterChange('stage', e.target.value)}
+                        className="px-4 py-2 rounded-lg bg-white dark:bg-[#1e293b] text-slate-600 dark:text-slate-300 text-xs font-bold uppercase tracking-wider border border-slate-200 dark:border-slate-700 shadow-sm outline-none cursor-pointer"
+                    >
+                        <option value="">All Stages</option>
+                        <option value="onboarding">Onboarding</option>
+                        <option value="submitted">Submitted</option>
+                        <option value="customer_experience">Customer Experience</option>
+                        <option value="credit_check_1">Credit Check 1</option>
+                        <option value="credit_check_2">Credit Check 2</option>
+                        <option value="internal_audit">Internal Audit</option>
+                        <option value="finance">Finance</option>
+                        <option value="disbursed">Disbursed</option>
+                    </select>
+                    {(user.role === 'sales_officer' || user.role === 'admin' || user.role === 'super_admin') && (
+                        <button
+                            onClick={() => setIsCreateModalOpen(true)}
+                            className="px-4 py-2 rounded-lg bg-blue-500 text-white text-xs font-bold uppercase tracking-wider flex items-center gap-2 hover:bg-blue-600 transition-all shadow-lg shadow-blue-500/20"
+                        >
+                            <span className="material-symbols-outlined text-sm">add</span>
+                            New Application
+                        </button>
+                    )}
+                </div>
+            </div>
 
             <div className="bg-white dark:bg-[#1e293b] rounded-3xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm">
                 <div className="p-6 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-[#0f172a]/50">
@@ -127,7 +162,7 @@ const LoanQueuePage: React.FC<LoanQueuePageProps> = ({ user, onLogout, toggleThe
                                     </td>
                                 </tr>
                             ) : (
-                                paginatedLoans.map((loan, i) => (
+                                filteredLoans.map((loan, i) => (
                                     <tr
                                         key={i}
                                         onClick={() => navigate(`/staff/loans/${loan.id}`)}
@@ -183,32 +218,14 @@ const LoanQueuePage: React.FC<LoanQueuePageProps> = ({ user, onLogout, toggleThe
                     </table>
                 </div>
 
-                {/* Pagination Footer */}
-                {totalPages > 1 && (
-                    <div className="p-6 border-t border-slate-200 dark:border-slate-800 flex justify-between items-center bg-slate-50/50 dark:bg-slate-900/50">
-                        <p className="text-xs text-slate-500 font-bold">
-                            Showing page {currentPage} of {totalPages} ({filteredLoans.length} total applications)
-                        </p>
-                        <div className="flex gap-2">
-                            <button
-                                disabled={currentPage === 1}
-                                onClick={() => handlePageChange(currentPage - 1)}
-                                className="px-4 py-2 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-50 transition-all flex items-center gap-1"
-                            >
-                                <span className="material-symbols-outlined text-sm">chevron_left</span>
-                                Previous
-                            </button>
-                            <button
-                                disabled={currentPage === totalPages}
-                                onClick={() => handlePageChange(currentPage + 1)}
-                                className="px-4 py-2 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-50 transition-all flex items-center gap-1"
-                            >
-                                Next
-                                <span className="material-symbols-outlined text-sm">chevron_right</span>
-                            </button>
-                        </div>
+                {/* Pagination (Placeholder) */}
+                <div className="p-4 border-t border-slate-200 dark:border-slate-800 flex justify-between items-center text-xs text-slate-500">
+                    <p>Showing 1-{Math.max(1, filteredLoans.length)} of {filteredLoans.length}</p>
+                    <div className="flex gap-2">
+                        <button className="px-3 py-1 rounded border border-slate-200 dark:border-slate-700 disabled:opacity-50" disabled>Previous</button>
+                        <button className="px-3 py-1 rounded border border-slate-200 dark:border-slate-700 disabled:opacity-50" disabled>Next</button>
                     </div>
-                )}
+                </div>
             </div>
 
             {isCreateModalOpen && (
