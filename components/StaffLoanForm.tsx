@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import MdaTertiarySelect from './MdaTertiarySelect';
+import MdaTertiarySelect, { TERTIARY_LIST } from './MdaTertiarySelect';
 
 interface StaffLoanFormProps {
     onClose: () => void;
@@ -107,7 +107,7 @@ const FileUpload = ({
 
 // --- Main Component ---
 
-const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess }) => {
+const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess, initialData, loanId, user }) => {
     const [step, setStep] = useState(0);
     const [loading, setLoading] = useState(false);
     const [uploadProgress, setUploadProgress] = useState<Record<string, number>>({});
@@ -138,11 +138,18 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess }) => 
     // Employment
     const [mda, setMda] = useState('');
     const [ippisNumber, setIppisNumber] = useState('');
+    const [staffId, setStaffId] = useState('');
     const [monthlyIncome, setMonthlyIncome] = useState('');
 
     // Loan Request
     const [amount, setAmount] = useState('');
     const [tenure, setTenure] = useState(6);
+
+    // Bank Details
+    const [bankName, setBankName] = useState('');
+    const [accountNumber, setAccountNumber] = useState('');
+    const [accountName, setAccountName] = useState('');
+    const [bankList, setBankList] = useState<{ name: string, code: string }[]>([]);
 
     // Documents
     const [uploadedDocs, setUploadedDocs] = useState<Record<string, { name: string, size: string, url: string } | null>>({
@@ -167,6 +174,75 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess }) => 
         "Documents",
         "References"
     ];
+
+    // Populate form if initialData exists (Edit Mode)
+    useEffect(() => {
+        if (initialData) {
+            setTitle(initialData.title || 'Mr');
+            setSurname(initialData.surname || '');
+            setFirstName(initialData.first_name || '');
+            setMiddleName(initialData.middle_name || '');
+            setGender(initialData.gender || '');
+            setDob(initialData.date_of_birth ? new Date(initialData.date_of_birth).toISOString().split('T')[0] : '');
+            setReligion(initialData.religion || '');
+            setMaritalStatus(initialData.marital_status || '');
+            setMothersMaidenName(initialData.mothers_maiden_name || '');
+            setMobileNumber(initialData.mobile_number || '');
+            setEmail(initialData.personal_email || '');
+            setBvn(initialData.bvn || '');
+            setNin(initialData.nin || '');
+
+            setStateOfOrigin(initialData.state_of_origin || '');
+            setStateOfResidence(initialData.state_of_residence || '');
+            setResidentialStatus(initialData.residential_status || '');
+            setAddress(initialData.primary_home_address || '');
+
+            setMda(initialData.mda_tertiary || '');
+            setIppisNumber(initialData.ippis_number || '');
+            setStaffId(initialData.staff_id || '');
+            setMonthlyIncome(initialData.average_monthly_income || '');
+
+            setAmount(initialData.requested_loan_amount || '');
+            setTenure(initialData.loan_tenure_months || 6);
+
+            // Pre-fill documents references if URLs exist (visual only, real re-upload needed to change)
+            setUploadedDocs(prev => ({
+                ...prev,
+                govt_id: initialData.govt_id_url ? { name: 'Existing Document', size: 'Unknown', url: initialData.govt_id_url } : null,
+                work_id: initialData.work_id_url ? { name: 'Existing Document', size: 'Unknown', url: initialData.work_id_url } : null,
+                payslip: initialData.payslip_url ? { name: 'Existing Document', size: 'Unknown', url: initialData.payslip_url } : null,
+                selfie: initialData.selfie_verification_url ? { name: 'Existing Document', size: 'Unknown', url: initialData.selfie_verification_url } : null,
+                bank_statement: initialData.statement_of_account_url ? { name: 'Existing Document', size: 'Unknown', url: initialData.statement_of_account_url } : null,
+                proof_address: initialData.proof_of_residence_url ? { name: 'Existing Document', size: 'Unknown', url: initialData.proof_of_residence_url } : null,
+            }));
+
+            if (initialData.customer_references) {
+                // Ensure references array matches structure or fallback
+                const refs = Array.isArray(initialData.customer_references) ? initialData.customer_references : [];
+                if (refs.length > 0) setReferences(refs);
+            }
+
+            // Bank Details
+            setBankName(initialData.bank_name || '');
+            setAccountNumber(initialData.account_number || '');
+            setAccountName(initialData.account_name || '');
+        }
+    }, [initialData]);
+
+    useEffect(() => {
+        // Fetch banks
+        const fetchBanks = async () => {
+            try {
+                const response = await axios.get(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/misc/banks`);
+                if (response.data && response.data.data) {
+                    setBankList(response.data.data);
+                }
+            } catch (error) {
+                console.error("Error fetching banks:", error);
+            }
+        };
+        fetchBanks();
+    }, []);
 
     const updateReference = (index: number, field: string, value: string) => {
         const newRefs = [...references];
@@ -292,38 +368,51 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess }) => 
 
         if (step === 2) { // Employment
             if (!mda) newErrors.mda = "Required";
-            if (!ippisNumber) newErrors.ippisNumber = "Required";
+
+            const isTertiary = TERTIARY_LIST.includes(mda);
+            if (!isTertiary && !ippisNumber) newErrors.ippisNumber = "Required";
+            if (isTertiary && !staffId) newErrors.staffId = "Required";
+
             if (!monthlyIncome) newErrors.monthlyIncome = "Required";
         }
 
         if (step === 3) { // Loan
             if (!amount) newErrors.amount = "Required";
-            else if (parseFloat(amount) < 1000) newErrors.amount = "Minimum ₦1,000";
+            else if (parseFloat(amount) < 100000) newErrors.amount = "Minimum ₦100,000";
+
+            if (!bankName) newErrors.bankName = "Required";
+            if (!accountNumber) {
+                newErrors.accountNumber = "Required";
+            } else if (!/^\d{10}$/.test(accountNumber)) {
+                newErrors.accountNumber = "Must be 10 digits";
+            }
+            if (!accountName) newErrors.accountName = "Required";
         }
 
         if (step === 4) { // Documents
             if (!uploadedDocs.govt_id) newErrors.govt_id = "Required";
             if (!uploadedDocs.work_id) newErrors.work_id = "Required";
             if (!uploadedDocs.payslip) newErrors.payslip = "Required";
+
+            // Bank Statement required for > 500k
+            if ((parseFloat(amount) || 0) > 500000 && !uploadedDocs.bank_statement) {
+                newErrors.bank_statement = "Required for > ₦500k";
+            }
         }
 
         if (step === 5) { // References
             references.forEach((ref, idx) => {
-                // First reference is strictly required. Others are required only if partially filled? Or generally required if added.
-                // Requirement: Only one is required. So first one must be valid.
-                if (idx === 0) {
-                    if (!ref.fullName) newErrors[`ref_${idx}_fullName`] = "Required";
-                    if (!ref.phoneNumber) newErrors[`ref_${idx}_phoneNumber`] = "Required";
-                    if (!ref.relationship) newErrors[`ref_${idx}_relationship`] = "Required";
-                    if (!ref.address) newErrors[`ref_${idx}_address`] = "Required";
-                } else {
-                    // If any field is filled in subsequent refs, enforce all fields (or just enforce if it exists in the list)
-                    // Let's enforce full objects if they are remaining in the list
-                    if (!ref.fullName) newErrors[`ref_${idx}_fullName`] = "Required";
-                    if (!ref.phoneNumber) newErrors[`ref_${idx}_phoneNumber`] = "Required";
-                    if (!ref.relationship) newErrors[`ref_${idx}_relationship`] = "Required";
-                    if (!ref.address) newErrors[`ref_${idx}_address`] = "Required";
+                // All fields required for any added reference
+                if (!ref.fullName?.trim()) newErrors[`ref_${idx}_fullName`] = "Required";
+
+                if (!ref.phoneNumber?.trim()) {
+                    newErrors[`ref_${idx}_phoneNumber`] = "Required";
+                } else if (ref.phoneNumber.replace(/\D/g, '').length < 10) {
+                    newErrors[`ref_${idx}_phoneNumber`] = "Invalid Number";
                 }
+
+                if (!ref.relationship) newErrors[`ref_${idx}_relationship`] = "Required";
+                if (!ref.address?.trim()) newErrors[`ref_${idx}_address`] = "Required";
             });
         }
 
@@ -374,6 +463,7 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess }) => 
                 primary_home_address: address,
                 mda_tertiary: mda,
                 ippis_number: ippisNumber,
+                staff_id: staffId,
                 average_monthly_income: parseFloat(monthlyIncome) || 0,
                 requested_loan_amount: parseFloat(amount) || 0,
                 loan_tenure_months: tenure,
@@ -383,16 +473,29 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess }) => 
                 statement_of_account_url: uploadedDocs.bank_statement?.url,
                 proof_of_residence_url: uploadedDocs.proof_address?.url,
                 selfie_verification_url: uploadedDocs.selfie?.url,
-                references
+                references,
+
+                // Bank Details
+                bank_name: bankName,
+                account_number: accountNumber,
+                account_name: accountName
             };
 
-            await axios.post('/api/staff/loans/application', payload);
-            alert("Loan Application Created Successfully!");
+            if (loanId) {
+                // UPDATE Mode
+                await axios.put(`/api/staff/loans/${loanId}`, payload);
+                alert("Loan Application Updated Successfully!");
+            } else {
+                // CREATE Mode
+                await axios.post('/api/staff/loans/application', payload);
+                alert("Loan Application Created Successfully!");
+            }
+
             onSuccess();
-            onClose();
+            onClose(); // Ensure we close the modal
         } catch (error: any) {
-            console.error("Failed to create loan", error);
-            alert(error.response?.data?.message || "Failed to create loan");
+            console.error("Failed to save loan", error);
+            alert(error.response?.data?.message || "Failed to save loan");
         } finally {
             setLoading(false);
         }
@@ -539,8 +642,11 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess }) => 
                                         error={errors.mda}
                                     />
                                 </div>
-                                <InputGroup label="IPPIS Number" required error={errors.ippisNumber}>
+                                <InputGroup label={`IPPIS Number ${TERTIARY_LIST.includes(mda) ? '(Optional)' : '*'}`} required={!TERTIARY_LIST.includes(mda)} error={errors.ippisNumber}>
                                     <input className="input-field" value={ippisNumber} onChange={e => { setIppisNumber(e.target.value); clearError('ippisNumber'); }} />
+                                </InputGroup>
+                                <InputGroup label={`Staff ID ${TERTIARY_LIST.includes(mda) ? '*' : '(Optional)'}`} required={TERTIARY_LIST.includes(mda)} error={errors.staffId}>
+                                    <input className="input-field" value={staffId} onChange={e => { setStaffId(e.target.value); clearError('staffId'); }} />
                                 </InputGroup>
                                 <InputGroup label="Monthly Income" required error={errors.monthlyIncome}>
                                     <input type="number" className="input-field" value={monthlyIncome} onChange={e => { setMonthlyIncome(e.target.value); clearError('monthlyIncome'); }} />
@@ -561,8 +667,41 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess }) => 
                                     </InputGroup>
                                     <InputGroup label="Tenure (Months)">
                                         <select className="input-field" value={tenure} onChange={e => setTenure(parseInt(e.target.value))}>
-                                            {[1, 3, 6, 9, 12, 18, 24].map(m => <option key={m} value={m}>{m} Months</option>)}
+                                            {[3, 6, 9, 12, 15, 18].map(m => <option key={m} value={m}>{m} Months</option>)}
                                         </select>
+                                    </InputGroup>
+                                </div>
+
+                                <div className="h-px bg-slate-100 dark:bg-slate-800 w-full" />
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                    <InputGroup label="Bank Name" required error={errors.bankName}>
+                                        <select className="input-field" value={bankName} onChange={e => { setBankName(e.target.value); clearError('bankName'); }}>
+                                            <option value="">Select Bank</option>
+                                            {bankList.map((bank: any) => (
+                                                <option key={bank.id} value={bank.name}>{bank.name}</option>
+                                            ))}
+                                        </select>
+                                    </InputGroup>
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                    <InputGroup label="Account Number" required error={errors.accountNumber}>
+                                        <input
+                                            className="input-field"
+                                            value={accountNumber}
+                                            onChange={handleNumericChange(setAccountNumber, 'accountNumber', 10)}
+                                            maxLength={10}
+                                            placeholder="10 Digits"
+                                        />
+                                    </InputGroup>
+                                    <InputGroup label="Account Name" required error={errors.accountName}>
+                                        <input
+                                            className="input-field"
+                                            value={accountName}
+                                            onChange={e => { setAccountName(e.target.value); clearError('accountName'); }}
+                                            placeholder="Account Name"
+                                        />
                                     </InputGroup>
                                 </div>
                             </div>
@@ -613,6 +752,7 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess }) => 
                                 <FileUpload
                                     id="bank_statement"
                                     label="Bank Statement"
+                                    required={(parseFloat(amount) || 0) > 500000}
                                     doc={uploadedDocs.bank_statement}
                                     progress={uploadProgress.bank_statement}
                                     onSelect={handleFileSelect}
