@@ -25,6 +25,8 @@ import UsersPage from './pages/UsersPage';
 import axios from 'axios';
 
 
+import LogoutWarningModal from './components/modals/LogoutWarningModal';
+
 // ProtectedRoute Component extracted to prevent re-renders
 interface ProtectedRouteProps {
   children: React.ReactElement;
@@ -98,6 +100,8 @@ const AppContent: React.FC = () => {
     name: '',
     isLoggedIn: false
   });
+
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
 
 
   useEffect(() => {
@@ -177,7 +181,7 @@ const AppContent: React.FC = () => {
     }
   }, [searchParams, handleLogin, navigateRouter]);
 
-  const handleLogout = useCallback(async () => {
+  const performLogout = useCallback(async () => {
     try {
       const backendUrl = ''; // Use proxy
       // If backendUrl is empty, it means we are using proxy (relative path)
@@ -190,8 +194,44 @@ const AppContent: React.FC = () => {
     } finally {
       setUser({ email: '', name: 'Alex Morgan', isLoggedIn: false });
       setResumeDraft(null);
+      setShowLogoutModal(false); // Close modal
     }
   }, []);
+
+  const handleLogoutRequest = useCallback(() => {
+    setShowLogoutModal(true);
+  }, []);
+
+  // --- Auto Logout Logic ---
+  useEffect(() => {
+    if (!user.isLoggedIn) return;
+
+    let timeoutId: NodeJS.Timeout;
+
+    const resetTimer = () => {
+      clearTimeout(timeoutId);
+      // 1 hour = 3600000 ms
+      timeoutId = setTimeout(() => {
+        console.log("Auto-logout triggered due to inactivity");
+        performLogout();
+      }, 3600000);
+    };
+
+    // Initial start
+    resetTimer();
+
+    // Event listeners for activity
+    const events = ['mousedown', 'keydown', 'scroll', 'touchstart', 'mousemove'];
+    const handleActivity = () => resetTimer();
+
+    events.forEach(event => window.addEventListener(event, handleActivity));
+
+    return () => {
+      clearTimeout(timeoutId);
+      events.forEach(event => window.removeEventListener(event, handleActivity));
+    };
+  }, [user.isLoggedIn, performLogout]);
+
 
   // Format money helper
   const formatMoney = useMemo(() => (amount: number) => {
@@ -233,6 +273,12 @@ const AppContent: React.FC = () => {
 
   return (
     <div className="min-h-screen flex flex-col bg-background-light dark:bg-background-dark text-slate-900 dark:text-slate-100 transition-all duration-300">
+      <LogoutWarningModal
+        isOpen={showLogoutModal}
+        onConfirm={performLogout}
+        onCancel={() => setShowLogoutModal(false)}
+      />
+
       <Routes>
         {/* Auth Routes */}
         <Route path="/login" element={
@@ -279,7 +325,7 @@ const AppContent: React.FC = () => {
           isLoading ? null : (user.isLoggedIn && user.role !== 'customer' ? (
             <StaffDashboard
               user={user}
-              onLogout={handleLogout}
+              onLogout={handleLogoutRequest}
               toggleTheme={toggleTheme}
               theme={theme}
             />
@@ -291,7 +337,7 @@ const AppContent: React.FC = () => {
           isLoading ? null : (user.isLoggedIn && user.role !== 'customer' ? (
             <LoanQueuePage
               user={user}
-              onLogout={handleLogout}
+              onLogout={handleLogoutRequest}
               toggleTheme={toggleTheme}
               theme={theme}
             />
@@ -301,7 +347,7 @@ const AppContent: React.FC = () => {
           isLoading ? null : (user.isLoggedIn && user.role !== 'customer' ? (
             <LoanDetailsPage
               user={user}
-              onLogout={handleLogout}
+              onLogout={handleLogoutRequest}
               toggleTheme={toggleTheme}
               theme={theme}
             />
@@ -312,7 +358,7 @@ const AppContent: React.FC = () => {
             <StaffPlaceholderPage
               title="Reports"
               user={user}
-              onLogout={handleLogout}
+              onLogout={handleLogoutRequest}
               toggleTheme={toggleTheme}
               theme={theme}
             />
@@ -322,7 +368,7 @@ const AppContent: React.FC = () => {
           isLoading ? null : (user.isLoggedIn && user.role !== 'customer' ? (
             <SettingsPage
               user={user}
-              onLogout={handleLogout}
+              onLogout={handleLogoutRequest}
               toggleTheme={toggleTheme}
               theme={theme}
             />
@@ -332,7 +378,7 @@ const AppContent: React.FC = () => {
           isLoading ? null : (user.isLoggedIn && user.role !== 'customer' ? (
             <UsersPage
               user={user}
-              onLogout={handleLogout}
+              onLogout={handleLogoutRequest}
               toggleTheme={toggleTheme}
               theme={theme}
             />
@@ -343,7 +389,7 @@ const AppContent: React.FC = () => {
             <StaffPlaceholderPage
               title="Audit"
               user={user}
-              onLogout={handleLogout}
+              onLogout={handleLogoutRequest}
               toggleTheme={toggleTheme}
               theme={theme}
             />
@@ -352,31 +398,31 @@ const AppContent: React.FC = () => {
 
         {/* Protected Routes */}
         <Route path="/dashboard" element={
-          <ProtectedRoute user={user} isLoading={isLoading} theme={theme} onLogout={handleLogout} onToggleTheme={toggleTheme}>
+          <ProtectedRoute user={user} isLoading={isLoading} theme={theme} onLogout={handleLogoutRequest} onToggleTheme={toggleTheme}>
             <Dashboard navigate={(step) => handleLegacyNavigate(step)} />
           </ProtectedRoute>
         } />
 
         <Route path="/products" element={
-          <ProtectedRoute user={user} isLoading={isLoading} theme={theme} onLogout={handleLogout} onToggleTheme={toggleTheme}>
+          <ProtectedRoute user={user} isLoading={isLoading} theme={theme} onLogout={handleLogoutRequest} onToggleTheme={toggleTheme}>
             <ProductSelect navigate={handleLegacyNavigate} />
           </ProtectedRoute>
         } />
 
         <Route path="/applications" element={
-          <ProtectedRoute user={user} isLoading={isLoading} theme={theme} onLogout={handleLogout} onToggleTheme={toggleTheme}>
+          <ProtectedRoute user={user} isLoading={isLoading} theme={theme} onLogout={handleLogoutRequest} onToggleTheme={toggleTheme}>
             <ApplicationsList navigate={handleLegacyNavigate} formatMoney={formatMoney} />
           </ProtectedRoute>
         } />
 
         <Route path="/calculator" element={
-          <ProtectedRoute user={user} isLoading={isLoading} theme={theme} onLogout={handleLogout} onToggleTheme={toggleTheme}>
+          <ProtectedRoute user={user} isLoading={isLoading} theme={theme} onLogout={handleLogoutRequest} onToggleTheme={toggleTheme}>
             <Calculator navigate={handleLegacyNavigate} formatMoney={formatMoney} />
           </ProtectedRoute>
         } />
 
         <Route path="/loan/*" element={
-          <ProtectedRoute user={user} isLoading={isLoading} theme={theme} onLogout={handleLogout} onToggleTheme={toggleTheme}>
+          <ProtectedRoute user={user} isLoading={isLoading} theme={theme} onLogout={handleLogoutRequest} onToggleTheme={toggleTheme}>
             <LoanFlow
               initialStep="TYPE"
               onComplete={handleLoanComplete}
@@ -389,7 +435,7 @@ const AppContent: React.FC = () => {
         } />
 
         <Route path="/investment/*" element={
-          <ProtectedRoute user={user} isLoading={isLoading} theme={theme} onLogout={handleLogout} onToggleTheme={toggleTheme}>
+          <ProtectedRoute user={user} isLoading={isLoading} theme={theme} onLogout={handleLogoutRequest} onToggleTheme={toggleTheme}>
             <InvestmentFlow
               navigate={handleLegacyNavigate}
               onComplete={handleInvestmentComplete}
@@ -400,7 +446,7 @@ const AppContent: React.FC = () => {
         } />
 
         <Route path="/success" element={
-          <ProtectedRoute user={user} isLoading={isLoading} theme={theme} onLogout={handleLogout} onToggleTheme={toggleTheme}>
+          <ProtectedRoute user={user} isLoading={isLoading} theme={theme} onLogout={handleLogoutRequest} onToggleTheme={toggleTheme}>
             <SuccessScreen
               onDashboard={() => { }}
               loan={loan}
@@ -411,7 +457,7 @@ const AppContent: React.FC = () => {
         } />
 
         {/* Default Redirect */}
-        <Route path="/restricted" element={<RestrictedAccessPage onLogout={handleLogout} />} />
+        <Route path="/restricted" element={<RestrictedAccessPage onLogout={handleLogoutRequest} />} />
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
     </div>

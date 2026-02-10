@@ -9,7 +9,7 @@ interface MdaTertiarySelectProps {
     error?: string;
 }
 
-const TERTIARY_LIST = [
+export const TERTIARY_LIST = [
     'AHMADU BELLO UNIVERSITY ZARIA',
     'AKANU IBIAM FEDERAL POLYTECHNIC',
     'ALVAN IKOKU COLLEGE OF EDUCATION',

@@ -1,5 +1,6 @@
 
 import React from 'react';
+import { Link } from 'react-router-dom';
 
 interface AuthLayoutProps {
     children: React.ReactNode;
@@ -20,12 +21,18 @@ const AuthLayout: React.FC<AuthLayoutProps> = ({ children }) => {
                     ></div>
                 </div>
 
-                <div className="relative z-20 flex items-center gap-3">
-                    <div className="flex items-center justify-center size-10 rounded-xl bg-primary text-white shadow-[0_0_15px_rgba(2,143,245,0.4)]">
-                        <span className="material-symbols-outlined text-2xl">ssid_chart</span>
+                <Link to="/" className="relative z-20 flex items-center gap-4 cursor-pointer mb-12">
+                    <div className="w-16 h-16 rounded-2xl flex items-center justify-center overflow-hidden">
+                        <img
+                            src="https://isswlcllytiltgjbysjv.supabase.co/storage/v1/object/public/template-images/logo%20file-02%20(1).png"
+                            alt="NOLT Finance Logo"
+                            className="w-full h-full object-contain p-1"
+                        />
                     </div>
-                    <h2 className="text-white text-xl font-bold tracking-tight">NOLT Finance</h2>
-                </div>
+                    <h1 className="text-2xl font-black tracking-tighter text-white uppercase drop-shadow-md">
+                        NOLT Finance
+                    </h1>
+                </Link>
 
                 <div className="relative z-20 mt-auto max-w-md">
                     <div className="glass-effect p-8 rounded-3xl border border-white/5 shadow-2xl">
@@ -42,8 +49,8 @@ const AuthLayout: React.FC<AuthLayoutProps> = ({ children }) => {
                         <div className="flex items-center gap-3">
                             <div className="size-10 rounded-full bg-slate-700 bg-cover bg-center border border-white/10" style={{ backgroundImage: 'url("https://picsum.photos/seed/user123/100/100")' }}></div>
                             <div>
-                                <p className="text-sm font-bold text-white">David Chen</p>
-                                <p className="text-xs text-slate-400 font-medium">CEO, TechStart Inc.</p>
+                                <p className="text-sm font-bold text-white">Anonymous User</p>
+                                <p className="text-xs text-slate-400 font-medium">....</p>
                             </div>
                         </div>
                     </div>
