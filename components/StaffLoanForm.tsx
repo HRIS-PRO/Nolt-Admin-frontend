@@ -235,9 +235,12 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess, initi
         // Fetch banks
         const fetchBanks = async () => {
             try {
-                const response = await axios.get(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/misc/banks`);
+                // Use relative path to leverage proxy (Vite)
+                const response = await axios.get('/api/misc/banks');
                 if (response.data && response.data.data) {
                     setBankList(response.data.data);
+                } else {
+                    console.warn("Bank list response format unexpected:", response.data);
                 }
             } catch (error) {
                 console.error("Error fetching banks:", error);
