@@ -49,11 +49,57 @@ const StaffDashboard: React.FC<StaffDashboardProps> = ({ user, onLogout, toggleT
             .join('');
     };
 
+    const handleExport = () => {
+        if (!loans || loans.length === 0) {
+            alert("No data to export");
+            return;
+        }
+
+        const headers = [
+            "Reference ID",
+            "Applicant Name",
+            "Applicant Email",
+            "Node/Stage",
+            "Sales Officer",
+            "Requested Amount",
+            "Status",
+            "Product Type",
+            "Date Applied"
+        ];
+
+        const csvContent = [
+            headers.join(","),
+            ...loans.map(loan => {
+                const row = [
+                    `LOAN-${loan.id}`,
+                    `"${loan.applicant_full_name || ''}"`,
+                    `"${loan.applicant_email || ''}"`, // Assuming email might be available, otherwise blank
+                    `"${loan.stage || ''}"`,
+                    `"${loan.officer_name || 'Unassigned'}"`,
+                    `${loan.requested_loan_amount || 0}`,
+                    `"${loan.status || ''}"`,
+                    `"${loan.product_type || ''}"`,
+                    `"${new Date(loan.created_at).toLocaleDateString()}"`
+                ];
+                return row.join(",");
+            })
+        ].join("\n");
+
+        const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.setAttribute("href", url);
+        link.setAttribute("download", `loans_report_${new Date().toISOString().split('T')[0]}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
 
 
     return (
         <StaffLayout user={user} onLogout={onLogout} toggleTheme={toggleTheme} theme={theme}>
-            <header className="flex justify-between items-end mb-8">
+            <header className="flex flex-col md:flex-row justify-between md:items-end gap-6 mb-8">
                 <div>
                     <h1 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight leading-tight">
                         Welcome back, {user.name.split(' ')[0]}
@@ -67,7 +113,10 @@ const StaffDashboard: React.FC<StaffDashboardProps> = ({ user, onLogout, toggleT
                         <span className="material-symbols-outlined text-sm">verified_user</span>
                         {user.role} View
                     </button>
-                    <button className="px-4 py-2 rounded-lg bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-white text-xs font-bold uppercase tracking-wider flex items-center gap-2 hover:bg-slate-300 dark:hover:bg-slate-600 transition-all">
+                    <button
+                        onClick={handleExport}
+                        className="px-4 py-2 rounded-lg bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-white text-xs font-bold uppercase tracking-wider flex items-center gap-2 hover:bg-slate-300 dark:hover:bg-slate-600 transition-all"
+                    >
                         <span className="material-symbols-outlined text-sm">download</span>
                         Export Report
                     </button>
@@ -76,17 +125,17 @@ const StaffDashboard: React.FC<StaffDashboardProps> = ({ user, onLogout, toggleT
 
             {/* AI Banner */}
             <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-blue-600 to-cyan-500 p-[1px] shadow-xl shadow-blue-500/10 mb-8">
-                <div className="bg-white dark:bg-[#0f172a] rounded-[23px] p-6 relative overflow-hidden flex items-center justify-between">
-                    <div className="flex items-center gap-6 relative z-10">
-                        <div className="size-14 rounded-2xl bg-blue-500 flex items-center justify-center shadow-lg shadow-blue-500/40">
+                <div className="bg-white dark:bg-[#0f172a] rounded-[23px] p-6 relative overflow-hidden flex flex-col md:flex-row items-center justify-between gap-6">
+                    <div className="flex flex-col md:flex-row items-center gap-6 relative z-10 text-center md:text-left">
+                        <div className="size-14 rounded-2xl bg-blue-500 flex items-center justify-center shadow-lg shadow-blue-500/40 shrink-0">
                             <span className="material-symbols-outlined text-white text-3xl">auto_awesome</span>
                         </div>
                         <div>
                             <p className="text-blue-500 dark:text-blue-400 text-xs font-black uppercase tracking-widest mb-1">AI Assistant Intelligence</p>
-                            <h3 className="text-slate-900 dark:text-white font-bold text-lg">Need a quick analysis? Let AI summarize the current review queue and identify trends.</h3>
+                            <h3 className="text-slate-900 dark:text-white font-bold text-lg max-w-xl">Need a quick analysis? Let AI summarize the current review queue and identify trends.</h3>
                         </div>
                     </div>
-                    <button className="px-6 py-3 rounded-xl bg-blue-500 hover:bg-blue-400 text-white font-bold text-sm tracking-wide shadow-lg shadow-blue-500/30 transition-all z-10">
+                    <button className="w-full md:w-auto px-6 py-3 rounded-xl bg-blue-500 hover:bg-blue-400 text-white font-bold text-sm tracking-wide shadow-lg shadow-blue-500/30 transition-all z-10 whitespace-nowrap">
                         GENERATE ANALYSIS
                     </button>
 
@@ -135,7 +184,7 @@ const StaffDashboard: React.FC<StaffDashboardProps> = ({ user, onLogout, toggleT
                 </div>
 
                 <div className="overflow-x-auto">
-                    <table className="w-full text-left">
+                    <table className="w-full text-left min-w-[1000px]">
                         <thead className="bg-slate-50/50 dark:bg-[#0f172a]/30 text-xs uppercase text-slate-500 font-black tracking-wider">
                             <tr>
                                 <th className="p-4 w-4"><div className="size-4 rounded border border-slate-300 dark:border-slate-700"></div></th>

@@ -16,13 +16,14 @@ interface Activity {
 interface ActivityTimelineProps {
     loanId: string | undefined;
     refreshTrigger?: number;
+    defaultOpen?: boolean;
 }
 
-const ActivityTimeline: React.FC<ActivityTimelineProps> = ({ loanId, refreshTrigger = 0 }) => {
+const ActivityTimeline: React.FC<ActivityTimelineProps> = ({ loanId, refreshTrigger = 0, defaultOpen = false }) => {
     const [items, setItems] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [expandedItems, setExpandedItems] = useState<Record<string, boolean>>({});
-    const [isTimelineOpen, setIsTimelineOpen] = useState(false);
+    const [isTimelineOpen, setIsTimelineOpen] = useState(defaultOpen);
 
     const toggleExpand = (id: string) => {
         setExpandedItems(prev => ({ ...prev, [id]: !prev[id] }));

@@ -373,8 +373,12 @@ const LoanDetailsPage: React.FC<LoanDetailsPageProps> = ({ user, onLogout, toggl
 
                     <CollapsibleGroup title="Financial Profile" icon="trending_up">
                         <Field label="Monthly Income" value={`₦${Number(loan.average_monthly_income).toLocaleString()}`} />
+                        <Field label="Bank Name" value={loan.bank_name} />
+                        <Field label="Account Number" value={loan.account_number} copy />
+                        <Field label="Account Name" value={loan.account_name} />
                         <Field label="IPPIS" value={loan.ippis_number} />
-                        <Field label="MDA" value={loan.mda_tertiary} />
+                        <Field label="MDA / Tertiary" value={loan.mda_tertiary} />
+                        <Field label="Staff ID" value={loan.staff_id} />
                         <SensitiveDataField loanId={loan.id} field="bvn" label="BVN" />
                         <SensitiveDataField loanId={loan.id} field="nin" label="NIN" />
                     </CollapsibleGroup>

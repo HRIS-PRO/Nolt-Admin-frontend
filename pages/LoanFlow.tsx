@@ -826,12 +826,12 @@ const LoanFlow: React.FC<LoanFlowProps> = ({ initialStep, onComplete, navigate, 
               <p className="text-slate-500 font-medium">Upload necessary documents to verify your identity and income.</p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                 {[
-                  { id: 'national_id', label: 'Government Issued ID', icon: 'badge' },
+                  { id: 'national_id', label: 'Government Issued ID', icon: 'badge', required: true },
+                  { id: 'work_id', label: 'Work ID', icon: 'badge', required: true },
+                  { id: 'payslip', label: 'Recent Payslip', icon: 'receipt', required: true },
                   { id: 'bank_statement', label: 'Last 3 Mo. Statements', icon: 'account_balance' },
                   { id: 'proof_address', label: 'Proof of Residence', icon: 'home_pin' },
                   { id: 'selfie', label: 'Selfie Verification', icon: 'add_a_photo' },
-                  { id: 'work_id', label: 'Work ID', icon: 'badge' },
-                  { id: 'payslip', label: 'Recent Payslip', icon: 'receipt' }
                 ].map(doc => (
                   <div key={doc.id} onClick={() => handleFileSelect(doc.id)} className={`relative group p-6 rounded-3xl border-2 border-dashed transition-all cursor-pointer flex flex-col items-center gap-4 text-center ${uploadedDocs[doc.id] ? 'border-green-500 bg-green-500/5' : 'border-slate-200 dark:border-slate-700 hover:border-primary'}`}>
                     {uploadedDocs[doc.id] ? (
@@ -842,7 +842,7 @@ const LoanFlow: React.FC<LoanFlowProps> = ({ initialStep, onComplete, navigate, 
                     <div>
                       <p className="font-bold dark:text-white text-sm">
                         {doc.label}
-                        {doc.id === 'bank_statement' && (parseFloat(desiredAmount.replace(/[^0-9.]/g, '')) || 0) > 500000 && <span className="text-red-500 ml-1">*</span>}
+                        {(doc.required || (doc.id === 'bank_statement' && (parseFloat(desiredAmount.replace(/[^0-9.]/g, '')) || 0) > 500000)) && <span className="text-red-500 ml-1">*</span>}
                       </p>
                       {uploadedDocs[doc.id] ? <p className="text-[10px] text-green-500 font-black uppercase tracking-widest mt-1">Uploaded</p> : <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest mt-1">Click to upload</p>}
                     </div>

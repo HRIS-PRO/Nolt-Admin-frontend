@@ -140,7 +140,7 @@ const UsersPage: React.FC<UsersPageProps> = ({ user, onLogout, toggleTheme, them
 
     return (
         <StaffLayout user={user} onLogout={onLogout} toggleTheme={toggleTheme} theme={theme}>
-            <div className="flex justify-between items-end mb-8">
+            <div className="flex flex-col md:flex-row justify-between md:items-end gap-4 mb-8">
                 <div>
                     <h1 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight leading-tight">
                         Core Team
@@ -151,10 +151,10 @@ const UsersPage: React.FC<UsersPageProps> = ({ user, onLogout, toggleTheme, them
                 </div>
                 <button
                     onClick={() => setShowInviteModal(true)}
-                    className="px-6 py-3 rounded-xl bg-blue-600 text-white text-xs font-bold uppercase tracking-wider flex items-center gap-2 hover:bg-blue-700 transition-all shadow-lg shadow-blue-500/20"
+                    className="self-end md:self-auto px-4 py-3 md:px-6 rounded-xl bg-blue-600 text-white text-xs font-bold uppercase tracking-wider flex items-center gap-2 hover:bg-blue-700 transition-all shadow-lg shadow-blue-500/20"
                 >
-                    <span className="material-symbols-outlined text-lg">add</span>
-                    Invite Member
+                    <span className="material-symbols-outlined text-xl md:text-lg">add</span>
+                    <span className="hidden md:inline">Invite Member</span>
                 </button>
             </div>
 
@@ -311,7 +311,7 @@ const UsersPage: React.FC<UsersPageProps> = ({ user, onLogout, toggleTheme, them
             {/* Invite Modal */}
             {showInviteModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
-                    <div className="bg-white dark:bg-slate-900 rounded-[32px] p-8 w-full max-w-md shadow-2xl border border-slate-200 dark:border-slate-800 relative animate-in fade-in zoom-in duration-300">
+                    <div className="bg-white dark:bg-slate-900 rounded-[32px] p-6 md:p-8 w-full max-w-md shadow-2xl border border-slate-200 dark:border-slate-800 relative animate-in fade-in zoom-in duration-300">
                         <button onClick={() => setShowInviteModal(false)} className="absolute top-6 right-6 text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors">
                             <span className="material-symbols-outlined">close</span>
                         </button>
