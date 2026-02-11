@@ -31,7 +31,7 @@ const ApplicationsList: React.FC<ApplicationsListProps> = ({ navigate, formatMon
           // Filter for completed statuses (disbursed, rejected)
           // Also including repayment_started and closed as they are logically completed/advanced steps of disbursed
           const completed = data.filter((app: any) =>
-            ['disbursed', 'rejected', 'repayment_started', 'closed'].includes(app.status?.toLowerCase())
+            ['disbursed', 'rejected', 'repayment_started', 'closed', 'approved'].includes(app.status?.toLowerCase())
           ).map(app => ({
             id: String(app.id), // Ensure string for consistency
             type: 'Business Loan', // Default type or derive from data if available

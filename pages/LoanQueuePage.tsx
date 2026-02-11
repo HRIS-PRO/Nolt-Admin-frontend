@@ -77,7 +77,7 @@ const LoanQueuePage: React.FC<LoanQueuePageProps> = ({ user, onLogout, toggleThe
 
     return (
         <StaffLayout user={user} onLogout={onLogout} toggleTheme={toggleTheme} theme={theme}>
-            <div className="flex justify-between items-end mb-8">
+            <div className="flex flex-col md:flex-row justify-between md:items-end gap-6 mb-8">
                 <div>
                     <h1 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight leading-tight">
                         Loan Queue
@@ -86,11 +86,11 @@ const LoanQueuePage: React.FC<LoanQueuePageProps> = ({ user, onLogout, toggleThe
                         Comprehensive management of historical and ongoing loan transactions.
                     </p>
                 </div>
-                <div className="flex gap-3">
+                <div className="flex flex-wrap gap-3 w-full md:w-auto">
                     <select
                         value={statusFilter}
                         onChange={(e) => handleFilterChange('status', e.target.value)}
-                        className="px-4 py-2 rounded-lg bg-white dark:bg-[#1e293b] text-slate-600 dark:text-slate-300 text-xs font-bold uppercase tracking-wider border border-slate-200 dark:border-slate-700 shadow-sm outline-none cursor-pointer"
+                        className="flex-1 md:flex-none px-4 py-2 rounded-lg bg-white dark:bg-[#1e293b] text-slate-600 dark:text-slate-300 text-xs font-bold uppercase tracking-wider border border-slate-200 dark:border-slate-700 shadow-sm outline-none cursor-pointer"
                     >
                         <option value="">All Status</option>
                         <option value="pending">Pending</option>
@@ -102,7 +102,7 @@ const LoanQueuePage: React.FC<LoanQueuePageProps> = ({ user, onLogout, toggleThe
                     <select
                         value={stageFilter}
                         onChange={(e) => handleFilterChange('stage', e.target.value)}
-                        className="px-4 py-2 rounded-lg bg-white dark:bg-[#1e293b] text-slate-600 dark:text-slate-300 text-xs font-bold uppercase tracking-wider border border-slate-200 dark:border-slate-700 shadow-sm outline-none cursor-pointer"
+                        className="flex-1 md:flex-none px-4 py-2 rounded-lg bg-white dark:bg-[#1e293b] text-slate-600 dark:text-slate-300 text-xs font-bold uppercase tracking-wider border border-slate-200 dark:border-slate-700 shadow-sm outline-none cursor-pointer"
                     >
                         <option value="">All Stages</option>
                         <option value="onboarding">Onboarding</option>
@@ -117,7 +117,7 @@ const LoanQueuePage: React.FC<LoanQueuePageProps> = ({ user, onLogout, toggleThe
                     {(user.role === 'sales_officer' || user.role === 'admin' || user.role === 'super_admin') && (
                         <button
                             onClick={() => setIsCreateModalOpen(true)}
-                            className="px-4 py-2 rounded-lg bg-blue-500 text-white text-xs font-bold uppercase tracking-wider flex items-center gap-2 hover:bg-blue-600 transition-all shadow-lg shadow-blue-500/20"
+                            className="w-full md:w-auto px-4 py-2 rounded-lg bg-blue-500 text-white text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 hover:bg-blue-600 transition-all shadow-lg shadow-blue-500/20"
                         >
                             <span className="material-symbols-outlined text-sm">add</span>
                             New Application

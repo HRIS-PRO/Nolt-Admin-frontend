@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link, NavLink, useSearchParams } from 'react-router-dom';
 import { Theme } from '../../types';
 
@@ -13,6 +13,7 @@ interface StaffLayoutProps {
 const StaffLayout: React.FC<StaffLayoutProps> = ({ children, user, onLogout, toggleTheme, theme }) => {
     const [searchParams, setSearchParams] = useSearchParams();
     const searchQuery = searchParams.get('search') || '';
+    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
     const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
         const value = e.target.value;
@@ -45,43 +46,78 @@ const StaffLayout: React.FC<StaffLayoutProps> = ({ children, user, onLogout, tog
     ];
 
     return (
-        <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex text-slate-900 dark:text-white font-sans">
+        <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex text-slate-900 dark:text-white font-sans relative">
+
+            {/* Mobile Sidebar Overlay */}
+            {isSidebarOpen && (
+                <div
+                    className="fixed inset-0 bg-slate-900/50 z-30 lg:hidden backdrop-blur-sm"
+                    onClick={() => setIsSidebarOpen(false)}
+                ></div>
+            )}
+
             {/* Sidebar */}
-            <aside className="w-72 bg-[#0f172a] text-white flex flex-col fixed h-full z-20 transition-all duration-300 border-r border-[#1e293b]">
+            <aside className={`
+                fixed lg:sticky top-0 h-screen w-72 bg-[#0f172a] text-white flex flex-col z-40 transition-transform duration-300 border-r border-[#1e293b]
+                ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
+            `}>
                 {/* Brand */}
-                <Link to="/" className="flex items-center gap-3 p-8 cursor-pointer">
-                    <div className="w-10 h-10 rounded-xl flex items-center justify-center overflow-hidden">
-                        <img
-                            src="https://isswlcllytiltgjbysjv.supabase.co/storage/v1/object/public/template-images/logo%20file-02%20(1).png"
-                            alt="NOLT Finance Logo"
-                            className="w-full h-full object-contain"
-                        />
-                    </div>
-                    <h1 className="text-xl font-black tracking-tighter text-slate-900 text-white uppercase">
-                        NOLT Finance
-                    </h1>
-                </Link>
+                <div className="flex items-center justify-between p-8">
+                    <Link to="/" className="flex items-center gap-3 cursor-pointer">
+                        <div className="w-10 h-10 rounded-xl flex items-center justify-center overflow-hidden">
+                            <img
+                                src="https://isswlcllytiltgjbysjv.supabase.co/storage/v1/object/public/template-images/logo%20file-02%20(1).png"
+                                alt="NOLT Finance Logo"
+                                className="w-full h-full object-contain"
+                            />
+                        </div>
+                        <h1 className="text-xl font-black tracking-tighter text-slate-900 text-white uppercase">
+                            NOLT Finance
+                        </h1>
+                    </Link>
+                    {/* Mobile Close Button */}
+                    <button
+                        onClick={() => setIsSidebarOpen(false)}
+                        className="lg:hidden p-2 text-slate-400 hover:text-white"
+                    >
+                        <span className="material-symbols-outlined">close</span>
+                    </button>
+                </div>
 
                 {/* Navigation */}
                 <nav className="flex-1 px-4 flex flex-col gap-8 overflow-y-auto">
-                    {navGroups.map((group, idx) => (
-                        <div key={idx} className="flex flex-col gap-2">
-                            <h3 className="px-4 text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 mb-2">{group.title}</h3>
-                            {group.items.map((item) => (
-                                <NavLink
-                                    key={item.path}
-                                    to={item.path}
-                                    className={({ isActive }) => `flex items-center gap-4 px-4 py-3.5 rounded-xl transition-all font-bold text-sm ${isActive
-                                        ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/20'
-                                        : 'text-slate-400 hover:bg-slate-800 hover:text-white'
-                                        }`}
-                                >
-                                    <span className="material-symbols-outlined text-[20px]">{item.icon}</span>
-                                    {item.label}
-                                </NavLink>
-                            ))}
-                        </div>
-                    ))}
+                    {navGroups.map((group, idx) => {
+                        // Filter items based on role
+                        const filteredItems = group.items.filter(item => {
+                            if (item.label === 'Users' || item.label === 'Audit Trail') {
+                                return user?.role === 'super_admin';
+                            }
+                            return true;
+                        });
+
+                        // Don't render group if no items
+                        if (filteredItems.length === 0) return null;
+
+                        return (
+                            <div key={idx} className="flex flex-col gap-2">
+                                <h3 className="px-4 text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 mb-2">{group.title}</h3>
+                                {filteredItems.map((item) => (
+                                    <NavLink
+                                        key={item.path}
+                                        to={item.path}
+                                        onClick={() => setIsSidebarOpen(false)} // Close sidebar on mobile nav
+                                        className={({ isActive }) => `flex items-center gap-4 px-4 py-3.5 rounded-xl transition-all font-bold text-sm ${isActive
+                                            ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/20'
+                                            : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                                            }`}
+                                    >
+                                        <span className="material-symbols-outlined text-[20px]">{item.icon}</span>
+                                        {item.label}
+                                    </NavLink>
+                                ))}
+                            </div>
+                        )
+                    })}
                 </nav>
 
                 {/* Footer / User Profile */}
@@ -115,24 +151,35 @@ const StaffLayout: React.FC<StaffLayoutProps> = ({ children, user, onLogout, tog
             </aside>
 
             {/* Main Content */}
-            <main className="flex-1 ml-72 p-8 transition-all duration-300">
+            <main className="flex-1 w-full min-w-0 p-4 md:p-8 transition-all duration-300">
                 <div className="max-w-[1600px] mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
                     {/* Top Bar */}
-                    <div className="flex justify-between items-center mb-8">
-                        {/* Search */}
-                        <div className="relative w-96 group">
-                            <span className="absolute left-4 top-1/2 -translate-y-1/2 material-symbols-outlined text-slate-400 group-focus-within:text-primary transition-colors">search</span>
-                            <input
-                                type="text"
-                                placeholder="Search transactions, users, or loans..."
-                                value={searchQuery}
-                                onChange={handleSearch}
-                                className="w-full h-12 pl-12 pr-4 rounded-xl bg-slate-200 dark:bg-[#1e293b] border-none outline-none font-medium text-slate-900 dark:text-white focus:ring-2 focus:ring-primary/50 transition-all placeholder:text-slate-500"
-                            />
+                    <div className="flex flex-col md:flex-row justify-between md:items-center gap-4 mb-8">
+
+                        {/* Mobile Menu Toggle & Search Container */}
+                        <div className="flex items-center gap-4 w-full md:w-auto">
+                            <button
+                                onClick={() => setIsSidebarOpen(true)}
+                                className="lg:hidden p-2 -ml-2 text-slate-600 dark:text-slate-400"
+                            >
+                                <span className="material-symbols-outlined text-2xl">menu</span>
+                            </button>
+
+                            {/* Search */}
+                            <div className="relative flex-1 md:w-96 group">
+                                <span className="absolute left-4 top-1/2 -translate-y-1/2 material-symbols-outlined text-slate-400 group-focus-within:text-primary transition-colors">search</span>
+                                <input
+                                    type="text"
+                                    placeholder="Search transactions..."
+                                    value={searchQuery}
+                                    onChange={handleSearch}
+                                    className="w-full h-12 pl-12 pr-4 rounded-xl bg-slate-200 dark:bg-[#1e293b] border-none outline-none font-medium text-slate-900 dark:text-white focus:ring-2 focus:ring-primary/50 transition-all placeholder:text-slate-500 text-sm"
+                                />
+                            </div>
                         </div>
 
                         {/* Right Actions */}
-                        <div className="flex items-center gap-4">
+                        <div className="flex items-center justify-end gap-3 md:gap-4">
                             {/* Theme Toggle */}
                             <button onClick={toggleTheme} className="size-10 rounded-full bg-slate-200 dark:bg-[#1e293b] flex items-center justify-center text-slate-600 dark:text-slate-400 hover:bg-slate-300 dark:hover:bg-slate-700 transition-all">
                                 <span className="material-symbols-outlined text-xl">{theme === 'dark' ? 'light_mode' : 'dark_mode'}</span>

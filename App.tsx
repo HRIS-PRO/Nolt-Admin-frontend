@@ -22,6 +22,7 @@ import SettingsPage from './pages/SettingsPage';
 import LoanQueuePage from './pages/LoanQueuePage';
 import LoanDetailsPage from './pages/LoanDetailsPage';
 import UsersPage from './pages/UsersPage';
+import AuditTrailPage from './pages/AuditTrailPage';
 import axios from 'axios';
 
 
@@ -104,34 +105,35 @@ const AppContent: React.FC = () => {
   const [showLogoutModal, setShowLogoutModal] = useState(false);
 
 
-  useEffect(() => {
-    const fetchUser = async () => {
-      try {
-        const { data } = await axios.get(`${backendUrl}/api/me`, {
-          withCredentials: true
-        });
+  const refreshUser = useCallback(async () => {
+    try {
+      const { data } = await axios.get(`${backendUrl}/api/me`, {
+        withCredentials: true
+      });
 
-        console.log(data)
-        setUser({
-          email: data.email,
-          name: data.full_name || data.name || 'User',
-          isLoggedIn: true,
-          avatar_url: data.avatar_url,
-          role: data.role,
-          new_comer: data.new_comer,
-          // Map full_name to name for frontend consistency
-          full_name: data.full_name,
-          referral_code_used: data.referral_code_used
-        });
-      } catch (error) {
-        console.error("Failed to fetch user", error);
-        // User remains logged out
-      } finally {
-        setIsLoading(false);
-      }
+      console.log(data)
+      setUser({
+        email: data.email,
+        name: data.full_name || data.name || 'User',
+        isLoggedIn: true,
+        avatar_url: data.avatar_url,
+        role: data.role,
+        new_comer: data.new_comer,
+        // Map full_name to name for frontend consistency
+        full_name: data.full_name,
+        referral_code_used: data.referral_code_used
+      });
+    } catch (error) {
+      console.error("Failed to fetch user", error);
+      // User remains logged out
+    } finally {
+      setIsLoading(false);
     }
-    fetchUser();
   }, [backendUrl]);
+
+  useEffect(() => {
+    refreshUser();
+  }, [refreshUser]);
 
   // console.log("the user", user)
 
@@ -310,8 +312,8 @@ const AppContent: React.FC = () => {
                 try {
                   const backendUrl = ''; // Use proxy
                   await axios.put(`${backendUrl}/api/onboarding-complete`, {}, { withCredentials: true });
-                  // Update local state
-                  setUser(prev => ({ ...prev, new_comer: false }));
+                  // Update local state by refetching from backend to get referral code
+                  await refreshUser();
                   navigateRouter('/dashboard');
                 } catch (e) {
                   console.error("Failed to complete onboarding", e);
@@ -385,9 +387,8 @@ const AppContent: React.FC = () => {
           ) : <Navigate to="/login" />)
         } />
         <Route path="/staff/audit" element={
-          isLoading ? null : (user.isLoggedIn && user.role !== 'customer' ? (
-            <StaffPlaceholderPage
-              title="Audit"
+          isLoading ? null : (user?.isLoggedIn && user.role !== 'customer' ? (
+            <AuditTrailPage
               user={user}
               onLogout={handleLogoutRequest}
               toggleTheme={toggleTheme}

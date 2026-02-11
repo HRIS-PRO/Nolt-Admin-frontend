@@ -150,6 +150,7 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess, initi
     const [accountNumber, setAccountNumber] = useState('');
     const [accountName, setAccountName] = useState('');
     const [bankList, setBankList] = useState<{ name: string, code: string }[]>([]);
+    const [productType, setProductType] = useState('');
 
     // Documents
     const [uploadedDocs, setUploadedDocs] = useState<Record<string, { name: string, size: string, url: string } | null>>({
@@ -178,6 +179,7 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess, initi
     // Populate form if initialData exists (Edit Mode)
     useEffect(() => {
         if (initialData) {
+            setProductType(initialData.product_type || '');
             setTitle(initialData.title || 'Mr');
             setSurname(initialData.surname || '');
             setFirstName(initialData.first_name || '');
@@ -445,6 +447,7 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess, initi
         try {
             const payload = {
                 title,
+                productType,
                 surname,
                 first_name: firstName,
                 middle_name: middleName,
@@ -505,10 +508,10 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess, initi
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-md p-4 overflow-y-auto">
             <div className="bg-white dark:bg-slate-900 w-full max-w-5xl rounded-[2.5rem] shadow-2xl shadow-black/50 flex flex-col max-h-[92vh] overflow-hidden border border-slate-100 dark:border-slate-800">
                 {/* Header */}
-                <div className="p-8 border-b border-slate-100 dark:border-slate-800 flex justify-between items-start bg-white dark:bg-slate-900 z-10">
+                <div className="p-6 md:p-8 border-b border-slate-100 dark:border-slate-800 flex justify-between items-start bg-white dark:bg-slate-900 z-10">
                     <div className="space-y-1">
                         <p className="text-xs font-black text-primary uppercase tracking-widest">New Application</p>
-                        <h2 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight">Staff Loan</h2>
+                        {/* <h2 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight">Staff Loan</h2> */}
                     </div>
                     <button
                         onClick={onClose}
@@ -519,7 +522,7 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess, initi
                 </div>
 
                 {/* Progress Indicator */}
-                <div className="px-8 pt-6 pb-2">
+                <div className="px-6 md:px-8 pt-6 pb-2">
                     <div className="flex justify-between items-center mb-4">
                         <span className="text-sm font-bold text-slate-900 dark:text-white">{steps[step]}</span>
                         <span className="text-xs font-black text-slate-400 uppercase tracking-widest">Step {step + 1} / {steps.length}</span>
@@ -533,10 +536,17 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess, initi
                 </div>
 
                 {/* Content */}
-                <div className="flex-1 overflow-y-auto p-8 scrollbar-thin scrollbar-thumb-slate-200 dark:scrollbar-thumb-slate-800">
+                <div className="flex-1 overflow-y-auto p-6 md:p-8 scrollbar-thin scrollbar-thumb-slate-200 dark:scrollbar-thumb-slate-800">
                     {step === 0 && (
                         <div className="space-y-8 animate-in fade-in slide-in-from-right-8 duration-500">
                             <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
+                                <div className="md:col-span-2">
+                                    <InputGroup label="Product Type">
+                                        <select className="input-field" value={productType} onChange={e => setProductType(e.target.value)}>
+                                            <option>Public Sector Loan</option>
+                                        </select>
+                                    </InputGroup>
+                                </div>
                                 <div className="md:col-span-2">
                                     <InputGroup label="Title">
                                         <select className="input-field" value={title} onChange={e => setTitle(e.target.value)}>
