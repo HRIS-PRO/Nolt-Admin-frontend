@@ -10,13 +10,13 @@ export default defineConfig(({ mode }) => {
       host: '0.0.0.0',
       proxy: {
         '/api': {
-          target: env.VITE_API_TARGET || 'http://localhost:5000',
+          target: 'https://nolt-admin-backend-production.up.railway.app',
           changeOrigin: true,
           secure: false,
           cookieDomainRewrite: "localhost"
         },
         '/auth': {
-          target: env.VITE_API_TARGET || 'http://localhost:5000',
+          target: 'https://nolt-admin-backend-production.up.railway.app',
           changeOrigin: true,
           secure: false,
           cookieDomainRewrite: "localhost"
