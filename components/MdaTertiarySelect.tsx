@@ -80,7 +80,12 @@ const MdaTertiarySelect: React.FC<MdaTertiarySelectProps> = ({
     const [dropdownStyles, setDropdownStyles] = useState({});
 
     useEffect(() => {
-        const handleScroll = () => {
+        const handleScroll = (e: Event) => {
+            // If scroll happens within the dropdown content, don't close
+            // We use a class name or ref check. Since the portal is disjoint, we check the target.
+            const target = e.target as HTMLElement;
+            if (target.classList?.contains('scrollbar-thin')) return;
+
             if (isOpen) setIsOpen(false);
         };
         window.addEventListener('scroll', handleScroll, true);
