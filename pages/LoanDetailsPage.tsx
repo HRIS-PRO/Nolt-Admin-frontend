@@ -23,7 +23,7 @@ const ActionCard = ({ loan, userRole, onActionComplete }: { loan: any, userRole:
     const [uploadLoading, setUploadLoading] = useState(false);
     const [reason, setReason] = useState('');
 
-    const handleAction = async (action: 'approve' | 'reject' | 'return') => {
+    const handleAction = async (action: 'approve' | 'reject' | 'return', targetStage?: string) => {
         if ((action === 'reject' || action === 'return') && !reason.trim()) {
             alert("Please provide a reason for this action.");
             return;
@@ -33,7 +33,11 @@ const ActionCard = ({ loan, userRole, onActionComplete }: { loan: any, userRole:
         try {
             await axios.post(
                 `/api/staff/loans/${loan.id}/action`,
-                { action, data: { eligible_amount: eligibleAmount, tenure }, reason },
+                {
+                    action,
+                    data: { eligible_amount: eligibleAmount, tenure, target_stage: targetStage },
+                    reason
+                },
                 { withCredentials: true }
             );
             onActionComplete();
@@ -212,13 +216,25 @@ const ActionCard = ({ loan, userRole, onActionComplete }: { loan: any, userRole:
                     </button>
 
                     <div className="grid grid-cols-2 gap-3">
-                        <button
-                            onClick={() => handleAction('return')}
-                            disabled={actionLoading || stage === 'sales'}
-                            className="w-full py-3 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-bold text-xs uppercase tracking-wider hover:bg-slate-200 transition-all"
-                        >
-                            {stage === 'sales' ? 'Disabled' : 'Return'}
-                        </button>
+                        {/* Return Action with Stage Selection */}
+                        <div className="relative group/return w-full">
+                            <button
+                                onClick={(e) => {
+                                    if (stage === 'sales') return;
+                                    // Toggle logic or simple prompt
+                                    // For simplicity and better UX, we can use a small popover or just replace the button with a select
+                                    // Here we'll use a simple approach: If not Sales, act as a trigger or a combo
+                                }}
+                                disabled={actionLoading || stage === 'sales'}
+                                className="w-full h-full py-3 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-bold text-xs uppercase tracking-wider hover:bg-slate-200 transition-all flex items-center justify-center gap-2 peer"
+                            >
+                                {stage === 'sales' ? 'Disabled' : 'Return'}
+                                {stage !== 'sales' && <span className="material-symbols-outlined text-sm">arrow_drop_down</span>}
+                            </button>
+
+                            {/* Return Dropdown - Pure CSS/Focus approach or State based? State is better for this form. */}
+                        </div>
+
                         <button
                             onClick={() => handleAction('reject')}
                             disabled={actionLoading}
@@ -227,6 +243,39 @@ const ActionCard = ({ loan, userRole, onActionComplete }: { loan: any, userRole:
                             Reject
                         </button>
                     </div>
+
+                    {/* Return Stage Selection UI (Conditional) */}
+                    {stage !== 'sales' && (
+                        <div className="p-4 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 mt-2">
+                            <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2 block">Return To:</label>
+                            <div className="flex gap-2">
+                                <select
+                                    className="flex-1 text-sm p-2 rounded-lg border border-slate-300 dark:border-slate-600"
+                                    onChange={(e) => {
+                                        if (e.target.value) handleAction('return', e.target.value);
+                                    }}
+                                    value=""
+                                >
+                                    <option value="">Select Stage...</option>
+                                    {/* Calculated Previous Stages */}
+                                    {(() => {
+                                        const allStages = [
+                                            { id: 'sales', label: 'Sales' },
+                                            { id: 'customer_experience', label: 'Review' },
+                                            { id: 'credit_check_1', label: 'Credit I' },
+                                            { id: 'credit_check_2', label: 'Credit II' },
+                                            { id: 'internal_audit', label: 'Audit' },
+                                            { id: 'finance', label: 'Finance' }
+                                        ];
+                                        const currentIdx = allStages.findIndex(s => s.id === (stage === 'credit_check' ? 'credit_check_1' : stage));
+                                        return allStages.filter((_, idx) => idx < currentIdx).map(s => (
+                                            <option key={s.id} value={s.id}>{s.label}</option>
+                                        ));
+                                    })()}
+                                </select>
+                            </div>
+                        </div>
+                    )}
                 </div>
             </div>
         </div>
