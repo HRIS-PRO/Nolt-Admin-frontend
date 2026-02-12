@@ -18,11 +18,12 @@ interface LoanDetailsPageProps {
 const ActionCard = ({ loan, userRole, onActionComplete }: { loan: any, userRole: any, onActionComplete: () => void }) => {
     const [actionLoading, setActionLoading] = useState(false);
     const [eligibleAmount, setEligibleAmount] = useState(loan.eligible_amount ? loan.eligible_amount.toString() : '');
+    const [tenure, setTenure] = useState(loan.loan_tenure_months ? loan.loan_tenure_months.toString() : '');
     const [uploadFile, setUploadFile] = useState<File | null>(null);
     const [uploadLoading, setUploadLoading] = useState(false);
     const [reason, setReason] = useState('');
 
-    const handleAction = async (action: 'approve' | 'reject' | 'return') => {
+    const handleAction = async (action: 'approve' | 'reject' | 'return', targetStage?: string) => {
         if ((action === 'reject' || action === 'return') && !reason.trim()) {
             alert("Please provide a reason for this action.");
             return;
@@ -32,7 +33,11 @@ const ActionCard = ({ loan, userRole, onActionComplete }: { loan: any, userRole:
         try {
             await axios.post(
                 `/api/staff/loans/${loan.id}/action`,
-                { action, data: { eligible_amount: eligibleAmount }, reason },
+                {
+                    action,
+                    data: { eligible_amount: eligibleAmount, tenure, target_stage: targetStage },
+                    reason
+                },
                 { withCredentials: true }
             );
             onActionComplete();
@@ -76,7 +81,7 @@ const ActionCard = ({ loan, userRole, onActionComplete }: { loan: any, userRole:
         switch (stage) {
             case 'submitted':
             case 'sales': return ['sales_officer', 'sales_manager'].includes(userRole);
-            case 'customer_experience': return ['customer_experience', 'customer_service', 'sales_officer', 'sales_manager'].includes(userRole);
+            case 'customer_experience': return ['customer_experience', 'customer_service'].includes(userRole);
             case 'credit_check_1': return userRole === 'credit_officer';
             case 'credit_check_2': return userRole === 'credit_manager';
             case 'internal_audit': return userRole === 'internal_audit';
@@ -128,24 +133,45 @@ const ActionCard = ({ loan, userRole, onActionComplete }: { loan: any, userRole:
                     You have permission to process this application.
                 </p>
 
-                {/* Sales Manager Input */}
+                {/* Sales Manager / Credit Officer Input */}
                 {(stage === 'credit_check_1' || stage === 'credit_check_2') && (
-                    <div className="mb-6">
-                        <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2 block">Approved Amount (₦)</label>
-                        <input
-                            type="number"
-                            value={eligibleAmount}
-                            onChange={(e) => setEligibleAmount(e.target.value)}
-                            className="w-full p-4 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white font-bold"
-                            placeholder="Enter amount..."
-                        />
+                    <div className="grid grid-cols-2 gap-4 mb-6">
+                        <div>
+                            <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2 block">Approved Amount (₦)</label>
+                            <input
+                                type="number"
+                                value={eligibleAmount}
+                                onChange={(e) => setEligibleAmount(e.target.value)}
+                                className="w-full p-4 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white font-bold"
+                                placeholder="Enter amount..."
+                            />
+                        </div>
+                        <div>
+                            <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2 block">Approved Tenure (Months)</label>
+                            <select
+                                value={tenure}
+                                onChange={(e) => setTenure(e.target.value)}
+                                className="w-full p-4 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white font-bold appearance-none"
+                            >
+                                <option value="">Select Tenure</option>
+                                {[3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18].map(m => (
+                                    <option key={m} value={m}>{m} Months</option>
+                                ))}
+                            </select>
+                        </div>
                     </div>
                 )}
 
                 {/* Upload Section */}
-                {(stage === 'sales' || stage === 'credit_check_1' || stage === 'customer_experience') && (
-                    ['sales_officer', 'sales_manager', 'customer_experience', 'super_admin', 'superadmin'].includes(userRole)
-                ) && (
+                {/* Upload Section */}
+                {(() => {
+                    const canUpload = (
+                        (stage === 'sales' && ['sales_officer', 'sales_manager', 'super_admin', 'superadmin'].includes(userRole)) ||
+                        (stage === 'customer_experience' && ['customer_experience', 'customer_service', 'super_admin', 'superadmin'].includes(userRole)) ||
+                        (stage === 'credit_check_1' && ['credit_officer', 'super_admin', 'superadmin'].includes(userRole))
+                    );
+                    return canUpload;
+                })() && (
                         <div className="mb-6 p-4 rounded-xl bg-slate-50 dark:bg-slate-800 border border-dashed border-slate-300 dark:border-slate-700">
                             <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2 block">Upload Supporting Document</label>
                             <div className="flex gap-2">
@@ -190,13 +216,25 @@ const ActionCard = ({ loan, userRole, onActionComplete }: { loan: any, userRole:
                     </button>
 
                     <div className="grid grid-cols-2 gap-3">
-                        <button
-                            onClick={() => handleAction('return')}
-                            disabled={actionLoading || stage === 'sales'}
-                            className="w-full py-3 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-bold text-xs uppercase tracking-wider hover:bg-slate-200 transition-all"
-                        >
-                            {stage === 'sales' ? 'Disabled' : 'Return'}
-                        </button>
+                        {/* Return Action with Stage Selection */}
+                        <div className="relative group/return w-full">
+                            <button
+                                onClick={(e) => {
+                                    if (stage === 'sales') return;
+                                    // Toggle logic or simple prompt
+                                    // For simplicity and better UX, we can use a small popover or just replace the button with a select
+                                    // Here we'll use a simple approach: If not Sales, act as a trigger or a combo
+                                }}
+                                disabled={actionLoading || stage === 'sales'}
+                                className="w-full h-full py-3 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-bold text-xs uppercase tracking-wider hover:bg-slate-200 transition-all flex items-center justify-center gap-2 peer"
+                            >
+                                {stage === 'sales' ? 'Disabled' : 'Return'}
+                                {stage !== 'sales' && <span className="material-symbols-outlined text-sm">arrow_drop_down</span>}
+                            </button>
+
+                            {/* Return Dropdown - Pure CSS/Focus approach or State based? State is better for this form. */}
+                        </div>
+
                         <button
                             onClick={() => handleAction('reject')}
                             disabled={actionLoading}
@@ -205,6 +243,39 @@ const ActionCard = ({ loan, userRole, onActionComplete }: { loan: any, userRole:
                             Reject
                         </button>
                     </div>
+
+                    {/* Return Stage Selection UI (Conditional) */}
+                    {stage !== 'sales' && (
+                        <div className="p-4 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 mt-2">
+                            <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2 block">Return To:</label>
+                            <div className="flex gap-2">
+                                <select
+                                    className="flex-1 text-sm p-2 rounded-lg border border-slate-300 dark:border-slate-600"
+                                    onChange={(e) => {
+                                        if (e.target.value) handleAction('return', e.target.value);
+                                    }}
+                                    value=""
+                                >
+                                    <option value="">Select Stage...</option>
+                                    {/* Calculated Previous Stages */}
+                                    {(() => {
+                                        const allStages = [
+                                            { id: 'sales', label: 'Sales' },
+                                            { id: 'customer_experience', label: 'Review' },
+                                            { id: 'credit_check_1', label: 'Credit I' },
+                                            { id: 'credit_check_2', label: 'Credit II' },
+                                            { id: 'internal_audit', label: 'Audit' },
+                                            { id: 'finance', label: 'Finance' }
+                                        ];
+                                        const currentIdx = allStages.findIndex(s => s.id === (stage === 'credit_check' ? 'credit_check_1' : stage));
+                                        return allStages.filter((_, idx) => idx < currentIdx).map(s => (
+                                            <option key={s.id} value={s.id}>{s.label}</option>
+                                        ));
+                                    })()}
+                                </select>
+                            </div>
+                        </div>
+                    )}
                 </div>
             </div>
         </div>
@@ -218,6 +289,27 @@ const LoanDetailsPage: React.FC<LoanDetailsPageProps> = ({ user, onLogout, toggl
     const [loan, setLoan] = useState<any>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [showEditModal, setShowEditModal] = useState(false);
+
+    // Inline Edit State
+    const [isEditingLoanType, setIsEditingLoanType] = useState(false);
+    const [tempLoanType, setTempLoanType] = useState('');
+
+    const handleUpdateLoanType = async () => {
+        try {
+            await axios.patch(`/api/staff/loans/${id}/attribute`, {
+                field: 'loan_type',
+                value: tempLoanType
+            }, { withCredentials: true });
+
+            // Optimistic Update or Refresh
+            setLoan((prev: any) => ({ ...prev, loan_type: tempLoanType }));
+            setIsEditingLoanType(false);
+            alert("Loan Type Updated");
+        } catch (error: any) {
+            console.error("Update failed", error);
+            alert(error.response?.data?.message || "Update failed");
+        }
+    };
 
     useEffect(() => {
         const fetchLoan = async () => {
@@ -350,8 +442,53 @@ const LoanDetailsPage: React.FC<LoanDetailsPageProps> = ({ user, onLogout, toggl
                     {/* Summary Card */}
                     <div className="bg-white dark:bg-slate-900 rounded-[24px] p-8 border border-slate-200 dark:border-slate-800 flex justify-between items-center">
                         <div>
+                            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Loan Type</p>
+                            {isEditingLoanType ? (
+                                <div className="flex items-center gap-2">
+                                    <select
+                                        className="p-2 rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm font-bold"
+                                        value={tempLoanType}
+                                        onChange={(e) => setTempLoanType(e.target.value)}
+                                    >
+                                        <option value="new">New Loan</option>
+                                        <option value="top-up">Top-up</option>
+                                        <option value="buy_over">Buy-over</option>
+                                        <option value="re-app">Re-app</option>
+                                        <option value="add-on">Add-on</option>
+                                    </select>
+                                    <button onClick={handleUpdateLoanType} className="size-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center hover:bg-blue-200">
+                                        <span className="material-symbols-outlined text-sm">check</span>
+                                    </button>
+                                    <button onClick={() => setIsEditingLoanType(false)} className="size-8 rounded-full bg-slate-100 text-slate-600 flex items-center justify-center hover:bg-slate-200">
+                                        <span className="material-symbols-outlined text-sm">close</span>
+                                    </button>
+                                </div>
+                            ) : (
+                                <div className="flex items-center gap-2 group/edit">
+                                    <h3 className="text-3xl font-black text-slate-900 dark:text-white capitalize">{loan.loan_type?.replace(/_/g, ' ') || 'New'}</h3>
+                                    {(loan.stage === 'sales' || loan.stage === 'submitted') &&
+                                        ['sales_officer', 'sales_manager', 'super_admin', 'superadmin'].includes(user.role || '') && (
+                                            <button
+                                                onClick={() => {
+                                                    setTempLoanType(loan.loan_type || 'new');
+                                                    setIsEditingLoanType(true);
+                                                }}
+                                                className="opacity-0 group-hover/edit:opacity-100 transition-opacity p-1 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-blue-500"
+                                                title="Edit Loan Type"
+                                            >
+                                                <span className="material-symbols-outlined text-lg">edit</span>
+                                            </button>
+                                        )}
+                                </div>
+                            )}
+                        </div>
+                        <div>
                             <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Requested Amount</p>
                             <h3 className="text-3xl font-black text-slate-900 dark:text-white">₦{Number(loan.requested_loan_amount).toLocaleString()}</h3>
+                        </div>
+                        <div>
+                            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Tenure</p>
+                            <h3 className="text-3xl font-black text-slate-900 dark:text-white">{loan.loan_tenure_months || 6} Months</h3>
                         </div>
                         {loan.eligible_amount && (
                             <div>

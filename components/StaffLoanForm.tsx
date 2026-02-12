@@ -142,6 +142,7 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess, initi
     const [monthlyIncome, setMonthlyIncome] = useState('');
 
     // Loan Request
+    const [loanType, setLoanType] = useState('new');
     const [amount, setAmount] = useState('');
     const [tenure, setTenure] = useState(6);
 
@@ -206,6 +207,7 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess, initi
 
             setAmount(initialData.requested_loan_amount || '');
             setTenure(initialData.loan_tenure_months || 6);
+            setLoanType(initialData.loan_type || 'new');
 
             // Pre-fill documents references if URLs exist (visual only, real re-upload needed to change)
             setUploadedDocs(prev => ({
@@ -473,6 +475,7 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess, initi
                 average_monthly_income: parseFloat(monthlyIncome) || 0,
                 requested_loan_amount: parseFloat(amount) || 0,
                 loan_tenure_months: tenure,
+                loan_type: loanType,
                 govt_id_url: uploadedDocs.govt_id?.url,
                 work_id_url: uploadedDocs.work_id?.url,
                 payslip_url: uploadedDocs.payslip?.url,
@@ -671,6 +674,17 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess, initi
                     {step === 3 && (
                         <div className="space-y-8 animate-in fade-in slide-in-from-right-8 duration-500">
                             <div className="p-6 bg-slate-50 dark:bg-slate-800/50 rounded-3xl border border-slate-100 dark:border-slate-800">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
+                                    <InputGroup label="Loan Type">
+                                        <select className="input-field" value={loanType} onChange={e => setLoanType(e.target.value)}>
+                                            <option value="new">New Loan</option>
+                                            <option value="top-up">Top-up</option>
+                                            <option value="buy_over">Buy-over</option>
+                                            <option value="re-app">Re-app</option>
+                                            <option value="add-on">Add-on</option>
+                                        </select>
+                                    </InputGroup>
+                                </div>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                                     <InputGroup label="Loan Amount" required error={errors.amount}>
                                         <div className="relative">

@@ -21,14 +21,27 @@ const LoanQueuePage: React.FC<LoanQueuePageProps> = ({ user, onLogout, toggleThe
     const itemsPerPage = 10;
 
     const [loans, setLoans] = useState<any[]>([]);
+    const [officers, setOfficers] = useState<any[]>([]);
+    const [totalLoans, setTotalLoans] = useState(0);
     const [isLoading, setIsLoading] = useState(true);
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
 
     const fetchLoans = async () => {
+        setIsLoading(true);
         try {
-            const response = await axios.get(`${''}/api/staff/loans`, { withCredentials: true });
-            setLoans(response.data);
+            const response = await axios.get(`${''}/api/staff/loans`, {
+                params: {
+                    search: searchQuery,
+                    status: statusFilter,
+                    stage: stageFilter,
+                    page: currentPage,
+                    limit: itemsPerPage
+                },
+                withCredentials: true
+            });
+            setLoans(response.data.loans);
+            setTotalLoans(response.data.total);
         } catch (error) {
             console.error("Failed to fetch loans", error);
         } finally {
@@ -36,24 +49,45 @@ const LoanQueuePage: React.FC<LoanQueuePageProps> = ({ user, onLogout, toggleThe
         }
     };
 
+    const fetchOfficers = async () => {
+        if (['sales_manager', 'admin', 'super_admin', 'superadmin'].includes(user.role || '')) {
+            try {
+                const response = await axios.get(`${''}/api/staff/users`, { withCredentials: true });
+                setOfficers(response.data.filter((u: any) => u.role === 'sales_officer' && u.is_active));
+            } catch (error) {
+                console.error("Failed to fetch officers", error);
+            }
+        }
+    };
+
+    const handleAssignOfficer = async (loanId: string, officerId: string) => {
+        if (!confirm("Are you sure you want to reassign this loan?")) return;
+        try {
+            await axios.patch(`${''}/api/staff/loans/${loanId}/assign`, {
+                sales_officer_id: officerId
+            }, { withCredentials: true });
+
+            // Optimistic Update
+            setLoans(prev => prev.map(l => {
+                if (String(l.id) === String(loanId)) { // Ensure ID comparison works
+                    const officer = officers.find(o => String(o.id) === String(officerId)); // Ensure ID comparison works
+                    return { ...l, sales_officer_id: officerId, officer_name: officer?.full_name, officer_email: officer?.email };
+                }
+                return l;
+            }));
+            alert("Loan reassigned successfully");
+        } catch (error: any) {
+            alert(error.response?.data?.message || "Reassignment failed");
+        }
+    };
+
     useEffect(() => {
         fetchLoans();
-    }, []);
+        fetchOfficers();
+    }, [user.role, searchQuery, statusFilter, stageFilter, currentPage]); // Re-fetch on params change
 
-    const filteredLoans = loans.filter(loan => {
-        const matchesSearch = !searchQuery || (
-            loan.applicant_full_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            String(loan.id).includes(searchQuery.toLowerCase()) ||
-            (loan.officer_name && loan.officer_name.toLowerCase().includes(searchQuery.toLowerCase())) ||
-            (loan.officer_email && loan.officer_email.toLowerCase().includes(searchQuery.toLowerCase())) ||
-            (loan.status && loan.status.toLowerCase().includes(searchQuery.toLowerCase()))
-        );
-
-        const matchesStatus = !statusFilter || loan.status === statusFilter;
-        const matchesStage = !stageFilter || loan.stage === stageFilter;
-
-        return matchesSearch && matchesStatus && matchesStage;
-    });
+    // Client-side filtering removed as pagination is server-side now
+    const filteredLoans = loans;
 
     const handleFilterChange = (key: string, value: string) => {
         setSearchParams(prev => {
@@ -63,6 +97,7 @@ const LoanQueuePage: React.FC<LoanQueuePageProps> = ({ user, onLogout, toggleThe
             } else {
                 newParams.delete(key);
             }
+            newParams.set('page', '1'); // Reset to page 1 on filter
             return newParams;
         });
     };
@@ -105,8 +140,8 @@ const LoanQueuePage: React.FC<LoanQueuePageProps> = ({ user, onLogout, toggleThe
                         className="flex-1 md:flex-none px-4 py-2 rounded-lg bg-white dark:bg-[#1e293b] text-slate-600 dark:text-slate-300 text-xs font-bold uppercase tracking-wider border border-slate-200 dark:border-slate-700 shadow-sm outline-none cursor-pointer"
                     >
                         <option value="">All Stages</option>
-                        <option value="onboarding">Onboarding</option>
-                        <option value="submitted">Submitted</option>
+                        {/* <option value="onboarding">Onboarding</option> */}
+                        <option value="sales">Sales</option>
                         <option value="customer_experience">Customer Experience</option>
                         <option value="credit_check_1">Credit Check 1</option>
                         <option value="credit_check_2">Credit Check 2</option>
@@ -191,11 +226,31 @@ const LoanQueuePage: React.FC<LoanQueuePageProps> = ({ user, onLogout, toggleThe
                                                 {loan.stage || 'Onboarding'}
                                             </span>
                                         </td>
-                                        <td className="p-4 text-slate-700 dark:text-slate-300 font-bold text-xs">
-                                            <div className="flex items-center gap-2">
-                                                <span className="material-symbols-outlined text-sm text-slate-400 dark:text-slate-500">person</span>
-                                                {loan.officer_name || 'Unassigned'}
-                                            </div>
+                                        <td className="p-4 text-slate-700 dark:text-slate-300 font-bold text-xs" onClick={(e) => e.stopPropagation()}>
+                                            {['sales_manager', 'admin', 'super_admin', 'superadmin'].includes(user.role || '') ? (
+                                                <div className="relative group/assign">
+                                                    <div className="flex items-center gap-2 cursor-pointer p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+                                                        <span className="material-symbols-outlined text-sm text-slate-400 dark:text-slate-500">person</span>
+                                                        <span>{loan.officer_name || 'Unassigned'}</span>
+                                                        <span className="material-symbols-outlined text-sm text-slate-400 ml-auto opacity-0 group-hover/assign:opacity-100">edit</span>
+                                                    </div>
+                                                    <select
+                                                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                                                        value={loan.sales_officer_id || ''}
+                                                        onChange={(e) => handleAssignOfficer(loan.id, e.target.value)}
+                                                    >
+                                                        <option value="" disabled>Select Officer</option>
+                                                        {officers.map(officer => (
+                                                            <option key={officer.id} value={officer.id}>{officer.full_name}</option>
+                                                        ))}
+                                                    </select>
+                                                </div>
+                                            ) : (
+                                                <div className="flex items-center gap-2">
+                                                    <span className="material-symbols-outlined text-sm text-slate-400 dark:text-slate-500">person</span>
+                                                    {loan.officer_name || 'Unassigned'}
+                                                </div>
+                                            )}
                                         </td>
                                         <td className="p-4 font-black text-slate-900 dark:text-white">₦{Number(loan.requested_loan_amount).toLocaleString()}</td>
                                         <td className="p-4 text-slate-500 text-xs">{new Date(loan.created_at).toLocaleDateString()}</td>
@@ -218,12 +273,32 @@ const LoanQueuePage: React.FC<LoanQueuePageProps> = ({ user, onLogout, toggleThe
                     </table>
                 </div>
 
-                {/* Pagination (Placeholder) */}
+                {/* Pagination */}
                 <div className="p-4 border-t border-slate-200 dark:border-slate-800 flex justify-between items-center text-xs text-slate-500">
-                    <p>Showing 1-{Math.max(1, filteredLoans.length)} of {filteredLoans.length}</p>
+                    <p>Showing {((currentPage - 1) * itemsPerPage) + 1}-{Math.min(currentPage * itemsPerPage, totalLoans)} of {totalLoans}</p>
                     <div className="flex gap-2">
-                        <button className="px-3 py-1 rounded border border-slate-200 dark:border-slate-700 disabled:opacity-50" disabled>Previous</button>
-                        <button className="px-3 py-1 rounded border border-slate-200 dark:border-slate-700 disabled:opacity-50" disabled>Next</button>
+                        <button
+                            onClick={() => setSearchParams(prev => {
+                                const newParams = new URLSearchParams(prev);
+                                newParams.set('page', String(Math.max(1, currentPage - 1)));
+                                return newParams;
+                            })}
+                            className="px-3 py-1 rounded border border-slate-200 dark:border-slate-700 disabled:opacity-50"
+                            disabled={currentPage === 1}
+                        >
+                            Previous
+                        </button>
+                        <button
+                            onClick={() => setSearchParams(prev => {
+                                const newParams = new URLSearchParams(prev);
+                                newParams.set('page', String(currentPage + 1));
+                                return newParams;
+                            })}
+                            className="px-3 py-1 rounded border border-slate-200 dark:border-slate-700 disabled:opacity-50"
+                            disabled={currentPage * itemsPerPage >= totalLoans}
+                        >
+                            Next
+                        </button>
                     </div>
                 </div>
             </div>
