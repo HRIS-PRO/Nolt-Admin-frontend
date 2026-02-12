@@ -26,7 +26,7 @@ const StaffDashboard: React.FC<StaffDashboardProps> = ({ user, onLogout, toggleT
                     axios.get(`${''}/api/staff/loans`, { withCredentials: true }) // Fetch ALL loans
                 ]);
                 setStats(statsRes.data);
-                setLoans(loansRes.data);
+                setLoans(loansRes.data.loans || []);
             } catch (error) {
                 console.error("Failed to fetch dashboard data", error);
             } finally {
