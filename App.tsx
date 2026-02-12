@@ -24,6 +24,7 @@ import LoanDetailsPage from './pages/LoanDetailsPage';
 import UsersPage from './pages/UsersPage';
 import AuditTrailPage from './pages/AuditTrailPage';
 import axios from 'axios';
+import ReportsPage from './pages/ReportsPage';
 
 
 import LogoutWarningModal from './components/modals/LogoutWarningModal';
@@ -357,8 +358,7 @@ const AppContent: React.FC = () => {
         } />
         <Route path="/staff/reports" element={
           isLoading ? null : (user.isLoggedIn && user.role !== 'customer' ? (
-            <StaffPlaceholderPage
-              title="Reports"
+            <ReportsPage
               user={user}
               onLogout={handleLogoutRequest}
               toggleTheme={toggleTheme}
