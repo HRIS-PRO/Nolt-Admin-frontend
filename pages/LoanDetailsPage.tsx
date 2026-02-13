@@ -405,16 +405,18 @@ const LoanDetailsPage: React.FC<LoanDetailsPageProps> = ({ user, onLogout, toggl
                         <h1 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight leading-none">{loan.applicant_full_name}</h1>
 
                         {/* Edit Button Logic */}
-                        {(loan.stage === 'sales' || loan.stage === 'submitted') &&
-                            (['sales_officer', 'sales_manager', 'super_admin', 'superadmin'].includes(user.role || '')) && (
-                                <button
-                                    onClick={() => setShowEditModal(true)}
-                                    className="mt-2 text-xs font-bold text-blue-600 hover:underline flex items-center gap-1"
-                                >
-                                    <span className="material-symbols-outlined text-sm">edit</span>
-                                    Edit Application
-                                </button>
-                            )}
+                        {((loan.stage === 'sales' || loan.stage === 'submitted') &&
+                            (['sales_officer', 'sales_manager', 'super_admin', 'superadmin'].includes(user.role || ''))) ||
+                            ((loan.stage === 'customer_experience') &&
+                                (['customer_experience', 'customer_service', 'super_admin', 'superadmin'].includes(user.role || ''))) ? (
+                            <button
+                                onClick={() => setShowEditModal(true)}
+                                className="mt-2 text-xs font-bold text-blue-600 hover:underline flex items-center gap-1"
+                            >
+                                <span className="material-symbols-outlined text-sm">edit</span>
+                                Edit Application
+                            </button>
+                        ) : null}
                     </div>
                 </div>
             </div>

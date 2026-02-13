@@ -25,6 +25,8 @@ const LoanQueuePage: React.FC<LoanQueuePageProps> = ({ user, onLogout, toggleThe
     const [totalLoans, setTotalLoans] = useState(0);
     const [isLoading, setIsLoading] = useState(true);
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+    const [selectedLoans, setSelectedLoans] = useState<number[]>([]);
+    const [isBulkApproving, setIsBulkApproving] = useState(false);
 
 
     const fetchLoans = async () => {
@@ -57,6 +59,40 @@ const LoanQueuePage: React.FC<LoanQueuePageProps> = ({ user, onLogout, toggleThe
             } catch (error) {
                 console.error("Failed to fetch officers", error);
             }
+        }
+    };
+
+    const handleToggleSelection = (id: number) => {
+        setSelectedLoans(prev =>
+            prev.includes(id) ? prev.filter(loanId => loanId !== id) : [...prev, id]
+        );
+    };
+
+    const handleSelectAll = () => {
+        if (selectedLoans.length === filteredLoans.length) {
+            setSelectedLoans([]);
+        } else {
+            setSelectedLoans(filteredLoans.map(l => l.id));
+        }
+    };
+
+    const handleBulkApprove = async () => {
+        if (!confirm(`Are you sure you want to approve ${selectedLoans.length} loans? This will move them to Disbursed stage.`)) return;
+
+        setIsBulkApproving(true);
+        try {
+            const response = await axios.post(`${''}/api/staff/loans/bulk-approve`, {
+                loanIds: selectedLoans
+            }, { withCredentials: true });
+
+            alert(response.data.message);
+            setSelectedLoans([]);
+            fetchLoans(); // Refresh list
+        } catch (error: any) {
+            console.error("Bulk approval failed", error);
+            alert(error.response?.data?.message || "Bulk approval failed");
+        } finally {
+            setIsBulkApproving(false);
         }
     };
 
@@ -161,6 +197,21 @@ const LoanQueuePage: React.FC<LoanQueuePageProps> = ({ user, onLogout, toggleThe
                 </div>
             </div>
 
+            {/* Bulk Action Bar */}
+            {selectedLoans.length > 0 && stageFilter === 'finance' && ['finance', 'admin', 'super_admin', 'superadmin'].includes(user.role || '') && (
+                <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-2xl rounded-full px-6 py-3 flex items-center gap-4 z-50 animate-in slide-in-from-bottom-4">
+                    <span className="text-sm font-bold text-slate-700 dark:text-slate-200">{selectedLoans.length} selected</span>
+                    <div className="h-4 w-px bg-slate-200 dark:bg-slate-700"></div>
+                    <button
+                        onClick={handleBulkApprove}
+                        disabled={isBulkApproving}
+                        className="text-white bg-green-600 hover:bg-green-700 px-4 py-2 rounded-full text-xs font-bold uppercase tracking-wider disabled:opacity-50 transition-colors"
+                    >
+                        {isBulkApproving ? 'Processing...' : 'Approve Selected'}
+                    </button>
+                </div>
+            )}
+
             <div className="bg-white dark:bg-[#1e293b] rounded-3xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm">
                 <div className="p-6 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-[#0f172a]/50">
                     <div>
@@ -173,7 +224,17 @@ const LoanQueuePage: React.FC<LoanQueuePageProps> = ({ user, onLogout, toggleThe
                     <table className="w-full text-left">
                         <thead className="bg-slate-50/50 dark:bg-[#0f172a]/30 text-xs uppercase text-slate-500 font-black tracking-wider">
                             <tr>
-                                <th className="p-4 w-4"><div className="size-4 rounded border border-slate-300 dark:border-slate-700"></div></th>
+                                <th className="p-4 w-4">
+                                    <div
+                                        onClick={handleSelectAll}
+                                        className={`size-4 rounded border cursor-pointer flex items-center justify-center transition-colors ${selectedLoans.length > 0 && selectedLoans.length === filteredLoans.length
+                                            ? 'bg-blue-500 border-blue-500'
+                                            : 'border-slate-300 dark:border-slate-700'
+                                            }`}
+                                    >
+                                        {selectedLoans.length > 0 && selectedLoans.length === filteredLoans.length && <span className="material-symbols-outlined text-[10px] text-white font-bold">check</span>}
+                                    </div>
+                                </th>
                                 <th className="p-4">Reference ID</th>
                                 <th className="p-4">Applicant</th>
                                 <th className="p-4">Type</th>
@@ -201,9 +262,19 @@ const LoanQueuePage: React.FC<LoanQueuePageProps> = ({ user, onLogout, toggleThe
                                     <tr
                                         key={i}
                                         onClick={() => navigate(`/staff/loans/${loan.id}`)}
-                                        className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group cursor-pointer"
+                                        className={`hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group cursor-pointer ${selectedLoans.includes(loan.id) ? 'bg-blue-50/50 dark:bg-blue-900/10' : ''}`}
                                     >
-                                        <td className="p-4"><div className="size-4 rounded border border-slate-300 dark:border-slate-700 group-hover:border-slate-500"></div></td>
+                                        <td className="p-4" onClick={(e) => e.stopPropagation()}>
+                                            <div
+                                                onClick={() => handleToggleSelection(loan.id)}
+                                                className={`size-4 rounded border cursor-pointer flex items-center justify-center transition-colors ${selectedLoans.includes(loan.id)
+                                                    ? 'bg-blue-500 border-blue-500'
+                                                    : 'border-slate-300 dark:border-slate-700 group-hover:border-slate-500'
+                                                    }`}
+                                            >
+                                                {selectedLoans.includes(loan.id) && <span className="material-symbols-outlined text-[10px] text-white font-bold">check</span>}
+                                            </div>
+                                        </td>
                                         <td className="p-4 font-mono text-slate-500 dark:text-slate-400 text-xs text-nowrap">LOAN-{loan.id}</td>
                                         <td className="p-4">
                                             <div className="flex items-center gap-3">
