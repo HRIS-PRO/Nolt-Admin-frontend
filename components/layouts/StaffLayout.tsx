@@ -40,6 +40,7 @@ const StaffLayout: React.FC<StaffLayoutProps> = ({ children, user, onLogout, tog
             items: [
                 { label: 'Settings', icon: 'settings', path: '/staff/settings' },
                 { label: 'Users', icon: 'group', path: '/staff/users' },
+                { label: 'Customers', icon: 'groups', path: '/staff/customers' },
                 { label: 'Audit Trail', icon: 'verified_user', path: '/staff/audit' },
             ]
         }
@@ -89,6 +90,9 @@ const StaffLayout: React.FC<StaffLayoutProps> = ({ children, user, onLogout, tog
                     {navGroups.map((group, idx) => {
                         // Filter items based on role
                         const filteredItems = group.items.filter(item => {
+                            if (item.label === 'Customers') {
+                                return user?.role === 'super_admin' || user?.role === 'customer_experience';
+                            }
                             if (item.label === 'Users' || item.label === 'Audit Trail') {
                                 return user?.role === 'super_admin';
                             }

@@ -25,6 +25,7 @@ import UsersPage from './pages/UsersPage';
 import AuditTrailPage from './pages/AuditTrailPage';
 import axios from 'axios';
 import ReportsPage from './pages/ReportsPage';
+import CustomersPage from './pages/CustomersPage';
 
 
 import LogoutWarningModal from './components/modals/LogoutWarningModal';
@@ -404,6 +405,16 @@ const AppContent: React.FC = () => {
         <Route path="/staff/users" element={
           isLoading ? null : (user.isLoggedIn && user.role !== 'customer' ? (
             <UsersPage
+              user={user}
+              onLogout={handleLogoutRequest}
+              toggleTheme={toggleTheme}
+              theme={theme}
+            />
+          ) : <Navigate to="/login" />)
+        } />
+        <Route path="/staff/customers" element={
+          isLoading ? null : (user.isLoggedIn && user.role !== 'customer' ? (
+            <CustomersPage
               user={user}
               onLogout={handleLogoutRequest}
               toggleTheme={toggleTheme}

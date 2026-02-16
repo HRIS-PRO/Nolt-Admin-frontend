@@ -1,0 +1,318 @@
+import React, { useEffect, useState } from 'react';
+import StaffLayout from '../components/layouts/StaffLayout';
+import axios from 'axios';
+import CustomerDetailsDrawer from '../components/drawers/CustomerDetailsDrawer';
+
+interface Customer {
+    id: number;
+    email: string;
+    full_name: string;
+    phone_number?: string;
+    employer?: string;
+    role: string;
+    is_active: boolean;
+    created_at: string;
+    avatar_url?: string;
+    state_of_residence?: string;
+    last_sign_in_at?: string;
+    // New fields for export
+    bvn?: string;
+    nin?: string;
+    date_of_birth?: string;
+    primary_home_address?: string;
+    bank_name?: string;
+    account_number?: string;
+    account_name?: string;
+}
+
+interface CustomersPageProps {
+    user: { name: string; email: string; avatar_url?: string; role?: string };
+    onLogout: () => void;
+    toggleTheme?: () => void;
+    theme?: 'light' | 'dark';
+}
+
+const CustomersPage: React.FC<CustomersPageProps> = ({ user, onLogout, toggleTheme, theme }) => {
+    const [customers, setCustomers] = useState<Customer[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [selectedIds, setSelectedIds] = useState<number[]>([]);
+    const [searchTerm, setSearchTerm] = useState('');
+    const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+    const [drawerCustomerId, setDrawerCustomerId] = useState<number | null>(null);
+
+    useEffect(() => {
+        const fetchCustomers = async () => {
+            try {
+                // Fetch only users with role='customer'
+                const res = await axios.get(`${import.meta.env.VITE_BACKEND_URL || ''}/api/staff/users?role=customer`, { withCredentials: true });
+                setCustomers(res.data);
+            } catch (error) {
+                console.error("Failed to fetch customers", error);
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        fetchCustomers();
+    }, []);
+
+    const toggleSelectAll = () => {
+        if (selectedIds.length === customers.length) {
+            setSelectedIds([]);
+        } else {
+            setSelectedIds(customers.map(c => c.id));
+        }
+    };
+
+    const toggleSelectOne = (id: number) => {
+        if (selectedIds.includes(id)) {
+            setSelectedIds(selectedIds.filter(sid => sid !== id));
+        } else {
+            setSelectedIds([...selectedIds, id]);
+        }
+    };
+
+    const handleRowClick = (id: number) => {
+        setDrawerCustomerId(id);
+        setIsDrawerOpen(true);
+    };
+
+    const handleExport = (exportAll: boolean = false) => {
+        let dataToExport = customers;
+
+        if (!exportAll) {
+            if (selectedIds.length === 0) {
+                alert("Please select customers to export, or choose 'Export All'");
+                return;
+            }
+            dataToExport = customers.filter(c => selectedIds.includes(c.id));
+        }
+
+        if (dataToExport.length === 0) {
+            alert("No data to export");
+            return;
+        }
+
+        const headers = [
+            "ID",
+            "Full Name",
+            "Email",
+            "Phone Number",
+            "State of Residence",
+            "Employer",
+            "Status",
+            "Joined Date",
+            "BVN",
+            "NIN",
+            "Date of Birth",
+            "Home Address",
+            "Bank Name",
+            "Account Number",
+            "Account Name"
+        ];
+
+        const csvContent = [
+            headers.join(","),
+            ...dataToExport.map(c => {
+                const row = [
+                    c.id,
+                    `"${c.full_name || ''}"`,
+                    `"${c.email || ''}"`,
+                    `"${c.phone_number || ''}"`,
+                    `"${c.state_of_residence || ''}"`,
+                    `"${c.employer || ''}"`,
+                    c.is_active ? "Active" : "Inactive",
+                    `"${new Date(c.created_at).toLocaleDateString()}"`,
+                    `"${c.bvn || ''}"`,
+                    `"${c.nin || ''}"`,
+                    c.date_of_birth ? `"${new Date(c.date_of_birth).toLocaleDateString()}"` : "",
+                    `"${c.primary_home_address || ''}"`,
+                    `"${c.bank_name || ''}"`,
+                    `"${c.account_number || ''}"`,
+                    `"${c.account_name || ''}"`
+                ];
+                return row.join(",");
+            })
+        ].join("\n");
+
+        const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.setAttribute("href", url);
+        link.setAttribute("download", `customers_export_${new Date().toISOString().split('T')[0]}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
+    const filteredCustomers = customers.filter(c =>
+        c.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        c.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (c.phone_number && c.phone_number.includes(searchTerm))
+    );
+
+    return (
+        <StaffLayout user={user} onLogout={onLogout} toggleTheme={toggleTheme} theme={theme}>
+            <header className="flex flex-col md:flex-row justify-between md:items-end gap-6 mb-8">
+                <div>
+                    <h1 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight leading-tight">
+                        Customers
+                    </h1>
+                    <p className="text-slate-500 dark:text-slate-400 font-medium">
+                        Manage and view all registered customers.
+                    </p>
+                </div>
+                <div className="flex gap-3">
+                    {selectedIds.length > 0 && (
+                        <button
+                            onClick={() => handleExport(false)}
+                            className="px-4 py-2 rounded-lg bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200 text-xs font-bold uppercase tracking-wider flex items-center gap-2 hover:bg-slate-300 dark:hover:bg-slate-600 transition-all"
+                        >
+                            <span className="material-symbols-outlined text-sm">download</span>
+                            Export Selected ({selectedIds.length})
+                        </button>
+                    )}
+                    <button
+                        onClick={() => handleExport(true)}
+                        className="px-4 py-2 rounded-lg bg-green-500 text-white text-xs font-bold uppercase tracking-wider flex items-center gap-2 hover:bg-green-600 transition-all shadow-lg shadow-green-500/20"
+                    >
+                        <span className="material-symbols-outlined text-sm">download_for_offline</span>
+                        Export All
+                    </button>
+                </div>
+            </header>
+
+            <div className="bg-white dark:bg-[#1e293b] rounded-3xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm">
+                <div className="p-6 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-[#0f172a]/50">
+                    <div className="flex items-center gap-4">
+                        <div className="relative">
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 material-symbols-outlined text-slate-400 text-sm">search</span>
+                            <input
+                                type="text"
+                                placeholder="Search by name, email, phone..."
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                className="pl-9 pr-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm font-medium focus:ring-2 focus:ring-blue-500 outline-none w-72 transition-all"
+                            />
+                        </div>
+                    </div>
+                    <div className="text-xs font-bold text-slate-500">
+                        Total Customers: {customers.length}
+                    </div>
+                </div>
+
+                <div className="overflow-x-auto">
+                    <table className="w-full text-left min-w-[1000px]">
+                        <thead className="bg-slate-50/50 dark:bg-[#0f172a]/30 text-xs uppercase text-slate-500 font-black tracking-wider">
+                            <tr>
+                                <th className="p-4 w-4">
+                                    <input
+                                        type="checkbox"
+                                        checked={customers.length > 0 && selectedIds.length === customers.length}
+                                        onChange={toggleSelectAll}
+                                        className="rounded border-slate-300 dark:border-slate-700 text-blue-500 focus:ring-blue-500 bg-slate-100 dark:bg-slate-800"
+                                    />
+                                </th>
+                                <th className="p-4">Customer</th>
+                                <th className="p-4">Contact</th>
+                                <th className="p-4">State</th>
+                                <th className="p-4">Employment</th>
+                                <th className="p-4">Status</th>
+                                <th className="p-4">Joined</th>
+                                <th className="p-4">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody className="text-sm divide-y divide-slate-100 dark:divide-slate-800">
+                            {isLoading ? (
+                                <tr>
+                                    <td colSpan={8} className="p-8 text-center text-slate-500">
+                                        <div className="inline-block size-6 border-2 border-slate-200 border-t-blue-500 rounded-full animate-spin"></div>
+                                    </td>
+                                </tr>
+                            ) : filteredCustomers.length === 0 ? (
+                                <tr>
+                                    <td colSpan={8} className="p-8 text-center text-slate-500 font-medium">
+                                        No customers found.
+                                    </td>
+                                </tr>
+                            ) : (
+                                filteredCustomers.map((customer) => (
+                                    <tr
+                                        key={customer.id}
+                                        className={`hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors cursor-pointer ${selectedIds.includes(customer.id) ? 'bg-blue-50/50 dark:bg-blue-900/10' : ''}`}
+                                        onClick={() => handleRowClick(customer.id)}
+                                    >
+                                        <td className="p-4">
+                                            <input
+                                                type="checkbox"
+                                                checked={selectedIds.includes(customer.id)}
+                                                onChange={() => toggleSelectOne(customer.id)}
+                                                onClick={(e) => e.stopPropagation()}
+                                                className="rounded border-slate-300 dark:border-slate-700 text-blue-500 focus:ring-blue-500 bg-slate-100 dark:bg-slate-800"
+                                            />
+                                        </td>
+                                        <td className="p-4">
+                                            <div className="flex items-center gap-3">
+                                                <div className="size-8 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-xs font-bold text-slate-700 dark:text-white border border-slate-200 dark:border-slate-600 shrink-0 overflow-hidden">
+                                                    {customer.avatar_url ? (
+                                                        <img src={customer.avatar_url} alt={customer.full_name} className="w-full h-full object-cover" />
+                                                    ) : (
+                                                        customer.full_name ? customer.full_name[0] : '?'
+                                                    )}
+                                                </div>
+                                                <div>
+                                                    <p className="font-bold text-slate-900 dark:text-white text-xs">{customer.full_name}</p>
+                                                    <p className="text-[10px] text-slate-500">ID: {customer.id}</p>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td className="p-4">
+                                            <div className="flex flex-col">
+                                                <span className="text-slate-700 dark:text-slate-300 font-medium text-xs">{customer.email}</span>
+                                                <span className="text-[10px] text-slate-500">{customer.phone_number || 'No phone'}</span>
+                                            </div>
+                                        </td>
+                                        <td className="p-4 text-slate-600 dark:text-slate-400 font-medium text-xs">
+                                            {customer.state_of_residence || 'N/A'}
+                                        </td>
+                                        <td className="p-4 text-slate-600 dark:text-slate-400 font-medium text-xs">
+                                            {customer.employer || 'N/A'}
+                                        </td>
+                                        <td className="p-4">
+                                            <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${customer.is_active
+                                                ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                                                : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+                                                }`}>
+                                                {customer.is_active ? 'Active' : 'Inactive'}
+                                            </span>
+                                        </td>
+                                        <td className="p-4 text-slate-500 text-xs">
+                                            {new Date(customer.created_at).toLocaleDateString()}
+                                        </td>
+                                        <td className="p-4">
+                                            <button
+                                                onClick={(e) => { e.stopPropagation(); handleRowClick(customer.id); }}
+                                                className="text-blue-500 hover:text-blue-600 text-xs font-bold uppercase"
+                                            >
+                                                View
+                                            </button>
+                                        </td>
+                                    </tr>
+                                ))
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            {isDrawerOpen && (
+                <CustomerDetailsDrawer
+                    customerId={drawerCustomerId}
+                    onClose={() => setIsDrawerOpen(false)}
+                />
+            )}
+        </StaffLayout>
+    );
+};
+
+export default CustomersPage;
