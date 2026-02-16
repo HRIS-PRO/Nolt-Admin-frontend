@@ -9,6 +9,10 @@
             "destination": "https://nolt-admin-backend-production.up.railway.app/auth/:path*"
         },
         {
+            "source": "/socket.io/:path*",
+            "destination": "https://nolt-admin-backend-production.up.railway.app/socket.io/:path*"
+        },
+        {
             "source": "/(.*)",
             "destination": "/index.html"
         }
