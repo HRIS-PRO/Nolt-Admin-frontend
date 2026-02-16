@@ -241,6 +241,116 @@ const LoanFlow: React.FC<LoanFlowProps> = ({ initialStep, onComplete, navigate, 
     fetchBanks();
   }, []);
 
+  // Hydrate form from previous loan if available
+  useEffect(() => {
+    const fetchPreviousData = async () => {
+      if (initialDraft) return; // Don't overwrite draft
+
+      try {
+        const backendUrl = '';
+        // Reuse existing endpoint to get all loans, sorted by newest first
+        const response = await axios.get(`${backendUrl}/api/loans`, { withCredentials: true });
+
+        if (response.data && Array.isArray(response.data) && response.data.length > 0) {
+          const latestLoan = response.data[0];
+          console.log("Hydrating from previous loan:", latestLoan);
+
+          // Personal
+          setTitle(latestLoan.title || 'Mr');
+          setSurname(latestLoan.surname || '');
+          setFirstName(latestLoan.first_name || '');
+          setMiddleName(latestLoan.middle_name || '');
+          setIsOnBehalf(latestLoan.applying_for_others || false);
+          setRepresentativeRelation(latestLoan.relationship_to_applicant || '');
+          setIsPep(latestLoan.is_politically_exposed); // boolean
+          setGender(latestLoan.gender || '');
+          if (latestLoan.date_of_birth) {
+            setDob(new Date(latestLoan.date_of_birth).toISOString().split('T')[0]);
+          }
+          setMaidenName(latestLoan.mothers_maiden_name || '');
+          setMaritalStatus(latestLoan.marital_status || 'Single');
+          setReligion(latestLoan.religion || 'Prefer not to say');
+
+          // Contact
+          setCountryCode('+234'); // Defaulting/Resetting or we could store this too
+          setMobileNumber(latestLoan.mobile_number || '');
+          setContactEmail(latestLoan.personal_email || '');
+
+          // IDs
+          setBvn(latestLoan.bvn || '');
+          setNin(latestLoan.nin || '');
+
+          // Address
+          setStateOfOrigin(latestLoan.state_of_origin || '');
+          setStateOfResidence(latestLoan.state_of_residence || '');
+          setHomeAddress(latestLoan.primary_home_address || '');
+          setResidentialStatus(latestLoan.residential_status || 'Rent');
+
+          // Financial
+          setDependents(latestLoan.number_of_dependents || 0);
+          setHasActiveLoans(latestLoan.has_active_loans ? 'yes' : 'no');
+          setMonthlyIncome(latestLoan.average_monthly_income?.toString() || '0');
+
+          // Work / MDA
+          const dbMda = latestLoan.mda_tertiary;
+          if (dbMda) {
+            if (TERTIARY_LIST.includes(dbMda)) {
+              setMda(dbMda);
+            } else {
+              setMda('Other');
+              setCustomMda(dbMda);
+            }
+          }
+          setIppisNumber(latestLoan.ippis_number || '');
+          setStaffId(latestLoan.staff_id || '');
+
+          // Banking
+          setBankDetails({
+            bankName: latestLoan.bank_name || '',
+            accountNumber: latestLoan.account_number || '',
+            accountName: latestLoan.account_name || ''
+          });
+
+          // Uploaded Docs - Map URLs back to "uploaded" state so they appear valid
+          // We mark them with a special 'Previous Upload' name so user knows
+          setUploadedDocs(prev => ({
+            ...prev,
+            national_id: latestLoan.govt_id_url ? { name: 'Previous Upload', size: 'Existing', url: latestLoan.govt_id_url } : null,
+            work_id: latestLoan.work_id_url ? { name: 'Previous Upload', size: 'Existing', url: latestLoan.work_id_url } : null,
+            payslip: latestLoan.payslip_url ? { name: 'Previous Upload', size: 'Existing', url: latestLoan.payslip_url } : null,
+            bank_statement: latestLoan.statement_of_account_url ? { name: 'Previous Upload', size: 'Existing', url: latestLoan.statement_of_account_url } : null,
+            proof_address: latestLoan.proof_of_residence_url ? { name: 'Previous Upload', size: 'Existing', url: latestLoan.proof_of_residence_url } : null,
+            selfie: latestLoan.selfie_verification_url ? { name: 'Previous Upload', size: 'Existing', url: latestLoan.selfie_verification_url } : null,
+          }));
+
+          // References
+          // Handle both stringified JSON (from DB text column) or direct array
+          let refs = [];
+          if (typeof latestLoan.customer_references === 'string') {
+            try { refs = JSON.parse(latestLoan.customer_references); } catch (e) { }
+          } else if (Array.isArray(latestLoan.customer_references)) {
+            refs = latestLoan.customer_references;
+          }
+
+          if (refs.length > 0) {
+            setReferences(refs.map((r: any) => ({
+              name: r.fullName || r.name || '',
+              phone: r.phoneNumber || r.phone || '',
+              relationship: r.relationship || ''
+            })));
+          }
+
+          // Note: We intentionally do NOT pre-fill 'desiredAmount', 'repaymentPeriod', 'selectedLoanId'
+          // as these should be fresh for a new application.
+        }
+      } catch (error) {
+        console.error("Failed to load previous data", error);
+      }
+    };
+
+    fetchPreviousData();
+  }, [initialDraft]);
+
   const handleBack = () => {
     if (subStep > 0) {
       setSubStep(prev => prev - 1);
