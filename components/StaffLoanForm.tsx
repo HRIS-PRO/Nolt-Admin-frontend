@@ -153,6 +153,14 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess, initi
     const [bankList, setBankList] = useState<{ name: string, code: string }[]>([]);
     const [productType, setProductType] = useState('');
 
+    // New Fields for TopUp/BuyOver
+    const [casa, setCasa] = useState('');
+    const [topUpAmount, setTopUpAmount] = useState('');
+    const [buyOverAmount, setBuyOverAmount] = useState('');
+    const [buyOverCompanyName, setBuyOverCompanyName] = useState('');
+    const [buyOverAccountName, setBuyOverAccountName] = useState('');
+    const [buyOverAccountNumber, setBuyOverAccountNumber] = useState('');
+
     // Documents
     const [uploadedDocs, setUploadedDocs] = useState<Record<string, { name: string, size: string, url: string } | null>>({
         govt_id: null,
@@ -208,6 +216,14 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess, initi
             setAmount(initialData.requested_loan_amount || '');
             setTenure(initialData.loan_tenure_months || 6);
             setLoanType(initialData.loan_type || 'new');
+
+            // Populate New Fields
+            setCasa(initialData.casa || '');
+            setTopUpAmount(initialData.topup_amount || '');
+            setBuyOverAmount(initialData.buy_over_amount || '');
+            setBuyOverCompanyName(initialData.buy_over_company_name || '');
+            setBuyOverAccountName(initialData.buy_over_company_account_name || '');
+            setBuyOverAccountNumber(initialData.buy_over_company_account_number || '');
 
             // Pre-fill documents references if URLs exist (visual only, real re-upload needed to change)
             setUploadedDocs(prev => ({
@@ -394,6 +410,30 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess, initi
                 newErrors.accountNumber = "Must be 10 digits";
             }
             if (!accountName) newErrors.accountName = "Required";
+
+            // --- New Validation Logic ---
+            if (loanType !== 'new') {
+                // Common for TopUp, Re-App, BuyOver
+                if (['topup', 're-app', 'buy_over', 'add_on'].includes(loanType)) {
+                    // Note: IPPIS/Mobile are checked in earlier steps, assuming those steps are valid if we are here?
+                    // Actually validateStep checks current step. Validation for previous steps is assumed done.
+                    // But we should double check if we want to enforce it here?
+                    // For now, let's enforce the specific fields for this step.
+
+                    if (!casa) newErrors.casa = "Required";
+                }
+
+                if (loanType === 'topup' || loanType === 'add_on') {
+                    if (!topUpAmount) newErrors.topUpAmount = "Required";
+                }
+
+                if (loanType === 'buy_over') {
+                    if (!buyOverAmount) newErrors.buyOverAmount = "Required";
+                    if (!buyOverCompanyName) newErrors.buyOverCompanyName = "Required";
+                    if (!buyOverAccountName) newErrors.buyOverAccountName = "Required";
+                    if (!buyOverAccountNumber) newErrors.buyOverAccountNumber = "Required";
+                }
+            }
         }
 
         if (step === 4) { // Documents
@@ -487,7 +527,15 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess, initi
                 // Bank Details
                 bank_name: bankName,
                 account_number: accountNumber,
-                account_name: accountName
+                account_name: accountName,
+
+                // New Fields
+                casa: parseFloat(casa) || 0,
+                topup_amount: parseFloat(topUpAmount) || 0,
+                buy_over_amount: parseFloat(buyOverAmount) || 0,
+                buy_over_company_name: buyOverCompanyName,
+                buy_over_company_account_name: buyOverAccountName,
+                buy_over_company_account_number: buyOverAccountNumber
             };
 
             if (loanId) {
@@ -678,13 +726,78 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess, initi
                                     <InputGroup label="Loan Type">
                                         <select className="input-field" value={loanType} onChange={e => setLoanType(e.target.value)}>
                                             <option value="new">New Loan</option>
-                                            <option value="top-up">Top-up</option>
+                                            <option value="topup">Top-up</option> {/* Fixed key from top-up to topup to match backend */}
                                             <option value="buy_over">Buy-over</option>
                                             <option value="re-app">Re-app</option>
-                                            <option value="add-on">Add-on</option>
+                                            <option value="add_on">Add-on</option>
                                         </select>
                                     </InputGroup>
                                 </div>
+
+                                {/* Conditional Fields Based on Loan Type */}
+                                {['topup', 'buy_over', 're-app', 'add_on'].includes(loanType) && (
+                                    <div className="p-6 bg-blue-50 dark:bg-blue-900/10 rounded-2xl mb-8 border border-blue-100 dark:border-blue-900/20">
+                                        <h4 className="text-sm font-black text-blue-900 dark:text-blue-300 uppercase tracking-widest mb-4 border-b border-blue-200 dark:border-blue-800 pb-2">
+                                            {loanType.replace('_', ' ')} Details
+                                        </h4>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                            <InputGroup label="CASA Turnover (₦)" required error={errors.casa}>
+                                                <input
+                                                    type="number"
+                                                    className="input-field border-blue-200 focus:border-blue-500"
+                                                    value={casa}
+                                                    onChange={e => { setCasa(e.target.value); clearError('casa'); }}
+                                                />
+                                            </InputGroup>
+
+                                            {(loanType === 'topup' || loanType === 'add_on') && (
+                                                <InputGroup label="Top Up Amount (₦)" required error={errors.topUpAmount}>
+                                                    <input
+                                                        type="number"
+                                                        className="input-field border-blue-200 focus:border-blue-500"
+                                                        value={topUpAmount}
+                                                        onChange={e => { setTopUpAmount(e.target.value); clearError('topUpAmount'); }}
+                                                    />
+                                                </InputGroup>
+                                            )}
+
+                                            {loanType === 'buy_over' && (
+                                                <>
+                                                    <InputGroup label="Buy Over Amount (₦)" required error={errors.buyOverAmount}>
+                                                        <input
+                                                            type="number"
+                                                            className="input-field border-blue-200 focus:border-blue-500"
+                                                            value={buyOverAmount}
+                                                            onChange={e => { setBuyOverAmount(e.target.value); clearError('buyOverAmount'); }}
+                                                        />
+                                                    </InputGroup>
+                                                    <InputGroup label="Company Name" required error={errors.buyOverCompanyName}>
+                                                        <input
+                                                            className="input-field border-blue-200 focus:border-blue-500"
+                                                            value={buyOverCompanyName}
+                                                            onChange={e => { setBuyOverCompanyName(e.target.value); clearError('buyOverCompanyName'); }}
+                                                        />
+                                                    </InputGroup>
+                                                    <InputGroup label="Company Account Name" required error={errors.buyOverAccountName}>
+                                                        <input
+                                                            className="input-field border-blue-200 focus:border-blue-500"
+                                                            value={buyOverAccountName}
+                                                            onChange={e => { setBuyOverAccountName(e.target.value); clearError('buyOverAccountName'); }}
+                                                        />
+                                                    </InputGroup>
+                                                    <InputGroup label="Company Account Number" required error={errors.buyOverAccountNumber}>
+                                                        <input
+                                                            className="input-field border-blue-200 focus:border-blue-500"
+                                                            value={buyOverAccountNumber}
+                                                            onChange={handleNumericChange(setBuyOverAccountNumber, 'buyOverAccountNumber')}
+                                                        />
+                                                    </InputGroup>
+                                                </>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
+
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                                     <InputGroup label="Loan Amount" required error={errors.amount}>
                                         <div className="relative">

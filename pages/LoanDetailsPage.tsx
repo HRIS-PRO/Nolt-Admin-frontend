@@ -294,21 +294,11 @@ const LoanDetailsPage: React.FC<LoanDetailsPageProps> = ({ user, onLogout, toggl
     const [isEditingLoanType, setIsEditingLoanType] = useState(false);
     const [tempLoanType, setTempLoanType] = useState('');
 
-    const handleUpdateLoanType = async () => {
-        try {
-            await axios.patch(`/api/staff/loans/${id}/attribute`, {
-                field: 'loan_type',
-                value: tempLoanType
-            }, { withCredentials: true });
-
-            // Optimistic Update or Refresh
-            setLoan((prev: any) => ({ ...prev, loan_type: tempLoanType }));
-            setIsEditingLoanType(false);
-            alert("Loan Type Updated");
-        } catch (error: any) {
-            console.error("Update failed", error);
-            alert(error.response?.data?.message || "Update failed");
-        }
+    const handleUpdateLoanType = () => {
+        // Instead of a direct API call (which lacks validation for new fields),
+        // we open the full edit modal with the new type pre-selected.
+        // This forces the user to fill in the required fields (CASA, Buy Over details, etc.)
+        setShowEditModal(true);
     };
 
     useEffect(() => {
@@ -561,6 +551,14 @@ const LoanDetailsPage: React.FC<LoanDetailsPageProps> = ({ user, onLogout, toggl
                         <Field label="Staff ID" value={loan.staff_id} />
                         <SensitiveDataField loanId={loan.id} field="bvn" label="BVN" />
                         <SensitiveDataField loanId={loan.id} field="nin" label="NIN" />
+
+                        {/* New Fields */}
+                        {loan.casa && <Field label="CASA Turnover" value={`₦${Number(loan.casa).toLocaleString()}`} />}
+                        {loan.topup_amount && <Field label="Top Up Amount" value={`₦${Number(loan.topup_amount).toLocaleString()}`} />}
+                        {loan.buy_over_amount && <Field label="Buy Over Amount" value={`₦${Number(loan.buy_over_amount).toLocaleString()}`} />}
+                        {loan.buy_over_company_name && <Field label="Buy Over Company" value={loan.buy_over_company_name} />}
+                        {loan.buy_over_company_account_name && <Field label="Buy Over Account Name" value={loan.buy_over_company_account_name} />}
+                        {loan.buy_over_company_account_number && <Field label="Buy Over Account Number" value={loan.buy_over_company_account_number} copy />}
                     </CollapsibleGroup>
 
                     <CollapsibleGroup title="Documents" icon="folder_open">
@@ -625,7 +623,7 @@ const LoanDetailsPage: React.FC<LoanDetailsPageProps> = ({ user, onLogout, toggl
                             <h2 className="text-2xl font-black mb-6 text-slate-900 dark:text-white">Edit Application</h2>
                             <StaffLoanForm
                                 user={user}
-                                initialData={loan}
+                                initialData={{ ...loan, loan_type: isEditingLoanType ? tempLoanType : loan.loan_type }}
                                 loanId={loan.id}
                                 onClose={() => setShowEditModal(false)} // Pass existing onClose
                                 onSuccess={() => {
