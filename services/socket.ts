@@ -1,6 +1,8 @@
 import { io, Socket } from 'socket.io-client';
 
-const URL = "https://nolt-admin-backend-production.up.railway.app" // Use env var or default to window.location
+// Use env var (for direct connection) or default to window.location (for proxy/rewrite)
+// In production, VITE_BACKEND_URL should be set OR vercel.json rewrite must be present.
+const URL = import.meta.env.VITE_BACKEND_URL || undefined;
 
 export const socket: Socket = io(URL, {
     withCredentials: true,
