@@ -52,7 +52,8 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, user, isLoadi
     return <Navigate to="/login" replace />;
   }
 
-  if (user.new_comer) {
+  // Onboarding is only for customers
+  if (user.new_comer && user.role === 'customer') {
     return <Navigate to="/onboarding" replace />;
   }
 
@@ -136,6 +137,7 @@ const AppContent: React.FC = () => {
     refreshUser();
   }, [refreshUser]);
 
+  // console.log("the user", user)
   // console.log("the user", user)
 
 
@@ -234,6 +236,29 @@ const AppContent: React.FC = () => {
       events.forEach(event => window.removeEventListener(event, handleActivity));
     };
   }, [user.isLoggedIn, performLogout]);
+
+
+  // Socket Connection Logic
+  useEffect(() => {
+    import('./services/socket').then(({ socket }) => {
+      if (user.isLoggedIn && user.role !== 'customer') {
+        if (!socket.connected) {
+          socket.connect();
+          console.log("Socket connecting...");
+        }
+      } else {
+        if (socket.connected) {
+          socket.disconnect();
+          console.log("Socket disconnected");
+        }
+      }
+    });
+
+    return () => {
+      // We might not want to disconnect on every unmount if we want persistence, 
+      // but for App level it's fine.
+    };
+  }, [user.isLoggedIn, user.role]);
 
 
   // Format money helper

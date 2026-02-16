@@ -324,6 +324,47 @@ const LoanDetailsPage: React.FC<LoanDetailsPageProps> = ({ user, onLogout, toggl
         };
 
         if (id) fetchLoan();
+
+        // Socket Listeners
+        import('../services/socket').then(({ socket }) => {
+            if (!id) return;
+
+            const handleUpdate = (data: any) => {
+                if (String(data.id) === String(id) || String(data.loanId) === String(id)) {
+                    console.log("Real-time update for this loan");
+                    // Re-fetch loan
+                    axios.get(`/api/staff/loans/${id}`, { withCredentials: true })
+                        .then(res => setLoan(res.data))
+                        .catch(console.error);
+                }
+            };
+
+            const handleDocUpload = (data: any) => {
+                if (String(data.loanId) === String(id)) {
+                    console.log("Document uploaded");
+                    // Force refresh of DocumentsList
+                    setLoan((prev: any) => ({ ...prev, updated_at: new Date().toISOString() }));
+                }
+            }
+
+            const handleDocDelete = (data: any) => {
+                if (String(data.loanId) === String(id)) {
+                    console.log("Document deleted");
+                    // Force refresh
+                    setLoan((prev: any) => ({ ...prev, updated_at: new Date().toISOString() }));
+                }
+            }
+
+            socket.on('loan_updated', handleUpdate);
+            socket.on('doc_uploaded', handleDocUpload);
+            socket.on('doc_deleted', handleDocDelete);
+
+            return () => {
+                socket.off('loan_updated', handleUpdate);
+                socket.off('doc_uploaded', handleDocUpload);
+                socket.off('doc_deleted', handleDocDelete);
+            };
+        });
     }, [id, navigate]);
 
     if (isLoading) {
@@ -442,13 +483,13 @@ const LoanDetailsPage: React.FC<LoanDetailsPageProps> = ({ user, onLogout, toggl
             <div className="grid grid-cols-1 xl:grid-cols-12 gap-8 items-start">
                 <div className="xl:col-span-8 space-y-8">
                     {/* Summary Card */}
-                    <div className="bg-white dark:bg-slate-900 rounded-[24px] p-8 border border-slate-200 dark:border-slate-800 flex justify-between items-center">
+                    <div className="bg-white dark:bg-slate-900 rounded-[24px] p-8 border border-slate-200 dark:border-slate-800 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 items-start">
                         <div>
                             <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Loan Type</p>
                             {isEditingLoanType ? (
                                 <div className="flex items-center gap-2">
                                     <select
-                                        className="p-2 rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm font-bold"
+                                        className="p-2 rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm font-bold w-full"
                                         value={tempLoanType}
                                         onChange={(e) => setTempLoanType(e.target.value)}
                                     >
@@ -458,10 +499,10 @@ const LoanDetailsPage: React.FC<LoanDetailsPageProps> = ({ user, onLogout, toggl
                                         <option value="re-app">Re-app</option>
                                         <option value="add-on">Add-on</option>
                                     </select>
-                                    <button onClick={handleUpdateLoanType} className="size-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center hover:bg-blue-200">
+                                    <button onClick={handleUpdateLoanType} className="size-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center hover:bg-blue-200 shrink-0">
                                         <span className="material-symbols-outlined text-sm">check</span>
                                     </button>
-                                    <button onClick={() => setIsEditingLoanType(false)} className="size-8 rounded-full bg-slate-100 text-slate-600 flex items-center justify-center hover:bg-slate-200">
+                                    <button onClick={() => setIsEditingLoanType(false)} className="size-8 rounded-full bg-slate-100 text-slate-600 flex items-center justify-center hover:bg-slate-200 shrink-0">
                                         <span className="material-symbols-outlined text-sm">close</span>
                                     </button>
                                 </div>

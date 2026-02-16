@@ -43,33 +43,70 @@ const DocumentsList: React.FC<{ loanId: string | undefined; refreshTrigger?: num
         );
     }
 
+    const handleDelete = async (docId: string, event: React.MouseEvent) => {
+        event.preventDefault(); // Prevent link click
+        if (!confirm("Are you sure you want to delete this document?")) return;
+
+        try {
+            await axios.delete(`/api/upload/${docId}`, {
+                data: { loan_id: loanId },
+                withCredentials: true
+            });
+            // Optimistic update or wait for socket
+            setDocuments(prev => prev.filter(d => d.id !== docId));
+        } catch (error: any) {
+            console.error("Delete failed", error);
+            alert(error.response?.data?.message || "Delete failed");
+        }
+    };
+
     return (
         <div className="space-y-3">
             {documents.map((doc) => (
-                <a
+                <div
                     key={doc.id}
-                    href={doc.file_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-4 p-4 rounded-xl bg-white dark:bg-[#1e293b] border border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 transition-all group"
+                    className="flex items-center gap-4 p-4 rounded-xl bg-white dark:bg-[#1e293b] border border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 transition-all group relative"
                 >
-                    <div className="size-10 rounded-lg bg-indigo-50 dark:bg-indigo-900/20 flex items-center justify-center text-indigo-600 dark:text-indigo-400">
-                        <span className="material-symbols-outlined">description</span>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                        <p className="font-bold text-slate-900 dark:text-white text-sm truncate">{doc.file_name}</p>
-                        <div className="flex items-center gap-2 text-[10px] text-slate-500">
-                            <span className="uppercase tracking-wider">{doc.document_type.replace(/_/g, ' ')}</span>
-                            <span>•</span>
-                            <span>{doc.uploaded_by_name || 'System'}</span>
-                            <span>•</span>
-                            <span>{new Date(doc.created_at).toLocaleDateString()}</span>
+                    <a
+                        href={doc.file_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex-1 flex items-center gap-4 min-w-0"
+                    >
+                        <div className="size-10 rounded-lg bg-indigo-50 dark:bg-indigo-900/20 flex items-center justify-center text-indigo-600 dark:text-indigo-400 shrink-0">
+                            <span className="material-symbols-outlined">description</span>
                         </div>
+                        <div className="min-w-0">
+                            <p className="font-bold text-slate-900 dark:text-white text-sm truncate">{doc.file_name}</p>
+                            <div className="flex items-center gap-2 text-[10px] text-slate-500">
+                                <span className="uppercase tracking-wider">{doc.document_type.replace(/_/g, ' ')}</span>
+                                <span>•</span>
+                                <span>{doc.uploaded_by_name || 'System'}</span>
+                                <span>•</span>
+                                <span>{new Date(doc.created_at).toLocaleDateString()}</span>
+                            </div>
+                        </div>
+                    </a>
+
+                    <div className="flex items-center gap-2">
+                        <a
+                            href={doc.file_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-indigo-500 transition-colors"
+                            title="View"
+                        >
+                            <span className="material-symbols-outlined text-xl">open_in_new</span>
+                        </a>
+                        <button
+                            onClick={(e) => handleDelete(doc.id, e)}
+                            className="p-2 rounded-full hover:bg-red-50 dark:hover:bg-red-900/20 text-slate-400 hover:text-red-500 transition-colors"
+                            title="Delete"
+                        >
+                            <span className="material-symbols-outlined text-xl">delete</span>
+                        </button>
                     </div>
-                    <span className="material-symbols-outlined text-slate-400 group-hover:text-indigo-500 transition-colors">
-                        open_in_new
-                    </span>
-                </a>
+                </div>
             ))}
         </div>
     );

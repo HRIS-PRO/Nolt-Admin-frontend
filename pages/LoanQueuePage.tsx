@@ -120,6 +120,22 @@ const LoanQueuePage: React.FC<LoanQueuePageProps> = ({ user, onLogout, toggleThe
     useEffect(() => {
         fetchLoans();
         fetchOfficers();
+
+        // Socket Listeners
+        import('../services/socket').then(({ socket }) => {
+            const handleLoanChange = () => {
+                console.log("Real-time update received");
+                fetchLoans(); // Refresh list on any change
+            };
+
+            socket.on('loan_new', handleLoanChange);
+            socket.on('loan_updated', handleLoanChange);
+
+            return () => {
+                socket.off('loan_new', handleLoanChange);
+                socket.off('loan_updated', handleLoanChange);
+            };
+        });
     }, [user.role, searchQuery, statusFilter, stageFilter, currentPage]); // Re-fetch on params change
 
     // Client-side filtering removed as pagination is server-side now
