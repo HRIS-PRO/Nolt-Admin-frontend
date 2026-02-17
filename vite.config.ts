@@ -10,19 +10,19 @@ export default defineConfig(({ mode }) => {
       host: '0.0.0.0',
       proxy: {
         '/api': {
-          target: env.VITE_API_TARGET || 'https://nolt-admin-backend-production.up.railway.app',
+          target: env.VITE_API_TARGET || 'https://nolt-admin-backend-production.up.railway.app/',
           changeOrigin: true,
           secure: false,
           cookieDomainRewrite: "localhost"
         },
         '/auth': {
-          target: env.VITE_API_TARGET || 'https://nolt-admin-backend-production.up.railway.app',
+          target: env.VITE_API_TARGET || 'https://nolt-admin-backend-production.up.railway.app/',
           changeOrigin: true,
           secure: false,
           cookieDomainRewrite: "localhost"
         },
         '/socket.io': {
-          target: env.VITE_API_TARGET || 'https://nolt-admin-backend-production.up.railway.app',
+          target: env.VITE_API_TARGET || 'https://nolt-admin-backend-production.up.railway.app/',
           ws: true,
           changeOrigin: true,
           secure: false
