@@ -350,6 +350,7 @@ const LoanDetailsPage: React.FC<LoanDetailsPageProps> = ({ user, onLogout, toggl
         };
 
         if (id) fetchLoan();
+        
 
         // Socket Listeners
         import('../services/socket').then(({ socket }) => {
@@ -392,6 +393,8 @@ const LoanDetailsPage: React.FC<LoanDetailsPageProps> = ({ user, onLogout, toggl
             };
         });
     }, [id, navigate]);
+
+    // console.log(loan);
 
     if (isLoading) {
         return (
@@ -563,7 +566,7 @@ const LoanDetailsPage: React.FC<LoanDetailsPageProps> = ({ user, onLogout, toggl
                         <SensitiveDataField loanId={loan.id} field="nin" label="NIN" />
 
                         {/* New Fields */}
-                        {loan.casa && <Field label="CASA Turnover (ID)" value={String(loan.casa).split('.')[0]} />}
+                        {loan.casa && <Field label="CASA" value={String(loan.casa).split('.')[0]} />}
                         {loan.topup_amount && <Field label="Top Up Amount" value={`₦${Number(loan.topup_amount).toLocaleString()}`} />}
                         {loan.buy_over_amount && <Field label="Buy Over Amount" value={`₦${Number(loan.buy_over_amount).toLocaleString()}`} />}
                         {loan.buy_over_company_name && <Field label="Buy Over Company" value={loan.buy_over_company_name} />}
