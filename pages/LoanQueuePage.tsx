@@ -76,6 +76,9 @@ const LoanQueuePage: React.FC<LoanQueuePageProps> = ({ user, onLogout, toggleThe
         }
     };
 
+
+    // console.log(loans)
+
     const handleBulkApprove = async () => {
         if (!confirm(`Are you sure you want to approve ${selectedLoans.length} loans? This will move them to Disbursed stage.`)) return;
 
@@ -136,7 +139,9 @@ const LoanQueuePage: React.FC<LoanQueuePageProps> = ({ user, onLogout, toggleThe
                 socket.off('loan_updated', handleLoanChange);
             };
         });
-    }, [user.role, searchQuery, statusFilter, stageFilter, currentPage]); // Re-fetch on params change
+    }, [user.role, searchQuery, statusFilter, stageFilter, currentPage]);
+
+    // Re-fetch on params change
 
     // Client-side filtering removed as pagination is server-side now
     const filteredLoans = loans;
@@ -254,6 +259,7 @@ const LoanQueuePage: React.FC<LoanQueuePageProps> = ({ user, onLogout, toggleThe
                                 <th className="p-4">Reference ID</th>
                                 <th className="p-4">Applicant</th>
                                 <th className="p-4">Type</th>
+                                <th className="p-4">Loan Type</th>
                                 <th className="p-4">Stage</th>
                                 <th className="p-4">Sales Officer</th>
                                 <th className="p-4">Amount</th>
@@ -309,6 +315,11 @@ const LoanQueuePage: React.FC<LoanQueuePageProps> = ({ user, onLogout, toggleThe
                                             </span>
                                         </td>
                                         <td className="p-4">
+                                            <span className="px-2 py-1 rounded border border-purple-500/20 text-[10px] font-black uppercase text-purple-500 dark:text-purple-400 tracking-wider text-nowrap">
+                                                {loan.loan_type ? loan.loan_type.replace('_', ' ') : 'New'}
+                                            </span>
+                                        </td>
+                                        <td className="p-4">
                                             <span className="px-2 py-1 rounded border border-orange-500/20 text-[10px] font-black uppercase text-orange-500 dark:text-orange-400 tracking-wider text-nowrap">
                                                 {loan.stage || 'Onboarding'}
                                             </span>
@@ -339,7 +350,13 @@ const LoanQueuePage: React.FC<LoanQueuePageProps> = ({ user, onLogout, toggleThe
                                                 </div>
                                             )}
                                         </td>
-                                        <td className="p-4 font-black text-slate-900 dark:text-white">₦{Number(loan.requested_loan_amount).toLocaleString()}</td>
+                                        <td className="p-4 font-black text-slate-900 dark:text-white">
+                                            ₦{Number(
+                                                loan.loan_type === 'topup' || loan.loan_type === 're-app' || loan.loan_type === 'add-on' ? loan.topup_amount :
+                                                    loan.loan_type === 'buy_over' ? loan.buy_over_amount :
+                                                        loan.requested_loan_amount
+                                            ).toLocaleString()}
+                                        </td>
                                         <td className="p-4 text-slate-500 text-xs">{new Date(loan.created_at).toLocaleDateString()}</td>
                                         <td className="p-4">
                                             <div className={`flex items-center gap-2 px-2 py-1 rounded border w-fit text-[10px] font-bold uppercase tracking-widest border-amber-500/20 bg-amber-500/10 text-amber-600 dark:text-amber-500`}>
