@@ -359,8 +359,8 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess, initi
         const newErrors: Record<string, string> = {};
         let isValid = true;
 
-        // Check for Simplified Mode
-        if (['topup', 'buy_over', 're-app', 'add_on'].includes(loanType)) {
+        // Check for Simplified Mode (Buy Over removed)
+        if (['topup', 're-app', 'add_on'].includes(loanType)) {
             // Simplified Validation
             if (!surname.trim()) newErrors.surname = "Required";
             if (!firstName.trim()) newErrors.firstName = "Required";
@@ -375,11 +375,8 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess, initi
                 if (!topUpAmount) newErrors.topUpAmount = "Required";
             }
 
-            if (loanType === 'buy_over') {
-                if (!buyOverAmount) newErrors.buyOverAmount = "Required";
-                if (!buyOverCompanyName) newErrors.buyOverCompanyName = "Required";
-                if (!buyOverAccountName) newErrors.buyOverAccountName = "Required";
-                if (!buyOverAccountNumber) newErrors.buyOverAccountNumber = "Required";
+            if (loanType === 'topup' || loanType === 'add_on') {
+                if (!topUpAmount) newErrors.topUpAmount = "Required";
             }
 
             if (!uploadedDocs.payslip) newErrors.payslip = "Required";
@@ -437,6 +434,13 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess, initi
                     newErrors.accountNumber = "Must be 10 digits";
                 }
                 if (!accountName) newErrors.accountName = "Required";
+
+                if (loanType === 'buy_over') {
+                    if (!buyOverAmount) newErrors.buyOverAmount = "Required";
+                    if (!buyOverCompanyName) newErrors.buyOverCompanyName = "Required";
+                    if (!buyOverAccountName) newErrors.buyOverAccountName = "Required";
+                    if (!buyOverAccountNumber) newErrors.buyOverAccountNumber = "Required";
+                }
             }
 
             if (step === 4) { // Documents
@@ -506,16 +510,10 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess, initi
                 payslip_url: uploadedDocs.payslip?.url,
             };
 
-            if (['topup', 'buy_over', 're-app', 'add_on'].includes(loanType)) {
+            if (['topup', 're-app', 'add_on'].includes(loanType)) {
                 // --- SPECIAL LOAN PAYLOAD ---
                 if (loanType === 'topup' || loanType === 'add_on' || loanType === 're-app') {
                     payload.topup_amount = parseFloat(topUpAmount) || 0;
-                }
-                if (loanType === 'buy_over') {
-                    payload.buy_over_amount = parseFloat(buyOverAmount) || 0;
-                    payload.buy_over_company_name = buyOverCompanyName;
-                    payload.buy_over_company_account_name = buyOverAccountName;
-                    payload.buy_over_company_account_number = buyOverAccountNumber;
                 }
                 // Ensure other mandatory fields for backend are at least present if needed, 
                 // but our backend validation is now relaxed, so we can omit them.
@@ -562,6 +560,12 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess, initi
                     bank_name: bankName,
                     account_number: accountNumber,
                     account_name: accountName,
+
+                    // Buy Over Specifics
+                    buy_over_amount: loanType === 'buy_over' ? (parseFloat(buyOverAmount) || 0) : 0,
+                    buy_over_company_name: loanType === 'buy_over' ? buyOverCompanyName : null,
+                    buy_over_company_account_name: loanType === 'buy_over' ? buyOverAccountName : null,
+                    buy_over_company_account_number: loanType === 'buy_over' ? buyOverAccountNumber : null,
                 };
             }
 
@@ -604,7 +608,7 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess, initi
 
                 {/* Progress Indicator */}
                 {/* Progress Indicator - Only for Wizard Mode */}
-                {!['topup', 'buy_over', 're-app', 'add_on'].includes(loanType) && (
+                {!['topup', 're-app', 'add_on'].includes(loanType) && (
                     <div className="px-6 md:px-8 pt-6 pb-2">
                         <div className="flex justify-between items-center mb-4">
                             <span className="text-sm font-bold text-slate-900 dark:text-white">{steps[step]}</span>
@@ -622,7 +626,7 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess, initi
                 {/* Content */}
                 <div className="flex-1 overflow-y-auto p-6 md:p-8 scrollbar-thin scrollbar-thumb-slate-200 dark:scrollbar-thumb-slate-800">
                     {/* --- SIMPLIFIED VIEW FOR SPECIAL LOANS --- */}
-                    {['topup', 'buy_over', 're-app', 'add_on'].includes(loanType) ? (
+                    {['topup', 're-app', 'add_on'].includes(loanType) ? (
                         <div className="space-y-8 animate-in fade-in slide-in-from-right-8 duration-500">
                             {/* Loan Type Selector */}
                             <div className="p-6 bg-slate-50 dark:bg-slate-800/50 rounded-3xl border border-slate-100 dark:border-slate-800 mb-8">
@@ -678,8 +682,8 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess, initi
                             <div className="p-6 bg-slate-50 dark:bg-slate-800/50 rounded-3xl border border-slate-100 dark:border-slate-800">
                                 <h4 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-widest mb-6 border-b border-slate-200 pb-2">Financial Details</h4>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                    <InputGroup label="CASA ID" required error={errors.casa}>
-                                        <input className="input-field" value={casa} onChange={e => { setCasa(e.target.value); clearError('casa'); }} placeholder="Enter CASA ID" />
+                                    <InputGroup label="CASA" error={errors.casa}>
+                                        <input className="input-field" value={casa} onChange={e => { setCasa(e.target.value); clearError('casa'); }} placeholder="Enter CASA" />
                                     </InputGroup>
 
                                     {(loanType === 'topup' || loanType === 'add_on' || loanType === 're-app') && (
@@ -882,7 +886,9 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess, initi
                                             </InputGroup>
                                             <InputGroup label="Tenure (Months)">
                                                 <select className="input-field" value={tenure} onChange={e => setTenure(parseInt(e.target.value))}>
-                                                    {[3, 6, 9, 12, 15, 18].map(m => <option key={m} value={m}>{m} Months</option>)}
+                                                    {Array.from({ length: 16 }, (_, i) => i + 3).map(m => (
+                                                        <option key={m} value={m}>{m} Months</option>
+                                                    ))}
                                                 </select>
                                             </InputGroup>
                                         </div>
@@ -919,6 +925,26 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess, initi
                                                 />
                                             </InputGroup>
                                         </div>
+
+                                        {loanType === 'buy_over' && (
+                                            <div className="mt-8 p-6 bg-amber-50 dark:bg-amber-900/10 rounded-2xl border border-amber-100 dark:border-amber-900/20">
+                                                <h4 className="text-sm font-black text-amber-800 dark:text-amber-400 uppercase tracking-widest mb-6">Buy Over Details</h4>
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                                    <InputGroup label="Buy Over Amount (₦)" required error={errors.buyOverAmount}>
+                                                        <input type="number" className="input-field" value={buyOverAmount} onChange={e => { setBuyOverAmount(e.target.value); clearError('buyOverAmount'); }} />
+                                                    </InputGroup>
+                                                    <InputGroup label="Buy Over Company Name" required error={errors.buyOverCompanyName}>
+                                                        <input className="input-field" value={buyOverCompanyName} onChange={e => { setBuyOverCompanyName(e.target.value); clearError('buyOverCompanyName'); }} />
+                                                    </InputGroup>
+                                                    <InputGroup label="Company Account Name" required error={errors.buyOverAccountName}>
+                                                        <input className="input-field" value={buyOverAccountName} onChange={e => { setBuyOverAccountName(e.target.value); clearError('buyOverAccountName'); }} />
+                                                    </InputGroup>
+                                                    <InputGroup label="Company Account Number" required error={errors.buyOverAccountNumber}>
+                                                        <input className="input-field" value={buyOverAccountNumber} onChange={handleNumericChange(setBuyOverAccountNumber, 'buyOverAccountNumber')} />
+                                                    </InputGroup>
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             )}
@@ -1036,7 +1062,7 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess, initi
 
                 {/* Footer Controls */}
                 <div className="p-6 border-t border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 z-10 flex justify-between items-center">
-                    {!['topup', 'buy_over', 're-app', 'add_on'].includes(loanType) && step > 0 ? (
+                    {!['topup', 're-app', 'add_on'].includes(loanType) && step > 0 ? (
                         <button onClick={handleBack} className="px-8 py-4 rounded-2xl font-bold text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white transition-all">
                             Back
                         </button>
@@ -1046,7 +1072,7 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess, initi
                         </button>
                     )}
 
-                    {!['topup', 'buy_over', 're-app', 'add_on'].includes(loanType) && step < steps.length - 1 ? (
+                    {!['topup', 're-app', 'add_on'].includes(loanType) && step < steps.length - 1 ? (
                         <button onClick={handleNext} className="group px-10 py-4 rounded-2xl font-black text-white bg-primary hover:bg-primary/90 shadow-xl shadow-primary/20 hover:shadow-primary/30 hover:-translate-y-1 transition-all flex items-center gap-2">
                             Next Step <span className="material-symbols-outlined transition-transform group-hover:translate-x-1">arrow_forward</span>
                         </button>

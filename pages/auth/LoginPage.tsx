@@ -89,6 +89,12 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
                     </div>
                 </div>
 
+                <div className="flex justify-end">
+                    <Link to="/forgot-password" className="text-sm font-semibold text-primary hover:text-primary-dark transition-colors">
+                        Forgot Password?
+                    </Link>
+                </div>
+
                 {error && (
                     <div className="p-4 bg-red-50 text-red-500 text-sm font-bold rounded-xl border border-red-100 mb-4 animate-in fade-in">
                         {error}

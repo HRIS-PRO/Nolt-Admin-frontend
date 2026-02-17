@@ -15,6 +15,8 @@ import LoginPage from './pages/auth/LoginPage';
 import RegisterPage from './pages/auth/RegisterPage';
 import VerifyPage from './pages/auth/VerifyPage';
 import OnboardingPage from './pages/auth/OnboardingPage';
+import ForgotPasswordPage from './pages/auth/ForgotPasswordPage';
+import ResetPasswordPage from './pages/auth/ResetPasswordPage';
 import RestrictedAccessPage from './pages/RestrictedAccessPage';
 import StaffDashboard from './pages/StaffDashboard';
 import StaffPlaceholderPage from './pages/StaffPlaceholderPage';
@@ -329,6 +331,16 @@ const AppContent: React.FC = () => {
             <AuthLayout>
               <VerifyPage onLogin={handleLogin} />
             </AuthLayout>
+          ))
+        } />
+        <Route path="/forgot-password" element={
+          isLoading ? null : (user.isLoggedIn ? <Navigate to="/dashboard" /> : (
+            <ForgotPasswordPage />
+          ))
+        } />
+        <Route path="/reset-password" element={
+          isLoading ? null : (user.isLoggedIn ? <Navigate to="/dashboard" /> : (
+            <ResetPasswordPage />
           ))
         } />
         <Route path="/onboarding" element={
