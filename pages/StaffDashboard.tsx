@@ -191,23 +191,22 @@ const StaffDashboard: React.FC<StaffDashboardProps> = ({ user, onLogout, toggleT
                                 <th className="p-4">Reference ID</th>
                                 <th className="p-4">Applicant</th>
                                 <th className="p-4">Type</th>
-                                <th className="p-4">Node</th>
+                                <th className="p-4">Loan Type</th>
+                                <th className="p-4">Stage</th>
                                 <th className="p-4">Sales Officer</th>
-                                <th className="p-4">Ref. Code</th>
-                                <th className="p-4">Requested Amount</th>
+                                <th className="p-4">Amount</th>
                                 <th className="p-4">Status</th>
-                                <th className="p-4">product type</th>
                             </tr>
                         </thead>
                         <tbody className="text-sm divide-y divide-slate-100 dark:divide-slate-800">
                             {loans.length === 0 ? (
                                 <tr>
-                                    <td colSpan={10} className="p-8 text-center text-slate-500 font-medium">
+                                    <td colSpan={9} className="p-8 text-center text-slate-500 font-medium">
                                         No loans found.
                                     </td>
                                 </tr>
                             ) : (
-                                loans.map((loan, i) => (
+                                loans.slice(0, 10).map((loan, i) => (
                                     <tr
                                         key={i}
                                         onClick={() => navigate(`/staff/loans/${loan.id}`)}
@@ -227,8 +226,13 @@ const StaffDashboard: React.FC<StaffDashboardProps> = ({ user, onLogout, toggleT
                                             </div>
                                         </td>
                                         <td className="p-4">
-                                            <span className={`px-2 py-1 rounded border text-[10px] font-black uppercase tracking-wider border-blue-500/20 bg-blue-500/10 text-blue-500 dark:text-blue-400`}>
-                                                LOAN
+                                            <span className={`px-2 py-1 rounded border text-[10px] font-black uppercase tracking-wider border-blue-500/20 bg-blue-500/10 text-blue-500 dark:text-blue-400`} title={loan.product_type || 'Public Sector Loan'}>
+                                                {getInitials(loan.product_type || 'Public Sector Loan')}
+                                            </span>
+                                        </td>
+                                        <td className="p-4">
+                                            <span className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase">
+                                                {loan.loan_type?.replace('_', ' ') || 'NEW'}
                                             </span>
                                         </td>
                                         <td className="p-4">
@@ -237,21 +241,20 @@ const StaffDashboard: React.FC<StaffDashboardProps> = ({ user, onLogout, toggleT
                                             </span>
                                         </td>
                                         <td className="p-4 text-slate-700 dark:text-slate-300 font-bold text-xs flex items-center gap-2">
-                                            <span className="material-symbols-outlined text-sm text-slate-400 dark:text-slate-500">person</span>
                                             {loan.officer_name || 'Unassigned'}
                                         </td>
-                                        <td className="p-4"><span className="px-2 py-1 bg-slate-100 dark:bg-slate-800 rounded text-[10px] font-mono text-blue-500 dark:text-blue-400">REF-{loan.id}</span></td>
-                                        <td className="p-4 font-black text-slate-900 dark:text-white">₦{Number(loan.requested_loan_amount).toLocaleString()}</td>
+                                        <td className="p-4 font-black text-slate-900 dark:text-white">
+                                            ₦{Number(
+                                                loan.loan_type === 'topup' || loan.loan_type === 're-app' || loan.loan_type === 'add-on' ? loan.topup_amount :
+                                                    loan.loan_type === 'buy_over' ? loan.buy_over_amount :
+                                                        loan.requested_loan_amount
+                                            ).toLocaleString()}
+                                        </td>
                                         <td className="p-4">
                                             <div className={`flex items-center gap-2 px-2 py-1 rounded border w-fit text-[10px] font-bold uppercase tracking-widest border-amber-500/20 bg-amber-500/10 text-amber-600 dark:text-amber-500`}>
                                                 <span className={`size-1.5 rounded-full bg-amber-500`}></span>
                                                 {loan.status}
                                             </div>
-                                        </td>
-                                        <td className="p-4">
-                                            <span className={`px-2 py-1 rounded border text-[10px] font-black uppercase tracking-wider border-blue-500/20 bg-blue-500/10 text-blue-500 dark:text-blue-400`} title={loan.product_type || 'Public Sector Loan'}>
-                                                {getInitials(loan.product_type || 'Public Sector Loan')}
-                                            </span>
                                         </td>
                                     </tr>
                                 ))

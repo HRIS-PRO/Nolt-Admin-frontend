@@ -15,7 +15,8 @@ const UsersPage: React.FC<UsersPageProps> = ({ user, onLogout, toggleTheme, them
     const [searchParams, setSearchParams] = useSearchParams();
     const searchQuery = searchParams.get('search') || '';
     const currentPage = parseInt(searchParams.get('page') || '1', 10);
-    const itemsPerPage = 10;
+    const [limit, setLimit] = useState(10);
+    const [totalUsers, setTotalUsers] = useState(0);
 
     const [users, setUsers] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -27,11 +28,24 @@ const UsersPage: React.FC<UsersPageProps> = ({ user, onLogout, toggleTheme, them
     const [editingRoleId, setEditingRoleId] = useState<number | null>(null);
 
     const fetchUsers = async () => {
+        setIsLoading(true);
         try {
-            const response = await axios.get(`${''}/api/staff/users`, { withCredentials: true });
-            // Filter out customers
-            const staffUsers = response.data.filter((u: any) => u.role !== 'customer');
-            setUsers(staffUsers);
+            const response = await axios.get(`${''}/api/staff/users`, {
+                params: {
+                    page: currentPage,
+                    limit: limit,
+                    search: searchQuery,
+                    exclude_role: 'customer'
+                },
+                withCredentials: true
+            });
+
+            if (response.data.users) {
+                setUsers(response.data.users);
+                setTotalUsers(response.data.total);
+            } else {
+                setUsers(response.data); // Fallback
+            }
         } catch (error) {
             console.error("Failed to fetch users", error);
         } finally {
@@ -41,7 +55,7 @@ const UsersPage: React.FC<UsersPageProps> = ({ user, onLogout, toggleTheme, them
 
     useEffect(() => {
         fetchUsers();
-    }, []);
+    }, [currentPage, limit, searchQuery]);
 
     const handleInvite = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -129,14 +143,8 @@ const UsersPage: React.FC<UsersPageProps> = ({ user, onLogout, toggleTheme, them
         });
     };
 
-    const filteredUsers = users.filter(u =>
-        u.full_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        u.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        u.referral_code?.toLowerCase().includes(searchQuery.toLowerCase())
-    );
-
-    const totalPages = Math.ceil(filteredUsers.length / itemsPerPage);
-    const paginatedUsers = filteredUsers.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+    // const filteredUsers = users (Already filtered by server)
+    // const paginatedUsers = users (Already paginated by server)
 
     return (
         <StaffLayout user={user} onLogout={onLogout} toggleTheme={toggleTheme} theme={theme}>
@@ -188,7 +196,7 @@ const UsersPage: React.FC<UsersPageProps> = ({ user, onLogout, toggleTheme, them
                                 <tr>
                                     <td colSpan={6} className="p-8 text-center text-slate-500">Loading users...</td>
                                 </tr>
-                            ) : paginatedUsers.map((u) => (
+                            ) : users.map((u) => (
                                 <tr key={u.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/30 transition-colors group">
                                     <td className="p-6 pl-8">
                                         <div className="flex items-center gap-4">
@@ -280,32 +288,67 @@ const UsersPage: React.FC<UsersPageProps> = ({ user, onLogout, toggleTheme, them
                     </table>
                 </div>
 
-                {/* Pagination Footer */}
-                {totalPages > 1 && (
-                    <div className="p-6 border-t border-slate-200 dark:border-slate-800 flex justify-between items-center bg-slate-50/50 dark:bg-slate-900/50">
-                        <p className="text-xs text-slate-500 font-bold">
-                            Showing page {currentPage} of {totalPages} ({filteredUsers.length} total users)
-                        </p>
-                        <div className="flex gap-2">
-                            <button
-                                disabled={currentPage === 1}
-                                onClick={() => handlePageChange(currentPage - 1)}
-                                className="px-4 py-2 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-50 transition-all flex items-center gap-1"
-                            >
-                                <span className="material-symbols-outlined text-sm">chevron_left</span>
-                                Previous
-                            </button>
-                            <button
-                                disabled={currentPage === totalPages}
-                                onClick={() => handlePageChange(currentPage + 1)}
-                                className="px-4 py-2 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-50 transition-all flex items-center gap-1"
-                            >
-                                Next
-                                <span className="material-symbols-outlined text-sm">chevron_right</span>
-                            </button>
-                        </div>
+                {/* Pagination Controls */}
+                <div className="flex flex-col md:flex-row justify-between items-center gap-4 p-6 border-t border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50">
+                    <div className="text-slate-500 dark:text-slate-400 text-sm font-medium">
+                        Showing {users.length > 0 ? (currentPage - 1) * limit + 1 : 0} - {Math.min(currentPage * limit, totalUsers)} of {totalUsers} users
                     </div>
-                )}
+
+                    <div className="flex items-center gap-2">
+                        <button
+                            disabled={currentPage === 1}
+                            onClick={() => handlePageChange(currentPage - 1)}
+                            className="px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed font-bold text-xs uppercase"
+                        >
+                            Previous
+                        </button>
+
+                        <div className="flex items-center gap-1 hidden md:flex">
+                            {Array.from({ length: Math.min(5, Math.ceil(totalUsers / limit)) }, (_, i) => {
+                                let p = i + 1;
+                                if (currentPage > 3 && Math.ceil(totalUsers / limit) > 5) {
+                                    p = currentPage - 2 + i;
+                                }
+                                if (p > Math.ceil(totalUsers / limit)) return null;
+
+                                return (
+                                    <button
+                                        key={p}
+                                        onClick={() => handlePageChange(p)}
+                                        className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold text-xs transition-colors
+                                        ${currentPage === p
+                                                ? 'bg-blue-600 text-white'
+                                                : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'
+                                            }`}
+                                    >
+                                        {p}
+                                    </button>
+                                );
+                            })}
+                        </div>
+
+                        <button
+                            disabled={currentPage * limit >= totalUsers}
+                            onClick={() => handlePageChange(currentPage + 1)}
+                            className="px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed font-bold text-xs uppercase"
+                        >
+                            Next
+                        </button>
+
+                        <select
+                            value={limit}
+                            onChange={(e) => {
+                                setLimit(Number(e.target.value));
+                                handlePageChange(1);
+                            }}
+                            className="ml-4 px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-transparent text-slate-600 dark:text-slate-400 text-xs font-bold"
+                        >
+                            <option value="10">10 / page</option>
+                            <option value="20">20 / page</option>
+                            <option value="50">50 / page</option>
+                        </select>
+                    </div>
+                </div>
             </div>
 
             {/* Invite Modal */}
