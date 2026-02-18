@@ -22,7 +22,7 @@ export default defineConfig(({ mode }) => {
           cookieDomainRewrite: "localhost"
         },
         '/socket.io': {
-          target: env.VITE_API_TARGET || 'https://nolt-admin-backend-production.up.railway.app/',
+          target: env.VITE_API_TARGET || 'http://localhost:5000',
           ws: true,
           changeOrigin: true,
           secure: false
