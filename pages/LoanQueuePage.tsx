@@ -378,28 +378,61 @@ const LoanQueuePage: React.FC<LoanQueuePageProps> = ({ user, onLogout, toggleThe
                 </div>
 
                 {/* Pagination */}
-                <div className="p-4 border-t border-slate-200 dark:border-slate-800 flex justify-between items-center text-xs text-slate-500">
-                    <p>Showing {((currentPage - 1) * itemsPerPage) + 1}-{Math.min(currentPage * itemsPerPage, totalLoans)} of {totalLoans}</p>
-                    <div className="flex gap-2">
+                {/* Pagination Controls */}
+                <div className="flex flex-col md:flex-row justify-between items-center gap-4 p-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50">
+                    <div className="text-slate-500 dark:text-slate-400 text-sm font-medium">
+                        Showing {loans.length > 0 ? (currentPage - 1) * itemsPerPage + 1 : 0} - {Math.min(currentPage * itemsPerPage, totalLoans)} of {totalLoans} applications
+                    </div>
+
+                    <div className="flex items-center gap-2">
                         <button
+                            disabled={currentPage === 1}
                             onClick={() => setSearchParams(prev => {
                                 const newParams = new URLSearchParams(prev);
                                 newParams.set('page', String(Math.max(1, currentPage - 1)));
                                 return newParams;
                             })}
-                            className="px-3 py-1 rounded border border-slate-200 dark:border-slate-700 disabled:opacity-50"
-                            disabled={currentPage === 1}
+                            className="px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed font-bold text-xs uppercase"
                         >
                             Previous
                         </button>
+
+                        <div className="flex items-center gap-1 hidden md:flex">
+                            {Array.from({ length: Math.min(5, Math.ceil(totalLoans / itemsPerPage)) }, (_, i) => {
+                                let p = i + 1;
+                                if (currentPage > 3 && Math.ceil(totalLoans / itemsPerPage) > 5) {
+                                    p = currentPage - 2 + i;
+                                }
+                                if (p > Math.ceil(totalLoans / itemsPerPage)) return null;
+
+                                return (
+                                    <button
+                                        key={p}
+                                        onClick={() => setSearchParams(prev => {
+                                            const newParams = new URLSearchParams(prev);
+                                            newParams.set('page', String(p));
+                                            return newParams;
+                                        })}
+                                        className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold text-xs transition-colors
+                                            ${currentPage === p
+                                                ? 'bg-blue-600 text-white'
+                                                : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'
+                                            }`}
+                                    >
+                                        {p}
+                                    </button>
+                                );
+                            })}
+                        </div>
+
                         <button
+                            disabled={currentPage * itemsPerPage >= totalLoans}
                             onClick={() => setSearchParams(prev => {
                                 const newParams = new URLSearchParams(prev);
                                 newParams.set('page', String(currentPage + 1));
                                 return newParams;
                             })}
-                            className="px-3 py-1 rounded border border-slate-200 dark:border-slate-700 disabled:opacity-50"
-                            disabled={currentPage * itemsPerPage >= totalLoans}
+                            className="px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed font-bold text-xs uppercase"
                         >
                             Next
                         </button>

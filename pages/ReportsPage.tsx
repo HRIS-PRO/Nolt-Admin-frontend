@@ -15,14 +15,24 @@ const ReportsPage: React.FC<ReportsPageProps> = ({ user, onLogout, toggleTheme, 
 
     // Filters
     const [statusFilter, setStatusFilter] = useState('all');
+    const [stageFilter, setStageFilter] = useState('all');
     const [startDate, setStartDate] = useState('');
     const [endDate, setEndDate] = useState('');
+
+    // Pagination
+    const [currentPage, setCurrentPage] = useState(1);
+    const [limit, setLimit] = useState(10);
+    const [totalReports, setTotalReports] = useState(0);
 
     const fetchReports = async () => {
         setIsLoading(true);
         try {
-            const params: any = {};
+            const params: any = {
+                page: currentPage,
+                limit: limit
+            };
             if (statusFilter !== 'all') params.status = statusFilter;
+            if (stageFilter !== 'all') params.stage = stageFilter;
             if (startDate) params.startDate = startDate;
             if (endDate) params.endDate = endDate;
 
@@ -30,7 +40,16 @@ const ReportsPage: React.FC<ReportsPageProps> = ({ user, onLogout, toggleTheme, 
                 params,
                 withCredentials: true
             });
-            setReports(response.data);
+
+            // Handle Paginated Response
+            if (response.data.reports) {
+                setReports(response.data.reports);
+                setTotalReports(response.data.total);
+            } else {
+                // Fallback for non-paginated (backward compatibility if needed, though we updated backend)
+                setReports(response.data);
+                setTotalReports(response.data.length);
+            }
         } catch (error) {
             console.error("Failed to fetch reports", error);
         } finally {
@@ -40,7 +59,13 @@ const ReportsPage: React.FC<ReportsPageProps> = ({ user, onLogout, toggleTheme, 
 
     useEffect(() => {
         fetchReports();
-    }, []); // Initial load
+    }, [currentPage, limit]); // Re-fetch on page/limit change
+
+    // Reset to page 1 when filters change
+    const applyFilters = () => {
+        setCurrentPage(1);
+        fetchReports();
+    };
 
     const handleExport = () => {
         if (!reports || reports.length === 0) {
@@ -107,7 +132,7 @@ const ReportsPage: React.FC<ReportsPageProps> = ({ user, onLogout, toggleTheme, 
             <div className="flex flex-col md:flex-row justify-between md:items-center gap-6 mb-8">
                 <div>
                     <h1 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight">Loan Reports</h1>
-                    <p className="text-slate-500 dark:text-slate-400 font-medium">Export approved and rejected loan data.</p>
+                    <p className="text-slate-500 dark:text-slate-400 font-medium">View and export all loan application data.</p>
                 </div>
                 <button
                     onClick={handleExport}
@@ -120,7 +145,7 @@ const ReportsPage: React.FC<ReportsPageProps> = ({ user, onLogout, toggleTheme, 
 
             {/* Filters */}
             <div className="bg-white dark:bg-[#1e293b] p-6 rounded-[24px] border border-slate-200 dark:border-slate-800 shadow-sm mb-8">
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-6 items-end">
+                <div className="grid grid-cols-1 md:grid-cols-5 gap-6 items-end">
                     <div className="space-y-2">
                         <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Status</label>
                         <select
@@ -128,8 +153,28 @@ const ReportsPage: React.FC<ReportsPageProps> = ({ user, onLogout, toggleTheme, 
                             onChange={(e) => setStatusFilter(e.target.value)}
                             className="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 font-bold text-sm"
                         >
-                            <option value="all">All Reports</option>
-                            <option value="approved">Approved / Disbursed</option>
+                            <option value="all">All Statuses</option>
+                            <option value="pending">Pending</option>
+                            <option value="approved">Approved</option>
+                            <option value="rejected">Rejected</option>
+                            <option value="disbursed">Disbursed</option>
+                        </select>
+                    </div>
+                    <div className="space-y-2">
+                        <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Stage</label>
+                        <select
+                            value={stageFilter}
+                            onChange={(e) => setStageFilter(e.target.value)}
+                            className="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 font-bold text-sm"
+                        >
+                            <option value="all">All Stages</option>
+                            <option value="sales">Sales</option>
+                            <option value="customer_experience">Customer Experience</option>
+                            <option value="credit_check_1">Credit Check 1</option>
+                            <option value="credit_check_2">Credit Check 2</option>
+                            <option value="internal_audit">Internal Audit</option>
+                            <option value="finance">Finance</option>
+                            <option value="disbursed">Disbursed</option>
                             <option value="rejected">Rejected</option>
                         </select>
                     </div>
@@ -152,7 +197,7 @@ const ReportsPage: React.FC<ReportsPageProps> = ({ user, onLogout, toggleTheme, 
                         />
                     </div>
                     <button
-                        onClick={fetchReports}
+                        onClick={applyFilters}
                         className="w-full py-3 rounded-xl bg-blue-600 text-white font-bold uppercase tracking-wider hover:bg-blue-700 transition-all"
                     >
                         Apply Filters
@@ -214,6 +259,71 @@ const ReportsPage: React.FC<ReportsPageProps> = ({ user, onLogout, toggleTheme, 
                             )}
                         </tbody>
                     </table>
+                </div>
+            </div>
+            {/* Pagination Controls */}
+            <div className="flex flex-col md:flex-row justify-between items-center gap-4 mt-6">
+                <div className="text-slate-500 dark:text-slate-400 text-sm font-medium">
+                    Showing {reports.length > 0 ? (currentPage - 1) * limit + 1 : 0} - {Math.min(currentPage * limit, totalReports)} of {totalReports} reports
+                </div>
+
+                <div className="flex items-center gap-2">
+                    <button
+                        disabled={currentPage === 1}
+                        onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                        className="px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed font-bold text-xs uppercase"
+                    >
+                        Previous
+                    </button>
+
+                    <div className="flex items-center gap-1">
+                        {Array.from({ length: Math.min(5, Math.ceil(totalReports / limit)) }, (_, i) => {
+                            // Simple logic to show first 5 pages or sliding window could be implemented
+                            // For now, simpler prev/next with current page indicator
+                            let p = i + 1;
+                            if (currentPage > 3 && Math.ceil(totalReports / limit) > 5) {
+                                p = currentPage - 2 + i;
+                            }
+                            // Ensure p does not exceed total pages
+                            if (p > Math.ceil(totalReports / limit)) return null;
+
+                            return (
+                                <button
+                                    key={p}
+                                    onClick={() => setCurrentPage(p)}
+                                    className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold text-xs transition-colors
+                                        ${currentPage === p
+                                            ? 'bg-blue-600 text-white'
+                                            : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'
+                                        }`}
+                                >
+                                    {p}
+                                </button>
+                            );
+                        })}
+                    </div>
+
+                    <button
+                        disabled={currentPage * limit >= totalReports}
+                        onClick={() => setCurrentPage(prev => prev + 1)}
+                        className="px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed font-bold text-xs uppercase"
+                    >
+                        Next
+                    </button>
+
+                    <select
+                        value={limit}
+                        onChange={(e) => {
+                            setLimit(Number(e.target.value));
+                            setCurrentPage(1);
+                        }}
+                        className="ml-4 px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-transparent text-slate-600 dark:text-slate-400 text-xs font-bold"
+                    >
+                        <option value="10">10 / page</option>
+                        <option value="20">20 / page</option>
+                        <option value="50">50 / page</option>
+                        <option value="100">100 / page</option>
+                    </select>
                 </div>
             </div>
         </StaffLayout>

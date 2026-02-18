@@ -40,21 +40,43 @@ const CustomersPage: React.FC<CustomersPageProps> = ({ user, onLogout, toggleThe
     const [isDrawerOpen, setIsDrawerOpen] = useState(false);
     const [drawerCustomerId, setDrawerCustomerId] = useState<number | null>(null);
 
-    useEffect(() => {
-        const fetchCustomers = async () => {
-            try {
-                // Fetch only users with role='customer'
-                const res = await axios.get(`${import.meta.env.VITE_BACKEND_URL || ''}/api/staff/users?role=customer`, { withCredentials: true });
-                setCustomers(res.data);
-            } catch (error) {
-                console.error("Failed to fetch customers", error);
-            } finally {
-                setIsLoading(false);
-            }
-        };
+    // Pagination
+    const [currentPage, setCurrentPage] = useState(1);
+    const [limit, setLimit] = useState(10);
+    const [totalCustomers, setTotalCustomers] = useState(0);
 
+    const fetchCustomers = async () => {
+        setIsLoading(true);
+        try {
+            // Fetch only users with role='customer'
+            const res = await axios.get(`${import.meta.env.VITE_BACKEND_URL || ''}/api/staff/users`, {
+                params: {
+                    role: 'customer',
+                    page: currentPage,
+                    limit: limit,
+                    search: searchTerm
+                },
+                withCredentials: true
+            });
+
+            if (res.data.users) {
+                setCustomers(res.data.users);
+                setTotalCustomers(res.data.total);
+            } else {
+                setCustomers(res.data);
+                setTotalCustomers(res.data.length);
+            }
+
+        } catch (error) {
+            console.error("Failed to fetch customers", error);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    useEffect(() => {
         fetchCustomers();
-    }, []);
+    }, [currentPage, limit, searchTerm]);
 
     const toggleSelectAll = () => {
         if (selectedIds.length === customers.length) {
@@ -145,11 +167,7 @@ const CustomersPage: React.FC<CustomersPageProps> = ({ user, onLogout, toggleThe
         document.body.removeChild(link);
     };
 
-    const filteredCustomers = customers.filter(c =>
-        c.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        c.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (c.phone_number && c.phone_number.includes(searchTerm))
-    );
+    // const filteredCustomers = customers; // Already filtered by backend
 
     return (
         <StaffLayout user={user} onLogout={onLogout} toggleTheme={toggleTheme} theme={theme}>
@@ -191,13 +209,16 @@ const CustomersPage: React.FC<CustomersPageProps> = ({ user, onLogout, toggleThe
                                 type="text"
                                 placeholder="Search by name, email, phone..."
                                 value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
+                                onChange={(e) => {
+                                    setSearchTerm(e.target.value);
+                                    setCurrentPage(1);
+                                }}
                                 className="pl-9 pr-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm font-medium focus:ring-2 focus:ring-blue-500 outline-none w-72 transition-all"
                             />
                         </div>
                     </div>
                     <div className="text-xs font-bold text-slate-500">
-                        Total Customers: {customers.length}
+                        Total Customers: {totalCustomers}
                     </div>
                 </div>
 
@@ -229,14 +250,14 @@ const CustomersPage: React.FC<CustomersPageProps> = ({ user, onLogout, toggleThe
                                         <div className="inline-block size-6 border-2 border-slate-200 border-t-blue-500 rounded-full animate-spin"></div>
                                     </td>
                                 </tr>
-                            ) : filteredCustomers.length === 0 ? (
+                            ) : customers.length === 0 ? (
                                 <tr>
                                     <td colSpan={8} className="p-8 text-center text-slate-500 font-medium">
                                         No customers found.
                                     </td>
                                 </tr>
                             ) : (
-                                filteredCustomers.map((customer) => (
+                                customers.map((customer) => (
                                     <tr
                                         key={customer.id}
                                         className={`hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors cursor-pointer ${selectedIds.includes(customer.id) ? 'bg-blue-50/50 dark:bg-blue-900/10' : ''}`}
@@ -302,6 +323,68 @@ const CustomersPage: React.FC<CustomersPageProps> = ({ user, onLogout, toggleThe
                             )}
                         </tbody>
                     </table>
+                </div>
+            </div>
+
+            {/* Pagination Controls */}
+            <div className="flex flex-col md:flex-row justify-between items-center gap-4 mt-6">
+                <div className="text-slate-500 dark:text-slate-400 text-sm font-medium">
+                    Showing {customers.length > 0 ? (currentPage - 1) * limit + 1 : 0} - {Math.min(currentPage * limit, totalCustomers)} of {totalCustomers} customers
+                </div>
+
+                <div className="flex items-center gap-2">
+                    <button
+                        disabled={currentPage === 1}
+                        onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                        className="px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed font-bold text-xs uppercase"
+                    >
+                        Previous
+                    </button>
+
+                    <div className="flex items-center gap-1">
+                        {Array.from({ length: Math.min(5, Math.ceil(totalCustomers / limit)) }, (_, i) => {
+                            let p = i + 1;
+                            if (currentPage > 3 && Math.ceil(totalCustomers / limit) > 5) {
+                                p = currentPage - 2 + i;
+                            }
+                            if (p > Math.ceil(totalCustomers / limit)) return null;
+
+                            return (
+                                <button
+                                    key={p}
+                                    onClick={() => setCurrentPage(p)}
+                                    className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold text-xs transition-colors
+                                        ${currentPage === p
+                                            ? 'bg-blue-600 text-white'
+                                            : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'
+                                        }`}
+                                >
+                                    {p}
+                                </button>
+                            );
+                        })}
+                    </div>
+
+                    <button
+                        disabled={currentPage * limit >= totalCustomers}
+                        onClick={() => setCurrentPage(prev => prev + 1)}
+                        className="px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed font-bold text-xs uppercase"
+                    >
+                        Next
+                    </button>
+
+                    <select
+                        value={limit}
+                        onChange={(e) => {
+                            setLimit(Number(e.target.value));
+                            setCurrentPage(1);
+                        }}
+                        className="ml-4 px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-transparent text-slate-600 dark:text-slate-400 text-xs font-bold"
+                    >
+                        <option value="10">10 / page</option>
+                        <option value="20">20 / page</option>
+                        <option value="50">50 / page</option>
+                    </select>
                 </div>
             </div>
 
