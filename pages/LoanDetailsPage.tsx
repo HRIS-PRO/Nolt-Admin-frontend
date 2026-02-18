@@ -17,13 +17,55 @@ interface LoanDetailsPageProps {
 // --- Action Card Component ---
 const ActionCard = ({ loan, userRole, onActionComplete }: { loan: any, userRole: any, onActionComplete: () => void }) => {
     const [actionLoading, setActionLoading] = useState(false);
-    const [eligibleAmount, setEligibleAmount] = useState(loan.eligible_amount ? loan.eligible_amount.toString() : '');
+    const [eligibleAmount, setEligibleAmount] = useState(loan.topup_amount ? loan.topup_amount.toString() : '');
     const [tenure, setTenure] = useState(loan.loan_tenure_months ? loan.loan_tenure_months.toString() : '');
+    const [existingLoanBalance, setExistingLoanBalance] = useState(loan.existing_loan_balance ? loan.existing_loan_balance.toString() : '');
     const [uploadFile, setUploadFile] = useState<File | null>(null);
     const [uploadLoading, setUploadLoading] = useState(false);
     const [reason, setReason] = useState('');
     const [showReturnModal, setShowReturnModal] = useState(false);
     const [returnTargetStage, setReturnTargetStage] = useState('');
+
+    // Disbursement Logic State
+    const [applyManagementFee, setApplyManagementFee] = useState(loan.apply_management_fee || false);
+    const [applyInsuranceFee, setApplyInsuranceFee] = useState(loan.apply_insurance_fee || false);
+
+    // Check if loan is a special type (Top-Up, Add-On, Re-App)
+    const isSpecialLoan = ['topup', 'add_on', 're-app', 're_app'].includes(loan.loan_type?.toLowerCase());
+
+    // Calculate Disbursement Amount
+    const calculateDisbursementAmount = () => {
+        const amount = parseFloat(eligibleAmount) || 0;
+        const balance = parseFloat(existingLoanBalance) || 0;
+
+        let baseAmountForFees = amount;
+
+        // For SPECIAL LOANS: Fees are applied to the (Eligible Amount - Existing Balance)
+        if (isSpecialLoan) {
+            baseAmountForFees = amount - balance;
+        } else {
+            // For STANDARD LOANS: Fees are applied to the Eligible Amount
+            baseAmountForFees = amount;
+        }
+
+        // Ensure base amount isn't negative
+        if (baseAmountForFees < 0) baseAmountForFees = 0;
+
+        let fees = 0;
+        if (applyManagementFee) fees += baseAmountForFees * 0.02; // 2% Management Fee
+        if (applyInsuranceFee) fees += baseAmountForFees * 0.005; // 0.5% Insurance Fee
+
+        // Disbursement = Eligible Amount - Existing Balance - Fees (Wait, need to clarify deduction logic)
+        // Standard: Eligible - Fees
+        // TopUp: (Eligible - ExistingBalance) - Fees
+
+        let disbursement = amount - fees;
+        if (isSpecialLoan) {
+            disbursement = disbursement - balance;
+        }
+
+        return disbursement > 0 ? disbursement : 0;
+    };
 
     const handleAction = async (action: 'approve' | 'reject' | 'return', targetStage?: string) => {
         if ((action === 'reject' || action === 'return') && !reason.trim()) {
@@ -33,13 +75,26 @@ const ActionCard = ({ loan, userRole, onActionComplete }: { loan: any, userRole:
 
         setActionLoading(true);
         try {
+            const payload: any = {
+                action,
+                data: { eligible_amount: eligibleAmount, tenure, target_stage: targetStage },
+                reason
+            };
+
+            // Add fee flags and disbursement amount for approval in Credit stages
+            if (action === 'approve' && (stage === 'credit_check_1' || stage === 'credit_check_2')) {
+                payload.data.apply_management_fee = applyManagementFee;
+                payload.data.apply_insurance_fee = applyInsuranceFee;
+                payload.data.disbursement_amount = calculateDisbursementAmount();
+
+                if (isSpecialLoan) {
+                    payload.data.existing_loan_balance = existingLoanBalance;
+                }
+            }
+
             await axios.post(
                 `/api/staff/loans/${loan.id}/action`,
-                {
-                    action,
-                    data: { eligible_amount: eligibleAmount, tenure, target_stage: targetStage },
-                    reason
-                },
+                payload,
                 { withCredentials: true }
             );
             onActionComplete();
@@ -137,29 +192,103 @@ const ActionCard = ({ loan, userRole, onActionComplete }: { loan: any, userRole:
 
                 {/* Sales Manager / Credit Officer Input */}
                 {(stage === 'credit_check_1' || stage === 'credit_check_2') && (
-                    <div className="grid grid-cols-2 gap-4 mb-6">
-                        <div>
-                            <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2 block">Approved Amount (₦)</label>
-                            <input
-                                type="number"
-                                value={eligibleAmount}
-                                onChange={(e) => setEligibleAmount(e.target.value)}
-                                className="w-full p-4 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white font-bold"
-                                placeholder="Enter amount..."
-                            />
+                    <div className="space-y-4 mb-6">
+                        <div className="grid grid-cols-2 gap-4">
+                            {/* Hide Approved Amount for Special Loans (uses default/fixed topup amount) */}
+                            {!isSpecialLoan ? (
+                                <div>
+                                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2 block">Approved Amount (₦)</label>
+                                    <input
+                                        type="number"
+                                        value={eligibleAmount}
+                                        onChange={(e) => setEligibleAmount(e.target.value)}
+                                        className="w-full p-4 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white font-bold"
+                                        placeholder="Enter amount..."
+                                    />
+                                </div>
+                            ) : (
+                                <div>
+                                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2 block">Principal Amount (Fixed)</label>
+                                    <div className="w-full p-4 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 font-bold">
+                                        ₦{Number(eligibleAmount).toLocaleString()}
+                                    </div>
+                                </div>
+                            )}
+                            <div>
+                                <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2 block">Approved Tenure (Months)</label>
+                                <select
+                                    value={tenure}
+                                    onChange={(e) => setTenure(e.target.value)}
+                                    className="w-full p-4 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white font-bold appearance-none"
+                                >
+                                    <option value="">Select Tenure</option>
+                                    {[3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18].map(m => (
+                                        <option key={m} value={m}>{m} Months</option>
+                                    ))}
+                                </select>
+                            </div>
                         </div>
-                        <div>
-                            <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2 block">Approved Tenure (Months)</label>
-                            <select
-                                value={tenure}
-                                onChange={(e) => setTenure(e.target.value)}
-                                className="w-full p-4 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white font-bold appearance-none"
-                            >
-                                <option value="">Select Tenure</option>
-                                {[3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18].map(m => (
-                                    <option key={m} value={m}>{m} Months</option>
-                                ))}
-                            </select>
+
+                        {/* SPECIAL LOAN INPUT: Top-Up/Add-On Balance */}
+                        {isSpecialLoan && (
+                            <div>
+                                <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2 block">
+                                    Top Up Balance (To Deduct)
+                                </label>
+                                <input
+                                    type="number"
+                                    value={existingLoanBalance}
+                                    onChange={(e) => setExistingLoanBalance(e.target.value)}
+                                    className="w-full p-4 rounded-xl bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-700 text-amber-900 dark:text-amber-100 font-bold placeholder:text-amber-300"
+                                    placeholder="Enter balance..."
+                                />
+                                <p className="text-[10px] text-amber-600 mt-1">
+                                    Resulting Net Amount = Top Up Amount - Top Up Balance
+                                </p>
+                            </div>
+                        )}
+
+                        {/* Fees & Disbursement Checkboxes */}
+                        <div className="p-4 bg-slate-50 dark:bg-slate-800 rounded-xl space-y-3 border border-slate-100 dark:border-slate-700">
+                            <div className="flex justify-between items-center mb-2">
+                                <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Fees & Deductions</p>
+                                {isSpecialLoan && (
+                                    <span className="text-[10px] font-bold bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">
+                                        Special Loan Logic Active
+                                    </span>
+                                )}
+                            </div>
+
+                            <label className="flex items-center gap-3 cursor-pointer group">
+                                <div className={`size-5 rounded border flex items-center justify-center transition-colors ${applyManagementFee ? 'bg-blue-600 border-blue-600' : 'bg-white border-slate-300 dark:bg-slate-700 dark:border-slate-600'}`}>
+                                    {applyManagementFee && <span className="material-symbols-outlined text-white text-sm">check</span>}
+                                </div>
+                                <input type="checkbox" checked={applyManagementFee} onChange={(e) => setApplyManagementFee(e.target.checked)} className="hidden" />
+                                <span className="text-sm font-bold text-slate-700 dark:text-slate-300 group-hover:text-slate-900 dark:group-hover:text-white transition-colors">Apply Management Fee (2.00%)</span>
+                            </label>
+                            <label className="flex items-center gap-3 cursor-pointer group">
+                                <div className={`size-5 rounded border flex items-center justify-center transition-colors ${applyInsuranceFee ? 'bg-blue-600 border-blue-600' : 'bg-white border-slate-300 dark:bg-slate-700 dark:border-slate-600'}`}>
+                                    {applyInsuranceFee && <span className="material-symbols-outlined text-white text-sm">check</span>}
+                                </div>
+                                <input type="checkbox" checked={applyInsuranceFee} onChange={(e) => setApplyInsuranceFee(e.target.checked)} className="hidden" />
+                                <span className="text-sm font-bold text-slate-700 dark:text-slate-300 group-hover:text-slate-900 dark:group-hover:text-white transition-colors">Apply Insurance Fee (0.50%)</span>
+                            </label>
+
+                            <div className="pt-2 border-t border-slate-200 dark:border-slate-700 mt-2">
+                                {/* Special Loan Breakdown */}
+                                {isSpecialLoan && (
+                                    <div className="mb-2 text-[10px] text-slate-500 flex justify-between">
+                                        <span>Net Amount (Top Up - Balance):</span>
+                                        <span className="font-bold text-slate-700 dark:text-slate-300">
+                                            ₦{Math.max(0, (parseFloat(eligibleAmount) || 0) - (parseFloat(existingLoanBalance) || 0)).toLocaleString()}
+                                        </span>
+                                    </div>
+                                )}
+                                <div className="flex justify-between items-center">
+                                    <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Disbursement Amount</span>
+                                    <span className="text-lg font-black text-slate-900 dark:text-white">₦{calculateDisbursementAmount().toLocaleString()}</span>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 )}
@@ -350,7 +479,7 @@ const LoanDetailsPage: React.FC<LoanDetailsPageProps> = ({ user, onLogout, toggl
         };
 
         if (id) fetchLoan();
-        
+
 
         // Socket Listeners
         import('../services/socket').then(({ socket }) => {
@@ -519,7 +648,7 @@ const LoanDetailsPage: React.FC<LoanDetailsPageProps> = ({ user, onLogout, toggl
                         </div>
                         <div>
                             <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">
-                                {['topup', 'add_on', 're-app'].includes(loan.loan_type) ? 'Top Up Amount' :
+                                {['topup', 'add_on', 're-app'].includes(loan.loan_type) ? 'Principal Amount' :
                                     loan.loan_type === 'buy_over' ? 'Buy Over Amount' : 'Requested Amount'}
                             </p>
                             <h3 className="text-3xl font-black text-slate-900 dark:text-white">
@@ -540,6 +669,12 @@ const LoanDetailsPage: React.FC<LoanDetailsPageProps> = ({ user, onLogout, toggl
                             <div>
                                 <p className="text-[10px] font-black uppercase tracking-widest text-green-500 mb-1">Approved Amount</p>
                                 <h3 className="text-3xl font-black text-green-600 dark:text-green-400">₦{Number(loan.eligible_amount).toLocaleString()}</h3>
+                            </div>
+                        )}
+                        {loan.disbursement_amount && (
+                            <div>
+                                <p className="text-[10px] font-black uppercase tracking-widest text-blue-500 mb-1">Disbursement</p>
+                                <h3 className="text-3xl font-black text-blue-600 dark:text-blue-400">₦{Number(loan.disbursement_amount).toLocaleString()}</h3>
                             </div>
                         )}
                     </div>

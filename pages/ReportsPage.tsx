@@ -76,7 +76,8 @@ const ReportsPage: React.FC<ReportsPageProps> = ({ user, onLogout, toggleTheme, 
         const headers = [
             "Applicant Name",
             "Institution/Ministry",
-            "Approved Amount",
+            "Amount",
+            "Disbursement Amount",
             "Net Salary",
             "Account No",
             "Bank",
@@ -95,10 +96,15 @@ const ReportsPage: React.FC<ReportsPageProps> = ({ user, onLogout, toggleTheme, 
         const csvContent = [
             headers.join(","),
             ...reports.map(r => {
+                const amount = ['topup', 'add_on', 're-app', 're_app'].includes(r.loan_type?.toLowerCase())
+                    ? (r.topup_amount || 0)
+                    : (r.eligible_amount || r.requested_loan_amount || 0);
+
                 const row = [
                     `"${r.applicant_full_name || ''}"`,
                     `"${r.mda_tertiary || ''}"`,
-                    `${r.eligible_amount || r.requested_loan_amount || 0}`,
+                    `${amount}`,
+                    `${r.disbursement_amount || 0}`,
                     `${r.average_monthly_income || 0}`,
                     `"${r.account_number || ''}"`,
                     `"${r.bank_name || ''}"`,
@@ -214,6 +220,7 @@ const ReportsPage: React.FC<ReportsPageProps> = ({ user, onLogout, toggleTheme, 
                                 <th className="p-4">Applicant</th>
                                 <th className="p-4">Institution</th>
                                 <th className="p-4">Amount</th>
+                                <th className="p-4">Disbursement</th>
                                 <th className="p-4">Net Salary</th>
                                 <th className="p-4">Bank</th>
                                 <th className="p-4">Tenure</th>
@@ -236,7 +243,17 @@ const ReportsPage: React.FC<ReportsPageProps> = ({ user, onLogout, toggleTheme, 
                                     <tr key={i} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
                                         <td className="p-4 font-bold text-slate-900 dark:text-white">{r.applicant_full_name}</td>
                                         <td className="p-4 max-w-[200px] truncate" title={r.mda_tertiary}>{r.mda_tertiary}</td>
-                                        <td className="p-4">₦{Number(r.eligible_amount || r.requested_loan_amount).toLocaleString()}</td>
+                                        <td className="p-4">
+                                            {/* Show TopUp Amount for special loans, else Eligible/Requested */}
+                                            {
+                                                ['topup', 'add_on', 're-app', 're_app'].includes(r.loan_type?.toLowerCase())
+                                                    ? `₦${Number(r.topup_amount || 0).toLocaleString()} (TopUp)`
+                                                    : `₦${Number(r.eligible_amount || r.requested_loan_amount).toLocaleString()}`
+                                            }
+                                        </td>
+                                        <td className="p-4 font-bold text-slate-700 dark:text-slate-300">
+                                            {r.disbursement_amount ? `₦${Number(r.disbursement_amount).toLocaleString()}` : '-'}
+                                        </td>
                                         <td className="p-4">₦{Number(r.average_monthly_income).toLocaleString()}</td>
                                         <td className="p-4">
                                             <div>{r.bank_name}</div>
