@@ -23,7 +23,13 @@ const AuditTrailPage: React.FC<AuditTrailPageProps> = ({ user, onLogout, toggleT
         const fetchLoans = async () => {
             try {
                 const response = await axios.get(`${''}/api/staff/loans`, { withCredentials: true });
-                setLoans(response.data);
+                if (response.data && Array.isArray(response.data.loans)) {
+                    setLoans(response.data.loans);
+                } else if (Array.isArray(response.data)) {
+                    setLoans(response.data);
+                } else {
+                    setLoans([]);
+                }
             } catch (error) {
                 console.error("Failed to fetch loans", error);
             } finally {

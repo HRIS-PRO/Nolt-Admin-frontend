@@ -54,8 +54,9 @@ const LoanQueuePage: React.FC<LoanQueuePageProps> = ({ user, onLogout, toggleThe
     const fetchOfficers = async () => {
         if (['sales_manager', 'admin', 'super_admin', 'superadmin'].includes(user.role || '')) {
             try {
-                const response = await axios.get(`${''}/api/staff/users`, { withCredentials: true });
-                setOfficers(response.data.filter((u: any) => u.role === 'sales_officer' && u.is_active));
+                // Fetch specifically sales officers with a high limit to ensure we get them all
+                const response = await axios.get(`${''}/api/staff/users?role=sales_officer&limit=200`, { withCredentials: true });
+                setOfficers(response.data.users.filter((u: any) => u.is_active));
             } catch (error) {
                 console.error("Failed to fetch officers", error);
             }
