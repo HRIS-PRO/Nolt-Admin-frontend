@@ -99,72 +99,37 @@ const CustomersPage: React.FC<CustomersPageProps> = ({ user, onLogout, toggleThe
         setIsDrawerOpen(true);
     };
 
-    const handleExport = (exportAll: boolean = false) => {
-        let dataToExport = customers;
+    const handleExport = async (exportAll: boolean = false) => {
+        let queryString = '';
 
         if (!exportAll) {
             if (selectedIds.length === 0) {
                 alert("Please select customers to export, or choose 'Export All'");
                 return;
             }
-            dataToExport = customers.filter(c => selectedIds.includes(c.id));
+            queryString = `?ids=${selectedIds.join(',')}`;
+        } else {
+            // Export All (respecting current search/filter if any, or just all?)
+            // Usually "Export All" implies all matching current view or ALL all.
+            // The previous logic exported `customers` state which was paginated/filtered.
+            // But the backend implementation supports `search`.
+            if (searchTerm) {
+                queryString = `?search=${encodeURIComponent(searchTerm)}`;
+            }
         }
 
-        if (dataToExport.length === 0) {
-            alert("No data to export");
-            return;
+        try {
+            // Trigger download
+            const link = document.createElement("a");
+            link.href = `${import.meta.env.VITE_BACKEND_URL || ''}/api/staff/customers/export-zip${queryString}`;
+            link.setAttribute("download", `customers_export.zip`); // Browser might ignore this if content-disposition is set
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        } catch (error) {
+            console.error("Export failed:", error);
+            alert("Failed to initiate export.");
         }
-
-        const headers = [
-            "ID",
-            "Full Name",
-            "Email",
-            "Phone Number",
-            "State of Residence",
-            "Employer",
-            "Status",
-            "Joined Date",
-            "BVN",
-            "NIN",
-            "Date of Birth",
-            "Home Address",
-            "Bank Name",
-            "Account Number",
-            "Account Name"
-        ];
-
-        const csvContent = [
-            headers.join(","),
-            ...dataToExport.map(c => {
-                const row = [
-                    c.id,
-                    `"${c.full_name || ''}"`,
-                    `"${c.email || ''}"`,
-                    `"${c.phone_number || ''}"`,
-                    `"${c.state_of_residence || ''}"`,
-                    `"${c.employer || ''}"`,
-                    c.is_active ? "Active" : "Inactive",
-                    `"${new Date(c.created_at).toLocaleDateString()}"`,
-                    `"${c.bvn || ''}"`,
-                    `"${c.nin || ''}"`,
-                    c.date_of_birth ? `"${new Date(c.date_of_birth).toLocaleDateString()}"` : "",
-                    `"${c.primary_home_address || ''}"`,
-                    `"${c.bank_name || ''}"`,
-                    `"${c.account_number || ''}"`,
-                    `"${c.account_name || ''}"`
-                ];
-                return row.join(",");
-            })
-        ].join("\n");
-
-        const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement("a");
-        link.setAttribute("href", url);
-        link.setAttribute("download", `customers_export_${new Date().toISOString().split('T')[0]}.csv`);
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
     };
 
     // const filteredCustomers = customers; // Already filtered by backend
