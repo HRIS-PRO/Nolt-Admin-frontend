@@ -379,6 +379,15 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess, initi
                 if (!topUpAmount) newErrors.topUpAmount = "Required";
             }
 
+            // New Validation for Tenure & Bank Details
+            if (!bankName) newErrors.bankName = "Required";
+            if (!accountNumber) {
+                newErrors.accountNumber = "Required";
+            } else if (!/^\d{10}$/.test(accountNumber)) {
+                newErrors.accountNumber = "Must be 10 digits";
+            }
+            if (!accountName) newErrors.accountName = "Required";
+
             if (!uploadedDocs.payslip) newErrors.payslip = "Required";
 
         } else {
@@ -690,6 +699,34 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess, initi
                                         <InputGroup label="Top Up Amount (₦)" required error={errors.topUpAmount}>
                                             <input type="number" className="input-field" value={topUpAmount} onChange={e => { setTopUpAmount(e.target.value); clearError('topUpAmount'); }} />
                                         </InputGroup>
+                                    )}
+
+                                    {/* Tenure & Bank Details for Special Loans */}
+                                    {(['topup', 're-app', 'add_on'].includes(loanType)) && (
+                                        <>
+                                            <InputGroup label="Tenure (Months)" required>
+                                                <select className="input-field" value={tenure} onChange={e => setTenure(Number(e.target.value))}>
+                                                    {[3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(m => (
+                                                        <option key={m} value={m}>{m} Months</option>
+                                                    ))}
+                                                </select>
+                                            </InputGroup>
+
+                                            <InputGroup label="Bank Name" required error={errors.bankName}>
+                                                <select className="input-field" value={bankName} onChange={e => { setBankName(e.target.value); clearError('bankName'); }}>
+                                                    <option value="">Select Bank</option>
+                                                    {bankList.map((b, i) => <option key={i} value={b.name}>{b.name}</option>)}
+                                                </select>
+                                            </InputGroup>
+
+                                            <InputGroup label="Account Number" required error={errors.accountNumber}>
+                                                <input className="input-field" value={accountNumber} onChange={handleNumericChange(setAccountNumber, 'accountNumber', 10)} maxLength={10} />
+                                            </InputGroup>
+
+                                            <InputGroup label="Account Name" required error={errors.accountName}>
+                                                <input className="input-field" value={accountName} onChange={e => { setAccountName(e.target.value); clearError('accountName'); }} />
+                                            </InputGroup>
+                                        </>
                                     )}
 
                                     {loanType === 'buy_over' && (
