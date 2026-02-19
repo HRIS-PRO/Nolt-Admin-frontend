@@ -702,7 +702,7 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess, initi
                                         <>
                                             <InputGroup label="Tenure (Months)" required>
                                                 <select className="input-field" value={tenure} onChange={e => setTenure(Number(e.target.value))}>
-                                                    {[3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(m => (
+                                                    {[3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18].map(m => (
                                                         <option key={m} value={m}>{m} Months</option>
                                                     ))}
                                                 </select>
