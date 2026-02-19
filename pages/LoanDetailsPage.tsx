@@ -659,7 +659,7 @@ const LoanDetailsPage: React.FC<LoanDetailsPageProps> = ({ user, onLogout, toggl
                                 ).toLocaleString()}
                             </h3>
                         </div>
-                        {!['topup', 'add_on', 're-app', 'buy_over'].includes(loan.loan_type) && (
+                        {['topup', 'add_on', 're-app', 'buy_over', 'new'].includes(loan.loan_type) && (
                             <div>
                                 <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Tenure</p>
                                 <h3 className="text-3xl font-black text-slate-900 dark:text-white">{loan.loan_tenure_months || 6} Months</h3>
