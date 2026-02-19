@@ -264,6 +264,7 @@ const LoanQueuePage: React.FC<LoanQueuePageProps> = ({ user, onLogout, toggleThe
                                 <th className="p-4">Stage</th>
                                 <th className="p-4">Sales Officer</th>
                                 <th className="p-4">Amount</th>
+                                <th className="p-4">Disbursement</th>
                                 <th className="p-4">Date</th>
                                 <th className="p-4">Status</th>
                                 <th className="p-4 text-right">Actions</th>
@@ -357,6 +358,9 @@ const LoanQueuePage: React.FC<LoanQueuePageProps> = ({ user, onLogout, toggleThe
                                                     loan.loan_type === 'buy_over' ? loan.buy_over_amount :
                                                         loan.requested_loan_amount
                                             ).toLocaleString()}
+                                        </td>
+                                        <td className="p-4 font-black text-slate-900 dark:text-white">
+                                            {loan.disbursement_amount ? `₦${Number(loan.disbursement_amount).toLocaleString()}` : '-'}
                                         </td>
                                         <td className="p-4 text-slate-500 text-xs">{new Date(loan.created_at).toLocaleDateString()}</td>
                                         <td className="p-4">
