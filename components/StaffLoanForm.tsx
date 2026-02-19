@@ -524,16 +524,12 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess, initi
                 if (loanType === 'topup' || loanType === 'add_on' || loanType === 're-app') {
                     payload.topup_amount = parseFloat(topUpAmount) || 0;
                 }
-                // Ensure other mandatory fields for backend are at least present if needed, 
-                // but our backend validation is now relaxed, so we can omit them.
-                // However, 'requested_loan_amount' is a DB constraint? 
-                // DB schema might have constraints. 
-                // If requested_loan_amount is required in DB but not in form, we might need a dummy value or handle it.
-                // Backend 'dbschema' says requested_loan_amount is not nullable? 
-                // Let's assume backend handles missing fields or we send 0.
-                // Actually, the backend validation check I modified: 
-                // if (!requested_loan_amount && !topup_amount && !buy_over_amount) ...
-                // So sending 0 or null for requested_loan_amount should be fine if topup/buyover is there.
+
+                // Include Tenure & Bank Details
+                payload.loan_tenure_months = tenure;
+                payload.bank_name = bankName;
+                payload.account_number = accountNumber;
+                payload.account_name = accountName;
 
             } else {
                 // --- STANDARD WIZARD PAYLOAD ---
