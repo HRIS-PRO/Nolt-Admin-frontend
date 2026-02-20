@@ -267,7 +267,7 @@ const LoanQueuePage: React.FC<LoanQueuePageProps> = ({ user, onLogout, toggleThe
                                 <th className="p-4">Disbursement</th>
                                 <th className="p-4">Date</th>
                                 <th className="p-4">Status</th>
-                                <th className="p-4 text-right">Actions</th>
+                                {/* <th className="p-4 text-right">Actions</th> */}
                             </tr>
                         </thead>
                         <tbody className="text-sm divide-y divide-slate-100 dark:divide-slate-800">
@@ -369,12 +369,12 @@ const LoanQueuePage: React.FC<LoanQueuePageProps> = ({ user, onLogout, toggleThe
                                                 {loan.status}
                                             </div>
                                         </td>
-                                        <td className="p-4 text-right">
+                                        {/* <td className="p-4 text-right">
                                             <button
                                                 className="px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 text-xs font-bold transition-all">
                                                 View Details
                                             </button>
-                                        </td>
+                                        </td> */}
                                     </tr>
                                 ))
                             )}
