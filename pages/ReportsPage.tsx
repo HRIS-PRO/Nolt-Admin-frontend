@@ -12,6 +12,7 @@ interface ReportsPageProps {
 const ReportsPage: React.FC<ReportsPageProps> = ({ user, onLogout, toggleTheme, theme }) => {
     const [reports, setReports] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(false);
+    const [isExporting, setIsExporting] = useState(false);
 
     // Filters
     const [statusFilter, setStatusFilter] = useState('all');
@@ -67,72 +68,97 @@ const ReportsPage: React.FC<ReportsPageProps> = ({ user, onLogout, toggleTheme, 
         fetchReports();
     };
 
-    const handleExport = () => {
-        if (!reports || reports.length === 0) {
-            alert("No data to export");
-            return;
+    const handleExport = async () => {
+        setIsExporting(true);
+        try {
+            // Fetch all matching reports
+            const params: any = {
+                page: 1,
+                limit: 999999 // Fetch virtually all matching reports
+            };
+            if (statusFilter !== 'all') params.status = statusFilter;
+            if (stageFilter !== 'all') params.stage = stageFilter;
+            if (startDate) params.startDate = startDate;
+            if (endDate) params.endDate = endDate;
+
+            const response = await axios.get('/api/staff/reports', {
+                params,
+                withCredentials: true
+            });
+
+            const allReports = response.data.reports || response.data || [];
+
+            if (!allReports || allReports.length === 0) {
+                alert("No data to export for the selected filters");
+                return;
+            }
+
+            const headers = [
+                "Applicant Name",
+                "Institution/Ministry",
+                "Amount",
+                "Disbursement Amount",
+                "Net Salary",
+                "Account No",
+                "Bank",
+                "Tenure",
+                "Product",
+                "Branch",
+                "Account Officer",
+                "Loan Type",
+                "IPPIS No",
+                "Staff ID",
+                "Phone No",
+                "Status",
+                "Creation Date",
+                "Disb. Date"
+            ];
+
+            const csvContent = [
+                headers.join(","),
+                ...allReports.map((r: any) => {
+                    const amount = ['topup', 'add_on', 're-app', 're_app'].includes(r.loan_type?.toLowerCase())
+                        ? (r.topup_amount || 0)
+                        : (r.eligible_amount || r.requested_loan_amount || 0);
+
+                    const row = [
+                        `"${r.applicant_full_name || ''}"`,
+                        `"${r.mda_tertiary || ''}"`,
+                        `${amount}`,
+                        `${r.disbursement_amount || 0}`,
+                        `${r.average_monthly_income || 0}`,
+                        `"${r.account_number || ''}"`,
+                        `"${r.bank_name || ''}"`,
+                        `${r.loan_tenure_months || 0}`,
+                        `"${r.product_type || ''}"`,
+                        `""`, // Branch (Empty)
+                        `"${r.officer_name || ''}"`,
+                        `"${r.loan_type || ''}"`,
+                        `"${r.ippis_number || ''}"`,
+                        `"${r.staff_id || ''}"`,
+                        `"${r.mobile_number || ''}"`,
+                        `"${r.status || r.stage || ''}"`,
+                        `"${new Date(r.created_at).toLocaleDateString()}"`,
+                        `"${r.disb_date ? new Date(r.disb_date).toLocaleDateString() : '-'}"`
+                    ];
+                    return row.join(",");
+                })
+            ].join("\n");
+
+            const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.setAttribute("href", url);
+            link.setAttribute("download", `loan_reports_${new Date().toISOString().split('T')[0]}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        } catch (error) {
+            console.error("Export failed:", error);
+            alert("Failed to export data. Please try again.");
+        } finally {
+            setIsExporting(false);
         }
-
-        const headers = [
-            "Applicant Name",
-            "Institution/Ministry",
-            "Amount",
-            "Disbursement Amount",
-            "Net Salary",
-            "Account No",
-            "Bank",
-            "Tenure",
-            "Product",
-            "Branch",
-            "Account Officer",
-            "Loan Type",
-            "IPPIS No",
-            "Staff ID",
-            "Phone No",
-            "Status",
-            "Creation Date",
-            "Disb. Date"
-        ];
-
-        const csvContent = [
-            headers.join(","),
-            ...reports.map(r => {
-                const amount = ['topup', 'add_on', 're-app', 're_app'].includes(r.loan_type?.toLowerCase())
-                    ? (r.topup_amount || 0)
-                    : (r.eligible_amount || r.requested_loan_amount || 0);
-
-                const row = [
-                    `"${r.applicant_full_name || ''}"`,
-                    `"${r.mda_tertiary || ''}"`,
-                    `${amount}`,
-                    `${r.disbursement_amount || 0}`,
-                    `${r.average_monthly_income || 0}`,
-                    `"${r.account_number || ''}"`,
-                    `"${r.bank_name || ''}"`,
-                    `${r.loan_tenure_months || 0}`,
-                    `"${r.product_type || ''}"`,
-                    `""`, // Branch (Empty)
-                    `"${r.officer_name || ''}"`,
-                    `"${r.loan_type || ''}"`,
-                    `"${r.ippis_number || ''}"`,
-                    `"${r.staff_id || ''}"`,
-                    `"${r.mobile_number || ''}"`,
-                    `"${r.status || r.stage || ''}"`,
-                    `"${new Date(r.created_at).toLocaleDateString()}"`,
-                    `"${r.disb_date ? new Date(r.disb_date).toLocaleDateString() : '-'}"`
-                ];
-                return row.join(",");
-            })
-        ].join("\n");
-
-        const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement("a");
-        link.setAttribute("href", url);
-        link.setAttribute("download", `loan_reports_${new Date().toISOString().split('T')[0]}.csv`);
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
     };
 
     return (
@@ -144,10 +170,20 @@ const ReportsPage: React.FC<ReportsPageProps> = ({ user, onLogout, toggleTheme, 
                 </div>
                 <button
                     onClick={handleExport}
-                    className="px-6 py-3 rounded-xl bg-green-600 text-white font-bold uppercase tracking-wider hover:bg-green-700 transition-all shadow-lg shadow-green-600/20 flex items-center gap-2"
+                    disabled={isExporting}
+                    className="px-6 py-3 rounded-xl bg-green-600 text-white font-bold uppercase tracking-wider hover:bg-green-700 transition-all shadow-lg shadow-green-600/20 flex items-center gap-2 disabled:opacity-50"
                 >
-                    <span className="material-symbols-outlined">download</span>
-                    Export to Excel
+                    {isExporting ? (
+                        <>
+                            <span className="size-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                            Exporting...
+                        </>
+                    ) : (
+                        <>
+                            <span className="material-symbols-outlined">download</span>
+                            Export to Excel
+                        </>
+                    )}
                 </button>
             </div>
 
