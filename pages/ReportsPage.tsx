@@ -90,7 +90,8 @@ const ReportsPage: React.FC<ReportsPageProps> = ({ user, onLogout, toggleTheme, 
             "Staff ID",
             "Phone No",
             "Status",
-            "Date"
+            "Creation Date",
+            "Disb. Date"
         ];
 
         const csvContent = [
@@ -117,7 +118,8 @@ const ReportsPage: React.FC<ReportsPageProps> = ({ user, onLogout, toggleTheme, 
                     `"${r.staff_id || ''}"`,
                     `"${r.mobile_number || ''}"`,
                     `"${r.status || r.stage || ''}"`,
-                    `"${new Date(r.created_at).toLocaleDateString()}"`
+                    `"${new Date(r.created_at).toLocaleDateString()}"`,
+                    `"${r.disb_date ? new Date(r.disb_date).toLocaleDateString() : '-'}"`
                 ];
                 return row.join(",");
             })
@@ -226,7 +228,8 @@ const ReportsPage: React.FC<ReportsPageProps> = ({ user, onLogout, toggleTheme, 
                                 <th className="p-4">Tenure</th>
                                 <th className="p-4">Officer</th>
                                 <th className="p-4">Status</th>
-                                <th className="p-4">Date</th>
+                                <th className="p-4">Creation Date</th>
+                                <th className="p-4">Disb. Date</th>
                             </tr>
                         </thead>
                         <tbody className="text-xs divide-y divide-slate-100 dark:divide-slate-800 font-medium">
@@ -271,6 +274,7 @@ const ReportsPage: React.FC<ReportsPageProps> = ({ user, onLogout, toggleTheme, 
                                             </span>
                                         </td>
                                         <td className="p-4 text-slate-500">{new Date(r.created_at).toLocaleDateString()}</td>
+                                        <td className="p-4 text-slate-500">{r.disb_date ? new Date(r.disb_date).toLocaleDateString() : '-'}</td>
                                     </tr>
                                 ))
                             )}

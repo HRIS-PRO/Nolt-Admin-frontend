@@ -37,6 +37,7 @@ const ActionCard = ({ loan, userRole, onActionComplete }: { loan: any, userRole:
     const calculateDisbursementAmount = () => {
         const amount = parseFloat(eligibleAmount) || 0;
         const balance = parseFloat(existingLoanBalance) || 0;
+        const buyOverAmount = parseFloat(loan.buy_over_amount) || 0;
 
         let baseAmountForFees = amount;
 
@@ -62,6 +63,8 @@ const ActionCard = ({ loan, userRole, onActionComplete }: { loan: any, userRole:
         let disbursement = amount - fees;
         if (isSpecialLoan) {
             disbursement = disbursement - balance;
+        } else if (loan.loan_type === 'buy_over') {
+            disbursement = disbursement - buyOverAmount;
         }
 
         return disbursement > 0 ? disbursement : 0;
