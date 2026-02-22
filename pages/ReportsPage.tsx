@@ -380,6 +380,7 @@ const ReportsPage: React.FC<ReportsPageProps> = ({ user, onLogout, toggleTheme, 
                         <option value="20">20 / page</option>
                         <option value="50">50 / page</option>
                         <option value="100">100 / page</option>
+                        <option value="999999">All</option>
                     </select>
                 </div>
             </div>
