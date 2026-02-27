@@ -33,6 +33,7 @@ const StaffLayout: React.FC<StaffLayoutProps> = ({ children, user, onLogout, tog
                 { label: 'Dashboard', icon: 'grid_view', path: '/staff-dashboard' },
                 { label: 'Loans', icon: 'credit_card', path: '/staff/loans' },
                 { label: 'Reports', icon: 'description', path: '/staff/reports' },
+                { label: 'Timeline', icon: 'timeline', path: '/staff/timeline' },
             ]
         },
         {
@@ -91,6 +92,9 @@ const StaffLayout: React.FC<StaffLayoutProps> = ({ children, user, onLogout, tog
                         // Filter items based on role
                         const filteredItems = group.items.filter(item => {
                             if (item.label === 'Customers') {
+                                return user?.role === 'super_admin' || user?.role === 'customer_experience';
+                            }
+                            if (item.label === 'Timeline') {
                                 return user?.role === 'super_admin' || user?.role === 'customer_experience';
                             }
                             if (item.label === 'Users' || item.label === 'Audit Trail') {

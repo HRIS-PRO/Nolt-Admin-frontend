@@ -28,7 +28,7 @@ import AuditTrailPage from './pages/AuditTrailPage';
 import axios from 'axios';
 import ReportsPage from './pages/ReportsPage';
 import CustomersPage from './pages/CustomersPage';
-
+import TimelineReportPage from './pages/TimelineReportPage';
 
 import LogoutWarningModal from './components/modals/LogoutWarningModal';
 
@@ -437,6 +437,16 @@ const AppContent: React.FC = () => {
         <Route path="/staff/audit" element={
           isLoading ? null : (user?.isLoggedIn && user.role !== 'customer' ? (
             <AuditTrailPage
+              user={user}
+              onLogout={handleLogoutRequest}
+              toggleTheme={toggleTheme}
+              theme={theme}
+            />
+          ) : <Navigate to="/login" />)
+        } />
+        <Route path="/staff/timeline" element={
+          isLoading ? null : (user?.isLoggedIn && user.role !== 'customer' ? (
+            <TimelineReportPage
               user={user}
               onLogout={handleLogoutRequest}
               toggleTheme={toggleTheme}
