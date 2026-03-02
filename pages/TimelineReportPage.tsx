@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import StaffLayout from '../components/layouts/StaffLayout';
 import { useSearchParams } from 'react-router-dom';
 import axios from 'axios';
+import { getStatusStyles } from '../utils/statusStyles';
 
 interface TimelineReportPageProps {
     user: { name: string; email: string; avatar_url?: string; role?: string };
@@ -130,7 +131,16 @@ const TimelineReportPage: React.FC<TimelineReportPageProps> = ({ user, onLogout,
                                         <td className="p-2 px-3 border-r border-slate-200 dark:border-[#0f172a] text-slate-700 dark:text-slate-300">APP-{row.loanId.toString().padStart(3, '0')}</td>
                                         <td className="p-2 px-3 border-r border-slate-200 dark:border-[#0f172a] text-slate-700 dark:text-slate-300">{row.productType}</td>
                                         <td className="p-2 px-3 border-r border-slate-200 dark:border-[#0f172a] text-right font-mono text-slate-700 dark:text-slate-300">{Number(row.amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                                        <td className="p-2 px-3 border-r border-slate-200 dark:border-[#0f172a] capitalize text-slate-700 dark:text-slate-300">{row.currentStatus}</td>
+                                        <td className="p-2 px-3 border-r border-slate-200 dark:border-[#0f172a] capitalize">
+                                            {(() => {
+                                                const styles = getStatusStyles(row.currentStatus);
+                                                return (
+                                                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${styles.container}`}>
+                                                        {row.currentStatus}
+                                                    </span>
+                                                );
+                                            })()}
+                                        </td>
                                         <td className="p-2 px-3 border-r border-slate-200 dark:border-[#0f172a] text-slate-700 dark:text-slate-300">{row.officerName}</td>
                                         <td className="p-2 px-3 border-r border-slate-200 dark:border-[#0f172a] text-slate-700 dark:text-slate-300">{row.initiator}</td>
                                         <td className="p-2 px-3 border-r border-slate-200 dark:border-[#0f172a] text-slate-700 dark:text-slate-300">{row.stageName}</td>

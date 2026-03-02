@@ -6,6 +6,7 @@ import DocumentsList from '../components/DocumentsList';
 import axios from 'axios';
 import SensitiveDataField from '../components/SensitiveDataField';
 import StaffLoanForm from '../components/StaffLoanForm';
+import { getStatusStyles } from '../utils/statusStyles';
 
 interface LoanDetailsPageProps {
     user: { name: string; email: string; avatar_url?: string; role?: string };
@@ -603,7 +604,17 @@ const LoanDetailsPage: React.FC<LoanDetailsPageProps> = ({ user, onLogout, toggl
                         <span className="material-symbols-outlined">arrow_back</span>
                     </button>
                     <div>
-                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Application #{loan.id}</p>
+                        <div className="flex items-center gap-3 mb-1">
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Application #{loan.id}</p>
+                            {(() => {
+                                const styles = getStatusStyles(loan.status);
+                                return (
+                                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border uppercase tracking-wider ${styles.container}`}>
+                                        {loan.status}
+                                    </span>
+                                );
+                            })()}
+                        </div>
                         <h1 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight leading-none">{loan.applicant_full_name}</h1>
 
                         {/* Edit Button Logic */}
