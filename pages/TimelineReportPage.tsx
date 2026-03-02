@@ -109,6 +109,7 @@ const TimelineReportPage: React.FC<TimelineReportPageProps> = ({ user, onLogout,
                                 <th className="p-3 border border-slate-200 dark:border-[#0f172a]">Product Type</th>
                                 <th className="p-3 border border-slate-200 dark:border-[#0f172a] text-right">Amount</th>
                                 <th className="p-3 border border-slate-200 dark:border-[#0f172a]">Current Status</th>
+                                <th className="p-3 border border-slate-200 dark:border-[#0f172a]">Sales Officer</th>
                                 <th className="p-3 border border-slate-200 dark:border-[#0f172a]">Initiator</th>
                                 <th className="p-3 border border-slate-200 dark:border-[#0f172a]">Stage Name</th>
                                 <th className="p-3 border border-slate-200 dark:border-[#0f172a]">Stage Entry Timestamp</th>
@@ -120,9 +121,9 @@ const TimelineReportPage: React.FC<TimelineReportPageProps> = ({ user, onLogout,
                         </thead>
                         <tbody className="text-sm">
                             {isLoading ? (
-                                <tr><td colSpan={11} className="p-8 text-center text-slate-500 bg-white dark:bg-[#1e293b]">Loading timeline data...</td></tr>
+                                <tr><td colSpan={12} className="p-8 text-center text-slate-500 bg-white dark:bg-[#1e293b]">Loading timeline data...</td></tr>
                             ) : timelineData.length === 0 ? (
-                                <tr><td colSpan={11} className="p-8 text-center text-slate-500 bg-white dark:bg-[#1e293b]">No records found.</td></tr>
+                                <tr><td colSpan={12} className="p-8 text-center text-slate-500 bg-white dark:bg-[#1e293b]">No records found.</td></tr>
                             ) : (
                                 timelineData.map((row, idx) => (
                                     <tr key={idx} className="bg-white dark:bg-[#1e293b] hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors border-b border-slate-200 dark:border-[#0f172a]">
@@ -130,6 +131,7 @@ const TimelineReportPage: React.FC<TimelineReportPageProps> = ({ user, onLogout,
                                         <td className="p-2 px-3 border-r border-slate-200 dark:border-[#0f172a] text-slate-700 dark:text-slate-300">{row.productType}</td>
                                         <td className="p-2 px-3 border-r border-slate-200 dark:border-[#0f172a] text-right font-mono text-slate-700 dark:text-slate-300">{Number(row.amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                                         <td className="p-2 px-3 border-r border-slate-200 dark:border-[#0f172a] capitalize text-slate-700 dark:text-slate-300">{row.currentStatus}</td>
+                                        <td className="p-2 px-3 border-r border-slate-200 dark:border-[#0f172a] text-slate-700 dark:text-slate-300">{row.officerName}</td>
                                         <td className="p-2 px-3 border-r border-slate-200 dark:border-[#0f172a] text-slate-700 dark:text-slate-300">{row.initiator}</td>
                                         <td className="p-2 px-3 border-r border-slate-200 dark:border-[#0f172a] text-slate-700 dark:text-slate-300">{row.stageName}</td>
                                         <td className="p-2 px-3 border-r border-slate-200 dark:border-[#0f172a] text-slate-700 dark:text-slate-300">
