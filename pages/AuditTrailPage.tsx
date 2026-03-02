@@ -3,6 +3,7 @@ import StaffLayout from '../components/layouts/StaffLayout';
 import { useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import ActivityTimeline from '../components/ActivityTimeline';
+import { getStatusStyles } from '../utils/statusStyles';
 
 interface AuditTrailPageProps {
     user: { name: string; email: string; avatar_url?: string; role?: string };
@@ -111,12 +112,14 @@ const AuditTrailPage: React.FC<AuditTrailPageProps> = ({ user, onLogout, toggleT
                                         <td className="p-4 font-bold text-slate-900 dark:text-white">{loan.applicant_full_name}</td>
                                         <td className="p-4 font-mono text-slate-600 dark:text-slate-300">₦{Number(loan.requested_loan_amount).toLocaleString()}</td>
                                         <td className="p-4">
-                                            <span className={`px-2 py-1 rounded border text-[10px] font-black uppercase tracking-wider 
-                                                ${loan.status === 'APPROVED' ? 'bg-emerald-50 text-emerald-600 border-emerald-200' :
-                                                    loan.status === 'REJECTED' ? 'bg-red-50 text-red-600 border-red-200' :
-                                                        'bg-amber-50 text-amber-600 border-amber-200'}`}>
-                                                {loan.status}
-                                            </span>
+                                            {(() => {
+                                                const styles = getStatusStyles(loan.status);
+                                                return (
+                                                    <span className={`px-2 py-1 rounded border text-[10px] font-black uppercase tracking-wider ${styles.container}`}>
+                                                        {loan.status}
+                                                    </span>
+                                                );
+                                            })()}
                                         </td>
                                         <td className="p-4 text-xs text-slate-500">{new Date(loan.created_at).toLocaleDateString()}</td>
                                         <td className="p-4 text-right">

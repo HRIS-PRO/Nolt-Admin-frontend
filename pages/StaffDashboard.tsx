@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import StaffLayout from '../components/layouts/StaffLayout';
 import axios from 'axios';
+import { getStatusStyles } from '../utils/statusStyles';
 
 interface StaffDashboardProps {
     user: { name: string; email: string; avatar_url?: string; role?: string };
@@ -250,11 +251,16 @@ const StaffDashboard: React.FC<StaffDashboardProps> = ({ user, onLogout, toggleT
                                                         loan.requested_loan_amount
                                             ).toLocaleString()}
                                         </td>
-                                        <td className="p-4">
-                                            <div className={`flex items-center gap-2 px-2 py-1 rounded border w-fit text-[10px] font-bold uppercase tracking-widest border-amber-500/20 bg-amber-500/10 text-amber-600 dark:text-amber-500`}>
-                                                <span className={`size-1.5 rounded-full bg-amber-500`}></span>
-                                                {loan.status}
-                                            </div>
+                                        <td className="p-4 text-xs">
+                                            {(() => {
+                                                const styles = getStatusStyles(loan.status);
+                                                return (
+                                                    <div className={`flex items-center gap-2 px-2 py-1 rounded border w-fit text-[10px] font-bold uppercase tracking-widest ${styles.container}`}>
+                                                        <span className={`size-1.5 rounded-full ${styles.dot}`}></span>
+                                                        {loan.status}
+                                                    </div>
+                                                );
+                                            })()}
                                         </td>
                                     </tr>
                                 ))

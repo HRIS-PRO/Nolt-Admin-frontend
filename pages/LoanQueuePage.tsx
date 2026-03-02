@@ -3,6 +3,7 @@ import StaffLayout from '../components/layouts/StaffLayout';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import StaffLoanForm from '../components/StaffLoanForm';
+import { getStatusStyles } from '../utils/statusStyles';
 
 interface LoanQueuePageProps {
     user: { name: string; email: string; avatar_url?: string; role?: string };
@@ -364,10 +365,15 @@ const LoanQueuePage: React.FC<LoanQueuePageProps> = ({ user, onLogout, toggleThe
                                         </td>
                                         <td className="p-4 text-slate-500 text-xs">{new Date(loan.created_at).toLocaleDateString()}</td>
                                         <td className="p-4">
-                                            <div className={`flex items-center gap-2 px-2 py-1 rounded border w-fit text-[10px] font-bold uppercase tracking-widest border-amber-500/20 bg-amber-500/10 text-amber-600 dark:text-amber-500`}>
-                                                <span className={`size-1.5 rounded-full bg-amber-500`}></span>
-                                                {loan.status}
-                                            </div>
+                                            {(() => {
+                                                const styles = getStatusStyles(loan.status);
+                                                return (
+                                                    <div className={`flex items-center gap-2 px-2 py-1 rounded border w-fit text-[10px] font-bold uppercase tracking-widest ${styles.container}`}>
+                                                        <span className={`size-1.5 rounded-full ${styles.dot}`}></span>
+                                                        {loan.status}
+                                                    </div>
+                                                );
+                                            })()}
                                         </td>
                                         {/* <td className="p-4 text-right">
                                             <button
