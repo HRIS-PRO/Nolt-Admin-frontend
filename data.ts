@@ -497,6 +497,7 @@ export const MDAS_LIST = [
     'Federal Ministry of Finance',
     'National Population Commission',
     'National Sport Commission',
+    'Nigeria Customs',
     'Federal Ministry of Environment',
     'Federal Ministry of Health',
     'Federal Ministry of Education',
