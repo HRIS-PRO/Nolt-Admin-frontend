@@ -1114,7 +1114,7 @@ const LoanFlow: React.FC<LoanFlowProps> = ({ initialStep, onComplete, navigate, 
                   </div>
                   <div className="space-y-6">
                     <div className="flex justify-between items-center"><label className="text-lg font-black text-slate-900 dark:text-white">Term (Months)</label><span className="bg-primary text-white font-black px-6 py-2 rounded-full text-sm shadow-md shadow-primary/20">{repaymentPeriod} Months</span></div>
-                    <input type="range" min="3" max="20" step="1" value={repaymentPeriod} onChange={(e) => setRepaymentPeriod(parseInt(e.target.value))} className="w-full h-3 bg-slate-100 dark:bg-slate-900 rounded-full appearance-none cursor-pointer accent-primary" />
+                    <input type="range" min="3" max="24" step="1" value={repaymentPeriod} onChange={(e) => setRepaymentPeriod(parseInt(e.target.value))} className="w-full h-3 bg-slate-100 dark:bg-slate-900 rounded-full appearance-none cursor-pointer accent-primary" />
 
                     {/* Additional Info */}
                     <div className="space-y-6 pt-6 border-t border-slate-100 dark:border-slate-700">
