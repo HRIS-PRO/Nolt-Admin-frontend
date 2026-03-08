@@ -16,7 +16,7 @@ export default defineConfig(({ mode }) => {
           cookieDomainRewrite: "localhost"
         },
         '/auth': {
-          target: env.VITE_API_TARGET || 'http://noltadmin1.eu-central-1.elasticbeanstalk.com',
+          target: env.VITE_API_TARGET || 'http:http://noltadmin1.eu-central-1.elasticbeanstalk.com///noltadmin1.eu-central-1.elasticbeanstalk.com',
           changeOrigin: true,
           secure: false,
           cookieDomainRewrite: "localhost"
