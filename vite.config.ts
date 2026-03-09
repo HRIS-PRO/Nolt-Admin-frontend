@@ -10,19 +10,19 @@ export default defineConfig(({ mode }) => {
       host: '0.0.0.0',
       proxy: {
         '/api': {
-          target: env.VITE_API_TARGET || 'http://noltadmin1.eu-central-1.elasticbeanstalk.com',
+          target: env.VITE_API_TARGET || 'https://nolt-admin-backend-production-713d.up.railway.app',
           changeOrigin: true,
           secure: false,
           cookieDomainRewrite: "localhost"
         },
         '/auth': {
-          target: env.VITE_API_TARGET || 'http://noltadmin1.eu-central-1.elasticbeanstalk.com',
+          target: env.VITE_API_TARGET || 'https://nolt-admin-backend-production-713d.up.railway.app',
           changeOrigin: true,
           secure: false,
           cookieDomainRewrite: "localhost"
         },
         '/socket.io': {
-          target: env.VITE_API_TARGET || 'http://noltadmin1.eu-central-1.elasticbeanstalk.com',
+          target: env.VITE_API_TARGET || 'https://nolt-admin-backend-production-713d.up.railway.app',
           ws: true,
           changeOrigin: true,
           secure: false
