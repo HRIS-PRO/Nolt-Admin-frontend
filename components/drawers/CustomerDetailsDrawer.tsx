@@ -56,7 +56,7 @@ const CustomerDetailsDrawer: React.FC<CustomerDetailsDrawerProps> = ({ customerI
     const fetchDetails = async (id: number) => {
         setIsLoading(true);
         try {
-            const res = await axios.get(`${import.meta.env.VITE_BACKEND_URL || ''}/api/staff/customers/${id}`, { withCredentials: true });
+            const res = await axios.get(`/api/staff/customers/${id}`, { withCredentials: true });
             setProfile(res.data.profile);
             setLoans(res.data.loans);
             setDocuments(res.data.documents);
@@ -193,8 +193,8 @@ const CustomerDetailsDrawer: React.FC<CustomerDetailsDrawerProps> = ({ customerI
                                                         </div>
                                                     </div>
                                                     <span className={`px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider ${loan.status === 'active' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' :
-                                                            loan.status === 'pending' ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400' :
-                                                                'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-400'
+                                                        loan.status === 'pending' ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400' :
+                                                            'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-400'
                                                         }`}>
                                                         {loan.status}
                                                     </span>

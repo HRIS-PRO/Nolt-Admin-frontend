@@ -21,7 +21,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
         setError('');
 
         try {
-            const backendUrl = import.meta.env.VITE_BACKEND_URL || '';
+            const backendUrl = '';
             const { data } = await axios.post(`${backendUrl}/auth/login`, {
                 email,
                 password
