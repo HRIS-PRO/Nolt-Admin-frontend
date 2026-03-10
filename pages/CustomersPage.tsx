@@ -121,7 +121,7 @@ const CustomersPage: React.FC<CustomersPageProps> = ({ user, onLogout, toggleThe
         try {
             // Trigger download
             const link = document.createElement("a");
-            link.href = `${import.meta.env.VITE_BACKEND_URL || ''}/api/staff/customers/export-zip${queryString}`;
+            link.href = `/api/staff/customers/export-zip${queryString}`;
             link.setAttribute("download", `customers_export.zip`); // Browser might ignore this if content-disposition is set
             document.body.appendChild(link);
             link.click();
