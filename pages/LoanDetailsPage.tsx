@@ -698,6 +698,8 @@ const LoanDetailsPage: React.FC<LoanDetailsPageProps> = ({ user, onLogout, toggl
                         <Field label="Gender" value={loan.gender} />
                         <Field label="Date of Birth" value={loan.date_of_birth ? new Date(loan.date_of_birth).toLocaleDateString() : '-'} />
                         <Field label="Marital Status" value={loan.marital_status} />
+                        <Field label="Religion" value={loan.religion} />
+                        <Field label="State of Origin" value={loan.state_of_origin} />
                         <Field label="Phone" value={loan.mobile_number} />
                         <Field label="Email" value={loan.personal_email} />
                         <Field label="Address" value={loan.primary_home_address} />
