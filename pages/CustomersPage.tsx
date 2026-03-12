@@ -30,7 +30,10 @@ interface Customer {
     residential_status?: string;
     ippis_number?: string;
     staff_id?: string;
-    monthly_income?: string;
+    average_monthly_income?: string;
+    mda_tertiary?: string;
+    personal_email?: string;
+    mobile_number?: string;
 }
 
 interface CustomersPageProps {
@@ -140,8 +143,8 @@ const CustomersPage: React.FC<CustomersPageProps> = ({ user, onLogout, toggleThe
                     const row = [
                         c.id,
                         `"${c.full_name || ''}"`,
-                        `"${c.email || ''}"`,
-                        `"${c.phone_number || ''}"`,
+                        `"${c.personal_email || c.email || ''}"`,
+                        `"${c.phone_number || c.mobile_number || ''}"`,
                         `"${c.gender || ''}"`,
                         `"${formatDate(c.date_of_birth)}"`,
                         `"${c.marital_status || ''}"`,
@@ -152,10 +155,10 @@ const CustomersPage: React.FC<CustomersPageProps> = ({ user, onLogout, toggleThe
                         `"${c.state_of_residence || ''}"`,
                         `"${c.residential_status || ''}"`,
                         `"${c.primary_home_address?.replace(/"/g, '""') || ''}"`,
-                        `"${c.employer || ''}"`,
+                        `"${c.mda_tertiary || c.employer || ''}"`,
                         `"${c.ippis_number || ''}"`,
                         `"${c.staff_id || ''}"`,
-                        `"${c.monthly_income || ''}"`,
+                        `"${c.average_monthly_income || ''}"`,
                         `"${c.bank_name || ''}"`,
                         `"${c.account_number || ''}"`,
                         `"${c.account_name || ''}"`,
