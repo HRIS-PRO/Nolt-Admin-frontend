@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
+import { formatDate } from '../../utils/dateFormatter';
 
 interface CustomerDetailsDrawerProps {
     customerId: number | null;
@@ -15,15 +16,23 @@ interface CustomerProfile {
     employer?: string;
     avatar_url?: string;
     role: string;
-    is_active: boolean;
-    created_at: string;
     bvn?: string;
     nin?: string;
     date_of_birth?: string;
     primary_home_address?: string;
     bank_name?: string;
     account_number?: string;
+    is_active: boolean;
+    created_at: string;
     account_name?: string;
+    gender?: string;
+    marital_status?: string;
+    religion?: string;
+    state_of_origin?: string;
+    residential_status?: string;
+    ippis_number?: string;
+    staff_id?: string;
+    monthly_income?: string;
 }
 
 interface Loan {
@@ -160,13 +169,29 @@ const CustomerDetailsDrawer: React.FC<CustomerDetailsDrawerProps> = ({ customerI
                                         <InfoItem label="Email" value={profile.email} icon="mail" />
                                         <InfoItem label="BVN" value={profile.bvn} icon="fingerprint" />
                                         <InfoItem label="NIN" value={profile.nin} icon="badge" />
-                                        <InfoItem label="Date of Birth" value={profile.date_of_birth ? new Date(profile.date_of_birth).toLocaleDateString() : undefined} icon="cake" />
+                                        <InfoItem label="Date of Birth" value={formatDate(profile.date_of_birth)} icon="cake" />
                                     </Section>
 
                                     <Section title="Financial Details">
                                         <InfoItem label="Bank Name" value={profile.bank_name} icon="account_balance" />
                                         <InfoItem label="Account Number" value={profile.account_number} icon="numbers" />
                                         <InfoItem label="Account Name" value={profile.account_name} icon="person" />
+                                    </Section>
+
+                                    <Section title="Employment Details">
+                                        <InfoItem label="Employer" value={profile.employer} icon="business" />
+                                        <InfoItem label="MDA/Institution" value={profile.employer} icon="account_balance" />
+                                        <InfoItem label="IPPIS Number" value={profile.ippis_number} icon="tag" />
+                                        <InfoItem label="Staff ID" value={profile.staff_id} icon="badge" />
+                                        <InfoItem label="Monthly Income" value={profile.monthly_income ? `₦${Number(profile.monthly_income).toLocaleString()}` : undefined} icon="payments" />
+                                    </Section>
+
+                                    <Section title="Additional Information">
+                                        <InfoItem label="Gender" value={profile.gender} icon="person" />
+                                        <InfoItem label="Marital Status" value={profile.marital_status} icon="favorite" />
+                                        <InfoItem label="Religion" value={profile.religion} icon="church" />
+                                        <InfoItem label="State of Origin" value={profile.state_of_origin} icon="flag" />
+                                        <InfoItem label="Residential Status" value={profile.residential_status} icon="home" />
                                     </Section>
                                 </div>
                             )}
@@ -189,7 +214,7 @@ const CustomerDetailsDrawer: React.FC<CustomerDetailsDrawerProps> = ({ customerI
                                                             {new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN' }).format(Number(loan.requested_loan_amount))}
                                                         </div>
                                                         <div className="text-xs text-slate-500 font-medium">
-                                                            Applied on {new Date(loan.created_at).toLocaleDateString()}
+                                                            Applied on {formatDate(loan.created_at)}
                                                         </div>
                                                     </div>
                                                     <span className={`px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider ${loan.status === 'active' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' :
@@ -235,7 +260,7 @@ const CustomerDetailsDrawer: React.FC<CustomerDetailsDrawerProps> = ({ customerI
                                                         {doc.type}
                                                     </div>
                                                     <div className="text-[10px] text-slate-400 font-medium">
-                                                        Uploaded: {new Date(doc.date).toLocaleDateString()}
+                                                        Uploaded: {formatDate(doc.date)}
                                                     </div>
                                                 </div>
                                                 <span className="material-symbols-outlined text-slate-300 group-hover:text-blue-500 transition-colors text-lg">open_in_new</span>

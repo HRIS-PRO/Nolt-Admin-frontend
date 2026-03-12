@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import StaffLayout from '../components/layouts/StaffLayout';
 import axios from 'axios';
 import { getStatusStyles } from '../utils/statusStyles';
+import { formatDate } from '../utils/dateFormatter';
 
 interface StaffDashboardProps {
     user: { name: string; email: string; avatar_url?: string; role?: string };
@@ -80,7 +81,7 @@ const StaffDashboard: React.FC<StaffDashboardProps> = ({ user, onLogout, toggleT
                     `${loan.requested_loan_amount || 0}`,
                     `"${loan.status || ''}"`,
                     `"${loan.product_type || ''}"`,
-                    `"${new Date(loan.created_at).toLocaleDateString()}"`
+                    `"${formatDate(loan.created_at)}"`
                 ];
                 return row.join(",");
             })
@@ -222,7 +223,7 @@ const StaffDashboard: React.FC<StaffDashboardProps> = ({ user, onLogout, toggleT
                                                 </div>
                                                 <div>
                                                     <p className="font-bold text-slate-900 dark:text-white text-xs">{loan.applicant_full_name}</p>
-                                                    <p className="text-[10px] text-slate-500">Applied {new Date(loan.created_at).toLocaleDateString()}</p>
+                                                    <p className="text-[10px] text-slate-500">Applied {formatDate(loan.created_at)}</p>
                                                 </div>
                                             </div>
                                         </td>

@@ -397,6 +397,7 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess, initi
                 if (!firstName.trim()) newErrors.firstName = "Required";
                 if (!gender) newErrors.gender = "Required";
                 if (!dob) newErrors.dob = "Required";
+                if (!religion) newErrors.religion = "Required";
                 if (!maritalStatus) newErrors.maritalStatus = "Required";
 
                 if (!mobileNumber) newErrors.mobileNumber = "Required";
@@ -831,7 +832,15 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess, initi
                                         </InputGroup>
                                     </div>
 
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                        <InputGroup label="Religion" required error={errors.religion}>
+                                            <select className="input-field" value={religion} onChange={e => { setReligion(e.target.value); clearError('religion'); }}>
+                                                <option value="">Select</option>
+                                                <option>Christianity</option>
+                                                <option>Islam</option>
+                                                <option>Others</option>
+                                            </select>
+                                        </InputGroup>
                                         <InputGroup label="Mobile Number" required error={errors.mobileNumber}>
                                             <input className="input-field" value={mobileNumber} onChange={handleNumericChange(setMobileNumber, 'mobileNumber', 11)} placeholder="080..." maxLength={11} />
                                         </InputGroup>
@@ -1074,11 +1083,13 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess, initi
                                                 <InputGroup label="Relationship" error={errors[`ref_${idx}_relationship`]}>
                                                     <select className="input-field" value={ref.relationship} onChange={e => updateReference(idx, 'relationship', e.target.value)}>
                                                         <option value="">Select Relationship</option>
-                                                        <option value="Colleague">Colleague</option>
-                                                        <option value="Friend">Friend</option>
-                                                        <option value="Family">Family</option>
-                                                        <option value="Spouse">Spouse</option>
-                                                        <option value="Other">Other</option>
+                                                        <option value="Colleague">Husband</option>
+                                                        <option value="Friend">Wife</option>
+                                                        <option value="Family">Brother</option>
+                                                        <option value="Spouse">Sister</option>
+                                                        <option value="Spouse">Widow</option>
+                                                        <option value="Spouse">Proxy</option>
+                                                        <option value="Other">Others</option>
                                                     </select>
                                                 </InputGroup>
                                                 <InputGroup label="Address" error={errors[`ref_${idx}_address`]}>

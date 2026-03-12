@@ -4,6 +4,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import StaffLoanForm from '../components/StaffLoanForm';
 import { getStatusStyles } from '../utils/statusStyles';
+import { formatDate } from '../utils/dateFormatter';
 
 interface LoanQueuePageProps {
     user: { name: string; email: string; avatar_url?: string; role?: string };
@@ -363,7 +364,7 @@ const LoanQueuePage: React.FC<LoanQueuePageProps> = ({ user, onLogout, toggleThe
                                         <td className="p-4 font-black text-slate-900 dark:text-white">
                                             {loan.disbursement_amount ? `₦${Number(loan.disbursement_amount).toLocaleString()}` : '-'}
                                         </td>
-                                        <td className="p-4 text-slate-500 text-xs">{new Date(loan.created_at).toLocaleDateString()}</td>
+                                        <td className="p-4 text-slate-500 text-xs">{formatDate(loan.created_at)}</td>
                                         <td className="p-4">
                                             {(() => {
                                                 const styles = getStatusStyles(loan.status);

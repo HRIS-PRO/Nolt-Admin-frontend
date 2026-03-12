@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
+import { formatDate } from '../utils/dateFormatter';
 
 interface Document {
     id: string;
@@ -83,7 +84,7 @@ const DocumentsList: React.FC<{ loanId: string | undefined; refreshTrigger?: num
                                 <span>•</span>
                                 <span>{doc.uploaded_by_name || 'System'}</span>
                                 <span>•</span>
-                                <span>{new Date(doc.created_at).toLocaleDateString()}</span>
+                                <span>{formatDate(doc.created_at)}</span>
                             </div>
                         </div>
                     </a>
