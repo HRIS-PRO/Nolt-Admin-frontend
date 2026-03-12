@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import StaffLayout from '../components/layouts/StaffLayout';
 import axios from 'axios';
+import { formatDate } from '../utils/dateFormatter';
 
 interface ReportsPageProps {
     user: { name: string; email: string; avatar_url?: string; role?: string };
@@ -138,8 +139,8 @@ const ReportsPage: React.FC<ReportsPageProps> = ({ user, onLogout, toggleTheme, 
                         `"${r.staff_id || ''}"`,
                         `"${r.mobile_number || ''}"`,
                         `"${r.status || r.stage || ''}"`,
-                        `"${new Date(r.created_at).toLocaleDateString()}"`,
-                        `"${r.disb_date ? new Date(r.disb_date).toLocaleDateString() : '-'}"`
+                        `"${formatDate(r.created_at)}"`,
+                        `"${formatDate(r.disb_date)}"`
                     ];
                     return row.join(",");
                 })
@@ -309,8 +310,8 @@ const ReportsPage: React.FC<ReportsPageProps> = ({ user, onLogout, toggleTheme, 
                                                 {r.status || r.stage}
                                             </span>
                                         </td>
-                                        <td className="p-4 text-slate-500">{new Date(r.created_at).toLocaleDateString()}</td>
-                                        <td className="p-4 text-slate-500">{r.disb_date ? new Date(r.disb_date).toLocaleDateString() : '-'}</td>
+                                        <td className="p-4 text-slate-500">{formatDate(r.created_at)}</td>
+                                        <td className="p-4 text-slate-500">{formatDate(r.disb_date)}</td>
                                     </tr>
                                 ))
                             )}

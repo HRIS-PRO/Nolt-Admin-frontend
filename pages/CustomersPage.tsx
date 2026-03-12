@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import StaffLayout from '../components/layouts/StaffLayout';
 import axios from 'axios';
 import CustomerDetailsDrawer from '../components/drawers/CustomerDetailsDrawer';
+import { formatDate } from '../utils/dateFormatter';
 
 interface Customer {
     id: number;
@@ -15,14 +16,21 @@ interface Customer {
     avatar_url?: string;
     state_of_residence?: string;
     last_sign_in_at?: string;
-    // New fields for export
+    account_number?: string;
+    account_name?: string;
+    gender?: string;
+    marital_status?: string;
+    religion?: string;
     bvn?: string;
     nin?: string;
     date_of_birth?: string;
     primary_home_address?: string;
     bank_name?: string;
-    account_number?: string;
-    account_name?: string;
+    state_of_origin?: string;
+    residential_status?: string;
+    ippis_number?: string;
+    staff_id?: string;
+    monthly_income?: string;
 }
 
 interface CustomersPageProps {
@@ -99,6 +107,82 @@ const CustomersPage: React.FC<CustomersPageProps> = ({ user, onLogout, toggleThe
         setIsDrawerOpen(true);
     };
 
+    const handleCSVExport = async () => {
+        setIsLoading(true);
+        try {
+            // Fetch ALL customers for export (matching search if any)
+            const res = await axios.get(`${import.meta.env.VITE_BACKEND_URL || ''}/api/staff/users`, {
+                params: {
+                    role: 'customer',
+                    page: 1,
+                    limit: 999999, // Fetch virtually all
+                    search: searchTerm
+                },
+                withCredentials: true
+            });
+
+            const allCustomers = res.data.users || res.data || [];
+
+            if (allCustomers.length === 0) {
+                alert("No customers to export.");
+                return;
+            }
+
+            const headers = [
+                "ID", "Full Name", "Email", "Phone Number", "Gender", "DOB", "Marital Status", "Religion", "BVN", "NIN",
+                "State of Origin", "State of Residence", "Residential Status", "Address", "Employer/MDA", "IPPIS Number", "Staff ID", "Monthly Income",
+                "Bank Name", "Account Number", "Account Name", "Role", "Status", "Joined Date"
+            ];
+
+            const csvContent = [
+                headers.join(","),
+                ...allCustomers.map((c: Customer) => {
+                    const row = [
+                        c.id,
+                        `"${c.full_name || ''}"`,
+                        `"${c.email || ''}"`,
+                        `"${c.phone_number || ''}"`,
+                        `"${c.gender || ''}"`,
+                        `"${formatDate(c.date_of_birth)}"`,
+                        `"${c.marital_status || ''}"`,
+                        `"${c.religion || ''}"`,
+                        `"${c.bvn || ''}"`,
+                        `"${c.nin || ''}"`,
+                        `"${c.state_of_origin || ''}"`,
+                        `"${c.state_of_residence || ''}"`,
+                        `"${c.residential_status || ''}"`,
+                        `"${c.primary_home_address?.replace(/"/g, '""') || ''}"`,
+                        `"${c.employer || ''}"`,
+                        `"${c.ippis_number || ''}"`,
+                        `"${c.staff_id || ''}"`,
+                        `"${c.monthly_income || ''}"`,
+                        `"${c.bank_name || ''}"`,
+                        `"${c.account_number || ''}"`,
+                        `"${c.account_name || ''}"`,
+                        `"${c.role || ''}"`,
+                        `"${c.is_active ? 'Active' : 'Inactive'}"`,
+                        `"${formatDate(c.created_at)}"`
+                    ];
+                    return row.join(",");
+                })
+            ].join("\n");
+
+            const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.setAttribute("href", url);
+            link.setAttribute("download", `customers_report_${new Date().toISOString().split('T')[0]}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        } catch (error) {
+            console.error("CSV Export failed:", error);
+            alert("Failed to export CSV.");
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
     const handleExport = async (exportAll: boolean = false) => {
         let queryString = '';
 
@@ -156,11 +240,18 @@ const CustomersPage: React.FC<CustomersPageProps> = ({ user, onLogout, toggleThe
                         </button>
                     )}
                     <button
+                        onClick={handleCSVExport}
+                        className="px-4 py-2 rounded-lg bg-blue-600 text-white text-xs font-bold uppercase tracking-wider flex items-center gap-2 hover:bg-blue-700 transition-all shadow-lg shadow-blue-500/20"
+                    >
+                        <span className="material-symbols-outlined text-sm">spreadsheet</span>
+                        Export to CSV
+                    </button>
+                    <button
                         onClick={() => handleExport(true)}
                         className="px-4 py-2 rounded-lg bg-green-500 text-white text-xs font-bold uppercase tracking-wider flex items-center gap-2 hover:bg-green-600 transition-all shadow-lg shadow-green-500/20"
                     >
-                        <span className="material-symbols-outlined text-sm">download_for_offline</span>
-                        Export All
+                        <span className="material-symbols-outlined text-sm">folder_zip</span>
+                        Export Docs (ZIP)
                     </button>
                 </div>
             </header>
@@ -273,7 +364,7 @@ const CustomersPage: React.FC<CustomersPageProps> = ({ user, onLogout, toggleThe
                                             </span>
                                         </td>
                                         <td className="p-4 text-slate-500 text-xs">
-                                            {new Date(customer.created_at).toLocaleDateString()}
+                                            {formatDate(customer.created_at)}
                                         </td>
                                         <td className="p-4">
                                             <button

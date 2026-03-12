@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { AppStep, SavedDraft } from '../types';
 import { storageService } from '../services/storageService';
 import axios from 'axios';
+import { formatDate } from '../utils/dateFormatter';
 
 interface ApplicationsListProps {
   navigate: (step: AppStep, draft?: SavedDraft | null) => void;
@@ -36,7 +37,7 @@ const ApplicationsList: React.FC<ApplicationsListProps> = ({ navigate, formatMon
             id: String(app.id), // Ensure string for consistency
             type: 'Business Loan', // Default type or derive from data if available
             amount: parseFloat(app.requested_loan_amount),
-            submittedAt: new Date(app.created_at).toLocaleDateString(),
+            submittedAt: formatDate(app.created_at),
             status: app.status.toUpperCase(),
             icon: app.status === 'rejected' ? 'cancel' : 'check_circle',
             // Ensure all fields are mapped
@@ -178,7 +179,7 @@ const ApplicationsList: React.FC<ApplicationsListProps> = ({ navigate, formatMon
                   )}
 
                   <p className="text-slate-500 font-bold">Step {draft.subStep + 1} of {draft.type === 'LOAN' ? 12 : 11}</p>
-                  <p className="text-xs text-slate-400 font-medium">Modified {new Date(draft.updatedAt).toLocaleDateString()}</p>
+                  <p className="text-xs text-slate-400 font-medium">Modified {formatDate(draft.updatedAt)}</p>
                 </div>
 
                 <div className="w-full md:w-48 space-y-2">
@@ -347,7 +348,7 @@ const ApplicationsList: React.FC<ApplicationsListProps> = ({ navigate, formatMon
                       </div>
                       <div>
                         <p className="text-slate-500 text-xs uppercase font-bold">Date of Birth</p>
-                        <p className="font-bold dark:text-white">{selectedApp.data?.date_of_birth ? new Date(selectedApp.data.date_of_birth).toLocaleDateString() : 'N/A'}</p>
+                        <p className="font-bold dark:text-white">{formatDate(selectedApp.data?.date_of_birth)}</p>
                       </div>
                       <div>
                         <p className="text-slate-500 text-xs uppercase font-bold">BVN</p>

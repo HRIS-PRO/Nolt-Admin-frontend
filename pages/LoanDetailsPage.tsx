@@ -7,6 +7,7 @@ import axios from 'axios';
 import SensitiveDataField from '../components/SensitiveDataField';
 import StaffLoanForm from '../components/StaffLoanForm';
 import { getStatusStyles } from '../utils/statusStyles';
+import { formatDate } from '../utils/dateFormatter';
 
 interface LoanDetailsPageProps {
     user: { name: string; email: string; avatar_url?: string; role?: string };
@@ -696,10 +697,11 @@ const LoanDetailsPage: React.FC<LoanDetailsPageProps> = ({ user, onLogout, toggl
                     <CollapsibleGroup title="Personal Information" icon="person" defaultOpen={true}>
                         <Field label="Full Name" value={loan.applicant_full_name} copy />
                         <Field label="Gender" value={loan.gender} />
-                        <Field label="Date of Birth" value={loan.date_of_birth ? new Date(loan.date_of_birth).toLocaleDateString() : '-'} />
+                        <Field label="Date of Birth" value={formatDate(loan.date_of_birth)} />
                         <Field label="Marital Status" value={loan.marital_status} />
                         <Field label="Religion" value={loan.religion} />
                         <Field label="State of Origin" value={loan.state_of_origin} />
+                        <Field label="State of Residence" value={loan.state_of_residence} />
                         <Field label="Phone" value={loan.mobile_number} />
                         <Field label="Email" value={loan.personal_email} />
                         <Field label="Address" value={loan.primary_home_address} />

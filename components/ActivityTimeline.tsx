@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
+import { formatDate } from '../utils/dateFormatter';
 
 interface Activity {
     id: string;
@@ -119,7 +120,7 @@ const ActivityTimeline: React.FC<ActivityTimelineProps> = ({ loanId, refreshTrig
                                                     </p>
                                                 </div>
                                                 <span className="text-[10px] font-mono text-slate-400 whitespace-nowrap">
-                                                    {new Date(item.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                                    {formatDate(item.created_at)}
                                                 </span>
                                             </div>
 
