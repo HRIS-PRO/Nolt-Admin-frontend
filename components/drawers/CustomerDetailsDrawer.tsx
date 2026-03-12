@@ -32,7 +32,10 @@ interface CustomerProfile {
     residential_status?: string;
     ippis_number?: string;
     staff_id?: string;
-    monthly_income?: string;
+    average_monthly_income?: string;
+    mda_tertiary?: string;
+    personal_email?: string;
+    phone_number?: string;
 }
 
 interface Loan {
@@ -118,7 +121,7 @@ const CustomerDetailsDrawer: React.FC<CustomerDetailsDrawerProps> = ({ customerI
                                 </div>
                                 <div>
                                     <h2 className="text-xl font-black text-slate-900 dark:text-white">{profile.full_name}</h2>
-                                    <p className="text-sm text-slate-500 dark:text-slate-400">{profile.email}</p>
+                                    <p className="text-sm text-slate-500 dark:text-slate-400">{profile.personal_email || profile.email}</p>
                                     {profile.employer && (
                                         <div className="flex items-center gap-1 mt-1 text-xs font-bold text-blue-600 dark:text-blue-400">
                                             <span className="material-symbols-outlined text-[14px]">work</span>
@@ -165,8 +168,8 @@ const CustomerDetailsDrawer: React.FC<CustomerDetailsDrawerProps> = ({ customerI
                                     </div>
 
                                     <Section title="Contact & Identity">
-                                        <InfoItem label="Mobile" value={profile.mobile_number} icon="call" />
-                                        <InfoItem label="Email" value={profile.email} icon="mail" />
+                                        <InfoItem label="Mobile" value={profile.mobile_number || profile.phone_number} icon="call" />
+                                        <InfoItem label="Email" value={profile.personal_email || profile.email} icon="mail" />
                                         <InfoItem label="BVN" value={profile.bvn} icon="fingerprint" />
                                         <InfoItem label="NIN" value={profile.nin} icon="badge" />
                                         <InfoItem label="Date of Birth" value={formatDate(profile.date_of_birth)} icon="cake" />
@@ -179,11 +182,11 @@ const CustomerDetailsDrawer: React.FC<CustomerDetailsDrawerProps> = ({ customerI
                                     </Section>
 
                                     <Section title="Employment Details">
-                                        <InfoItem label="Employer" value={profile.employer} icon="business" />
-                                        <InfoItem label="MDA/Institution" value={profile.employer} icon="account_balance" />
+                                        <InfoItem label="Employer" value={profile.mda_tertiary || profile.employer} icon="business" />
+                                        <InfoItem label="MDA/Institution" value={profile.mda_tertiary} icon="account_balance" />
                                         <InfoItem label="IPPIS Number" value={profile.ippis_number} icon="tag" />
                                         <InfoItem label="Staff ID" value={profile.staff_id} icon="badge" />
-                                        <InfoItem label="Monthly Income" value={profile.monthly_income ? `₦${Number(profile.monthly_income).toLocaleString()}` : undefined} icon="payments" />
+                                        <InfoItem label="Monthly Income" value={profile.average_monthly_income ? `₦${Number(profile.average_monthly_income).toLocaleString()}` : undefined} icon="payments" />
                                     </Section>
 
                                     <Section title="Additional Information">
