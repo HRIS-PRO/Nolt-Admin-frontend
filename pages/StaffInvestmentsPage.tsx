@@ -1,0 +1,517 @@
+import React, { useState, useEffect } from 'react';
+import axios from 'axios';
+import StaffLayout from '../components/layouts/StaffLayout';
+
+interface StaffInvestmentsPageProps {
+    user: { name: string; email: string; avatar_url?: string; role?: string };
+    onLogout: () => void;
+    toggleTheme?: () => void;
+    theme?: 'light' | 'dark';
+}
+
+const StaffInvestmentsPage: React.FC<StaffInvestmentsPageProps> = ({ user, onLogout, toggleTheme, theme }) => {
+    const [activeTab, setActiveTab] = useState<'applications' | 'rate_guide'>('applications');
+    const [showAddRateForm, setShowAddRateForm] = useState(false);
+    const [isInfinity, setIsInfinity] = useState(false);
+    const [rates, setRates] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [editingId, setEditingId] = useState<number | null>(null);
+
+    const initialFormData = {
+        plan: 'NOLT Rise',
+        currency: 'NGN',
+        tenure: '',
+        minAmount: '',
+        maxAmount: '',
+        interest: ''
+    };
+
+    const currencySymbols: Record<string, string> = {
+        NGN: '₦',
+        USD: '$',
+        GBP: '£',
+        EUR: '€'
+    };
+
+    const [formData, setFormData] = useState(initialFormData);
+
+    const handleCloseForm = () => {
+        setShowAddRateForm(false);
+        setFormData(initialFormData);
+        setIsInfinity(false);
+        setEditingId(null);
+    };
+
+    const investments = [
+        {
+            id: 2,
+            applicant: 'EMILY NWOSU',
+            avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?auto=format&fit=crop&q=80&w=100',
+            plan: 'NOLT RISE',
+            principal: 10000000,
+            status: 'pending'
+        }
+    ];
+
+
+
+    const fetchRates = async () => {
+        try {
+            setLoading(true);
+            const response = await axios.get('/api/yield-rates');
+            setRates(response.data);
+        } catch (error) {
+            console.error('Error fetching rates:', error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        if (activeTab === 'rate_guide') {
+            fetchRates();
+        }
+    }, [activeTab]);
+
+    const handleActivateYieldRate = async (e: React.FormEvent) => {
+        e.preventDefault();
+        try {
+            setIsSubmitting(true);
+            const min = parseFloat(formData.minAmount);
+            const max = isInfinity ? null : parseFloat(formData.maxAmount);
+
+            if (max !== null && max < min) {
+                alert(`Maximum amount cannot be less than Minimum amount (${currencySymbols[formData.currency]}${min.toLocaleString()})`);
+                setIsSubmitting(false);
+                return;
+            }
+
+            const payload = {
+                plan_name: formData.plan,
+                currency: formData.currency,
+                tenure_months: formData.tenure,
+                min_amount: formData.minAmount,
+                max_amount: max,
+                interest_rate: formData.interest
+            };
+
+            if (editingId) {
+                await axios.put(`/api/yield-rates/${editingId}`, payload);
+            } else {
+                await axios.post('/api/yield-rates', payload);
+            }
+
+            fetchRates();
+            handleCloseForm();
+        } catch (error: any) {
+            console.error('Error saving yield rate:', error);
+            const message = error.response?.data?.message || 'Failed to save yield rate. Please check console for details.';
+            alert(message);
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
+    const handleEditRate = (rate: any) => {
+        setFormData({
+            plan: rate.plan_name,
+            currency: rate.currency,
+            tenure: rate.tenure_months.toString(),
+            minAmount: rate.min_amount.toString(),
+            maxAmount: rate.max_amount ? rate.max_amount.toString() : '',
+            interest: rate.interest_rate.toString()
+        });
+        setIsInfinity(!rate.max_amount);
+        setEditingId(rate.id);
+        setShowAddRateForm(true);
+    };
+
+    const handleDuplicateRate = async (rate: any) => {
+        try {
+            const payload = {
+                plan_name: rate.plan_name,
+                currency: rate.currency,
+                tenure_months: 1,
+                min_amount: 1,
+                max_amount: 2,
+                interest_rate: 1
+            };
+
+            await axios.post('/api/yield-rates', payload);
+            fetchRates();
+            alert(`Draft duplicated for ${rate.plan_name} (${rate.currency}). You can now edit its details.`);
+        } catch (error: any) {
+            console.error('Error duplicating rate:', error);
+            const message = error.response?.data?.message || 'Failed to duplicate rate.';
+            alert(message);
+        }
+    };
+
+    const handleDeleteRate = async (id: number) => {
+        if (window.confirm('Are you sure you want to delete this yield rate?')) {
+            try {
+                await axios.delete(`/api/yield-rates/${id}`);
+                fetchRates();
+            } catch (error) {
+                console.error('Error deleting rate:', error);
+                alert('Failed to delete rate.');
+            }
+        }
+    };
+
+    return (
+        <StaffLayout user={user} onLogout={onLogout} toggleTheme={toggleTheme} theme={theme}>
+            <div className="space-y-8">
+                {/* Header with Tabs */}
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                    <div>
+                        <h1 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight leading-tight">
+                            Investments
+                        </h1>
+                        <p className="text-slate-500 dark:text-slate-400 font-medium">
+                            Manage investment portfolios and rates.
+                        </p>
+                    </div>
+                    <div className="flex p-1 bg-slate-200/50 dark:bg-slate-800/50 rounded-2xl backdrop-blur-sm shadow-inner">
+                        <button
+                            onClick={() => { setActiveTab('applications'); handleCloseForm(); }}
+                            className={`px-6 py-2 rounded-xl text-xs font-black transition-all uppercase tracking-widest ${activeTab === 'applications'
+                                ? 'bg-white dark:bg-slate-700 text-blue-600 shadow-sm'
+                                : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+                                }`}
+                        >
+                            APPLICATIONS
+                        </button>
+                        <button
+                            onClick={() => { setActiveTab('rate_guide'); handleCloseForm(); }}
+                            className={`px-6 py-2 rounded-xl text-xs font-black transition-all uppercase tracking-widest ${activeTab === 'rate_guide'
+                                ? 'bg-white dark:bg-slate-700 text-blue-600 shadow-sm'
+                                : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+                                }`}
+                        >
+                            RATE GUIDE
+                        </button>
+                    </div>
+                </div>
+
+                {activeTab === 'applications' ? (
+                    <div className="bg-white dark:bg-[#1e293b]/50 rounded-[32px] border border-slate-200 dark:border-slate-800 overflow-hidden backdrop-blur-md">
+                        <div className="overflow-x-auto">
+                            <table className="w-full">
+                                <thead>
+                                    <tr className="border-b border-slate-100 dark:border-slate-800">
+                                        <th className="px-8 py-6 text-left text-[10px] font-black uppercase tracking-widest text-slate-400">APPLICANT</th>
+                                        <th className="px-8 py-6 text-left text-[10px] font-black uppercase tracking-widest text-slate-400">PLAN</th>
+                                        <th className="px-8 py-6 text-left text-[10px] font-black uppercase tracking-widest text-slate-400">PRINCIPAL</th>
+                                        <th className="px-8 py-6 text-right text-[10px] font-black uppercase tracking-widest text-slate-400">REVIEW</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-50 dark:divide-slate-800/50">
+                                    {investments.length > 0 ? (
+                                        investments.map((inv) => (
+                                            <tr key={inv.id} className="group hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-all duration-300">
+                                                <td className="px-8 py-6">
+                                                    <div className="flex items-center gap-4">
+                                                        <div className="size-12 rounded-[18px] bg-slate-200 dark:bg-slate-800 overflow-hidden shadow-sm group-hover:scale-105 transition-transform duration-500">
+                                                            <img src={inv.avatar} alt={inv.applicant} className="w-full h-full object-cover" />
+                                                        </div>
+                                                        <div className="flex flex-col">
+                                                            <span className="font-black text-slate-900 dark:text-white uppercase tracking-tight group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">{inv.applicant}</span>
+                                                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Customer ID: {inv.id * 1234}</span>
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                                <td className="px-8 py-6">
+                                                    <span className="px-4 py-2 rounded-xl bg-purple-100 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400 text-[10px] font-black uppercase tracking-widest border border-purple-200/50 dark:border-purple-800/30 group-hover:bg-purple-600 group-hover:text-white group-hover:border-purple-600 transition-all duration-300">
+                                                        {inv.plan}
+                                                    </span>
+                                                </td>
+                                                <td className="px-8 py-6">
+                                                    <div className="flex flex-col">
+                                                        <span className="font-black text-slate-900 dark:text-white tracking-tight text-lg">
+                                                            ₦{inv.principal.toLocaleString()}
+                                                        </span>
+                                                        <span className="text-[10px] font-bold text-green-500 uppercase tracking-widest">8.4% Return p.a.</span>
+                                                    </div>
+                                                </td>
+                                                <td className="px-8 py-6 text-right">
+                                                    <button className="size-12 rounded-2xl bg-slate-100 dark:bg-slate-800 text-slate-400 group-hover:bg-blue-600 group-hover:text-white group-hover:shadow-lg group-hover:shadow-blue-500/30 transition-all duration-300 flex items-center justify-center">
+                                                        <span className="material-symbols-outlined text-xl">arrow_forward</span>
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        ))
+                                    ) : (
+                                        <tr>
+                                            <td colSpan={4} className="px-8 py-20 text-center">
+                                                <div className="flex flex-col items-center gap-3 text-slate-400">
+                                                    <span className="material-symbols-outlined text-4xl">inbox</span>
+                                                    <p className="text-[10px] font-black uppercase tracking-[0.2em]">No investment applications found</p>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                ) : (
+                    <div className="flex flex-col lg:flex-row gap-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                        {/* Left Side: Rates Table */}
+                        <div className="flex-1 bg-white dark:bg-[#1e293b]/50 rounded-[32px] border border-slate-200 dark:border-slate-800 overflow-hidden backdrop-blur-md">
+                            <div className="p-8 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center">
+                                <div>
+                                    <h3 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight">Active Rates</h3>
+                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Manage investment product yields</p>
+                                </div>
+                                <button
+                                    onClick={() => setShowAddRateForm(true)}
+                                    className="px-6 py-3 rounded-2xl bg-blue-600 text-white text-xs font-black lg:flex items-center gap-3 hover:bg-blue-500 transition-all shadow-lg shadow-blue-500/20 active:scale-95 uppercase tracking-widest"
+                                >
+                                    <span className="material-symbols-outlined text-sm">add</span>
+                                    Add New Rate
+                                </button>
+                            </div>
+
+                            <div className="overflow-x-auto">
+                                <table className="w-full">
+                                    <thead>
+                                        <tr className="border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/20">
+                                            <th className="px-8 py-4 text-left text-[10px] font-black uppercase tracking-widest text-slate-400">Plan</th>
+                                            <th className="px-8 py-4 text-left text-[10px] font-black uppercase tracking-widest text-slate-400">Range (₦)</th>
+                                            <th className="px-8 py-4 text-left text-[10px] font-black uppercase tracking-widest text-slate-400">Tenure</th>
+                                            <th className="px-8 py-4 text-left text-[10px] font-black uppercase tracking-widest text-slate-400 text-center">Interest</th>
+                                            <th className="px-8 py-4 text-right text-[10px] font-black uppercase tracking-widest text-slate-400">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-50 dark:divide-slate-800/50">
+                                        {rates.length > 0 ? (
+                                            rates.map((rate) => (
+                                                <tr key={rate.id} className="group hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors">
+                                                    <td className="px-8 py-6">
+                                                        <div className="flex items-center gap-3">
+                                                            <div className={`size-2 rounded-full ${rate.plan_name === 'NOLT Rise' ? 'bg-blue-500' : rate.plan_name === 'NOLT Surge' ? 'bg-purple-500' : 'bg-orange-500'}`} />
+                                                            <span className="font-black text-slate-900 dark:text-white uppercase tracking-tight text-sm">{rate.plan_name}</span>
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-8 py-6 font-bold text-slate-600 dark:text-slate-300 text-sm">
+                                                        {currencySymbols[rate.currency]}{Number(rate.min_amount).toLocaleString()} - {rate.max_amount ? `${currencySymbols[rate.currency]}${Number(rate.max_amount).toLocaleString()}` : '∞'}
+                                                    </td>
+                                                    <td className="px-8 py-6 font-bold text-slate-600 dark:text-slate-300 text-sm">
+                                                        {rate.tenure_months} Months
+                                                    </td>
+                                                    <td className="px-8 py-6 text-center">
+                                                        <span className="px-3 py-1.5 rounded-lg border border-green-500/30 bg-green-500/10 text-green-500 text-[10px] font-black uppercase tracking-widest">
+                                                            {rate.interest_rate}% P.A
+                                                        </span>
+                                                    </td>
+                                                    <td className="px-8 py-6">
+                                                        <div className="flex justify-end gap-2">
+                                                            <button
+                                                                onClick={() => handleDuplicateRate(rate)}
+                                                                className="size-8 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-400 hover:text-blue-500 transition-colors flex items-center justify-center"
+                                                            >
+                                                                <span className="material-symbols-outlined text-lg">content_copy</span>
+                                                            </button>
+                                                            <button
+                                                                onClick={() => handleEditRate(rate)}
+                                                                className="size-8 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-400 hover:text-blue-500 transition-colors flex items-center justify-center"
+                                                            >
+                                                                <span className="material-symbols-outlined text-lg">edit</span>
+                                                            </button>
+                                                            <button
+                                                                onClick={() => handleDeleteRate(rate.id)}
+                                                                className="size-8 rounded-lg bg-red-50 dark:bg-red-900/10 text-red-500 hover:bg-red-500 hover:text-white transition-all flex items-center justify-center"
+                                                            >
+                                                                <span className="material-symbols-outlined text-lg">delete</span>
+                                                            </button>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            ))
+                                        ) : (
+                                            <tr>
+                                                <td colSpan={5} className="px-8 py-20 text-center text-slate-400 text-[10px] font-black uppercase tracking-widest">
+                                                    {loading ? 'Loading rates...' : 'No yield rates configured'}
+                                                </td>
+                                            </tr>
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        {/* Right Side: Rate Management Info Card */}
+                        <div className="w-full lg:w-80 space-y-6">
+                            <div className="bg-slate-900 dark:bg-[#1e293b] rounded-[32px] p-8 text-white relative overflow-hidden shadow-2xl">
+                                <div className="absolute top-0 right-0 p-8 opacity-10">
+                                    <span className="material-symbols-outlined text-8xl">trending_up</span>
+                                </div>
+                                <div className="relative z-10 flex flex-col items-center text-center space-y-6">
+                                    <div className="size-16 rounded-[22px] bg-blue-500/20 border border-blue-500/30 flex items-center justify-center text-blue-400">
+                                        <span className="material-symbols-outlined text-3xl">info</span>
+                                    </div>
+                                    <div className="space-y-3">
+                                        <h3 className="text-xl font-black uppercase tracking-tight text-white leading-none">Rate Management</h3>
+                                        <p className="text-xs text-slate-400 font-medium leading-relaxed">
+                                            Select a rate from the list to modify its parameters. Changes will be reflected immediately on the customer-facing portal.
+                                        </p>
+                                    </div>
+                                    <div className="w-full pt-6 border-t border-slate-800 space-y-4 font-black uppercase tracking-widest text-[9px]">
+                                        <div className="flex justify-between items-center text-slate-500">
+                                            <span>Last Updated</span>
+                                            <span className="text-white">TODAY, 10:42 AM</span>
+                                        </div>
+                                        <div className="flex justify-between items-center text-slate-500">
+                                            <span>Active Plans</span>
+                                            <span className="text-white">2 Products</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
+            </div>
+
+            {/* Add New Rate Form / Modal Overlay */}
+            {showAddRateForm && (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+                    <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={handleCloseForm} />
+                    <div className="relative w-full max-w-lg bg-white dark:bg-[#1e293b] rounded-[40px] shadow-2xl overflow-hidden border border-slate-200 dark:border-slate-800 animate-in fade-in zoom-in-95 duration-300 text-slate-900 dark:text-white">
+                        <div className="p-10 space-y-10">
+                            <div className="flex justify-between items-center px-2">
+                                <div>
+                                    <h3 className="text-2xl font-black uppercase tracking-tight">{editingId ? 'EDIT YIELD RATE' : 'ADD NEW RATE'}</h3>
+                                    <p className="text-xs font-black text-slate-400 uppercase tracking-widest mt-1">Configure investment parameters</p>
+                                </div>
+                                <button onClick={handleCloseForm} className="size-12 rounded-2xl bg-slate-100 dark:bg-slate-800 text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors flex items-center justify-center">
+                                    <span className="material-symbols-outlined text-2xl">close</span>
+                                </button>
+                            </div>
+
+                            <form className="space-y-8" onSubmit={handleActivateYieldRate}>
+                                <div className="grid grid-cols-2 gap-6">
+                                    <div className="space-y-3">
+                                        <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 px-1">Investment Plan</label>
+                                        <select
+                                            value={formData.plan}
+                                            onChange={(e) => setFormData({ ...formData, plan: e.target.value })}
+                                            className="w-full h-14 px-5 rounded-2xl bg-slate-50 dark:bg-slate-800 border-none outline-none font-bold text-sm focus:ring-2 focus:ring-blue-500/50 transition-all appearance-none cursor-pointer"
+                                        >
+                                            <option>NOLT Rise</option>
+                                            <option>NOLT Surge</option>
+                                            <option>NOLT Vault</option>
+                                        </select>
+                                    </div>
+                                    <div className="space-y-3">
+                                        <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 px-1">Currency</label>
+                                        <select
+                                            value={formData.currency}
+                                            onChange={(e) => setFormData({ ...formData, currency: e.target.value })}
+                                            className="w-full h-14 px-5 rounded-2xl bg-slate-50 dark:bg-slate-800 border-none outline-none font-bold text-sm focus:ring-2 focus:ring-blue-500/50 transition-all appearance-none cursor-pointer"
+                                        >
+                                            <option value="NGN">NGN (₦)</option>
+                                            <option value="USD">USD ($)</option>
+                                            <option value="GBP">GBP (£)</option>
+                                            <option value="EUR">EUR (€)</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-6">
+                                    <div className="space-y-3">
+                                        <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 px-1">Tenure (Months)</label>
+                                        <input
+                                            required
+                                            type="number"
+                                            min="1"
+                                            placeholder="e.g. 12"
+                                            value={formData.tenure}
+                                            onChange={(e) => setFormData({ ...formData, tenure: e.target.value })}
+                                            className="w-full h-14 px-5 rounded-2xl bg-slate-50 dark:bg-slate-800 border-none outline-none font-bold text-sm focus:ring-2 focus:ring-blue-500/50 transition-all"
+                                        />
+                                    </div>
+                                    <div className="space-y-3">
+                                        <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 px-1">Annual Interest Rate (%)</label>
+                                        <div className="relative">
+                                            <input
+                                                required
+                                                type="number"
+                                                step="0.01"
+                                                min="0"
+                                                placeholder="e.g. 14.5"
+                                                value={formData.interest}
+                                                onChange={(e) => setFormData({ ...formData, interest: e.target.value })}
+                                                className="w-full h-14 px-5 rounded-2xl bg-slate-50 dark:bg-slate-800 border-none outline-none font-bold text-sm focus:ring-2 focus:ring-blue-500/50 transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                            />
+                                            <span className="absolute right-5 top-1/2 -translate-y-1/2 text-blue-500 font-black text-xs uppercase">% P.A</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-3">
+                                    <div className="flex justify-between items-center px-1">
+                                        <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Investment Range ({currencySymbols[formData.currency]})</label>
+                                        <div className="flex items-center gap-2 group cursor-pointer" onClick={() => setIsInfinity(!isInfinity)}>
+                                            <div className={`size-4 rounded border transition-all flex items-center justify-center ${isInfinity ? 'bg-blue-600 border-blue-600' : 'border-slate-300 dark:border-slate-700'}`}>
+                                                {isInfinity && <span className="material-symbols-outlined text-white text-[10px] font-bold">check</span>}
+                                            </div>
+                                            <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 group-hover:text-blue-500 transition-colors">Infinity</span>
+                                        </div>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="relative">
+                                            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold">{currencySymbols[formData.currency]}</span>
+                                            <input
+                                                required
+                                                type="number"
+                                                min="0"
+                                                placeholder="Min Amount"
+                                                value={formData.minAmount}
+                                                onChange={(e) => setFormData({ ...formData, minAmount: e.target.value })}
+                                                className="w-full h-14 pl-10 pr-5 rounded-2xl bg-slate-50 dark:bg-slate-800 border-none outline-none font-bold text-sm focus:ring-2 focus:ring-blue-500/50 transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                            />
+                                        </div>
+                                        <div className="relative">
+                                            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold">{currencySymbols[formData.currency]}</span>
+                                            <input
+                                                type="number"
+                                                min="0"
+                                                placeholder={isInfinity ? "∞" : "Max Amount"}
+                                                disabled={isInfinity}
+                                                value={isInfinity ? '' : formData.maxAmount}
+                                                onChange={(e) => setFormData({ ...formData, maxAmount: e.target.value })}
+                                                className={`w-full h-14 pl-10 pr-5 rounded-2xl border-none outline-none font-bold text-sm focus:ring-2 focus:ring-blue-500/50 transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${isInfinity ? 'bg-slate-100 dark:bg-slate-900/50 text-slate-400 cursor-not-allowed opacity-50' : 'bg-slate-50 dark:bg-slate-800'}`}
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+
+
+                                <div className="pt-6 flex gap-4">
+                                    <button
+                                        type="button"
+                                        onClick={handleCloseForm}
+                                        className="flex-1 h-14 rounded-2xl bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-bold hover:bg-slate-200 dark:hover:bg-slate-700 transition-all uppercase tracking-widest text-[10px]"
+                                    >
+                                        Discard
+                                    </button>
+                                    <button
+                                        type="submit"
+                                        className="flex-[2] h-14 rounded-2xl bg-blue-600 text-white font-black uppercase tracking-widest shadow-lg shadow-blue-500/30 hover:bg-blue-500 transition-all active:scale-95 text-xs"
+                                    >
+                                        {isSubmitting ? (editingId ? 'Updating...' : 'Creating...') : (editingId ? 'Update Rate' : 'Create New Rate')}
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </StaffLayout>
+    );
+};
+
+export default StaffInvestmentsPage;

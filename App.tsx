@@ -29,6 +29,7 @@ import axios from 'axios';
 import ReportsPage from './pages/ReportsPage';
 import CustomersPage from './pages/CustomersPage';
 import TimelineReportPage from './pages/TimelineReportPage';
+import StaffInvestmentsPage from './pages/StaffInvestmentsPage';
 
 import LogoutWarningModal from './components/modals/LogoutWarningModal';
 
@@ -377,6 +378,16 @@ const AppContent: React.FC = () => {
         <Route path="/staff/loans" element={
           isLoading ? null : (user.isLoggedIn && user.role !== 'customer' ? (
             <LoanQueuePage
+              user={user}
+              onLogout={handleLogoutRequest}
+              toggleTheme={toggleTheme}
+              theme={theme}
+            />
+          ) : <Navigate to="/login" />)
+        } />
+        <Route path="/staff/investments" element={
+          isLoading ? null : (user.isLoggedIn && user.role !== 'customer' ? (
+            <StaffInvestmentsPage
               user={user}
               onLogout={handleLogoutRequest}
               toggleTheme={toggleTheme}
