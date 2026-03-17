@@ -13,7 +13,7 @@ export default defineConfig(({ mode }) => {
           target: env.VITE_API_TARGET || 'https://nolt-admin-backend-production-713d.up.railway.app',
           changeOrigin: true,
           secure: false,
-          cookieDomainRewrite: "localhost"
+          cookieDomainRewrite: "localhost" 
         },
         '/auth': {
           target: env.VITE_API_TARGET || 'https://nolt-admin-backend-production-713d.up.railway.app',
