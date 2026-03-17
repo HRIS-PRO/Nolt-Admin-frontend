@@ -23,8 +23,11 @@ const UsersPage: React.FC<UsersPageProps> = ({ user, onLogout, toggleTheme, them
 
     // Actions State
     const [showInviteModal, setShowInviteModal] = useState(false);
+    const [showBulkModal, setShowBulkModal] = useState(false);
     const [inviteForm, setInviteForm] = useState({ full_name: '', email: '', role: 'staff', password: '' });
     const [recruiting, setRecruiting] = useState(false);
+    const [bulkFile, setBulkFile] = useState<File | null>(null);
+    const [bulking, setBulking] = useState(false);
     const [editingRoleId, setEditingRoleId] = useState<number | null>(null);
 
     const fetchUsers = async () => {
@@ -73,6 +76,30 @@ const UsersPage: React.FC<UsersPageProps> = ({ user, onLogout, toggleTheme, them
         }
     };
 
+    const handleBulkUpload = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!bulkFile) return alert("Please select a CSV file first.");
+        setBulking(true);
+
+        const formData = new FormData();
+        formData.append('file', bulkFile);
+
+        try {
+            const res = await axios.post(`${''}/api/staff/bulk-invite`, formData, {
+                headers: { 'Content-Type': 'multipart/form-data' },
+                withCredentials: true
+            });
+            alert(res.data.message);
+            setShowBulkModal(false);
+            setBulkFile(null);
+            fetchUsers();
+        } catch (error: any) {
+            alert(error.response?.data?.message || "Failed to bulk upload");
+        } finally {
+            setBulking(false);
+        }
+    };
+
     const handleRevoke = async (userId: number) => {
         if (!confirm("Are you sure you want to revoke access? They will no longer be able to log in.")) return;
         try {
@@ -102,7 +129,16 @@ const UsersPage: React.FC<UsersPageProps> = ({ user, onLogout, toggleTheme, them
         }
     };
 
-    const getRoleBadge = (role: string) => {
+    const getRoleBadge = (role: string | null) => {
+        if (!role) {
+            return (
+                <span className="flex items-center gap-2 px-3 py-1 rounded-full border border-red-200 bg-red-50 text-red-600 dark:bg-red-500/10 dark:text-red-400 dark:border-red-500/20 text-[10px] font-black uppercase tracking-wider w-fit">
+                    <span className="material-symbols-outlined text-sm">warning</span>
+                    Not Assigned
+                </span>
+            );
+        }
+
         const styles: Record<string, string> = {
             super_admin: "text-blue-600 bg-blue-100 dark:bg-blue-500/10 dark:text-blue-400 border-blue-200 dark:border-blue-500/20",
             credit_manager: "text-indigo-600 bg-indigo-100 dark:bg-indigo-500/10 dark:text-indigo-400 border-indigo-200 dark:border-indigo-500/20",
@@ -157,13 +193,22 @@ const UsersPage: React.FC<UsersPageProps> = ({ user, onLogout, toggleTheme, them
                         Manage permissions and view all system administrators.
                     </p>
                 </div>
-                <button
-                    onClick={() => setShowInviteModal(true)}
-                    className="self-end md:self-auto px-4 py-3 md:px-6 rounded-xl bg-blue-600 text-white text-xs font-bold uppercase tracking-wider flex items-center gap-2 hover:bg-blue-700 transition-all shadow-lg shadow-blue-500/20"
-                >
-                    <span className="material-symbols-outlined text-xl md:text-lg">add</span>
-                    <span className="hidden md:inline">Invite Member</span>
-                </button>
+                <div className="flex items-center gap-3 self-end md:self-auto">
+                    <button
+                        onClick={() => setShowBulkModal(true)}
+                        className="px-4 py-3 md:px-6 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-bold uppercase tracking-wider flex items-center gap-2 hover:bg-slate-200 dark:hover:bg-slate-700 transition-all border border-slate-200 dark:border-slate-700"
+                    >
+                        <span className="material-symbols-outlined text-xl md:text-lg">upload_file</span>
+                        <span className="hidden md:inline">Bulk Invite</span>
+                    </button>
+                    <button
+                        onClick={() => setShowInviteModal(true)}
+                        className="px-4 py-3 md:px-6 rounded-xl bg-blue-600 text-white text-xs font-bold uppercase tracking-wider flex items-center gap-2 hover:bg-blue-700 transition-all shadow-lg shadow-blue-500/20"
+                    >
+                        <span className="material-symbols-outlined text-xl md:text-lg">add</span>
+                        <span className="hidden md:inline">Invite Member</span>
+                    </button>
+                </div>
             </div>
 
             <div className="bg-white dark:bg-[#0f172a] rounded-[24px] border border-slate-200 dark:border-slate-800 overflow-hidden shadow-xl">
@@ -389,6 +434,48 @@ const UsersPage: React.FC<UsersPageProps> = ({ user, onLogout, toggleTheme, them
                             </div>
                             <button disabled={recruiting} className="w-full py-4 rounded-xl bg-blue-600 text-white font-black uppercase tracking-wider hover:bg-blue-700 transition-all shadow-lg shadow-blue-500/20 disabled:opacity-50 mt-4">
                                 {recruiting ? "Sending Invite..." : "Send Invitation"}
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            )}
+            {/* Bulk Invite Modal */}
+            {showBulkModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+                    <div className="bg-white dark:bg-slate-900 rounded-[32px] p-6 md:p-8 w-full max-w-md shadow-2xl border border-slate-200 dark:border-slate-800 relative animate-in fade-in zoom-in duration-300">
+                        <button onClick={() => setShowBulkModal(false)} className="absolute top-6 right-6 text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors">
+                            <span className="material-symbols-outlined">close</span>
+                        </button>
+                        <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-2">Bulk Staff Invite</h2>
+                        <p className="text-slate-500 text-sm mb-6">Upload a CSV file with "full_name" and "email" columns. Roles can be assigned later.</p>
+
+                        <form onSubmit={handleBulkUpload} className="space-y-6">
+                            <div className="border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-2xl p-8 flex flex-col items-center justify-center gap-4 bg-slate-50/50 dark:bg-slate-900/50">
+                                <span className="material-symbols-outlined text-4xl text-slate-300">csv</span>
+                                <div className="text-center">
+                                    <p className="text-sm font-bold text-slate-700 dark:text-slate-300">{bulkFile ? bulkFile.name : "Select CSV File"}</p>
+                                    <p className="text-[10px] text-slate-500 uppercase tracking-widest mt-1">Required: full_name, email</p>
+                                </div>
+                                <input
+                                    type="file"
+                                    accept=".csv"
+                                    onChange={e => setBulkFile(e.target.files?.[0] || null)}
+                                    className="hidden"
+                                    id="bulk-csv-input"
+                                />
+                                <label
+                                    htmlFor="bulk-csv-input"
+                                    className="px-4 py-2 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-black uppercase tracking-wider cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors shadow-sm"
+                                >
+                                    Choose File
+                                </label>
+                            </div>
+
+                            <button
+                                disabled={bulking || !bulkFile}
+                                className="w-full py-4 rounded-xl bg-blue-600 text-white font-black uppercase tracking-wider hover:bg-blue-700 transition-all shadow-lg shadow-blue-500/20 disabled:opacity-50"
+                            >
+                                {bulking ? "Processing..." : "Start Upload"}
                             </button>
                         </form>
                     </div>
