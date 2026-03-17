@@ -32,6 +32,7 @@ const StaffLayout: React.FC<StaffLayoutProps> = ({ children, user, onLogout, tog
             items: [
                 { label: 'Dashboard', icon: 'grid_view', path: '/staff-dashboard' },
                 { label: 'Loans', icon: 'credit_card', path: '/staff/loans' },
+                { label: 'Investments', icon: 'account_balance_wallet', path: '/staff/investments' },
                 { label: 'Reports', icon: 'description', path: '/staff/reports' },
                 { label: 'Timeline', icon: 'timeline', path: '/staff/timeline' },
             ]
