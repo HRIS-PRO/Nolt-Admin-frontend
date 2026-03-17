@@ -107,6 +107,7 @@ const TimelineReportPage: React.FC<TimelineReportPageProps> = ({ user, onLogout,
                         <thead className="bg-[#18467b] text-white text-xs font-semibold">
                             <tr>
                                 <th className="p-3 border border-slate-200 dark:border-[#0f172a]">Reference</th>
+                                <th className="p-3 border border-slate-200 dark:border-[#0f172a]">Loan Type</th>
                                 <th className="p-3 border border-slate-200 dark:border-[#0f172a]">Product Type</th>
                                 <th className="p-3 border border-slate-200 dark:border-[#0f172a] text-right">Amount</th>
                                 <th className="p-3 border border-slate-200 dark:border-[#0f172a]">Current Status</th>
@@ -129,6 +130,7 @@ const TimelineReportPage: React.FC<TimelineReportPageProps> = ({ user, onLogout,
                                 timelineData.map((row, idx) => (
                                     <tr key={idx} className="bg-white dark:bg-[#1e293b] hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors border-b border-slate-200 dark:border-[#0f172a]">
                                         <td className="p-2 px-3 border-r border-slate-200 dark:border-[#0f172a] text-slate-700 dark:text-slate-300">APP-{row.loanId.toString().padStart(3, '0')}</td>
+                                        <td className="p-2 px-3 border-r border-slate-200 dark:border-[#0f172a] text-slate-700 dark:text-slate-300">{row.loanType}</td>
                                         <td className="p-2 px-3 border-r border-slate-200 dark:border-[#0f172a] text-slate-700 dark:text-slate-300">{row.productType}</td>
                                         <td className="p-2 px-3 border-r border-slate-200 dark:border-[#0f172a] text-right font-mono text-slate-700 dark:text-slate-300">{Number(row.amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                                         <td className="p-2 px-3 border-r border-slate-200 dark:border-[#0f172a] capitalize">
