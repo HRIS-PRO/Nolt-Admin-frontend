@@ -43,18 +43,19 @@ const StaffInvestmentsPage: React.FC<StaffInvestmentsPageProps> = ({ user, onLog
         setEditingId(null);
     };
 
-    const investments = [
-        {
-            id: 2,
-            applicant: 'EMILY NWOSU',
-            avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?auto=format&fit=crop&q=80&w=100',
-            plan: 'NOLT RISE',
-            principal: 10000000,
-            status: 'pending'
+    const [allInvestments, setAllInvestments] = useState<any[]>([]);
+
+    const fetchInvestments = async () => {
+        try {
+            setLoading(true);
+            const response = await axios.get('/api/staff/investments');
+            setAllInvestments(response.data);
+        } catch (error) {
+            console.error('Error fetching investments:', error);
+        } finally {
+            setLoading(false);
         }
-    ];
-
-
+    };
 
     const fetchRates = async () => {
         try {
@@ -71,6 +72,8 @@ const StaffInvestmentsPage: React.FC<StaffInvestmentsPageProps> = ({ user, onLog
     useEffect(() => {
         if (activeTab === 'rate_guide') {
             fetchRates();
+        } else {
+            fetchInvestments();
         }
     }, [activeTab]);
 
@@ -208,31 +211,33 @@ const StaffInvestmentsPage: React.FC<StaffInvestmentsPageProps> = ({ user, onLog
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-50 dark:divide-slate-800/50">
-                                    {investments.length > 0 ? (
-                                        investments.map((inv) => (
+                                    {allInvestments.length > 0 ? (
+                                        allInvestments.map((inv) => (
                                             <tr key={inv.id} className="group hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-all duration-300">
                                                 <td className="px-8 py-6">
                                                     <div className="flex items-center gap-4">
-                                                        <div className="size-12 rounded-[18px] bg-slate-200 dark:bg-slate-800 overflow-hidden shadow-sm group-hover:scale-105 transition-transform duration-500">
-                                                            <img src={inv.avatar} alt={inv.applicant} className="w-full h-full object-cover" />
+                                                        <div className="size-12 rounded-[18px] bg-slate-200 dark:bg-slate-800 overflow-hidden shadow-sm group-hover:scale-105 transition-transform duration-500 flex items-center justify-center font-black text-slate-400">
+                                                            {inv.rep_full_name?.charAt(0) || 'U'}
                                                         </div>
                                                         <div className="flex flex-col">
-                                                            <span className="font-black text-slate-900 dark:text-white uppercase tracking-tight group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">{inv.applicant}</span>
-                                                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Customer ID: {inv.id * 1234}</span>
+                                                            <span className="font-black text-slate-900 dark:text-white uppercase tracking-tight group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                                                                {inv.rep_full_name || inv.customer_name || 'Individual'}
+                                                            </span>
+                                                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{inv.customer_email || 'No email'}</span>
                                                         </div>
                                                     </div>
                                                 </td>
                                                 <td className="px-8 py-6">
                                                     <span className="px-4 py-2 rounded-xl bg-purple-100 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400 text-[10px] font-black uppercase tracking-widest border border-purple-200/50 dark:border-purple-800/30 group-hover:bg-purple-600 group-hover:text-white group-hover:border-purple-600 transition-all duration-300">
-                                                        {inv.plan}
+                                                        {inv.investment_type?.replace(/_/g, ' ') || 'INVESTMENT'}
                                                     </span>
                                                 </td>
                                                 <td className="px-8 py-6">
                                                     <div className="flex flex-col">
                                                         <span className="font-black text-slate-900 dark:text-white tracking-tight text-lg">
-                                                            ₦{inv.principal.toLocaleString()}
+                                                            {inv.currency === 'USD' ? '$' : '₦'}{Number(inv.investment_amount).toLocaleString()}
                                                         </span>
-                                                        <span className="text-[10px] font-bold text-green-500 uppercase tracking-widest">8.4% Return p.a.</span>
+                                                        <span className="text-[10px] font-bold text-green-500 uppercase tracking-widest">{inv.tenure_days / 30} Months Tenure</span>
                                                     </div>
                                                 </td>
                                                 <td className="px-8 py-6 text-right">
