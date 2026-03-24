@@ -11,6 +11,7 @@
   "dependencies": {
     "@google/genai": "^1.35.0",
     "axios": "^1.13.4",
+    "motion": "^12.38.0",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
     "react-router-dom": "^7.13.0",

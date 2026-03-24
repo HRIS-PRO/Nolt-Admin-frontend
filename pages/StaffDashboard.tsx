@@ -15,7 +15,9 @@ const StaffDashboard: React.FC<StaffDashboardProps> = ({ user, onLogout, toggleT
     const [stats, setStats] = useState({
         totalLoans: 0,
         totalUsers: 0,
-        pendingLoans: 0
+        pendingLoans: 0,
+        totalInvestments: 0,
+        investmentVolume: 0
     });
     const [loans, setLoans] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -147,9 +149,10 @@ const StaffDashboard: React.FC<StaffDashboardProps> = ({ user, onLogout, toggleT
             </div>
 
             {/* Stats Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
                 {[
                     { label: 'Loan Requests', value: `${isLoading ? '...' : stats.totalLoans} Applications`, sub: '₦0.00', change: '+5.0%', icon: 'payments', color: 'text-cyan-500 dark:text-cyan-400', bg: 'bg-white dark:bg-[#1e293b]' },
+                    { label: 'Investment Volume', value: `₦${isLoading ? '...' : Number(stats.investmentVolume || 0).toLocaleString()}`, sub: `${stats.totalInvestments || 0} Applications`, change: 'Live Data', icon: 'trending_up', color: 'text-blue-500 dark:text-blue-400', bg: 'bg-white dark:bg-[#1e293b]' },
                     { label: 'Active Users', value: `${isLoading ? '...' : stats.totalUsers} Users`, sub: '', change: '+8.4%', icon: 'group', color: 'text-purple-500 dark:text-purple-400', bg: 'bg-white dark:bg-[#1e293b]' },
                     { label: 'Pending Loans', value: `${isLoading ? '...' : stats.pendingLoans} Pending`, sub: '', change: 'High Priority', changeColor: 'text-amber-500 dark:text-amber-400 border-amber-400/20', icon: 'pending_actions', color: 'text-amber-500 dark:text-amber-400', bg: 'bg-white dark:bg-[#1e293b]' },
                 ].map((stat, idx) => (

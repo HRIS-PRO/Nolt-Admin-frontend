@@ -30,6 +30,8 @@ import ReportsPage from './pages/ReportsPage';
 import CustomersPage from './pages/CustomersPage';
 import TimelineReportPage from './pages/TimelineReportPage';
 import StaffInvestmentsPage from './pages/StaffInvestmentsPage';
+import VerifyGiftPage from './pages/investment/VerifyGiftPage';
+import ClaimGiftPage from './pages/investment/ClaimGiftPage';
 
 import LogoutWarningModal from './components/modals/LogoutWarningModal';
 
@@ -96,6 +98,7 @@ const AppContent: React.FC = () => {
   const [theme, setTheme] = useState<Theme>(() => {
     return (localStorage.getItem('theme') as Theme) || 'light';
   });
+
   const [lastProduct, setLastProduct] = useState<'LOAN' | 'INVESTMENT'>('LOAN');
   const [resumeDraft, setResumeDraft] = useState<SavedDraft | null>(null);
   // Use relative path (proxy) by default for First-Party Cookies on Vercel
@@ -107,6 +110,18 @@ const AppContent: React.FC = () => {
     name: '',
     isLoggedIn: false
   });
+
+  // Resume Gift Choice after Login
+  useEffect(() => {
+    if (user.isLoggedIn) {
+      const pendingToken = sessionStorage.getItem('pending_gift_token');
+      if (pendingToken) {
+        console.log("Resuming pending gift claim:", pendingToken);
+        sessionStorage.removeItem('pending_gift_token');
+        navigateRouter(`/investment?gift_token=${pendingToken}`, { replace: true });
+      }
+    }
+  }, [user.isLoggedIn, navigateRouter, user.email]);
 
   const [showLogoutModal, setShowLogoutModal] = useState(false);
 
@@ -514,6 +529,14 @@ const AppContent: React.FC = () => {
             />
           </ProtectedRoute>
         } />
+
+        <Route path="/investment/verify-payment" element={
+          <ProtectedRoute user={user} isLoading={isLoading} theme={theme} onLogout={handleLogoutRequest} onToggleTheme={toggleTheme}>
+            <VerifyGiftPage />
+          </ProtectedRoute>
+        } />
+
+        <Route path="/claim-gift" element={<ClaimGiftPage />} />
 
         <Route path="/success" element={
           <ProtectedRoute user={user} isLoading={isLoading} theme={theme} onLogout={handleLogoutRequest} onToggleTheme={toggleTheme}>

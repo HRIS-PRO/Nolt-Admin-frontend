@@ -1,4 +1,8 @@
 
+export type InvestmentPlan = 'RISE' | 'SURGE' | 'VAULT';
+export type PayoutFrequency = 'monthly' | 'quarterly' | 'maturity' | 'upfront';
+export type Currency = 'NGN' | 'USD';
+
 export type AppStep =
   | 'AUTH'
   | 'DASHBOARD'
