@@ -317,7 +317,7 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
     if (!recipientEmail.includes('@')) return alert("Enter a valid recipient email");
     // @ts-ignore
     const handler = window.PaystackPop.setup({
-      key: 'pk_test_24ecf69fa42f3bcbbfd543e7a509f6b5443d6cd2',
+      key: import.meta.env.VITE_PAYSTACK_PUBLIC_KEY,
       email: contactEmail || recipientEmail,
       amount: Math.round(parseFloat(amount) * 100),
       currency: 'NGN',
@@ -352,7 +352,7 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
 
     // @ts-ignore
     const handler = window.PaystackPop.setup({
-      key: 'pk_test_24ecf69fa42f3bcbbfd543e7a509f6b5443d6cd2',
+      key: import.meta.env.VITE_PAYSTACK_PUBLIC_KEY,
       email: contactEmail,
       amount: Math.round(parseFloat(amount) * 100),
       currency: 'NGN',
