@@ -48,6 +48,7 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
   const [rollover, setRollover] = useState(initialDraft?.data?.rollover ?? 'principal_interest');
   const [targetAmount, setTargetAmount] = useState<string>(initialDraft?.data?.targetAmount ?? '');
   const [payoutFrequency, setPayoutFrequency] = useState<PayoutFrequency>(initialDraft?.data?.payoutFrequency ?? 'maturity');
+  const [contributionFrequency, setContributionFrequency] = useState<'daily' | 'weekly' | 'monthly'>(initialDraft?.data?.contributionFrequency ?? 'monthly');
 
   // Entity & Identity
   const [entityType, setEntityType] = useState<'INDIVIDUAL' | 'CORPORATE'>(initialDraft?.data?.entityType ?? 'INDIVIDUAL');
@@ -160,6 +161,27 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
           setStateOfOrigin(latestInfo.rep_state_of_origin || '');
           setStateOfResidence(latestInfo.rep_state_of_residence || '');
           setHomeAddress(latestInfo.rep_street_address || '');
+          
+          setIsPep(latestInfo.is_pep ?? null);
+          setTitle(latestInfo.title || 'Mr');
+          setGender(latestInfo.gender || '');
+          setDob(latestInfo.dob ? new Date(latestInfo.dob).toISOString().split('T')[0] : '');
+          setMaidenName(latestInfo.mother_maiden_name || '');
+          setReligion(latestInfo.religion || 'Prefer not to say');
+          setMaritalStatus(latestInfo.marital_status || 'Single');
+          setContactEmail(latestInfo.customer_email || '');
+          
+          setNokName(latestInfo.nok_name || '');
+          setNokRelationship(latestInfo.nok_relationship || '');
+          setNokAddress(latestInfo.nok_address || '');
+          
+          setUploadedDocs(prev => ({
+            ...prev,
+            gov_id: latestInfo.rep_id_url ? { name: 'Previous Gov ID', size: 'Pre-filled', url: latestInfo.rep_id_url } : null,
+            utility_bill: latestInfo.utility_bill_url ? { name: 'Previous Utility Bill', size: 'Pre-filled', url: latestInfo.utility_bill_url } : null,
+            selfie: latestInfo.rep_selfie_url ? { name: 'Previous Selfie', size: 'Pre-filled', url: latestInfo.rep_selfie_url } : null,
+            secondary_id: latestInfo.secondary_id_url ? { name: 'Previous Secondary ID', size: 'Pre-filled', url: latestInfo.secondary_id_url } : null,
+          }));
         }
       } catch (err) {
         console.error("Error pre-filling data:", err);
@@ -388,7 +410,8 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
         title, gender, dob, mother_maiden_name: maidenName, religion, marital_status: maritalStatus,
         is_on_behalf: isOnBehalf, representative_relation: representativeRelation, is_pep: isPep,
         nok_name: nokName, nok_relationship: nokRelationship, nok_address: nokAddress,
-        target_amount: targetAmount, rollover_option: rollover,
+        target_amount: targetAmount, rollover_option: rollover, contribution_frequency: contributionFrequency,
+        interest_rate: dynamicInterestRate,
         draft_id: draftId,
         // Map URLs from uploadedDocs
         rep_selfie_url: uploadedDocs.selfie?.url || null,
@@ -777,37 +800,182 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
 
       {/* Step 10: Config */}
       {subStep === 10 && (
-        <div className="space-y-10 animate-in fade-in slide-in-from-right-4 duration-500">
-          <h1 className="text-4xl font-black text-slate-900 dark:text-white tracking-tight">Investment Config</h1>
-          <div className="grid gap-8">
-            <div className="space-y-6">
-              <div className="flex justify-between items-end"><label className="text-xs font-black text-slate-500 uppercase">Amount</label></div>
-              <div className="relative">
-                <span className="absolute left-8 top-1/2 -translate-y-1/2 text-3xl font-black text-slate-300">{currency === 'NGN' ? '₦' : '$'}</span>
-                <input disabled={isClaimingGift} className="w-full h-24 pl-16 pr-8 rounded-[2.5rem] bg-white dark:bg-slate-900 border-2 border-slate-100 text-4xl font-black text-slate-900 dark:text-white focus:border-primary outline-none" value={amount} onChange={e => setAmount(e.target.value.replace(/\D/g, ''))} />
-                {rateLoading && (
-                  <div className="absolute right-8 top-1/2 -translate-y-1/2">
-                    <div className="size-6 border-2 border-primary/20 border-t-primary rounded-full animate-spin"></div>
-                  </div>
-                )}
-              </div>
-              {(!dynamicInterestRate && !rateLoading && parseFloat(amount) > 0) && (
-                <p className="text-xs font-bold text-red-500 mt-2 flex items-center gap-1">
-                  <span className="material-symbols-outlined text-sm">warning</span>
-                  No valid interest rate found for this amount and tenure.
-                </p>
-              )}
+        <div className="space-y-8 animate-in fade-in slide-in-from-right-4 duration-500">
+            <div className="flex justify-between items-start">
+              <h1 className="text-4xl font-black text-slate-900 dark:text-white tracking-tight leading-tight">Investment Configuration</h1>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              <div className="space-y-4"><label className="text-xs font-black text-slate-500 uppercase">Tenure ({tenure} Months)</label><input disabled={isClaimingGift} type="range" min="1" max="60" value={tenure} onChange={e => setTenure(parseInt(e.target.value))} className="w-full accent-primary" /></div>
-              <div className="space-y-4"><label className="text-xs font-black text-slate-500 uppercase">Rollover Option</label><select className="w-full h-14 rounded-xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 px-4 font-bold dark:text-white" value={rollover} onChange={e => setRollover(e.target.value)}><option value="principal_interest">Principal + Interest</option><option value="principal_only">Principal Only</option><option value="none">Payout</option></select></div>
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
+                <div className="lg:col-span-7 flex flex-col gap-10">
+                    <div className="space-y-4">
+                        <div className="flex justify-between items-end">
+                          <label className="text-sm font-black text-slate-500 uppercase tracking-widest">Investment Amount</label>
+                          <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-xl gap-1">
+                            <button disabled={isClaimingGift} onClick={() => setCurrency('NGN')} className={`px-3 py-1 rounded-lg text-[10px] font-black transition-all ${currency === 'NGN' ? 'bg-white dark:bg-slate-700 text-primary shadow-sm' : 'text-slate-400'}`}>NGN</button>
+                            {(selectedPlan === 'VAULT') && (
+                              <button disabled={isClaimingGift} onClick={() => setCurrency('USD')} className={`px-3 py-1 rounded-lg text-[10px] font-black transition-all ${currency === 'USD' ? 'bg-white dark:bg-slate-700 text-primary shadow-sm' : 'text-slate-400'}`}>USD</button>
+                            )}
+                          </div>
+                        </div>
+                        <div className="relative">
+                            <span className="absolute left-6 top-1/2 -translate-y-1/2 text-2xl font-black text-slate-400">{currency === 'NGN' ? '₦' : '$'}</span>
+                            <input disabled={isClaimingGift} className="w-full h-20 pl-14 pr-6 rounded-3xl bg-white dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 text-3xl font-black text-slate-900 dark:text-white focus:border-primary outline-none transition-all" value={amount} onChange={e => setAmount(e.target.value.replace(/[^0-9]/g, ''))} />
+                        </div>
+                        {(!dynamicInterestRate && !rateLoading && parseFloat(amount) > 0) && (
+                          <p className="text-xs font-bold text-red-500 mt-2 flex items-center gap-1">
+                            <span className="material-symbols-outlined text-sm">warning</span>
+                            No valid interest rate found for this amount and tenure.
+                          </p>
+                        )}
+                        {(parseFloat(amount) < minAmount && amount) && (
+                          <p className="text-xs font-bold text-red-500 mt-2 flex items-center gap-1">
+                            <span className="material-symbols-outlined text-sm">warning</span>
+                            Minimum investment for NOLT {selectedPlan} is {formatMoney(minAmount, currency)}
+                          </p>
+                        )}
+                    </div>
+                    {selectedPlan === 'RISE' && (
+                        <div className="space-y-4">
+                            <label className="text-sm font-black text-slate-500 uppercase tracking-widest">Target Amount (Optional)</label>
+                            <div className="relative">
+                                <span className="absolute left-6 top-1/2 -translate-y-1/2 text-xl font-black text-slate-400">{currency === 'NGN' ? '₦' : '$'}</span>
+                                <input disabled={isClaimingGift} className="w-full h-16 pl-12 pr-6 rounded-2xl bg-white dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 text-xl font-bold dark:text-white focus:border-primary outline-none" value={targetAmount} onChange={e => setTargetAmount(e.target.value)} placeholder="What's your goal?" />
+                            </div>
+                        </div>
+                    )}
+
+                    {selectedPlan === 'RISE' && (
+                        <div className="space-y-4">
+                            <label className="text-sm font-black text-slate-500 uppercase tracking-widest">Contribution Frequency</label>
+                            <div className="grid grid-cols-3 gap-3">
+                                {[
+                                    { id: 'daily', label: 'Daily' },
+                                    { id: 'weekly', label: 'Weekly' },
+                                    { id: 'monthly', label: 'Monthly' }
+                                ].map(freq => (
+                                    <button 
+                                        key={freq.id}
+                                        disabled={isClaimingGift}
+                                        onClick={() => setContributionFrequency(freq.id as any)}
+                                        className={`py-4 rounded-2xl border-2 font-bold transition-all ${contributionFrequency === freq.id ? 'border-primary bg-primary/5 text-primary' : 'border-slate-100 dark:border-slate-800 text-slate-400'}`}
+                                    >
+                                        {freq.label}
+                                    </button>
+                                ))}
+                            </div>
+                            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Automated contributions to promote disciplined wealth building.</p>
+                        </div>
+                    )}
+
+                    {selectedPlan === 'VAULT' && currency === 'NGN' && (
+                        <div className="space-y-4">
+                            <label className="text-sm font-black text-slate-500 uppercase tracking-widest">Payout Frequency</label>
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                {[
+                                    { id: 'upfront', label: 'Upfront' },
+                                    { id: 'monthly', label: 'Monthly' },
+                                    { id: 'quarterly', label: 'Quarterly' },
+                                    { id: 'maturity', label: 'At Maturity' }
+                                ].map(freq => (
+                                    <button 
+                                        key={freq.id}
+                                        disabled={isClaimingGift}
+                                        onClick={() => setPayoutFrequency(freq.id as any)}
+                                        className={`py-4 rounded-2xl border-2 font-bold transition-all ${payoutFrequency === freq.id ? 'border-primary bg-primary/5 text-primary' : 'border-slate-100 dark:border-slate-800 text-slate-400'}`}
+                                    >
+                                        {freq.label}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    <div className="space-y-6">
+                        <div className="flex justify-between items-center">
+                            <label className="text-sm font-black text-slate-500 uppercase tracking-widest">Tenure (Months)</label>
+                            <div className="flex items-center gap-4">
+                                {selectedPlan === 'SURGE' && (
+                                    <label className="flex items-center gap-2 cursor-pointer group">
+                                        <div className="relative flex items-center">
+                                            <input 
+                                                disabled={isClaimingGift}
+                                                type="checkbox" 
+                                                checked={isInfinityTenure} 
+                                                onChange={e => setIsInfinityTenure(e.target.checked)}
+                                                className="peer size-5 appearance-none rounded border-2 border-slate-300 dark:border-slate-700 checked:bg-primary checked:border-primary transition-all cursor-pointer"
+                                            />
+                                            <span className="absolute inset-0 flex items-center justify-center text-white opacity-0 peer-checked:opacity-100 transition-opacity pointer-events-none">
+                                                <span className="material-symbols-outlined text-sm font-bold">all_inclusive</span>
+                                            </span>
+                                        </div>
+                                        <span className="text-xs font-black uppercase tracking-widest text-slate-400 group-hover:text-primary transition-colors">Infinity</span>
+                                    </label>
+                                )}
+                                <span className="bg-primary text-white font-black px-6 py-2 rounded-full text-sm">
+                                    {isInfinityTenure ? '∞' : `${tenure} Mo.`}
+                                </span>
+                            </div>
+                        </div>
+                        {!isInfinityTenure && (
+                            <input 
+                                disabled={isClaimingGift}
+                                type="range" 
+                                min={(selectedPlan === 'VAULT' && currency === 'NGN') || selectedPlan === 'SURGE' ? "1" : "3"} 
+                                max={selectedPlan === 'SURGE' ? "60" : "24"} 
+                                step={(selectedPlan === 'VAULT' && currency === 'NGN') || selectedPlan === 'SURGE' ? "1" : "3"} 
+                                value={tenure} 
+                                onChange={e => setTenure(parseInt(e.target.value))} 
+                                className="w-full h-3 bg-slate-100 dark:bg-slate-900 rounded-full appearance-none cursor-pointer accent-primary" 
+                            />
+                        )}
+                        <div className="flex justify-between text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">
+                            <span>{(selectedPlan === 'VAULT' && currency === 'NGN') || selectedPlan === 'SURGE' ? (selectedPlan === 'SURGE' ? 'Flexible' : '30 Days') : '3 Months'}</span>
+                            <span>{selectedPlan === 'SURGE' ? '5 Years' : '2 Year'}</span>
+                        </div>
+                    </div>
+                    <div className="space-y-4">
+                        <div className="flex items-center gap-2">
+                          <label className="text-sm font-black text-slate-500 uppercase tracking-widest">Rollover Instruction</label>
+                          <button onClick={() => setShowRolloverInfo(!showRolloverInfo)} className="text-slate-400 hover:text-primary transition-colors">
+                            <span className="material-symbols-outlined text-sm">info</span>
+                          </button>
+                        </div>
+                        {showRolloverInfo && (
+                          <div className="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-700 animate-in fade-in slide-in-from-top-1 duration-200">
+                            <p className="text-[11px] font-bold text-slate-500 leading-relaxed">
+                              How would you like to manage your funds upon the completion of your investment term?
+                            </p>
+                          </div>
+                        )}
+                        <select disabled={isClaimingGift} className="w-full h-16 rounded-2xl bg-white dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-6 text-xl font-bold dark:text-white focus:border-primary outline-none" value={rollover} onChange={e => setRollover(e.target.value)}>
+                            <option value="principal_interest">Rollover Principal & Interest</option>
+                            <option value="principal_only">Rollover Principal Only</option>
+                            <option value="none">Payout at Maturity</option>
+                        </select>
+                    </div>
+                    <NavActions isNextDisabled={parseFloat(amount) < minAmount || rateLoading || !dynamicInterestRate} />
+                </div>
+                <div className="lg:col-span-5">
+                    <div className="bg-slate-900 rounded-[2.5rem] p-10 text-white shadow-2xl space-y-8 relative overflow-hidden">
+                        <div className="absolute top-0 right-0 size-48 bg-primary/20 rounded-full blur-3xl -mr-24 -mt-24"></div>
+                        <h3 className="text-xl font-black uppercase tracking-widest">Returns Estimate</h3>
+                        <div className="bg-white/5 p-8 rounded-3xl border border-white/10 ring-2 ring-primary/20">
+                            <p className="text-xs font-bold text-slate-400 uppercase tracking-[0.2em] mb-3">Expected Maturity Value</p>
+                            <span className="text-5xl font-black text-primary">{formatMoney(returns.total, currency)}</span>
+                        </div>
+                        <div className="space-y-4 pt-4 border-t border-white/10">
+                            <div className="flex justify-between text-sm font-bold">
+                              <span className="text-slate-500 uppercase">Interest Rate</span>
+                              <div className="text-right">
+                                <span className="font-black text-primary">
+                                  {interestRate}% p.a.
+                                </span>
+                              </div>
+                            </div>
+                            <div className="flex justify-between text-sm font-bold"><span className="text-slate-500 uppercase">Total Interest</span><span>{formatMoney(returns.interestEarned, currency)}</span></div>
+                        </div>
+                    </div>
+                </div>
             </div>
-          </div>
-          <div className="p-8 bg-slate-900 text-white rounded-[2rem] flex justify-between items-center shadow-2xl">
-            <div><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Expected Return ({interestRate}% p.a.)</p><p className="text-4xl font-black">{formatMoney(returns.total, currency)}</p></div>
-            <div className="text-right"><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Interest Earned</p><p className="text-xl font-bold text-primary">+{formatMoney(returns.interestEarned, currency)}</p></div>
-          </div>
-          <NavActions isNextDisabled={parseFloat(amount) < minAmount || rateLoading || !dynamicInterestRate} />
         </div>
       )}
 
