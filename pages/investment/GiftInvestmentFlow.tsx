@@ -152,7 +152,10 @@ const GiftInvestmentFlow: React.FC<GiftInvestmentFlowProps> = (props) => {
                             </div>
                             <div className="space-y-3">
                                 <label className="text-xs font-black text-slate-400 uppercase tracking-[0.2em] ml-2">Recipient's Email</label>
-                                <input className="w-full h-20 rounded-[2rem] bg-white dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-800 px-8 text-xl font-bold dark:text-white focus:border-rose-500 outline-none shadow-sm transition-all" value={recipientEmail} onChange={e => setRecipientEmail(e.target.value)} placeholder="email@example.com" />
+                                <input className={`w-full h-20 rounded-[2rem] bg-white dark:bg-slate-900 border-2 ${recipientEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipientEmail) ? 'border-red-500 focus:border-red-500' : 'border-slate-100 dark:border-slate-800 focus:border-rose-500'} px-8 text-xl font-bold dark:text-white outline-none shadow-sm transition-all`} value={recipientEmail} onChange={e => setRecipientEmail(e.target.value)} type="email" placeholder="email@example.com" />
+                                {recipientEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipientEmail) && (
+                                    <p className="text-red-500 text-xs font-bold ml-2">Please enter a valid email address.</p>
+                                )}
                             </div>
                             <div className="space-y-3">
                                 <label className="text-xs font-black text-slate-400 uppercase tracking-[0.2em] ml-2">Recipient's Phone (Optional)</label>
@@ -201,8 +204,8 @@ const GiftInvestmentFlow: React.FC<GiftInvestmentFlowProps> = (props) => {
                     <div className="flex justify-end pt-6">
                         <button
                             onClick={handleNext}
-                            disabled={!recipientName || !recipientEmail}
-                            className={`px-12 py-5 rounded-2xl font-black text-xl flex items-center gap-3 transition-all ${(!recipientName || !recipientEmail) ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'bg-gradient-to-r from-rose-500 to-pink-600 text-white shadow-xl shadow-rose-500/30 hover:scale-105 active:scale-95'}`}
+                            disabled={!recipientName || !recipientEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipientEmail)}
+                            className={`px-12 py-5 rounded-2xl font-black text-xl flex items-center gap-3 transition-all ${(!recipientName || !recipientEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipientEmail)) ? 'bg-slate-100 dark:bg-slate-800 text-slate-400 cursor-not-allowed' : 'bg-gradient-to-r from-rose-500 to-pink-600 text-white shadow-xl shadow-rose-500/30 hover:scale-[1.02] active:scale-95'}`}
                         >
                             Choose a Plan
                             <span className="material-symbols-outlined">arrow_forward</span>

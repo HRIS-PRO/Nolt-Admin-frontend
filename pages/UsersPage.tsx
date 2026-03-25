@@ -141,10 +141,12 @@ const UsersPage: React.FC<UsersPageProps> = ({ user, onLogout, toggleTheme, them
 
         const styles: Record<string, string> = {
             super_admin: "text-blue-600 bg-blue-100 dark:bg-blue-500/10 dark:text-blue-400 border-blue-200 dark:border-blue-500/20",
+            md: "text-fuchsia-600 bg-fuchsia-100 dark:bg-fuchsia-500/10 dark:text-fuchsia-400 border-fuchsia-200 dark:border-fuchsia-500/20",
             credit_manager: "text-indigo-600 bg-indigo-100 dark:bg-indigo-500/10 dark:text-indigo-400 border-indigo-200 dark:border-indigo-500/20",
             credit_officer: "text-indigo-600 bg-indigo-100 dark:bg-indigo-500/10 dark:text-indigo-400 border-indigo-200 dark:border-indigo-500/20",
             sales_officer: "text-emerald-600 bg-emerald-100 dark:bg-emerald-500/10 dark:text-emerald-400 border-emerald-200 dark:border-emerald-500/20",
             customer_experience: "text-sky-600 bg-sky-100 dark:bg-sky-500/10 dark:text-sky-400 border-sky-200 dark:border-sky-500/20",
+            compliance: "text-teal-600 bg-teal-100 dark:bg-teal-500/10 dark:text-teal-400 border-teal-200 dark:border-teal-500/20",
             default: "text-slate-600 bg-slate-100 dark:bg-slate-800 dark:text-slate-400 border-slate-200 dark:border-slate-700"
         };
         const style = styles[role] || styles.default;
@@ -264,12 +266,14 @@ const UsersPage: React.FC<UsersPageProps> = ({ user, onLogout, toggleTheme, them
                                                 className="bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-2 py-1 text-xs font-bold text-slate-700 dark:text-white outline-none"
                                             >
                                                 <option value="super_admin">Super Admin</option>
+                                                <option value="md">MD</option>
                                                 <option value="credit_manager">Credit Manager</option>
                                                 <option value="credit_officer">Credit Officer</option>
                                                 <option value="sales_officer">Sales Officer</option>
                                                 <option value="sales_manager">Sales Manager</option>
                                                 <option value="customer_experience">Customer Experience</option>
                                                 <option value="internal_audit">Internal Audit</option>
+                                                <option value="compliance">Compliance</option>
                                                 <option value="finance">Finance</option>
                                             </select>
                                         ) : (
@@ -428,7 +432,9 @@ const UsersPage: React.FC<UsersPageProps> = ({ user, onLogout, toggleTheme, them
                                     <option value="credit_manager">Credit Manager</option>
                                     <option value="credit_officer">Credit Officer</option>
                                     <option value="internal_audit">Internal Audit</option>
+                                    <option value="compliance">Compliance</option>
                                     <option value="finance">Finance</option>
+                                    <option value="md">MD</option>
                                     <option value="super_admin">Super Admin</option>
                                 </select>
                             </div>

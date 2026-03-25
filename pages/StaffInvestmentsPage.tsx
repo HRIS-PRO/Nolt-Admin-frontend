@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import StaffLayout from '../components/layouts/StaffLayout';
 
@@ -10,6 +11,7 @@ interface StaffInvestmentsPageProps {
 }
 
 const StaffInvestmentsPage: React.FC<StaffInvestmentsPageProps> = ({ user, onLogout, toggleTheme, theme }) => {
+    const navigate = useNavigate();
     const [activeTab, setActiveTab] = useState<'applications' | 'rate_guide'>('applications');
     const [showAddRateForm, setShowAddRateForm] = useState(false);
     const [isInfinity, setIsInfinity] = useState(false);
@@ -17,6 +19,10 @@ const StaffInvestmentsPage: React.FC<StaffInvestmentsPageProps> = ({ user, onLog
     const [loading, setLoading] = useState(true);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [editingId, setEditingId] = useState<number | null>(null);
+
+    const [searchQuery, setSearchQuery] = useState('');
+    const [statusFilter, setStatusFilter] = useState('all');
+    const [stageFilter, setStageFilter] = useState('all');
 
     const initialFormData = {
         plan: 'NOLT Rise',
@@ -198,58 +204,148 @@ const StaffInvestmentsPage: React.FC<StaffInvestmentsPageProps> = ({ user, onLog
                     </div>
                 </div>
 
-                {activeTab === 'applications' ? (
-                    <div className="bg-white dark:bg-[#1e293b]/50 rounded-[32px] border border-slate-200 dark:border-slate-800 overflow-hidden backdrop-blur-md">
+                {activeTab === 'applications' ? (() => {
+                    const filteredInvestments = allInvestments.filter(inv => {
+                        const matchesSearch = !searchQuery || 
+                            (inv.rep_full_name && inv.rep_full_name.toLowerCase().includes(searchQuery.toLowerCase())) ||
+                            (inv.customer_name && inv.customer_name.toLowerCase().includes(searchQuery.toLowerCase())) ||
+                            (inv.id && inv.id.toString().includes(searchQuery));
+                        
+                        const matchesStatus = statusFilter === 'all' || inv.status === statusFilter;
+                        const matchesStage = stageFilter === 'all' || (inv.stage || 'submitted') === stageFilter;
+
+                        return matchesSearch && matchesStatus && matchesStage;
+                    });
+
+                    return (
+                    <div className="bg-white dark:bg-[#1e293b] rounded-[32px] border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm">
+                        <div className="p-6 border-b border-slate-200 dark:border-slate-800 flex flex-col md:flex-row justify-between items-center bg-slate-50 dark:bg-[#0f172a]/50 gap-4">
+                            <div>
+                                <h3 className="font-black text-lg text-slate-900 dark:text-white">All Investments</h3>
+                                <p className="text-slate-500 text-xs font-medium"> Total: {filteredInvestments.length} matching applications</p>
+                            </div>
+                            <div className="flex items-center gap-4 flex-wrap">
+                                <div className="relative">
+                                    <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">search</span>
+                                    <input 
+                                        type="text" 
+                                        placeholder="Search name or ID..." 
+                                        value={searchQuery}
+                                        onChange={(e) => setSearchQuery(e.target.value)}
+                                        className="pl-10 pr-4 py-2 bg-white dark:bg-[#1e293b] border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-bold w-48 focus:outline-none focus:border-purple-500"
+                                    />
+                                </div>
+                                <select 
+                                    value={stageFilter}
+                                    onChange={(e) => setStageFilter(e.target.value)}
+                                    className="px-4 py-2 bg-white dark:bg-[#1e293b] border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300 outline-none"
+                                >
+                                    <option value="all">All Stages</option>
+                                    <option value="submitted">Submitted</option>
+                                    <option value="compliance_review">Compliance</option>
+                                    <option value="finance_review">Finance</option>
+                                    <option value="active">Active</option>
+                                    <option value="rejected">Rejected</option>
+                                </select>
+                                <select 
+                                    value={statusFilter}
+                                    onChange={(e) => setStatusFilter(e.target.value)}
+                                    className="px-4 py-2 bg-white dark:bg-[#1e293b] border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300 outline-none"
+                                >
+                                    <option value="all">All Status</option>
+                                    <option value="pending">Pending</option>
+                                    <option value="active">Active</option>
+                                    <option value="completed">Completed</option>
+                                    <option value="rejected">Rejected</option>
+                                    <option value="terminated">Terminated</option>
+                                </select>
+                            </div>
+                        </div>
+
                         <div className="overflow-x-auto">
-                            <table className="w-full">
-                                <thead>
+                            <table className="w-full text-left">
+                                <thead className="bg-slate-50/50 dark:bg-[#0f172a]/30 text-xs uppercase text-slate-500 font-black tracking-wider">
                                     <tr className="border-b border-slate-100 dark:border-slate-800">
-                                        <th className="px-8 py-6 text-left text-[10px] font-black uppercase tracking-widest text-slate-400">APPLICANT</th>
-                                        <th className="px-8 py-6 text-left text-[10px] font-black uppercase tracking-widest text-slate-400">PLAN</th>
-                                        <th className="px-8 py-6 text-left text-[10px] font-black uppercase tracking-widest text-slate-400">PRINCIPAL</th>
-                                        <th className="px-8 py-6 text-right text-[10px] font-black uppercase tracking-widest text-slate-400">REVIEW</th>
+                                        <th className="p-4 w-4"></th>
+                                        <th className="p-4">Reference ID</th>
+                                        <th className="p-4">Applicant</th>
+                                        <th className="p-4">Investment Plan</th>
+                                        <th className="p-4">Principal Amount</th>
+                                        <th className="p-4 text-center">Interest</th>
+                                        <th className="p-4">Tenure</th>
+                                        <th className="p-4">Application Date</th>
+                                        <th className="p-4">Stage</th>
+                                        <th className="p-4">Status</th>
                                     </tr>
                                 </thead>
-                                <tbody className="divide-y divide-slate-50 dark:divide-slate-800/50">
-                                    {allInvestments.length > 0 ? (
-                                        allInvestments.map((inv) => (
-                                            <tr key={inv.id} className="group hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-all duration-300">
-                                                <td className="px-8 py-6">
-                                                    <div className="flex items-center gap-4">
-                                                        <div className="size-12 rounded-[18px] bg-slate-200 dark:bg-slate-800 overflow-hidden shadow-sm group-hover:scale-105 transition-transform duration-500 flex items-center justify-center font-black text-slate-400">
-                                                            {inv.rep_full_name?.charAt(0) || 'U'}
+                                <tbody className="text-sm divide-y divide-slate-100 dark:divide-slate-800">
+                                    {filteredInvestments.length > 0 ? (
+                                        filteredInvestments.map((inv) => (
+                                            <tr key={inv.id} className="group hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-all duration-300 cursor-pointer" onClick={() => navigate(`/staff/investments/${inv.id}`)}>
+                                                <td className="p-4">
+                                                    <div className="size-4 rounded border border-slate-300 dark:border-slate-700 flex items-center justify-center transition-colors"></div>
+                                                </td>
+                                                <td className="p-4 font-mono text-slate-500 dark:text-slate-400 text-xs text-nowrap">
+                                                    INV-{inv.id}
+                                                </td>
+                                                <td className="p-4">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="size-8 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-xs font-bold text-slate-700 dark:text-white border border-slate-200 dark:border-slate-600 shrink-0">
+                                                            {inv.rep_full_name ? inv.rep_full_name.charAt(0) : (inv.customer_name ? inv.customer_name.charAt(0) : '?')}
                                                         </div>
                                                         <div className="flex flex-col">
-                                                            <span className="font-black text-slate-900 dark:text-white uppercase tracking-tight group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                                                            <span className="font-bold text-slate-900 dark:text-white text-xs">
                                                                 {inv.rep_full_name || inv.customer_name || 'Individual'}
                                                             </span>
-                                                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{inv.customer_email || 'No email'}</span>
+                                                            <span className="text-[10px] font-bold text-slate-500 lowercase">{inv.customer_email || 'No email'}</span>
                                                         </div>
                                                     </div>
                                                 </td>
-                                                <td className="px-8 py-6">
-                                                    <span className="px-4 py-2 rounded-xl bg-purple-100 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400 text-[10px] font-black uppercase tracking-widest border border-purple-200/50 dark:border-purple-800/30 group-hover:bg-purple-600 group-hover:text-white group-hover:border-purple-600 transition-all duration-300">
+                                                <td className="p-4">
+                                                    <span className="px-2 py-1 rounded border border-purple-500/20 bg-purple-500/10 text-[10px] font-black uppercase text-purple-500 dark:text-purple-400 tracking-wider text-nowrap">
                                                         {inv.investment_type?.replace(/_/g, ' ') || 'INVESTMENT'}
                                                     </span>
                                                 </td>
-                                                <td className="px-8 py-6">
-                                                    <div className="flex flex-col">
-                                                        <span className="font-black text-slate-900 dark:text-white tracking-tight text-lg">
-                                                            {inv.currency === 'USD' ? '$' : '₦'}{Number(inv.investment_amount).toLocaleString()}
-                                                        </span>
-                                                        <span className="text-[10px] font-bold text-green-500 uppercase tracking-widest">{inv.tenure_days / 30} Months Tenure</span>
+                                                <td className="p-4">
+                                                    <div className="font-black text-slate-900 dark:text-white tracking-tight text-sm">
+                                                        {inv.currency === 'USD' ? '$' : '₦'}{Number(inv.investment_amount).toLocaleString()}
                                                     </div>
                                                 </td>
-                                                <td className="px-8 py-6 text-right">
-                                                    <button className="size-12 rounded-2xl bg-slate-100 dark:bg-slate-800 text-slate-400 group-hover:bg-blue-600 group-hover:text-white group-hover:shadow-lg group-hover:shadow-blue-500/30 transition-all duration-300 flex items-center justify-center">
-                                                        <span className="material-symbols-outlined text-xl">arrow_forward</span>
-                                                    </button>
+                                                <td className="p-4 text-center">
+                                                    <span className="text-[10px] font-bold text-green-500 uppercase tracking-widest">{inv.interest_rate}% P.A</span>
+                                                </td>
+                                                <td className="p-4 font-bold text-slate-600 dark:text-slate-300 text-xs text-nowrap">
+                                                    {inv.tenure_days / 30} Months
+                                                </td>
+                                                <td className="p-4 text-slate-500 text-xs text-nowrap">
+                                                    {new Date(inv.created_at).toLocaleDateString()}
+                                                </td>
+                                                <td className="p-4">
+                                                    <span className="px-2 py-1 rounded bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-300 text-[10px] font-black uppercase tracking-wider text-nowrap">
+                                                        {inv.stage?.replace(/_/g, ' ') || 'Submitted'}
+                                                    </span>
+                                                </td>
+                                                <td className="p-4">
+                                                    <div className={`flex items-center gap-2 px-2 py-1 rounded border w-fit text-[10px] font-bold uppercase tracking-widest ${
+                                                        inv.status === 'active' ? 'border-green-500/20 bg-green-500/10 text-green-500' :
+                                                        inv.status === 'completed' ? 'border-blue-500/20 bg-blue-500/10 text-blue-500' :
+                                                        inv.status === 'terminated' ? 'border-red-500/20 bg-red-500/10 text-red-500' :
+                                                        'border-orange-500/20 bg-orange-500/10 text-orange-500'
+                                                    }`}>
+                                                        <span className={`size-1.5 rounded-full ${
+                                                            inv.status === 'active' ? 'bg-green-500' :
+                                                            inv.status === 'completed' ? 'bg-blue-500' :
+                                                            inv.status === 'terminated' ? 'bg-red-500' :
+                                                            'bg-orange-500'
+                                                        }`}></span>
+                                                        {inv.status || 'pending'}
+                                                    </div>
                                                 </td>
                                             </tr>
                                         ))
                                     ) : (
                                         <tr>
-                                            <td colSpan={4} className="px-8 py-20 text-center">
+                                            <td colSpan={9} className="px-8 py-20 text-center">
                                                 <div className="flex flex-col items-center gap-3 text-slate-400">
                                                     <span className="material-symbols-outlined text-4xl">inbox</span>
                                                     <p className="text-[10px] font-black uppercase tracking-[0.2em]">No investment applications found</p>
@@ -261,7 +357,8 @@ const StaffInvestmentsPage: React.FC<StaffInvestmentsPageProps> = ({ user, onLog
                             </table>
                         </div>
                     </div>
-                ) : (
+                );
+            })() : (
                     <div className="flex flex-col lg:flex-row gap-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
                         {/* Left Side: Rates Table */}
                         <div className="flex-1 bg-white dark:bg-[#1e293b]/50 rounded-[32px] border border-slate-200 dark:border-slate-800 overflow-hidden backdrop-blur-md">

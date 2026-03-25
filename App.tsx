@@ -30,6 +30,7 @@ import ReportsPage from './pages/ReportsPage';
 import CustomersPage from './pages/CustomersPage';
 import TimelineReportPage from './pages/TimelineReportPage';
 import StaffInvestmentsPage from './pages/StaffInvestmentsPage';
+import StaffInvestmentDetailsPage from './pages/StaffInvestmentDetailsPage';
 import VerifyGiftPage from './pages/investment/VerifyGiftPage';
 import ClaimGiftPage from './pages/investment/ClaimGiftPage';
 
@@ -403,6 +404,16 @@ const AppContent: React.FC = () => {
         <Route path="/staff/investments" element={
           isLoading ? null : (user.isLoggedIn && user.role !== 'customer' ? (
             <StaffInvestmentsPage
+              user={user}
+              onLogout={handleLogoutRequest}
+              toggleTheme={toggleTheme}
+              theme={theme}
+            />
+          ) : <Navigate to="/login" />)
+        } />
+        <Route path="/staff/investments/:id" element={
+          isLoading ? null : (user.isLoggedIn && user.role !== 'customer' ? (
+            <StaffInvestmentDetailsPage
               user={user}
               onLogout={handleLogoutRequest}
               toggleTheme={toggleTheme}
