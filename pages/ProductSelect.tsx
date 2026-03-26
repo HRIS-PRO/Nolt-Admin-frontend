@@ -47,6 +47,13 @@ const ProductSelect: React.FC<ProductSelectProps> = ({ navigate }) => {
               </div>
             </div>
             <div className="flex items-center gap-3 p-3 bg-slate-50 dark:bg-slate-900/50 rounded-xl">
+              <span className="material-symbols-outlined text-primary">bolt</span>
+              <div>
+                <p className="font-bold text-sm dark:text-white">NOLT Surge</p>
+                <p className="text-xs text-slate-400">Accelerated Returns</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 p-3 bg-slate-50 dark:bg-slate-900/50 rounded-xl">
               <span className="material-symbols-outlined text-primary">savings</span>
               <div>
                 <p className="font-bold text-sm dark:text-white">NOLT Vault</p>
