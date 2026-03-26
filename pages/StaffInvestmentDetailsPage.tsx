@@ -142,10 +142,19 @@ const StaffInvestmentDetailsPage: React.FC<StaffInvestmentDetailsPageProps> = ({
                             </span>
                         </div>
                         <h1 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight leading-none">
-                            {investment.rep_full_name || investment.customer_name || 'Individual'}
+                            {investment.company_name || investment.rep_full_name || investment.customer_name || 'Individual Application'}
                         </h1>
                     </div>
                 </div>
+                {investment.gift_id && (
+                    <div className="flex items-center gap-3 px-6 py-3 rounded-2xl bg-rose-500 text-white shadow-lg shadow-rose-500/20 animate-bounce">
+                        <span className="material-symbols-outlined filled">featured_seasonal</span>
+                        <div className="flex flex-col">
+                            <span className="text-[10px] font-black uppercase tracking-widest leading-none">Gift Investment</span>
+                            <span className="text-xs font-bold">Sent with Love 🎁</span>
+                        </div>
+                    </div>
+                )}
             </div>
 
             {/* Stage Tracker */}
@@ -224,14 +233,55 @@ const StaffInvestmentDetailsPage: React.FC<StaffInvestmentDetailsPageProps> = ({
                         <MaskedField label="NIN" value={investment.rep_nin || investment.nin} />
                     </CollapsibleGroup>
 
-                    {investment.company_name && (
-                        <CollapsibleGroup title="Corporate Data" icon="domain">
+                    {investment.entity_type === 'CORPORATE' && (
+                        <CollapsibleGroup title="Corporate Data" icon="domain" defaultOpen={true}>
                             <Field label="Company Name" value={investment.company_name} />
-                            <Field label="Company Address" value={investment.company_address} />
-                            <Field label="Date of Incorporation" value={investment.date_of_incorporation ? formatDate(investment.date_of_incorporation) : ''} />
+                            <Field label="Business Nature" value={investment.business_nature} />
+                            <Field label="Business Address" value={investment.business_address} />
                             <Field label="RC Number" value={investment.rc_number} />
-                            <Field label="Business Type" value={investment.business_type} />
-                            <Field label="Representative Designation" value={investment.rep_designation} />
+                            <Field label="TIN" value={investment.tin} />
+                            <Field label="Date of Incorporation" value={investment.date_of_incorporation ? formatDate(investment.date_of_incorporation) : ''} />
+                            
+                            <div className="col-span-full border-t border-slate-100 dark:border-slate-800 pt-6">
+                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Authorized Representative</p>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                    <Field label="Is Authorized Rep?" value={investment.is_authorized_rep ? 'Yes' : 'No'} />
+                                    <Field label="Rep Phone Number" value={investment.auth_rep_phone} />
+                                </div>
+                            </div>
+
+                            {/* Directors Table */}
+                            {investment.directors && (
+                                <div className="col-span-full border-t border-slate-100 dark:border-slate-800 pt-6">
+                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Board of Directors</p>
+                                    <div className="overflow-x-auto rounded-xl border border-slate-100 dark:border-slate-800">
+                                        <table className="w-full text-left text-xs">
+                                            <thead className="bg-slate-50 dark:bg-slate-800/50 font-black uppercase text-slate-500">
+                                                <tr>
+                                                    <th className="p-3">Name</th>
+                                                    <th className="p-3">Phone</th>
+                                                    <th className="p-3">BVN/NIN</th>
+                                                    <th className="p-3">PEP?</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
+                                                {(typeof investment.directors === 'string' ? JSON.parse(investment.directors) : investment.directors).map((d: any, i: number) => (
+                                                    <tr key={i} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30">
+                                                        <td className="p-3 font-bold truncate max-w-[150px] capitalize">{`${d.firstName} ${d.surname}`}</td>
+                                                        <td className="p-3 font-mono">{d.phone}</td>
+                                                        <td className="p-3 font-mono text-slate-500">{d.bvn}</td>
+                                                        <td className="p-3">
+                                                            <span className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase ${d.isPep ? 'bg-orange-100 text-orange-600' : 'bg-slate-100 text-slate-500'}`}>
+                                                                {d.isPep ? 'YES' : 'NO'}
+                                                            </span>
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            )}
                         </CollapsibleGroup>
                     )}
 
@@ -243,13 +293,44 @@ const StaffInvestmentDetailsPage: React.FC<StaffInvestmentDetailsPageProps> = ({
                         </CollapsibleGroup>
                     )}
 
-                    {(investment.rep_id_url || investment.utility_bill_url || investment.cac_url || investment.secondary_id_url || investment.signatures) && (
+                    {(investment.rep_id_url || investment.utility_bill_url || investment.cac_url || investment.secondary_id_url || investment.company_profile_url || investment.status_report_url || investment.memart_url || investment.annual_returns_url || investment.board_resolution_url || investment.signatures) && (
                         <CollapsibleGroup title="Secure Vault Documents" icon="folder_open">
                             <Field label="Passport / Government ID" value={investment.rep_id_url} isLink />
                             <Field label="Utility Bill" value={investment.utility_bill_url} isLink />
-                            {investment.cac_url && <Field label="CAC Document" value={investment.cac_url} isLink />}
-                            {investment.secondary_id_url && <Field label="Secondary / Directoor ID" value={investment.secondary_id_url} isLink />}
+                            <Field label="Rep Selfie" value={investment.rep_selfie_url} isLink />
+                            <Field label="Secondary / Director ID" value={investment.secondary_id_url} isLink />
+                            
+                            {investment.entity_type === 'CORPORATE' && (
+                                <>
+                                    <Field label="CAC Certificate" value={investment.cac_url} isLink />
+                                    <Field label="Company Profile" value={investment.company_profile_url} isLink />
+                                    <Field label="Status Report" value={investment.status_report_url} isLink />
+                                    <Field label="MEMART" value={investment.memart_url} isLink />
+                                    <Field label="Annual Returns" value={investment.annual_returns_url} isLink />
+                                    <Field label="Board Resolution" value={investment.board_resolution_url} isLink />
+                                </>
+                            )}
+                            
                             {investment.signatures && investment.signatures.length > 0 && <Field label="Signature" value={investment.signatures[0]} isLink />}
+                        </CollapsibleGroup>
+                    )}
+
+                    {investment.gift_id && (
+                        <CollapsibleGroup title="Gift Details" icon="featured_seasonal" defaultOpen={true}>
+                            <div className="col-span-full p-6 rounded-2xl bg-rose-50 dark:bg-rose-900/10 border border-rose-100 dark:border-rose-900/20 flex flex-col md:flex-row items-center gap-6">
+                                <div className="size-16 rounded-full bg-rose-500 text-white flex items-center justify-center shadow-lg shadow-rose-500/20 shrink-0">
+                                    <span className="material-symbols-outlined text-3xl">favorite</span>
+                                </div>
+                                <div className="space-y-4 flex-1">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <Field label="From (Gifter)" value={investment.gifter_name} />
+                                        <Field label="Gift Amount" value={`₦${Number(investment.gift_amount).toLocaleString()}`} />
+                                    </div>
+                                    <div className="p-4 bg-white dark:bg-slate-800 rounded-xl border border-rose-100 dark:border-rose-900/20 italic text-sm text-slate-600 dark:text-slate-300">
+                                        "{investment.gift_message || 'No personal message provided.'}"
+                                    </div>
+                                </div>
+                            </div>
                         </CollapsibleGroup>
                     )}
 

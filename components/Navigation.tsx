@@ -30,25 +30,21 @@ const Navigation: React.FC<NavigationProps> = ({
     };
   }, []);
 
-  console.log("Navigation User Prop:", user);
+  // console.log("Navigation User Prop:", user);
   return (
     <header className="sticky top-0 z-50 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 px-6 py-4">
       <div className="max-w-7xl mx-auto flex items-center justify-between">
         <div className="flex items-center gap-8">
         <Link to="/" className="flex items-center gap-3 cursor-pointer">
-          <div className="w-10 h-10 rounded-xl flex items-center justify-center overflow-hidden">
-            <img
-              src="https://isswlcllytiltgjbysjv.supabase.co/storage/v1/object/public/template-images/logo%20file-02%20(1).png"
-              alt="NOLT Finance Logo"
-              className="w-full h-full object-contain"
+            <img 
+              src="https://noltfinance.s3.us-east-1.amazonaws.com/logo+updated+white.png" 
+              alt="NOLT Finance" 
+              className="h-8 w-auto dark:brightness-100 [filter:invert(38%)_sepia(98%)_saturate(2136%)_hue-rotate(187deg)_brightness(101%)_contrast(101%)] dark:[filter:none] transition-all duration-300"
+              referrerPolicy="no-referrer"
             />
-          </div>
-          <h1 className="text-xl font-black tracking-tighter text-slate-900 dark:text-white uppercase">
-            NOLT Finance
-          </h1>
         </Link>
 
-          {/* <nav className="hidden sm:flex items-center">
+          <nav className="hidden sm:flex items-center">
             <button
               onClick={onDashboard}
               className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-black text-slate-600 dark:text-slate-300 hover:text-primary dark:hover:text-primary hover:bg-primary/5 transition-all active:scale-95"
@@ -56,7 +52,7 @@ const Navigation: React.FC<NavigationProps> = ({
               <span className="material-symbols-outlined text-[20px]">grid_view</span>
               Dashboard
             </button>
-          </nav> */}
+          </nav>
         </div>
 
         <div className="flex items-center gap-2 sm:gap-4">

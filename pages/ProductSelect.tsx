@@ -26,7 +26,7 @@ const ProductSelect: React.FC<ProductSelectProps> = ({ navigate }) => {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <button
-          onClick={() => navigate('INVESTMENT_FLOW')}
+          onClick={() => navigate('INVESTMENT_FLOW', null)}
           className="group cursor-pointer p-8 rounded-3xl border-2 border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800 hover:border-primary transition-all duration-300 text-left relative shadow-xl shadow-slate-200/50 dark:shadow-none hover:-translate-y-1 active:scale-[0.98]"
         >
           <div className="size-16 rounded-2xl bg-primary flex items-center justify-center text-white mb-8 shadow-lg shadow-primary/30">
@@ -153,7 +153,7 @@ const ProductSelect: React.FC<ProductSelectProps> = ({ navigate }) => {
         </button>
 
         <button
-          onClick={() => navigate('LOAN_TYPE')}
+          onClick={() => navigate('LOAN_TYPE', null)}
           className="group cursor-pointer p-8 rounded-3xl border-2 border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800 hover:border-primary transition-all duration-300 text-left relative shadow-xl shadow-slate-200/50 dark:shadow-none hover:-translate-y-1 active:scale-[0.98]"
         >
           <div className="size-16 rounded-2xl bg-primary/10 flex items-center justify-center text-primary mb-8">
