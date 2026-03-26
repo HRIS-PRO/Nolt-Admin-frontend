@@ -13,8 +13,9 @@ const ApplicationsList: React.FC<ApplicationsListProps> = ({ navigate, formatMon
   const [activeTab, setActiveTab] = useState<'DRAFTS' | 'COMPLETED'>('DRAFTS');
   const [uploadingReceiptId, setUploadingReceiptId] = useState<string | null>(null);
   const [uploadedReceipts, setUploadedReceipts] = useState<Record<string, boolean>>({});
-  const [drafts, setDrafts] = useState<SavedDraft[]>([]);
+  const [drafts, setDrafts] = useState<SavedDraft[]>(storageService.getDrafts());
   const [completedApps, setCompletedApps] = useState<any[]>([]);
+  const [pendingGift, setPendingGift] = useState<any>(null);
 
   // Modal State
   const [selectedApp, setSelectedApp] = useState<{ id: string, type: string, amount: number, data?: any } | null>(null);
@@ -73,6 +74,20 @@ const ApplicationsList: React.FC<ApplicationsListProps> = ({ navigate, formatMon
       }
     };
     fetchApplications();
+
+    // Check for Pending Gift from Session Storage
+    const checkPendingGift = async () => {
+      const token = localStorage.getItem('pending_gift_token');
+      if (token) {
+        try {
+          const { data } = await axios.get(`${import.meta.env.VITE_API_URL || ''}/api/investments/claim-gift/${token}`);
+          setPendingGift({ ...data, token });
+        } catch (e) {
+          console.error("Failed to fetch pending gift matching token", e);
+        }
+      }
+    };
+    checkPendingGift();
   }, []);
 
 
@@ -154,7 +169,31 @@ const ApplicationsList: React.FC<ApplicationsListProps> = ({ navigate, formatMon
 
       <div className="grid grid-cols-1 gap-6 print:hidden">
         {activeTab === 'DRAFTS' ? (
-          drafts.length > 0 ? (
+          <>
+            {/* Surfaced Pending Gift Block */}
+            {pendingGift && (
+              <div className="mb-8 p-8 rounded-[3rem] bg-gradient-to-br from-rose-500/10 via-pink-500/5 to-transparent border-2 border-rose-500/20 shadow-2xl shadow-rose-500/10 flex flex-col md:flex-row items-center gap-8 animate-in slide-in-from-top-4 duration-700 relative overflow-hidden group">
+                   <div className="absolute -top-10 -right-10 size-40 bg-rose-500/10 rounded-full blur-3xl group-hover:bg-rose-500/20 transition-all"></div>
+                   <div className="size-20 bg-rose-500 text-white rounded-3xl flex items-center justify-center shadow-xl shadow-rose-500/40 shrink-0 transform -rotate-6 group-hover:rotate-0 transition-transform">
+                     <span className="material-symbols-outlined text-4xl">redeem</span>
+                   </div>
+                   <div className="flex-1 space-y-2 text-center md:text-left">
+                     <div className="flex items-center justify-center md:justify-start gap-3">
+                       <h3 className="text-2xl font-black text-slate-900 dark:text-white uppercase tracking-tight">Incoming Gift Ready! 🎁</h3>
+                       <span className="px-3 py-1 bg-rose-500 text-white text-[10px] font-black rounded-full uppercase tracking-widest animate-pulse">Claim Now</span>
+                     </div>
+                     <p className="text-slate-600 dark:text-slate-400 font-medium">You have a pending gift investment of <span className="text-rose-600 dark:text-rose-400 font-black">{formatMoney(parseFloat(pendingGift.amount))}</span> waiting for you.</p>
+                   </div>
+                   <div className="flex items-center gap-4">
+                     <button onClick={() => { localStorage.setItem('pending_gift_token', pendingGift.token); navigate('INVESTMENT_FLOW'); }} className="px-10 py-5 bg-rose-500 text-white font-black rounded-2xl shadow-xl shadow-rose-500/30 hover:scale-[1.02] active:scale-95 transition-all flex items-center gap-3">
+                       Claim Investment
+                       <span className="material-symbols-outlined">arrow_forward</span>
+                     </button>
+                   </div>
+              </div>
+            )}
+
+            {drafts.length > 0 ? (
             drafts.map((draft) => (
               <div
                 key={draft.id}
@@ -166,7 +205,9 @@ const ApplicationsList: React.FC<ApplicationsListProps> = ({ navigate, formatMon
 
                 <div className="flex-1 space-y-1 text-center md:text-left">
                   <div className="flex flex-wrap items-center justify-center md:justify-start gap-3">
-                    <h3 className="text-xl font-black text-slate-900 dark:text-white uppercase tracking-tight">{draft.label || (draft.type === 'LOAN' ? 'Business Loan' : 'NOLT Investment')}</h3>
+                    <h3 className="text-xl font-black text-slate-900 dark:text-white uppercase tracking-tight">
+                      {draft.label || (draft.type === 'LOAN' ? 'Business Loan' : (draft.data?.isGift ? 'Gift Investment 🎁' : (draft.data?.isTopUp ? 'Investment Top-Up' : 'NOLT Investment')))}
+                    </h3>
                     <span className="px-3 py-1 bg-slate-100 dark:bg-slate-700 text-slate-500 text-[10px] font-black rounded-full uppercase tracking-widest">#{draft.id}</span>
                   </div>
 
@@ -215,7 +256,8 @@ const ApplicationsList: React.FC<ApplicationsListProps> = ({ navigate, formatMon
               <p className="text-slate-400 font-bold">No saved drafts found.</p>
               <button onClick={() => navigate('PRODUCT_SELECT')} className="text-primary font-black uppercase tracking-widest text-sm hover:underline">Start a new one</button>
             </div>
-          )
+            )}
+          </>
         ) : (
           completedApps.map((item: any) => (
             <div
@@ -533,7 +575,10 @@ const ApplicationsList: React.FC<ApplicationsListProps> = ({ navigate, formatMon
             <p className="text-sm text-slate-500 dark:text-slate-400 font-bold leading-relaxed">Our team is available 24/7 to help you with your applications or payment confirmations.</p>
           </div>
         </div>
-        <button className="whitespace-nowrap px-10 py-4 rounded-full border-2 border-primary text-primary font-black text-sm hover:bg-primary hover:text-white transition-all active:scale-95">
+        <button 
+          onClick={() => (window as any).zE?.('messenger', 'open')}
+          className="whitespace-nowrap px-10 py-4 rounded-full border-2 border-primary text-primary font-black text-sm hover:bg-primary hover:text-white transition-all active:scale-95"
+        >
           Talk to Us
         </button>
       </div>

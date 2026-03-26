@@ -115,14 +115,23 @@ const AppContent: React.FC = () => {
   // Resume Gift Choice after Login
   useEffect(() => {
     if (user.isLoggedIn) {
-      const pendingToken = sessionStorage.getItem('pending_gift_token');
+      const pendingToken = localStorage.getItem('pending_gift_token');
       if (pendingToken) {
-        console.log("Resuming pending gift claim:", pendingToken);
-        sessionStorage.removeItem('pending_gift_token');
-        navigateRouter(`/investment?gift_token=${pendingToken}`, { replace: true });
+        // If we are on login/register/success/verify, or if we were just redirected to dashboard
+        const currentPath = window.location.pathname;
+        const isAuthPath = ['/login', '/register', '/verify', '/dashboard'].includes(currentPath);
+        
+        if (isAuthPath || searchParams.get('login') === 'success') {
+            console.log("Resuming pending gift claim from path:", currentPath, "Token:", pendingToken);
+            // We DON'T remove the token here anymore, let the target flow or user action handle it
+            // Use a slight delay to ensure other effects have settled
+            setTimeout(() => {
+                navigateRouter(`/investment?gift_token=${pendingToken}`, { replace: true });
+            }, 100);
+        }
       }
     }
-  }, [user.isLoggedIn, navigateRouter, user.email]);
+  }, [user.isLoggedIn, navigateRouter, user.email, searchParams]);
 
   const [showLogoutModal, setShowLogoutModal] = useState(false);
 
@@ -200,11 +209,15 @@ const AppContent: React.FC = () => {
   // Handle Google Login Callback
   useEffect(() => {
     if (searchParams.get('login') === 'success') {
-      // handleLogin('google-user@example.com');
-      // Remove query param
-      navigateRouter('/dashboard', { replace: true });
+      const pendingToken = localStorage.getItem('pending_gift_token');
+      if (pendingToken) {
+          console.log("Google login success with pending gift, redirection will be handled by auth effect");
+          // Redirection is handled by the useEffect above that watches user.isLoggedIn
+      } else {
+          navigateRouter('/dashboard', { replace: true });
+      }
     }
-  }, [searchParams, handleLogin, navigateRouter]);
+  }, [searchParams, navigateRouter]);
 
   const performLogout = useCallback(async () => {
     try {
@@ -301,9 +314,7 @@ const AppContent: React.FC = () => {
   }, []);
 
   const handleLegacyNavigate = (step: string, draft?: SavedDraft | null) => {
-    if (draft) {
-      setResumeDraft(draft);
-    }
+    setResumeDraft(draft || null);
 
     // Map legacy steps to routes
     const routeMap: Record<string, string> = {
@@ -520,6 +531,7 @@ const AppContent: React.FC = () => {
         <Route path="/loan/*" element={
           <ProtectedRoute user={user} isLoading={isLoading} theme={theme} onLogout={handleLogoutRequest} onToggleTheme={toggleTheme}>
             <LoanFlow
+              key={resumeDraft?.id || 'fresh-loan'}
               initialStep="TYPE"
               onComplete={handleLoanComplete}
               navigate={handleLegacyNavigate}
@@ -533,10 +545,12 @@ const AppContent: React.FC = () => {
         <Route path="/investment/*" element={
           <ProtectedRoute user={user} isLoading={isLoading} theme={theme} onLogout={handleLogoutRequest} onToggleTheme={toggleTheme}>
             <InvestmentFlow
+              key={resumeDraft?.id || 'fresh'}
               navigate={handleLegacyNavigate}
               onComplete={handleInvestmentComplete}
               formatMoney={formatMoney}
               initialDraft={resumeDraft}
+              user={user}
             />
           </ProtectedRoute>
         } />

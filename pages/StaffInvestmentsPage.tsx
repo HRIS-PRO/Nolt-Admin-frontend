@@ -23,6 +23,7 @@ const StaffInvestmentsPage: React.FC<StaffInvestmentsPageProps> = ({ user, onLog
     const [searchQuery, setSearchQuery] = useState('');
     const [statusFilter, setStatusFilter] = useState('all');
     const [stageFilter, setStageFilter] = useState('all');
+    const [entityFilter, setEntityFilter] = useState('all');
 
     const initialFormData = {
         plan: 'NOLT Rise',
@@ -213,8 +214,9 @@ const StaffInvestmentsPage: React.FC<StaffInvestmentsPageProps> = ({ user, onLog
                         
                         const matchesStatus = statusFilter === 'all' || inv.status === statusFilter;
                         const matchesStage = stageFilter === 'all' || (inv.stage || 'submitted') === stageFilter;
+                        const matchesEntity = entityFilter === 'all' || inv.entity_type === entityFilter;
 
-                        return matchesSearch && matchesStatus && matchesStage;
+                        return matchesSearch && matchesStatus && matchesStage && matchesEntity;
                     });
 
                     return (
@@ -259,6 +261,15 @@ const StaffInvestmentsPage: React.FC<StaffInvestmentsPageProps> = ({ user, onLog
                                     <option value="rejected">Rejected</option>
                                     <option value="terminated">Terminated</option>
                                 </select>
+                                <select 
+                                    value={entityFilter}
+                                    onChange={(e) => setEntityFilter(e.target.value)}
+                                    className="px-4 py-2 bg-white dark:bg-[#1e293b] border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300 outline-none"
+                                >
+                                    <option value="all">All Entities</option>
+                                    <option value="INDIVIDUAL">Individual</option>
+                                    <option value="CORPORATE">Corporate</option>
+                                </select>
                             </div>
                         </div>
 
@@ -268,6 +279,7 @@ const StaffInvestmentsPage: React.FC<StaffInvestmentsPageProps> = ({ user, onLog
                                     <tr className="border-b border-slate-100 dark:border-slate-800">
                                         <th className="p-4 w-4"></th>
                                         <th className="p-4">Reference ID</th>
+                                        <th className="p-4">Entity</th>
                                         <th className="p-4">Applicant</th>
                                         <th className="p-4">Investment Plan</th>
                                         <th className="p-4">Principal Amount</th>
@@ -281,23 +293,47 @@ const StaffInvestmentsPage: React.FC<StaffInvestmentsPageProps> = ({ user, onLog
                                 <tbody className="text-sm divide-y divide-slate-100 dark:divide-slate-800">
                                     {filteredInvestments.length > 0 ? (
                                         filteredInvestments.map((inv) => (
-                                            <tr key={inv.id} className="group hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-all duration-300 cursor-pointer" onClick={() => navigate(`/staff/investments/${inv.id}`)}>
+                                            <tr key={inv.id} className={`group hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-all duration-300 cursor-pointer ${inv.is_gift ? 'bg-rose-50/50 dark:bg-rose-900/10' : ''}`} onClick={() => navigate(`/staff/investments/${inv.id}`)}>
                                                 <td className="p-4">
-                                                    <div className="size-4 rounded border border-slate-300 dark:border-slate-700 flex items-center justify-center transition-colors"></div>
+                                                    <div className={`size-4 rounded border transition-colors ${inv.is_gift ? 'border-rose-300 bg-rose-200' : 'border-slate-300 dark:border-slate-700'}`}>
+                                                        {inv.is_gift && <span className="material-symbols-outlined text-rose-600 text-[10px] font-black">favorite</span>}
+                                                    </div>
                                                 </td>
                                                 <td className="p-4 font-mono text-slate-500 dark:text-slate-400 text-xs text-nowrap">
                                                     INV-{inv.id}
                                                 </td>
                                                 <td className="p-4">
+                                                    <div className={`flex items-center gap-2 px-2 py-1 rounded-lg border w-fit text-[9px] font-black uppercase tracking-widest ${
+                                                        inv.entity_type === 'CORPORATE' ? 'border-blue-500/20 bg-blue-500/10 text-blue-500' : 'border-slate-400/20 bg-slate-400/10 text-slate-500 dark:text-slate-400'
+                                                    }`}>
+                                                        <span className="material-symbols-outlined text-[12px]">
+                                                            {inv.entity_type === 'CORPORATE' ? 'domain' : 'person'}
+                                                        </span>
+                                                        {inv.entity_type || 'INDIVIDUAL'}
+                                                    </div>
+                                                </td>
+                                                <td className="p-4">
                                                     <div className="flex items-center gap-3">
-                                                        <div className="size-8 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-xs font-bold text-slate-700 dark:text-white border border-slate-200 dark:border-slate-600 shrink-0">
-                                                            {inv.rep_full_name ? inv.rep_full_name.charAt(0) : (inv.customer_name ? inv.customer_name.charAt(0) : '?')}
+                                                        <div className={`size-8 rounded-full flex items-center justify-center text-xs font-bold border shrink-0 ${
+                                                            inv.is_gift ? 'bg-rose-100 border-rose-200 text-rose-600' : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-white border-slate-200 dark:border-slate-600'
+                                                        }`}>
+                                                            {inv.company_name ? inv.company_name.charAt(0) : (inv.rep_full_name ? inv.rep_full_name.charAt(0) : '?')}
                                                         </div>
                                                         <div className="flex flex-col">
-                                                            <span className="font-bold text-slate-900 dark:text-white text-xs">
-                                                                {inv.rep_full_name || inv.customer_name || 'Individual'}
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="font-bold text-slate-900 dark:text-white text-xs">
+                                                                    {inv.company_name || inv.rep_full_name || 'Anonymous'}
+                                                                </span>
+                                                                {inv.is_gift && (
+                                                                    <span className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-rose-500 text-white text-[8px] font-black uppercase tracking-tighter">
+                                                                        <span className="material-symbols-outlined text-[8px]">featured_seasonal</span>
+                                                                        GIFT
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                            <span className="text-[10px] font-bold text-slate-500">
+                                                                {inv.entity_type === 'CORPORATE' ? inv.rep_full_name : inv.customer_email}
                                                             </span>
-                                                            <span className="text-[10px] font-bold text-slate-500 lowercase">{inv.customer_email || 'No email'}</span>
                                                         </div>
                                                     </div>
                                                 </td>

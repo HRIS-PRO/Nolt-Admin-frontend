@@ -1,7 +1,8 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
+import axios from 'axios';
 import { motion } from 'framer-motion';
 import { useSearchParams } from 'react-router-dom';
-import { AppStep, SavedDraft, Currency, InvestmentPlan, PayoutFrequency } from '../types';
+import { AppStep, SavedDraft, Currency, InvestmentPlan, PayoutFrequency, UserState } from '../types';
 import { storageService } from '../services/storageService';
 import { investmentService } from '../services/investmentService';
 import GiftInvestmentFlow from './investment/GiftInvestmentFlow';
@@ -11,6 +12,7 @@ interface InvestmentFlowProps {
   onComplete: () => void;
   formatMoney: (amount: number, curr?: string) => string;
   initialDraft?: SavedDraft | null;
+  user: UserState;
 }
 
 const NIGERIAN_STATES = [
@@ -20,7 +22,7 @@ const NIGERIAN_STATES = [
   "Rivers", "Sokoto", "Taraba", "Yobe", "Zamfara"
 ];
 
-const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, formatMoney, initialDraft }) => {
+const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, formatMoney, initialDraft, user }) => {
   const [searchParams] = useSearchParams();
   const giftTokenFromUrl = searchParams.get('gift_token') || sessionStorage.getItem('pending_gift_token');
 
@@ -64,11 +66,41 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
   const [maidenName, setMaidenName] = useState(initialDraft?.data?.maidenName ?? '');
   const [religion, setReligion] = useState(initialDraft?.data?.religion ?? 'Prefer not to say');
   const [maritalStatus, setMaritalStatus] = useState(initialDraft?.data?.maritalStatus ?? 'Single');
+  // Corporate specific fields (from LMS)
+  const [isAuthorizedRep, setIsAuthorizedRep] = useState(initialDraft?.data?.isAuthorizedRep ?? false);
+  const [authRepPhone, setAuthRepPhone] = useState(initialDraft?.data?.authRepPhone ?? '');
+  const [rcNumber, setRcNumber] = useState(initialDraft?.data?.rcNumber ?? '');
+  const [incorpDate, setIncorpDate] = useState(initialDraft?.data?.incorpDate ?? '');
+  const [businessAddress, setBusinessAddress] = useState(initialDraft?.data?.businessAddress ?? '');
+  const [businessNature, setBusinessNature] = useState(initialDraft?.data?.businessNature ?? '');
+  const [tin, setTin] = useState(initialDraft?.data?.tin ?? '');
+  const [directorCount, setDirectorCount] = useState<number>(initialDraft?.data?.directorCount ?? 1);
+  const [directors, setDirectors] = useState<any[]>(initialDraft?.data?.directors ?? [{
+      surname: '', firstName: '', middleName: '', phone: '', gender: '', dob: '', bvn: '', nin: '', isPep: false, photo: null, id_card: null
+  }]);
+  const [companyName, setCompanyName] = useState(initialDraft?.data?.companyName ?? '');
+  
+  // Name split for Individual (Requested refinement)
+  const nameParts = (user.name || '').trim().split(/\s+/);
+  const defSurname = nameParts.length > 1 ? nameParts[nameParts.length - 1] : '';
+  const defFirstName = nameParts[0] || '';
+  const defMiddleName = nameParts.length > 2 ? nameParts.slice(1, -1).join(' ') : '';
+
+  const [surname, setSurname] = useState(initialDraft?.data?.surname || defSurname);
+  const [firstName, setFirstName] = useState(initialDraft?.data?.firstName || defFirstName);
+  const [middleName, setMiddleName] = useState(initialDraft?.data?.middleName || defMiddleName);
+  
+  useEffect(() => {
+    if (entityType === 'INDIVIDUAL') {
+      setFullName(`${surname} ${firstName} ${middleName}`.replace(/\s+/g, ' ').trim());
+    }
+  }, [surname, firstName, middleName, entityType]);
+
 
   // Contact & Verification
   const [countryCode, setCountryCode] = useState(initialDraft?.data?.countryCode ?? '+234');
   const [mobileNumber, setMobileNumber] = useState(initialDraft?.data?.mobileNumber ?? '');
-  const [contactEmail, setContactEmail] = useState(initialDraft?.data?.contactEmail ?? '');
+  const [contactEmail, setContactEmail] = useState(initialDraft?.data?.contactEmail || user.email || '');
   const [bvn, setBvn] = useState(initialDraft?.data?.bvn ?? '');
   const [nin, setNin] = useState(initialDraft?.data?.nin ?? '');
 
@@ -82,11 +114,7 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
   const [nokRelationship, setNokRelationship] = useState(initialDraft?.data?.nokRelationship ?? '');
   const [nokAddress, setNokAddress] = useState(initialDraft?.data?.nokAddress ?? '');
 
-  // Corporate Specific
-  const [companyName, setCompanyName] = useState(initialDraft?.data?.companyName ?? '');
-  const [companyAddress, setCompanyAddress] = useState(initialDraft?.data?.companyAddress ?? '');
-  const [dateOfIncorporation, setDateOfIncorporation] = useState(initialDraft?.data?.dateOfIncorporation ?? '');
-  const [directorsArePep, setDirectorsArePep] = useState<boolean | null>(initialDraft?.data?.directorsArePep ?? null);
+
 
   // Top-Up
   const [isTopUp, setIsTopUp] = useState(initialDraft?.data?.isTopUp ?? false);
@@ -104,6 +132,47 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
       board_res: null
     }
   );
+
+  const individualDocs = useMemo(() => [
+    { id: 'gov_id', label: 'Government ID', icon: 'badge', required: true },
+    { id: 'utility_bill', label: 'Utility Bill', icon: 'description', required: true },
+    { id: 'selfie', label: 'Selfie', icon: 'add_a_photo', required: true },
+    { id: 'secondary_id', label: 'Secondary Government ID/Doc', icon: 'assignment_ind', required: true }
+  ], []);
+
+  const corporateDocs = useMemo(() => {
+    const docs: any[] = [];
+    directors.forEach((director, index) => {
+      const name = director.firstName && director.surname ? `${director.firstName} ${director.surname}` : `Director ${index + 1}`;
+      docs.push({
+        id: `director_photo_${index}`,
+        label: `Photo of Director ${index + 1} (${name})`,
+        icon: 'account_circle',
+        required: true
+      });
+      docs.push({
+        id: `director_id_${index}`,
+        label: `ID Card of Director ${index + 1} (${name})`,
+        icon: 'badge',
+        required: true
+      });
+    });
+    docs.push(
+      { id: 'company_profile', label: 'Company Profile', icon: 'business', required: true },
+      { id: 'status_report', label: 'Status Report', icon: 'analytics', required: true },
+      { id: 'memart', label: 'Memorandum & Articles of Association', icon: 'menu_book', required: true },
+      { id: 'board_resolution', label: 'Board Resolution of Authority to Transact with NOLT Finance', icon: 'gavel', required: true },
+      { id: 'annual_returns', label: 'Evidence of Filing of Annual Returns', icon: 'history_edu', required: true },
+      { id: 'utility_bill', label: 'Utility Bill', icon: 'home_work', required: true }
+    );
+    return docs;
+  }, [directors]);
+
+  const currentDocs = useMemo(() => entityType === 'CORPORATE' ? corporateDocs : individualDocs, [entityType, corporateDocs, individualDocs]);
+
+  const isSecureVaultComplete = useMemo(() => {
+    return currentDocs.filter(d => d.required).every(d => !!uploadedDocs[d.id]);
+  }, [currentDocs, uploadedDocs]);
   const [uploadProgress, setUploadProgress] = useState<Record<string, number>>({});
   const [receiptProgress, setReceiptProgress] = useState(0);
   const [receiptFile, setReceiptFile] = useState<{ name: string; size: string, url?: string } | null>(null);
@@ -150,6 +219,12 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
 
   // Auto-Prefill from Existing Investment
   useEffect(() => {
+    // If we are resuming a draft, don't stomp over it with old investment data
+    if (initialDraft) {
+      console.log("Resuming draft, skipping auto-prefill from latest investment");
+      return;
+    }
+
     const prefillData = async () => {
       try {
         const latestInfo = await investmentService.getLatestInvestment();
@@ -175,20 +250,59 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
           setNokRelationship(latestInfo.nok_relationship || '');
           setNokAddress(latestInfo.nok_address || '');
           
-          setUploadedDocs(prev => ({
-            ...prev,
-            gov_id: latestInfo.rep_id_url ? { name: 'Previous Gov ID', size: 'Pre-filled', url: latestInfo.rep_id_url } : null,
-            utility_bill: latestInfo.utility_bill_url ? { name: 'Previous Utility Bill', size: 'Pre-filled', url: latestInfo.utility_bill_url } : null,
-            selfie: latestInfo.rep_selfie_url ? { name: 'Previous Selfie', size: 'Pre-filled', url: latestInfo.rep_selfie_url } : null,
-            secondary_id: latestInfo.secondary_id_url ? { name: 'Previous Secondary ID', size: 'Pre-filled', url: latestInfo.secondary_id_url } : null,
-          }));
+          setUploadedDocs(prev => {
+            const updated = { ...prev };
+            // Basic Docs
+            if (latestInfo.rep_id_url) updated.gov_id = { name: 'Previous Gov ID', size: 'Pre-filled', url: latestInfo.rep_id_url };
+            if (latestInfo.utility_bill_url) updated.utility_bill = { name: 'Previous Utility Bill', size: 'Pre-filled', url: latestInfo.utility_bill_url };
+            if (latestInfo.rep_selfie_url) updated.selfie = { name: 'Previous Selfie', size: 'Pre-filled', url: latestInfo.rep_selfie_url };
+            if (latestInfo.secondary_id_url) updated.secondary_id = { name: 'Previous Secondary ID', size: 'Pre-filled', url: latestInfo.secondary_id_url };
+            
+            // Corporate Docs (Mapping DB columns to UI IDs)
+            if (latestInfo.company_profile_url) updated.company_profile = { name: 'Previous Corporate Doc', size: 'Pre-filled', url: latestInfo.company_profile_url };
+            if (latestInfo.status_report_url) updated.status_report = { name: 'Previous Status Report', size: 'Pre-filled', url: latestInfo.status_report_url };
+            if (latestInfo.memart_url) updated.memart = { name: 'Previous MeMart', size: 'Pre-filled', url: latestInfo.memart_url };
+            if (latestInfo.board_resolution_url) updated.board_resolution = { name: 'Previous Board Resolution', size: 'Pre-filled', url: latestInfo.board_resolution_url };
+            if (latestInfo.annual_returns_url) updated.annual_returns = { name: 'Previous Annual Returns', size: 'Pre-filled', url: latestInfo.annual_returns_url };
+            
+            return updated;
+          });
+
+          if (latestInfo.entity_type === 'CORPORATE') {
+            setEntityType('CORPORATE');
+            setCompanyName(latestInfo.company_name || '');
+            setRcNumber(latestInfo.rc_number || '');
+            setIncorpDate(latestInfo.date_of_incorporation ? new Date(latestInfo.date_of_incorporation).toISOString().split('T')[0] : '');
+            setBusinessAddress(latestInfo.business_address || '');
+            setBusinessNature(latestInfo.business_nature || '');
+            setTin(latestInfo.tin || '');
+            setIsAuthorizedRep(latestInfo.is_authorized_rep || false);
+            setAuthRepPhone(latestInfo.auth_rep_phone || '');
+            if (latestInfo.directors) {
+                try {
+                    const parsedDirectors = typeof latestInfo.directors === 'string' ? JSON.parse(latestInfo.directors) : latestInfo.directors;
+                    setDirectors(parsedDirectors);
+                    setDirectorCount(parsedDirectors.length);
+                    
+                    // Inject director documents from array into uploadedDocs
+                    setUploadedDocs(prev => {
+                      const updated = { ...prev };
+                      parsedDirectors.forEach((dir: any, idx: number) => {
+                        if (dir.photo) updated[`director_photo_${idx}`] = { name: 'Previous Photo', size: 'Pre-filled', url: dir.photo };
+                        if (dir.id_card) updated[`director_id_${idx}`] = { name: 'Previous ID Card', size: 'Pre-filled', url: dir.id_card };
+                      });
+                      return updated;
+                    });
+                } catch (e) { console.error("Error parsing directors:", e); }
+            }
+          }
         }
       } catch (err) {
         console.error("Error pre-filling data:", err);
       }
     };
     prefillData();
-  }, []); // Run on mount regardless of isClaimingGift
+  }, [initialDraft]); // Combined with draft check
 
   // Rate Calculation (Dynamic from Backend)
   useEffect(() => {
@@ -243,41 +357,76 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
   }, [selectedPlan, currency, serverMinAmount]);
 
   // Navigation Logic
+const handleSaveDraft = (nextStep: number) => {
+    storageService.saveDraft({
+      id: draftId,
+      progress: Math.floor((nextStep / 12) * 100),
+      lastSaved: new Date().toLocaleString(),
+      type: selectedPlan,
+      amount: parseFloat(amount.replace(/[^0-9.]/g, '') || '0'),
+      subStep: nextStep,
+      data: {
+        selectedPlan, currency, amount, tenure, rollover, targetAmount, payoutFrequency, contributionFrequency,
+        entityType, title, fullName, surname, firstName, middleName, isOnBehalf, representativeRelation, isPep,
+        gender, dob, maidenName, religion, maritalStatus, countryCode, mobileNumber, contactEmail, bvn, nin,
+        stateOfOrigin, stateOfResidence, homeAddress, nokName, nokRelationship, nokAddress,
+        companyName, businessAddress, incorpDate, rcNumber, businessNature, directors, 
+        isAuthorizedRep, authRepPhone, tin, uploadedDocs, isTopUp, casaNumber, giftToken, isClaimingGift
+      }
+    } as any);
+  };
+
   const handleNext = () => {
+    // Age Validation
+    if (subStep === 3 && entityType === 'INDIVIDUAL' && dob) {
+      const birthDate = new Date(dob);
+      const age = (new Date().getTime() - birthDate.getTime()) / (1000 * 60 * 60 * 24 * 365.25);
+      if (age < 18) {
+        alert("Applicant must be at least 18 years old to proceed.");
+        return;
+      }
+    }
+
     if (isGift) {
       if (subStep === 3) {
         handleGiftSubmit();
         return;
       }
+      handleSaveDraft(subStep + 1);
       setSubStep(prev => prev + 1);
       window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }
 
-    // Gift Claim Flow: Skip Configuration and Payment steps
     if (isClaimingGift) {
-      if (subStep === 9) { // After Documents
-        setSubStep(11); // Skip Configuration (10), go to Signature
+      if (subStep === 9) { 
+        handleSaveDraft(11);
+        setSubStep(11); 
         window.scrollTo({ top: 0, behavior: 'smooth' });
         return;
       }
-      if (subStep === 11) { // Final step (Signature)
-        handleSubmit(); // This will handle finishing without payment
+      if (subStep === 11) {
+        handleSubmit(); 
         return;
       }
     } else {
-      // Standard Flow
       if (subStep === 11) {
-        handleSubmit(); // Standard flow goes to payment step in handleSubmit
+        handleSubmit(); 
         return;
       }
     }
 
-    setSubStep(prev => prev + 1);
+    let nextStep = subStep + 1;
+    if (entityType === 'CORPORATE' && subStep === 3) {
+      nextStep = 9; // Skip Individual flow steps
+    }
+
+    handleSaveDraft(nextStep);
+    setSubStep(nextStep);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const handleBack = () => {
+const handleBack = () => {
     if (isGift) {
       if (subStep === 0) navigate('PRODUCT_SELECT');
       else setSubStep(prev => prev - 1);
@@ -285,7 +434,11 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
       return;
     }
     if (subStep > 0) {
-      setSubStep(prev => prev - 1);
+      let prevStep = subStep - 1;
+      if (entityType === 'CORPORATE' && subStep === 9) {
+        prevStep = 3;
+      }
+      setSubStep(prevStep);
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } else {
       navigate('PRODUCT_SELECT');
@@ -304,9 +457,27 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
     setIsUploading(prev => ({ ...prev, [id]: true }));
     setUploadProgress(prev => ({ ...prev, [id]: 10 }));
     try {
-      // Real upload to backend
       const result = await investmentService.uploadDocument(file, draftId, id);
-      setUploadedDocs(prev => ({ ...prev, [id]: { name: file.name, size: `${(file.size / 1024).toFixed(1)} KB`, url: result.document.file_url } }));
+      const url = result.document.file_url;
+      setUploadedDocs(prev => ({ ...prev, [id]: { name: file.name, size: `${(file.size / 1024).toFixed(1)} KB`, url } }));
+      
+      // Sync with directors array if it's a director document
+      if (id.startsWith('director_')) {
+        const parts = id.split('_');
+        const type = parts[1]; // photo or id
+        const index = parseInt(parts[2]);
+        if (!isNaN(index)) {
+          setDirectors(prev => {
+            const next = [...prev];
+            if (next[index]) {
+              if (type === 'photo') next[index].photo = url;
+              if (type === 'id') next[index].id_card = url;
+            }
+            return next;
+          });
+        }
+      }
+
       setUploadProgress(prev => ({ ...prev, [id]: 100 }));
     } catch (err) {
       console.error("Upload failed:", err);
@@ -392,6 +563,41 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
   const finalizeInvestment = async (reference: string) => {
     setLoading(true);
     try {
+      // Step 1: BVN Validation (Zeeh API)
+      // For individuals or authorized representatives in corporate
+      const bvnToCheck = bvn; 
+      
+      console.log("[BVN Validation] Starting verification for:", bvnToCheck);
+      try {
+        const kycResponse = await axios.post(`${import.meta.env.VITE_API_URL || ''}/api/kyc/verify-bvn`, {
+            bvn: bvnToCheck,
+            firstName,
+            dob,
+            mobileNumber
+        }, { withCredentials: true });
+
+        console.log("[BVN Validation] Success:", kycResponse.data);
+      } catch (kycErr: any) {
+        console.error("[BVN Validation] Failed:", kycErr.response?.data);
+        const errorData = kycErr.response?.data;
+        
+        let errorMessage = errorData?.message || "BVN verification failed. Please check your details.";
+        
+        // If it's a mismatch error, provide more detail
+        if (errorData?.matches) {
+            const missing = [];
+            if (!errorData.matches.firstName) missing.push("First Name");
+            if (!errorData.matches.dob) missing.push("Date of Birth");
+            if (!errorData.matches.phone) missing.push("Phone Number");
+            errorMessage = `Identity Verification Failed: The details on your BVN do not match your input for: ${missing.join(', ')}. At least 2 matches are required to continue.`;
+        }
+
+        alert(errorMessage);
+        setLoading(false);
+        return; // STOP submission
+      }
+
+      // Step 2: Create Investment
       const payload = {
         investment_type: `NOLT_${selectedPlan}`,
         investment_amount: parseFloat(amount),
@@ -399,6 +605,19 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
         currency,
         giftToken, // For linking if claim
         payment_reference: reference, // reference is already handled by caller (G_CLAIM_... or Paystack ref)
+        
+        // Corporate Fields
+        entity_type: entityType,
+        company_name: entityType === 'CORPORATE' ? companyName : null,
+        rc_number: entityType === 'CORPORATE' ? rcNumber : null,
+        incorp_date: entityType === 'CORPORATE' ? incorpDate : null,
+        tin: entityType === 'CORPORATE' ? tin : null,
+        business_nature: entityType === 'CORPORATE' ? businessNature : null,
+        business_address: entityType === 'CORPORATE' ? businessAddress : null,
+        is_authorized_rep: entityType === 'CORPORATE' ? isAuthorizedRep : false,
+        auth_rep_phone: entityType === 'CORPORATE' ? authRepPhone : null,
+        directors: entityType === 'CORPORATE' ? directors : [],
+
         // ... bio data ...
         rep_full_name: fullName,
         rep_phone_number: mobileNumber,
@@ -408,21 +627,31 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
         rep_state_of_residence: stateOfResidence,
         rep_street_address: homeAddress,
         title, gender, dob, mother_maiden_name: maidenName, religion, marital_status: maritalStatus,
-        is_on_behalf: isOnBehalf, representative_relation: representativeRelation, is_pep: isPep,
+        is_pep: isPep,
+        directors_are_pep: isPep, // Corporate PEP flag
         nok_name: nokName, nok_relationship: nokRelationship, nok_address: nokAddress,
         target_amount: targetAmount, rollover_option: rollover, contribution_frequency: contributionFrequency,
         interest_rate: dynamicInterestRate,
+        custom_email: contactEmail, // For record keeping
+        rep_house_number: '', // Add if needed, using empty for now
         draft_id: draftId,
         // Map URLs from uploadedDocs
         rep_selfie_url: uploadedDocs.selfie?.url || null,
         rep_id_url: uploadedDocs.gov_id?.url || null,
         secondary_id_url: uploadedDocs.secondary_id?.url || null,
         utility_bill_url: uploadedDocs.utility_bill?.url || null,
+        // Corporate Document Mappings
+        cac_url: uploadedDocs.company_profile?.url || null,
+        company_profile_url: uploadedDocs.company_profile?.url || null,
+        status_report_url: uploadedDocs.status_report?.url || null,
+        memart_url: uploadedDocs.memart?.url || null,
+        board_resolution_url: uploadedDocs.board_resolution?.url || null,
+        annual_returns_url: uploadedDocs.annual_returns?.url || null,
         signatures: [canvasRef.current?.toDataURL() || ""]
       };
 
       await investmentService.createInvestment(payload);
-      if (giftToken) sessionStorage.removeItem('pending_gift_token');
+      if (giftToken) localStorage.removeItem('pending_gift_token');
       setSubStep(12); // Go to success page
     } catch (err) {
       console.error("Submission error:", err);
@@ -587,41 +816,228 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
       )}
 
       {/* Step 2: Identity Basics */}
-      {subStep === 2 && (
+            {subStep === 2 && (
         <div className="space-y-8 animate-in fade-in slide-in-from-right-4 duration-500">
           <h2 className="text-3xl font-black dark:text-white">Identity Basics</h2>
-          <div className="grid gap-6">
-            <div className="space-y-2">
-              <label className="text-sm font-black text-slate-500 uppercase">Your Full Name</label>
-              <input
-                className="w-full h-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-6 text-lg font-bold dark:text-white focus:border-primary outline-none"
-                value={fullName}
-                onChange={e => setFullName(e.target.value)}
-                placeholder="fullname"
-              />
-            </div>
-            <div className="space-y-2"><label className="text-sm font-black text-slate-500 uppercase">Title</label><div className="flex gap-2">{['Mr', 'Mrs', 'Ms', 'Dr'].map(t => <button key={t} onClick={() => setTitle(t)} className={`px-6 py-3 rounded-xl border-2 font-bold transition-all ${title === t ? 'bg-primary border-primary text-white' : 'border-slate-100 dark:border-slate-700 dark:text-white'}`}>{t}</button>)}</div></div>
-            <div className="space-y-2">
-              <label className="text-sm font-black text-slate-500 uppercase leading-snug">Are you a Politically Exposed Person (PEP)?</label>
-              <div className="flex gap-4">
-                <button onClick={() => setIsPep(true)} className={`flex-1 h-14 rounded-xl border-2 font-black transition-all ${isPep === true ? 'bg-primary border-primary text-white' : 'border-slate-100 dark:border-slate-700 dark:text-white'}`}>Yes</button>
-                <button onClick={() => setIsPep(false)} className={`flex-1 h-14 rounded-xl border-2 font-black transition-all ${isPep === false ? 'bg-primary border-primary text-white' : 'border-slate-100 dark:border-slate-700 dark:text-white'}`}>No</button>
+          
+          {entityType === 'INDIVIDUAL' ? (
+            <div className="grid gap-8">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="space-y-2">
+                  <label className="text-sm font-black text-slate-500 uppercase">Surname</label>
+                  <input  className={`w-full h-16 rounded-2xl b g-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-6 text-lg font-bold dark:text-white focus:border-primary outline-none ${entityType === 'INDIVIDUAL' ? 'opacity-70 cursor-not-allowed select-none' : ''}`} value={surname} onChange={e => setSurname(e.target.value)} placeholder="Surname" />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-black text-slate-500 uppercase">First Name</label>
+                  <input  className={`w-full h-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-6 text-lg font-bold dark:text-white focus:border-primary outline-none ${entityType === 'INDIVIDUAL' ? 'opacity-70 cursor-not-allowed select-none' : ''}`} value={firstName} onChange={e => setFirstName(e.target.value)} placeholder="First Name" />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-black text-slate-500 uppercase">Middle Name (Optional)</label>
+                  <input  className={`w-full h-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-6 text-lg font-bold dark:text-white focus:border-primary outline-none ${entityType === 'INDIVIDUAL' ? 'opacity-70 cursor-not-allowed select-none' : ''}`} value={middleName} onChange={e => setMiddleName(e.target.value)} placeholder="Middle Name" />
+                </div>
+              </div>
+              <div className="space-y-2"><label className="text-sm font-black text-slate-500 uppercase">Title</label><div className="flex gap-2">{['Mr', 'Mrs', 'Ms', 'Dr'].map(t => <button key={t} onClick={() => setTitle(t)} className={`px-6 py-3 rounded-xl border-2 font-bold transition-all ${title === t ? 'bg-primary border-primary text-white' : 'border-slate-100 dark:border-slate-700 dark:text-white'}`}>{t}</button>)}</div></div>
+              <div className="space-y-2">
+                <label className="text-sm font-black text-slate-500 uppercase leading-snug">Are you a Politically Exposed Person (PEP)?</label>
+                <div className="flex gap-4">
+                  <button onClick={() => setIsPep(true)} className={`flex-1 h-14 rounded-xl border-2 font-black transition-all ${isPep === true ? 'bg-primary border-primary text-white' : 'border-slate-100 dark:border-slate-700 dark:text-white'}`}>Yes</button>
+                  <button onClick={() => setIsPep(false)} className={`flex-1 h-14 rounded-xl border-2 font-black transition-all ${isPep === false ? 'bg-primary border-primary text-white' : 'border-slate-100 dark:border-slate-700 dark:text-white'}`}>No</button>
+                </div>
               </div>
             </div>
-          </div>
-          <NavActions isNextDisabled={!fullName || isPep === null} />
+          ) : (
+            <div className="grid gap-6">
+              <div className="space-y-2">
+                <label className="text-sm font-black text-slate-500 uppercase">Name of Company</label>
+                <input className="w-full h-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-6 text-lg font-bold dark:text-white focus:border-primary outline-none" value={companyName} onChange={e => setCompanyName(e.target.value)} placeholder="Enter company name" />
+              </div>
+
+              <div className="space-y-4">
+                <label className="flex items-center gap-3 cursor-pointer group">
+                  <div className="relative flex items-center">
+                    <input 
+                      type="checkbox" 
+                      checked={isAuthorizedRep} 
+                      onChange={e => setIsAuthorizedRep(e.target.checked)}
+                      className="peer size-6 appearance-none rounded-lg border-2 border-slate-200 dark:border-slate-700 checked:bg-primary checked:border-primary transition-all cursor-pointer"
+                    />
+                    <span className="absolute inset-0 flex items-center justify-center text-white opacity-0 peer-checked:opacity-100 transition-opacity pointer-events-none">
+                      <span className="material-symbols-outlined text-sm font-bold">check</span>
+                    </span>
+                  </div>
+                  <span className="text-xs font-black uppercase tracking-widest text-slate-400 group-hover:text-primary transition-colors">I am an Authorized Representative</span>
+                </label>
+                {isAuthorizedRep && (
+                  <div className="space-y-2 animate-in fade-in slide-in-from-top-2 duration-300">
+                    <label className="text-sm font-black text-slate-500 uppercase">Representative Phone Number</label>
+                    <input className="w-full h-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-6 text-lg font-bold dark:text-white focus:border-primary outline-none" value={authRepPhone} onChange={e => setAuthRepPhone(e.target.value)} placeholder="080..." />
+                  </div>
+                )}
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <label className="text-sm font-black text-slate-500 uppercase">RC Number</label>
+                  <input className="w-full h-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-6 text-lg font-bold dark:text-white focus:border-primary outline-none" value={rcNumber} onChange={e => setRcNumber(e.target.value)} placeholder="RC123456" />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-black text-slate-500 uppercase">Date of Incorporation</label>
+                  <input type="date" className="w-full h-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-6 text-lg font-bold dark:text-white focus:border-primary outline-none" value={incorpDate} onChange={e => setIncorpDate(e.target.value)} />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-black text-slate-500 uppercase">Business Address</label>
+                <textarea rows={2} className="w-full p-6 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 text-lg font-bold dark:text-white focus:border-primary outline-none" value={businessAddress} onChange={e => setBusinessAddress(e.target.value)} placeholder="Full company address" />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <label className="text-sm font-black text-slate-500 uppercase">Nature of Business</label>
+                  <input className="w-full h-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-6 text-lg font-bold dark:text-white focus:border-primary outline-none" value={businessNature} onChange={e => setBusinessNature(e.target.value)} placeholder="e.g. Finance, Tech" />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-black text-slate-500 uppercase">Tax Identification Number (TIN)</label>
+                  <input className="w-full h-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-6 text-lg font-bold dark:text-white focus:border-primary outline-none" value={tin} onChange={e => setTin(e.target.value)} placeholder="1234567-0001" />
+                </div>
+              </div>
+            </div>
+          )}
+          <NavActions isNextDisabled={entityType === 'INDIVIDUAL' ? (!fullName || isPep === null) : (!companyName || !rcNumber || !incorpDate || !businessAddress)} />
         </div>
       )}
 
       {/* Step 3: Personal Details */}
-      {subStep === 3 && (
+            {subStep === 3 && (
         <div className="space-y-8 animate-in fade-in slide-in-from-right-4 duration-500">
-          <h2 className="text-3xl font-black dark:text-white">Personal Details</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-2"><label className="text-sm font-black text-slate-500 uppercase">Gender</label><select className="w-full h-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-6 text-lg font-bold dark:text-white focus:border-primary outline-none" value={gender} onChange={e => setGender(e.target.value)}><option value="">Select Gender</option><option value="Male">Male</option><option value="Female">Female</option></select></div>
-            <div className="space-y-2"><label className="text-sm font-black text-slate-500 uppercase">Date of Birth</label><input type="date" className="w-full h-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-6 text-lg font-bold dark:text-white focus:border-primary outline-none" value={dob} onChange={e => setDob(e.target.value)} /></div>
-          </div>
-          <NavActions isNextDisabled={!gender || !dob} />
+            {entityType === 'INDIVIDUAL' ? (
+              <>
+                <h2 className="text-3xl font-black dark:text-white">Personal Details</h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <label className="text-sm font-black text-slate-500 uppercase">Gender</label>
+                    <select className="w-full h-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-6 text-lg font-bold dark:text-white focus:border-primary outline-none" value={gender} onChange={e => setGender(e.target.value)}>
+                      <option value="">Select Gender</option>
+                      <option value="Male">Male</option>
+                      <option value="Female">Female</option>
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-black text-slate-500 uppercase">Date of Birth</label>
+                    <input type="date" className="w-full h-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-6 text-lg font-bold dark:text-white focus:border-primary outline-none" value={dob} onChange={e => setDob(e.target.value)} />
+                  </div>
+                </div>
+                <NavActions isNextDisabled={!gender || !dob} />
+              </>
+            ) : (
+              <>
+                <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+                  <div className="space-y-2">
+                    <h2 className="text-3xl font-black dark:text-white">Director Details</h2>
+                    <p className="text-slate-500 font-medium">Please provide information for at least one director.</p>
+                  </div>
+                  <div className="flex flex-col gap-2 min-w-[200px]">
+                    <label className="text-xs font-black text-slate-500 uppercase tracking-widest">Number of Directors</label>
+                    <select 
+                      className="h-14 rounded-xl bg-white dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 px-4 font-bold dark:text-white outline-none focus:border-primary"
+                      value={directorCount}
+                      onChange={e => {
+                        const count = parseInt(e.target.value);
+                        setDirectorCount(count);
+                        const newDirectors = [...directors];
+                        if (count > newDirectors.length) {
+                          for (let i = newDirectors.length; i < count; i++) {
+                            newDirectors.push({
+                              surname: '', firstName: '', middleName: '', phone: '', gender: '', dob: '', bvn: '', nin: '', isPep: false
+                            });
+                          }
+                        } else {
+                          newDirectors.splice(count);
+                        }
+                        setDirectors(newDirectors);
+                      }}
+                    >
+                      {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(n => <option key={n} value={n}>{n}</option>)}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="space-y-12">
+                  {directors.map((director, index) => (
+                    <div key={index} className="p-8 rounded-[2.5rem] bg-white dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-800 shadow-xl space-y-8 relative overflow-hidden">
+                      <div className="absolute top-0 left-0 w-2 h-full bg-primary"></div>
+                      <div className="flex items-center justify-between">
+                        <h3 className="text-xl font-black text-primary uppercase tracking-widest">Director {index + 1}</h3>
+                        {directors.length > 1 && (
+                          <button onClick={() => {
+                              const newDirectors = directors.filter((_, i) => i !== index);
+                              setDirectors(newDirectors);
+                              setDirectorCount(newDirectors.length);
+                            }} className="p-2 text-red-500 hover:bg-red-500/10 rounded-full transition-all" title="Remove Director"
+                          >
+                            <span className="material-symbols-outlined text-lg">delete</span>
+                          </button>
+                        )}
+                      </div>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div className="space-y-2">
+                          <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Surname</label>
+                          <input className="w-full h-14 rounded-xl bg-slate-50 dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 px-5 text-base font-bold dark:text-white focus:border-primary outline-none" value={director.surname} onChange={e => { const newD = [...directors]; newD[index].surname = e.target.value; setDirectors(newD); }} placeholder="Surname" />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-xs font-black text-slate-400 uppercase tracking-widest">First Name</label>
+                          <input className="w-full h-14 rounded-xl bg-slate-50 dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 px-5 text-base font-bold dark:text-white focus:border-primary outline-none" value={director.firstName} onChange={e => { const newD = [...directors]; newD[index].firstName = e.target.value; setDirectors(newD); }} placeholder="First Name" />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Middle Name (Optional)</label>
+                          <input className="w-full h-14 rounded-xl bg-slate-50 dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 px-5 text-base font-bold dark:text-white focus:border-primary outline-none" value={director.middleName} onChange={e => { const newD = [...directors]; newD[index].middleName = e.target.value; setDirectors(newD); }} placeholder="Middle Name" />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="space-y-2">
+                          <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Phone Number</label>
+                          <input className="w-full h-14 rounded-xl bg-slate-50 dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 px-5 text-base font-bold dark:text-white focus:border-primary outline-none" value={director.phone} onChange={e => { const newD = [...directors]; newD[index].phone = e.target.value; setDirectors(newD); }} placeholder="080..." />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Gender</label>
+                          <select className="w-full h-14 rounded-xl bg-slate-50 dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 px-5 text-base font-bold dark:text-white focus:border-primary outline-none" value={director.gender} onChange={e => { const newD = [...directors]; newD[index].gender = e.target.value; setDirectors(newD); }}>
+                            <option value="">Select Gender</option>
+                            <option value="Male">Male</option>
+                            <option value="Female">Female</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div className="space-y-2">
+                          <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Date of Birth</label>
+                          <input type="date" className="w-full h-14 rounded-xl bg-slate-50 dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 px-5 text-base font-bold dark:text-white focus:border-primary outline-none" value={director.dob} onChange={e => { const newD = [...directors]; newD[index].dob = e.target.value; setDirectors(newD); }} />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-xs font-black text-slate-400 uppercase tracking-widest">BVN</label>
+                          <input className="w-full h-14 rounded-xl bg-slate-50 dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 px-5 text-base font-bold dark:text-white focus:border-primary outline-none" value={director.bvn} onChange={e => { const newD = [...directors]; newD[index].bvn = e.target.value; setDirectors(newD); }} maxLength={11} placeholder="11 digits" />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-xs font-black text-slate-400 uppercase tracking-widest">NIN</label>
+                          <input className="w-full h-14 rounded-xl bg-slate-50 dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 px-5 text-base font-bold dark:text-white focus:border-primary outline-none" value={director.nin} onChange={e => { const newD = [...directors]; newD[index].nin = e.target.value; setDirectors(newD); }} maxLength={11} placeholder="11 digits" />
+                        </div>
+                      </div>
+
+                      <div className="space-y-4">
+                        <label className="text-sm font-black text-slate-500 uppercase">Is your Director a Politically Exposed Person (PEP)?</label>
+                        <div className="flex gap-4 max-w-xs">
+                          <button onClick={() => { const newD = [...directors]; newD[index].isPep = true; setDirectors(newD); }} className={`flex-1 h-12 rounded-xl border-2 font-black transition-all ${director.isPep === true ? 'bg-primary border-primary text-white shadow-lg shadow-primary/20' : 'border-slate-100 dark:border-slate-700 dark:text-white'}`}>Yes</button>
+                          <button onClick={() => { const newD = [...directors]; newD[index].isPep = false; setDirectors(newD); }} className={`flex-1 h-12 rounded-xl border-2 font-black transition-all ${director.isPep === false ? 'bg-primary border-primary text-white shadow-lg shadow-primary/20' : 'border-slate-100 dark:border-slate-700 dark:text-white'}`}>No</button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <NavActions isNextDisabled={directors.some(d => !d.surname || !d.firstName || !d.phone || !d.gender || !d.dob || d.bvn.length < 11 || d.nin.length < 11)} />
+              </>
+            )}
         </div>
       )}
 
@@ -660,7 +1076,8 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
               <label className="text-sm font-black text-slate-500 uppercase">Email Address</label>
               <input
                 type="email"
-                className="w-full h-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-6 text-lg font-bold dark:text-white focus:border-primary outline-none"
+                readOnly={entityType === 'INDIVIDUAL'}
+                className={`w-full h-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-6 text-lg font-bold dark:text-white focus:border-primary outline-none ${entityType === 'INDIVIDUAL' ? 'opacity-70 cursor-not-allowed select-none' : ''}`}
                 value={contactEmail}
                 onChange={e => setContactEmail(e.target.value)}
                 placeholder="e.g. name@example.com"
@@ -749,15 +1166,10 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
 
       {/* Step 9: Docs */}
       {subStep === 9 && (
-        <div className="space-y-8 animate-in fade-in slide-in-from-right-4 duration-500">
+        <div className="space-y-8 animate-in fade-in slide-in-from-right-4 duration-500 pb-20">
           <h2 className="text-3xl font-black dark:text-white">Secure Vault</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {[
-              { id: 'gov_id', label: 'Gov ID', icon: 'badge', required: true },
-              { id: 'utility_bill', label: 'Utility Bill', icon: 'description', required: true },
-              { id: 'selfie', label: 'Selfie (Optional)', icon: 'add_a_photo', required: false },
-              { id: 'secondary_id', label: 'Secondary Government ID/Doc', icon: 'branding_watermark', required: false }
-            ].map(doc => (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {currentDocs.map(doc => (
               <div key={doc.id} className="relative">
                 <input
                   type="file"
@@ -767,26 +1179,27 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
                 />
                 <label
                   htmlFor={`upload-${doc.id}`}
-                  className={`p-6 rounded-[2rem] border-2 border-dashed transition-all cursor-pointer flex flex-col items-center gap-3 w-full min-h-[180px] justify-center ${uploadedDocs[doc.id] ? 'border-green-500 bg-green-500/5' : 'border-slate-200 dark:border-slate-700 hover:border-primary'}`}
+                  className={`p-10 rounded-[2.5rem] border-2 border-dashed transition-all cursor-pointer flex flex-col items-center gap-5 w-full min-h-[200px] justify-center ${uploadedDocs[doc.id] ? 'border-green-500 bg-green-500/5' : 'border-slate-200 dark:border-slate-700 hover:border-primary hover:bg-primary/5'}`}
                 >
                   {uploadedDocs[doc.id] ? (
-                    <div className="size-12 rounded-full bg-green-500 text-white flex items-center justify-center"><span className="material-symbols-outlined text-2xl">check</span></div>
+                    <div className="size-16 rounded-full bg-green-500 text-white flex items-center justify-center shadow-lg shadow-green-500/20"><span className="material-symbols-outlined text-3xl">task_alt</span></div>
                   ) : isUploading[doc.id] ? (
-                    <div className="size-12 border-4 border-primary/20 border-t-primary rounded-full animate-spin"></div>
+                    <div className="size-16 border-4 border-primary/20 border-t-primary rounded-full animate-spin"></div>
                   ) : (
-                    <div className="size-12 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-400"><span className="material-symbols-outlined text-2xl">{doc.icon}</span></div>
+                    <div className="size-16 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-400 group-hover:bg-primary group-hover:text-white transition-all"><span className="material-symbols-outlined text-3xl">{doc.icon}</span></div>
                   )}
-                  <div className="text-center">
-                    <h4 className="font-bold text-sm dark:text-white">{doc.label}</h4>
-                    {uploadedDocs[doc.id] && <p className="text-[9px] text-slate-500 truncate max-w-[120px] mx-auto mt-1">{uploadedDocs[doc.id]?.name}</p>}
+                  <div className="text-center space-y-2">
+                    <h4 className="font-black text-sm uppercase tracking-tight dark:text-white">{doc.label}</h4>
+                    <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">{doc.required ? 'Required' : 'Optional'}</p>
+                    {uploadedDocs[doc.id] && <p className="text-[10px] text-primary font-black truncate max-w-[150px] mx-auto bg-primary/10 px-3 py-1 rounded-full">{uploadedDocs[doc.id]?.name}</p>}
                   </div>
                   {uploadProgress[doc.id] > 0 && uploadProgress[doc.id] < 100 && (
-                    <div className="w-full h-1 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden mt-1">
+                    <div className="w-full h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden mt-2 shadow-inner">
                       <div className="h-full bg-primary transition-all duration-300" style={{ width: `${uploadProgress[doc.id]}%` }}></div>
                     </div>
                   )}
                   {uploadedDocs[doc.id] && (
-                    <button onClick={() => removeDoc(doc.id)} className="absolute top-4 right-4 text-red-500 hover:scale-110 transition-transform">
+                    <button onClick={(e) => { e.preventDefault(); removeDoc(doc.id); }} className="absolute top-6 right-6 p-2 text-red-500 hover:bg-red-500/10 rounded-full transition-all">
                       <span className="material-symbols-outlined text-lg">cancel</span>
                     </button>
                   )}
@@ -794,7 +1207,7 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
               </div>
             ))}
           </div>
-          <NavActions isNextDisabled={!uploadedDocs.gov_id || !uploadedDocs.secondary_id || !uploadedDocs.utility_bill} />
+          <NavActions isNextDisabled={!isSecureVaultComplete} />
         </div>
       )}
 
@@ -1024,6 +1437,7 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
                   width={400}
                   height={220}
                   className="w-full h-56 cursor-crosshair touch-none"
+                  style={{ touchAction: 'none' }}
                   onMouseDown={(e) => {
                     const rect = canvasRef.current?.getBoundingClientRect();
                     if (!rect) return;

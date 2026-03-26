@@ -9,7 +9,7 @@ interface DashboardProps {
 }
 
 const Dashboard: React.FC<DashboardProps> = ({ navigate }) => {
-
+  const [pendingGiftToken, setPendingGiftToken] = React.useState<string | null>(localStorage.getItem('pending_gift_token'));
   const navigateRouter = useNavigate();
   return (
     <div className="max-w-5xl mx-auto px-6 py-16 flex flex-col items-center gap-12">
@@ -21,6 +21,26 @@ const Dashboard: React.FC<DashboardProps> = ({ navigate }) => {
           Apply for flexible financing or secure your future with high-yield investments.
         </p>
       </div>
+      
+      {pendingGiftToken && (
+        <div className="w-full max-w-4xl p-8 rounded-[2.5rem] bg-gradient-to-r from-rose-500/10 to-indigo-500/5 border-2 border-rose-500/20 shadow-xl shadow-rose-500/10 flex flex-col md:flex-row items-center gap-8 animate-in slide-in-from-top-4 duration-700 relative overflow-hidden group">
+            <div className="absolute top-0 right-0 size-40 bg-rose-500/10 rounded-full blur-3xl -mr-20 -mt-20"></div>
+            <div className="size-20 bg-rose-500 text-white rounded-3xl flex items-center justify-center shadow-lg shadow-rose-500/30 transform -rotate-6 group-hover:rotate-0 transition-transform">
+                <span className="material-symbols-outlined text-4xl">redeem</span>
+            </div>
+            <div className="flex-1 space-y-2 text-center md:text-left">
+                <h3 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">You've reached your gift! 🎁</h3>
+                <p className="text-slate-500 dark:text-slate-400 font-medium">Click below to claim your investment and start growing your wealth.</p>
+            </div>
+            <button 
+                onClick={() => navigateRouter(`/investment?gift_token=${pendingGiftToken}`)}
+                className="px-10 py-5 bg-rose-500 text-white font-black rounded-2xl shadow-xl shadow-rose-500/30 hover:scale-[1.02] active:scale-95 transition-all flex items-center gap-3"
+            >
+                Claim Now
+                <span className="material-symbols-outlined">arrow_forward</span>
+            </button>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8 w-full">
         <button
@@ -50,7 +70,7 @@ const Dashboard: React.FC<DashboardProps> = ({ navigate }) => {
             </div>
             <span className="px-3 py-1 bg-primary/10 text-primary text-xs font-black rounded-full border border-primary/20">{storageService.getDrafts().length} SAVED</span>
           </div>
-          <h3 className="text-2xl font-bold mb-4 dark:text-white">Continue from Saved</h3>
+          <h3 className="text-2xl font-bold mb-4 dark:text-white">My Applications</h3>
           <p className="text-slate-500 dark:text-slate-400 leading-relaxed mb-10 flex-1">
             Resume your previous applications where you left off. You have pending drafts waiting for completion.
           </p>
@@ -70,10 +90,13 @@ const Dashboard: React.FC<DashboardProps> = ({ navigate }) => {
             <span className="material-symbols-outlined text-primary text-[20px] filled">calculate</span>
             Calculator
           </button>
-          <div className="flex items-center gap-2 px-6 py-3 bg-slate-100 dark:bg-slate-800 rounded-xl text-sm font-black text-slate-600 dark:text-slate-300">
+          <button
+            onClick={() => (window as any).zE?.('messenger', 'open')}
+            className="flex items-center gap-2 px-6 py-3 bg-slate-100 dark:bg-slate-800 rounded-xl text-sm font-black text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-all"
+          >
             <span className="material-symbols-outlined text-primary text-[20px]">support_agent</span>
             Support
-          </div>
+          </button>
         </div>
         <p className="text-sm text-slate-400">Last login: Today, 10:42 AM</p>
       </div>
