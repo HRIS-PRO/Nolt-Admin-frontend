@@ -24,7 +24,7 @@ const NIGERIAN_STATES = [
 
 const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, formatMoney, initialDraft, user }) => {
   const [searchParams] = useSearchParams();
-  const giftTokenFromUrl = searchParams.get('gift_token') || sessionStorage.getItem('pending_gift_token');
+  const giftTokenFromUrl = searchParams.get('gift_token') || localStorage.getItem('pending_gift_token') || sessionStorage.getItem('pending_gift_token');
 
   const [subStep, setSubStep] = useState(initialDraft?.subStep ?? 0);
   const [loading, setLoading] = useState(false);
@@ -201,6 +201,13 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
         try {
           const gift = await investmentService.getGiftDetails(giftToken);
           if (gift) {
+            if (gift.status === 'claimed') {
+              console.log("Gift already claimed, clearing storage and redirecting.");
+              localStorage.removeItem('pending_gift_token');
+              sessionStorage.removeItem('pending_gift_token');
+              window.location.href = `/claim-gift?token=${giftToken}`;
+              return;
+            }
             setIsClaimingGift(true);
             setSelectedPlan(gift.plan_name);
             setAmount(gift.amount.toString());
@@ -210,6 +217,7 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
           }
         } catch (err) {
           console.error("Gift claim error:", err);
+          localStorage.removeItem('pending_gift_token');
           sessionStorage.removeItem('pending_gift_token');
         }
       };
