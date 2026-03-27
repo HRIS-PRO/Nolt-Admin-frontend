@@ -97,6 +97,14 @@ const Navigation: React.FC<NavigationProps> = ({
                     <p className="text-sm font-bold text-slate-900 dark:text-white truncate">{user.name}</p>
                     <p className="text-xs text-slate-500 truncate">{user.email}</p>
                   </div>
+                  <Link
+                    to="/profile"
+                    onClick={() => setIsOpen(false)}
+                    className="w-full text-left px-4 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-900/10 font-medium flex items-center gap-2 transition-colors border-b border-slate-100 dark:border-slate-700"
+                  >
+                    <span className="material-symbols-outlined text-[18px]">account_circle</span>
+                    My Profile
+                  </Link>
                   <button
                     onClick={() => {
                       setIsOpen(false);
