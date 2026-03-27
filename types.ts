@@ -23,6 +23,23 @@ export type AppStep =
 
 export type Theme = 'light' | 'dark';
 
+export interface UserProfile {
+  first_name: string;
+  surname: string;
+  middle_name: string;
+  phone_number: string;
+  personal_email: string;
+  state_of_origin: string;
+  state_of_residence: string;
+  address: string;
+  bvn: string;
+  nin: string;
+  date_of_birth: string;
+  is_identity_verified: boolean;
+  verification_ref?: string;
+  updated_at?: string;
+}
+
 export interface UserState {
   email: string;
   name: string;
@@ -32,6 +49,7 @@ export interface UserState {
   new_comer?: boolean;
   full_name?: string;
   referral_code_used?: string;
+  profile?: UserProfile;
 }
 
 export interface LoanState {

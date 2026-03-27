@@ -33,6 +33,7 @@ import StaffInvestmentsPage from './pages/StaffInvestmentsPage';
 import StaffInvestmentDetailsPage from './pages/StaffInvestmentDetailsPage';
 import VerifyGiftPage from './pages/investment/VerifyGiftPage';
 import ClaimGiftPage from './pages/investment/ClaimGiftPage';
+import ProfilePage from './pages/ProfilePage';
 
 import LogoutWarningModal from './components/modals/LogoutWarningModal';
 
@@ -73,7 +74,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, user, isLoadi
         user={user}
         theme={theme}
         onLogout={onLogout}
-        onDashboard={() => { }} // Navigation handled by Links in Navigation component ideally, or ignored here
+        onDashboard={() => { window.location.href = '/dashboard'; }}
         onToggleTheme={onToggleTheme}
       />
       <main className="flex-1">
@@ -142,6 +143,11 @@ const AppContent: React.FC = () => {
         withCredentials: true
       });
 
+      // Also fetch profile
+      const profileRes = await axios.get(`${backendUrl}/api/profile`, {
+        withCredentials: true
+      });
+
       console.log(data)
       setUser({
         email: data.email,
@@ -150,9 +156,7 @@ const AppContent: React.FC = () => {
         avatar_url: data.avatar_url,
         role: data.role,
         new_comer: data.new_comer,
-        // Map full_name to name for frontend consistency
-        full_name: data.full_name,
-        referral_code_used: data.referral_code_used
+        profile: profileRes.data?.profile || undefined
       });
     } catch (error) {
       console.error("Failed to fetch user", error);
@@ -507,6 +511,12 @@ const AppContent: React.FC = () => {
         <Route path="/dashboard" element={
           <ProtectedRoute user={user} isLoading={isLoading} theme={theme} onLogout={handleLogoutRequest} onToggleTheme={toggleTheme}>
             <Dashboard navigate={(step) => handleLegacyNavigate(step)} />
+          </ProtectedRoute>
+        } />
+
+        <Route path="/profile" element={
+          <ProtectedRoute user={user} isLoading={isLoading} theme={theme} onLogout={handleLogoutRequest} onToggleTheme={toggleTheme}>
+            <ProfilePage />
           </ProtectedRoute>
         } />
 

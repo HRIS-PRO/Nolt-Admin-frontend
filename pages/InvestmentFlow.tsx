@@ -61,8 +61,8 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
   const [isPep, setIsPep] = useState<boolean | null>(initialDraft?.data?.isPep ?? null);
 
   // Personal Details
-  const [gender, setGender] = useState(initialDraft?.data?.gender ?? '');
-  const [dob, setDob] = useState(initialDraft?.data?.dob ?? '');
+  const [gender, setGender] = useState(initialDraft?.data?.gender || user.profile?.gender || '');
+  const [dob, setDob] = useState(initialDraft?.data?.dob || (user.profile?.date_of_birth ? new Date(user.profile.date_of_birth).toISOString().split('T')[0] : ''));
   const [maidenName, setMaidenName] = useState(initialDraft?.data?.maidenName ?? '');
   const [religion, setReligion] = useState(initialDraft?.data?.religion ?? 'Prefer not to say');
   const [maritalStatus, setMaritalStatus] = useState(initialDraft?.data?.maritalStatus ?? 'Single');
@@ -86,9 +86,9 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
   const defFirstName = nameParts[0] || '';
   const defMiddleName = nameParts.length > 2 ? nameParts.slice(1, -1).join(' ') : '';
 
-  const [surname, setSurname] = useState(initialDraft?.data?.surname || defSurname);
-  const [firstName, setFirstName] = useState(initialDraft?.data?.firstName || defFirstName);
-  const [middleName, setMiddleName] = useState(initialDraft?.data?.middleName || defMiddleName);
+  const [surname, setSurname] = useState(initialDraft?.data?.surname || user.profile?.surname || defSurname);
+  const [firstName, setFirstName] = useState(initialDraft?.data?.firstName || user.profile?.first_name || defFirstName);
+  const [middleName, setMiddleName] = useState(initialDraft?.data?.middleName || user.profile?.middle_name || defMiddleName);
   
   useEffect(() => {
     if (entityType === 'INDIVIDUAL') {
@@ -99,20 +99,33 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
 
   // Contact & Verification
   const [countryCode, setCountryCode] = useState(initialDraft?.data?.countryCode ?? '+234');
-  const [mobileNumber, setMobileNumber] = useState(initialDraft?.data?.mobileNumber ?? '');
-  const [contactEmail, setContactEmail] = useState(initialDraft?.data?.contactEmail || user.email || '');
-  const [bvn, setBvn] = useState(initialDraft?.data?.bvn ?? '');
-  const [nin, setNin] = useState(initialDraft?.data?.nin ?? '');
+  const [mobileNumber, setMobileNumber] = useState(initialDraft?.data?.mobileNumber || user.profile?.phone_number || '');
+  const [contactEmail, setContactEmail] = useState(initialDraft?.data?.contactEmail || user.profile?.personal_email || user.email || '');
+  const [bvn, setBvn] = useState(initialDraft?.data?.bvn || user.profile?.bvn || '');
+  const [nin, setNin] = useState(initialDraft?.data?.nin || user.profile?.nin || '');
 
   // Address
-  const [stateOfOrigin, setStateOfOrigin] = useState(initialDraft?.data?.stateOfOrigin ?? 'Abia');
-  const [stateOfResidence, setStateOfResidence] = useState(initialDraft?.data?.stateOfResidence ?? 'Abia');
-  const [homeAddress, setHomeAddress] = useState(initialDraft?.data?.homeAddress ?? '');
+  const [stateOfOrigin, setStateOfOrigin] = useState(initialDraft?.data?.stateOfOrigin ?? user.profile?.state_of_origin ?? 'Abia');
+  const [stateOfResidence, setStateOfResidence] = useState(initialDraft?.data?.stateOfResidence ?? user.profile?.state_of_residence ?? 'Abia');
+  const [homeAddress, setHomeAddress] = useState(initialDraft?.data?.homeAddress ?? user.profile?.address ?? '');
 
   // Next of Kin
   const [nokName, setNokName] = useState(initialDraft?.data?.nokName ?? '');
   const [nokRelationship, setNokRelationship] = useState(initialDraft?.data?.nokRelationship ?? '');
   const [nokAddress, setNokAddress] = useState(initialDraft?.data?.nokAddress ?? '');
+  const [isNokSameAddress, setIsNokSameAddress] = useState(false);
+
+  // Sync fullName for Individuals
+  useEffect(() => {
+    if (entityType === 'INDIVIDUAL') {
+      const parts = [firstName, middleName, surname].filter(Boolean);
+      setFullName(parts.join(' '));
+    }
+  }, [firstName, middleName, surname, entityType]);
+
+  useEffect(() => {
+    if (isNokSameAddress) setNokAddress(homeAddress);
+  }, [isNokSameAddress, homeAddress]);
 
 
 
@@ -137,7 +150,7 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
     { id: 'gov_id', label: 'Government ID', icon: 'badge', required: true },
     { id: 'utility_bill', label: 'Utility Bill', icon: 'description', required: true },
     { id: 'selfie', label: 'Selfie', icon: 'add_a_photo', required: true },
-    { id: 'secondary_id', label: 'Secondary Government ID/Doc', icon: 'assignment_ind', required: true }
+    { id: 'secondary_id', label: 'Secondary Government ID/Doc', icon: 'assignment_ind', required: false }
   ], []);
 
   const corporateDocs = useMemo(() => {
@@ -193,6 +206,14 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [hasSigned, setHasSigned] = useState(false);
   const [acceptedIndemnity, setAcceptedIndemnity] = useState(false);
+  const [isGuardianConfirmed, setIsGuardianConfirmed] = useState(false);
+
+  const isMinor = useMemo(() => {
+    if (!dob) return false;
+    const birthDate = new Date(dob);
+    const age = (new Date().getTime() - birthDate.getTime()) / (1000 * 60 * 60 * 24 * 365.25);
+    return age < 18;
+  }, [dob]);
 
   // Handle Gift Claim on Load
   useEffect(() => {
@@ -234,25 +255,44 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
     }
 
     const prefillData = async () => {
+      // 1. Prioritize Profile Data (Source of Truth)
+      if (user.profile) {
+        const p = user.profile;
+        if (p.surname) setSurname(p.surname);
+        if (p.first_name) setFirstName(p.first_name);
+        if (p.middle_name) setMiddleName(p.middle_name);
+        if (p.date_of_birth) setDob(new Date(p.date_of_birth).toISOString().split('T')[0]);
+        if (p.gender) setGender(p.gender);
+        if (p.phone_number) setMobileNumber(p.phone_number);
+        if (p.personal_email) setContactEmail(p.personal_email);
+        if (p.bvn) setBvn(p.bvn);
+        if (p.nin) setNin(p.nin);
+        if (p.state_of_origin) setStateOfOrigin(p.state_of_origin);
+        if (p.state_of_residence) setStateOfResidence(p.state_of_residence);
+        if (p.address) setHomeAddress(p.address);
+      }
+
       try {
         const latestInfo = await investmentService.getLatestInvestment();
         if (latestInfo) {
-          setFullName(latestInfo.rep_full_name || '');
-          setMobileNumber(latestInfo.rep_phone_number || '');
-          setBvn(latestInfo.rep_bvn || '');
-          setNin(latestInfo.rep_nin || '');
-          setStateOfOrigin(latestInfo.rep_state_of_origin || '');
-          setStateOfResidence(latestInfo.rep_state_of_residence || '');
-          setHomeAddress(latestInfo.rep_street_address || '');
+          // 2. Only fill non-profile fields from legacy if profile is empty for those fields
+          if (!user.profile?.surname) setFullName(latestInfo.rep_full_name || '');
+          if (!user.profile?.phone_number) setMobileNumber(latestInfo.rep_phone_number || '');
+          if (!user.profile?.bvn) setBvn(latestInfo.rep_bvn || '');
+          if (!user.profile?.nin) setNin(latestInfo.rep_nin || '');
+          if (!user.profile?.state_of_origin) setStateOfOrigin(latestInfo.rep_state_of_origin || '');
+          if (!user.profile?.state_of_residence) setStateOfResidence(latestInfo.rep_state_of_residence || '');
+          if (!user.profile?.address) setHomeAddress(latestInfo.rep_street_address || '');
           
           setIsPep(latestInfo.is_pep ?? null);
           setTitle(latestInfo.title || 'Mr');
-          setGender(latestInfo.gender || '');
-          setDob(latestInfo.dob ? new Date(latestInfo.dob).toISOString().split('T')[0] : '');
+          if (!user.profile?.gender) setGender(latestInfo.gender || '');
+          if (!user.profile?.date_of_birth) setDob(latestInfo.dob ? new Date(latestInfo.dob).toISOString().split('T')[0] : '');
+          
           setMaidenName(latestInfo.mother_maiden_name || '');
           setReligion(latestInfo.religion || 'Prefer not to say');
           setMaritalStatus(latestInfo.marital_status || 'Single');
-          setContactEmail(latestInfo.customer_email || '');
+          if (!user.profile?.personal_email) setContactEmail(latestInfo.customer_email || '');
           
           setNokName(latestInfo.nok_name || '');
           setNokRelationship(latestInfo.nok_relationship || '');
@@ -385,12 +425,10 @@ const handleSaveDraft = (nextStep: number) => {
   };
 
   const handleNext = () => {
-    // Age Validation
+    // Age Logic
     if (subStep === 3 && entityType === 'INDIVIDUAL' && dob) {
-      const birthDate = new Date(dob);
-      const age = (new Date().getTime() - birthDate.getTime()) / (1000 * 60 * 60 * 24 * 365.25);
-      if (age < 18) {
-        alert("Applicant must be at least 18 years old to proceed.");
+      if (isMinor && !isGuardianConfirmed) {
+        alert("Please confirm that you are the legal guardian of the beneficiary.");
         return;
       }
     }
@@ -543,68 +581,43 @@ const handleBack = () => {
   };
 
   const handleSubmit = async () => {
-    if (isClaimingGift || giftToken) {
-      finalizeInvestment(`G_CLAIM_${giftToken || Date.now()}`);
-      return;
-    }
-
     if (!contactEmail.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) return alert("Please enter a valid email address.");
     if (mobileNumber.length < 10) return alert("Please enter a valid mobile number.");
 
-    // @ts-ignore
-    const handler = window.PaystackPop.setup({
-      key: import.meta.env.VITE_PAYSTACK_PUBLIC_KEY,
-      email: contactEmail,
-      amount: Math.round(parseFloat(amount) * 100),
-      currency: 'NGN',
-      ref: `INV_${Date.now()}`,
-      callback: (response: any) => {
-        finalizeInvestment(response.reference);
-      },
-      onClose: () => {
-        alert('Transaction was not completed, window closed.');
+    setLoading(true);
+    try {
+      if (isClaimingGift || giftToken) {
+        finalizeInvestment(`G_CLAIM_${giftToken || Date.now()}`);
+        return;
       }
-    });
-    handler.openIframe();
+
+      // Proceed to payment directly (Identity verified on profile)
+      // @ts-ignore
+      const handler = window.PaystackPop.setup({
+        key: import.meta.env.VITE_PAYSTACK_PUBLIC_KEY,
+        email: contactEmail,
+        amount: Math.round(parseFloat(amount) * 100),
+        currency: 'NGN',
+        ref: `INV_${Date.now()}`,
+        callback: (response: any) => {
+          finalizeInvestment(response.reference);
+        },
+        onClose: () => {
+          alert('Transaction was not completed, window closed.');
+        }
+      });
+      handler.openIframe();
+    } catch (err: any) {
+      console.error("Submission error:", err);
+      alert(err.message || "An error occurred during submission.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const finalizeInvestment = async (reference: string) => {
     setLoading(true);
     try {
-      // Step 1: BVN Validation (Zeeh API)
-      // For individuals or authorized representatives in corporate
-      const bvnToCheck = bvn; 
-      
-      console.log("[BVN Validation] Starting verification for:", bvnToCheck);
-      try {
-        const kycResponse = await axios.post(`${import.meta.env.VITE_API_URL || ''}/api/kyc/verify-bvn`, {
-            bvn: bvnToCheck,
-            firstName,
-            dob,
-            mobileNumber
-        }, { withCredentials: true });
-
-        console.log("[BVN Validation] Success:", kycResponse.data);
-      } catch (kycErr: any) {
-        console.error("[BVN Validation] Failed:", kycErr.response?.data);
-        const errorData = kycErr.response?.data;
-        
-        let errorMessage = errorData?.message || "BVN verification failed. Please check your details.";
-        
-        // If it's a mismatch error, provide more detail
-        if (errorData?.matches) {
-            const missing = [];
-            if (!errorData.matches.firstName) missing.push("First Name");
-            if (!errorData.matches.dob) missing.push("Date of Birth");
-            if (!errorData.matches.phone) missing.push("Phone Number");
-            errorMessage = `Identity Verification Failed: The details on your BVN do not match your input for: ${missing.join(', ')}. At least 2 matches are required to continue.`;
-        }
-
-        alert(errorMessage);
-        setLoading(false);
-        return; // STOP submission
-      }
-
       // Step 2: Create Investment
       const payload = {
         investment_type: `NOLT_${selectedPlan}`,
@@ -655,6 +668,8 @@ const handleBack = () => {
         memart_url: uploadedDocs.memart?.url || null,
         board_resolution_url: uploadedDocs.board_resolution?.url || null,
         annual_returns_url: uploadedDocs.annual_returns?.url || null,
+        is_minor_beneficiary: isMinor,
+        guardian_confirmed: isGuardianConfirmed,
         signatures: [canvasRef.current?.toDataURL() || ""]
       };
 
@@ -708,6 +723,33 @@ const handleBack = () => {
 
   const totalSteps = selectedPlan === 'RISE' ? 14 : (selectedPlan === 'VAULT' ? 13 : 13);
   const currentStep = subStep + 1;
+
+  // Render Logic - Profile Guard
+  if (!user.profile?.is_identity_verified && !isGift) {
+    return (
+      <div className="max-w-4xl mx-auto px-6 py-20 text-center space-y-8 animate-in fade-in duration-700">
+        <div className="size-24 bg-amber-500/10 rounded-3xl flex items-center justify-center text-amber-500 mx-auto border-2 border-amber-500/20 shadow-xl shadow-amber-500/5">
+          <span className="material-symbols-outlined text-5xl font-black">gpp_maybe</span>
+        </div>
+        <div className="space-y-4">
+          <h2 className="text-4xl font-black text-slate-900 dark:text-white tracking-tight">Identity Verification Required</h2>
+          <p className="text-lg text-slate-500 dark:text-slate-400 font-medium max-w-lg mx-auto leading-relaxed">
+            For your security and compliance, you must complete your profile and verify your identity before accessing investment products.
+          </p>
+        </div>
+        <div className="flex flex-col items-center gap-4">
+          <button 
+            onClick={() => window.location.href = '/profile'}
+            className="px-10 py-5 bg-primary text-white font-black text-lg rounded-2xl shadow-2xl shadow-primary/25 hover:-translate-y-1 transition-all active:scale-95 flex items-center gap-3"
+          >
+            Go to My Profile
+            <span className="material-symbols-outlined">fingerprint</span>
+          </button>
+          <button onClick={() => navigate('DASHBOARD')} className="text-slate-400 font-black uppercase tracking-widest text-xs hover:text-slate-600 transition-colors">Back to Dashboard</button>
+        </div>
+      </div>
+    );
+  }
 
   // Render Logic
   if (isGift) {
@@ -830,18 +872,54 @@ const handleBack = () => {
           
           {entityType === 'INDIVIDUAL' ? (
             <div className="grid gap-8">
+              <div className="space-y-4">
+                <label className="text-sm font-black text-slate-500 uppercase tracking-widest">Who are you investing for?</label>
+                <div className="flex gap-4">
+                  <button 
+                    onClick={() => {
+                        setIsOnBehalf(false);
+                        // Reset to profile data when switching to 'Self'
+                        if (user.profile) {
+                            const p = user.profile;
+                            setSurname(p.surname || '');
+                            setFirstName(p.first_name || '');
+                            setMiddleName(p.middle_name || '');
+                            setDob(p.date_of_birth ? new Date(p.date_of_birth).toISOString().split('T')[0] : '');
+                            setMobileNumber(p.phone_number || '');
+                            setBvn(p.bvn || '');
+                            setNin(p.nin || '');
+                            setStateOfOrigin(p.state_of_origin || '');
+                            setStateOfResidence(p.state_of_residence || '');
+                            setHomeAddress(p.address || '');
+                        }
+                    }} 
+                    className={`flex-1 h-14 rounded-xl border-2 font-black transition-all flex items-center justify-center gap-3 ${!isOnBehalf ? 'bg-primary border-primary text-white shadow-lg' : 'border-slate-100 dark:border-slate-700 dark:text-white'}`}
+                  >
+                    <span className="material-symbols-outlined text-sm">person</span>
+                    Myself
+                  </button>
+                  <button 
+                    onClick={() => setIsOnBehalf(true)} 
+                    className={`flex-1 h-14 rounded-xl border-2 font-black transition-all flex items-center justify-center gap-3 ${isOnBehalf ? 'bg-primary border-primary text-white shadow-lg' : 'border-slate-100 dark:border-slate-700 dark:text-white'}`}
+                  >
+                    <span className="material-symbols-outlined text-sm">family_history</span>
+                    Someone else
+                  </button>
+                </div>
+              </div>
+
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="space-y-2">
                   <label className="text-sm font-black text-slate-500 uppercase">Surname</label>
-                  <input  className={`w-full h-16 rounded-2xl b g-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-6 text-lg font-bold dark:text-white focus:border-primary outline-none ${entityType === 'INDIVIDUAL' ? 'opacity-70 cursor-not-allowed select-none' : ''}`} value={surname} onChange={e => setSurname(e.target.value)} placeholder="Surname" />
+                  <input disabled={!isOnBehalf && !!user.profile?.surname} className={`w-full h-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-6 text-lg font-bold dark:text-white focus:border-primary outline-none ${!isOnBehalf && !!user.profile?.surname ? 'opacity-70 cursor-not-allowed select-none' : ''}`} value={surname} onChange={e => setSurname(e.target.value)} placeholder="Surname" />
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-black text-slate-500 uppercase">First Name</label>
-                  <input  className={`w-full h-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-6 text-lg font-bold dark:text-white focus:border-primary outline-none ${entityType === 'INDIVIDUAL' ? 'opacity-70 cursor-not-allowed select-none' : ''}`} value={firstName} onChange={e => setFirstName(e.target.value)} placeholder="First Name" />
+                  <input disabled={!isOnBehalf && !!user.profile?.first_name} className={`w-full h-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-6 text-lg font-bold dark:text-white focus:border-primary outline-none ${!isOnBehalf && !!user.profile?.first_name ? 'opacity-70 cursor-not-allowed select-none' : ''}`} value={firstName} onChange={e => setFirstName(e.target.value)} placeholder="First Name" />
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-black text-slate-500 uppercase">Middle Name (Optional)</label>
-                  <input  className={`w-full h-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-6 text-lg font-bold dark:text-white focus:border-primary outline-none ${entityType === 'INDIVIDUAL' ? 'opacity-70 cursor-not-allowed select-none' : ''}`} value={middleName} onChange={e => setMiddleName(e.target.value)} placeholder="Middle Name" />
+                  <input disabled={!isOnBehalf && !!user.profile?.middle_name} className={`w-full h-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-6 text-lg font-bold dark:text-white focus:border-primary outline-none ${!isOnBehalf && !!user.profile?.middle_name ? 'opacity-70 cursor-not-allowed select-none' : ''}`} value={middleName} onChange={e => setMiddleName(e.target.value)} placeholder="Middle Name" />
                 </div>
               </div>
               <div className="space-y-2"><label className="text-sm font-black text-slate-500 uppercase">Title</label><div className="flex gap-2">{['Mr', 'Mrs', 'Ms', 'Dr'].map(t => <button key={t} onClick={() => setTitle(t)} className={`px-6 py-3 rounded-xl border-2 font-bold transition-all ${title === t ? 'bg-primary border-primary text-white' : 'border-slate-100 dark:border-slate-700 dark:text-white'}`}>{t}</button>)}</div></div>
@@ -924,18 +1002,49 @@ const handleBack = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-2">
                     <label className="text-sm font-black text-slate-500 uppercase">Gender</label>
-                    <select className="w-full h-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-6 text-lg font-bold dark:text-white focus:border-primary outline-none" value={gender} onChange={e => setGender(e.target.value)}>
+                    <select 
+                      disabled={!isOnBehalf && !!user.profile?.gender}
+                      className={`w-full h-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-6 text-lg font-bold dark:text-white focus:border-primary outline-none ${!isOnBehalf && user.profile?.gender ? 'opacity-70 cursor-not-allowed' : ''}`} 
+                      value={gender} 
+                      onChange={e => setGender(e.target.value)}
+                    >
                       <option value="">Select Gender</option>
                       <option value="Male">Male</option>
                       <option value="Female">Female</option>
                     </select>
                   </div>
-                  <div className="space-y-2">
+                  <div className="space-y-4">
                     <label className="text-sm font-black text-slate-500 uppercase">Date of Birth</label>
-                    <input type="date" className="w-full h-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-6 text-lg font-bold dark:text-white focus:border-primary outline-none" value={dob} onChange={e => setDob(e.target.value)} />
+                    <input disabled={!isOnBehalf && !!user.profile?.date_of_birth} type="date" className={`w-full h-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-6 text-lg font-bold dark:text-white focus:border-primary outline-none ${!isOnBehalf && !!user.profile?.date_of_birth ? 'opacity-70 cursor-not-allowed' : ''}`} value={dob} onChange={e => setDob(e.target.value)} />
+                    
+                    {isMinor && (
+                      <div className="p-6 rounded-2xl bg-primary/5 border-2 border-primary/20 flex flex-col gap-4 animate-in slide-in-from-top-2 duration-300">
+                        <div className="flex items-start gap-4">
+                          <div className="size-10 rounded-xl bg-primary text-white flex items-center justify-center shrink-0">
+                            <span className="material-symbols-outlined text-xl">gavel</span>
+                          </div>
+                          <div>
+                            <h4 className="font-black text-primary text-xs uppercase tracking-widest mb-1">Minor Beneficiary Detected</h4>
+                            <p className="text-[10px] font-bold text-slate-500 leading-relaxed uppercase tracking-tight">Investment for minors requires confirmation of legal guardianship.</p>
+                          </div>
+                        </div>
+                        
+                        <label className="flex items-center gap-3 cursor-pointer group bg-white dark:bg-slate-900 p-4 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800 transition-all hover:border-primary/30">
+                          <input 
+                            type="checkbox" 
+                            checked={isGuardianConfirmed}
+                            onChange={e => setIsGuardianConfirmed(e.target.checked)}
+                            className="size-5 rounded border-2 border-slate-300 text-primary focus:ring-primary shadow-sm"
+                          />
+                          <span className="text-xs font-black text-slate-700 dark:text-slate-300 uppercase tracking-tight group-hover:text-primary transition-colors">
+                            I confirm that I am the legal guardian of the beneficiary
+                          </span>
+                        </label>
+                      </div>
+                    )}
                   </div>
                 </div>
-                <NavActions isNextDisabled={!gender || !dob} />
+                <NavActions isNextDisabled={!gender || !dob || (isMinor && !isGuardianConfirmed)} />
               </>
             ) : (
               <>
@@ -1073,7 +1182,8 @@ const handleBack = () => {
               <label className="text-sm font-black text-slate-500 uppercase">Mobile Number</label>
               <input
                 type="tel"
-                className="w-full h-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-6 text-lg font-bold dark:text-white focus:border-primary outline-none"
+                disabled={!isOnBehalf && !!user.profile?.phone_number}
+                className={`w-full h-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-6 text-lg font-bold dark:text-white focus:border-primary outline-none ${!isOnBehalf && user.profile?.phone_number ? 'opacity-70 cursor-not-allowed' : ''}`}
                 value={mobileNumber}
                 onChange={e => setMobileNumber(e.target.value.replace(/\D/g, ''))}
                 placeholder="e.g. 08012345678"
@@ -1084,8 +1194,8 @@ const handleBack = () => {
               <label className="text-sm font-black text-slate-500 uppercase">Email Address</label>
               <input
                 type="email"
-                readOnly={entityType === 'INDIVIDUAL'}
-                className={`w-full h-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-6 text-lg font-bold dark:text-white focus:border-primary outline-none ${entityType === 'INDIVIDUAL' ? 'opacity-70 cursor-not-allowed select-none' : ''}`}
+                disabled={!isOnBehalf && entityType === 'INDIVIDUAL'}
+                className={`w-full h-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-6 text-lg font-bold dark:text-white focus:border-primary outline-none ${!isOnBehalf && entityType === 'INDIVIDUAL' ? 'opacity-70 cursor-not-allowed' : ''}`}
                 value={contactEmail}
                 onChange={e => setContactEmail(e.target.value)}
                 placeholder="e.g. name@example.com"
@@ -1104,7 +1214,8 @@ const handleBack = () => {
             <div className="space-y-2">
               <label className="text-sm font-black text-slate-500 uppercase">BVN</label>
               <input
-                className="w-full h-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-6 text-lg font-bold dark:text-white focus:border-primary outline-none"
+                disabled={!isOnBehalf && !!user.profile?.bvn}
+                className={`w-full h-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-6 text-lg font-bold dark:text-white focus:border-primary outline-none ${!isOnBehalf && user.profile?.bvn ? 'opacity-70 cursor-not-allowed' : ''}`}
                 value={bvn}
                 onChange={e => setBvn(e.target.value.replace(/\D/g, ''))}
                 maxLength={11}
@@ -1114,7 +1225,8 @@ const handleBack = () => {
             <div className="space-y-2">
               <label className="text-sm font-black text-slate-500 uppercase">NIN</label>
               <input
-                className="w-full h-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-6 text-lg font-bold dark:text-white focus:border-primary outline-none"
+                disabled={!isOnBehalf && !!user.profile?.nin}
+                className={`w-full h-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-6 text-lg font-bold dark:text-white focus:border-primary outline-none ${!isOnBehalf && user.profile?.nin ? 'opacity-70 cursor-not-allowed' : ''}`}
                 value={nin}
                 onChange={e => setNin(e.target.value.replace(/\D/g, ''))}
                 maxLength={11}
@@ -1132,10 +1244,39 @@ const handleBack = () => {
           <h2 className="text-3xl font-black dark:text-white">Address Details</h2>
           <div className="grid gap-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-2"><label className="text-sm font-black text-slate-500 uppercase">State of Origin</label><select className="w-full h-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-6 text-lg font-bold dark:text-white focus:border-primary outline-none" value={stateOfOrigin} onChange={e => setStateOfOrigin(e.target.value)}>{NIGERIAN_STATES.map(s => <option key={s} value={s}>{s}</option>)}</select></div>
-              <div className="space-y-2"><label className="text-sm font-black text-slate-500 uppercase">State of Residence</label><select className="w-full h-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-6 text-lg font-bold dark:text-white focus:border-primary outline-none" value={stateOfResidence} onChange={e => setStateOfResidence(e.target.value)}>{NIGERIAN_STATES.map(s => <option key={s} value={s}>{s}</option>)}</select></div>
+              <div className="space-y-2">
+                <label className="text-sm font-black text-slate-500 uppercase">State of Origin</label>
+                <select 
+                  disabled={!isOnBehalf && !!user.profile?.state_of_origin}
+                  className={`w-full h-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-6 text-lg font-bold dark:text-white focus:border-primary outline-none ${!isOnBehalf && user.profile?.state_of_origin ? 'opacity-70 cursor-not-allowed' : ''}`} 
+                  value={stateOfOrigin} 
+                  onChange={e => setStateOfOrigin(e.target.value)}
+                >
+                  {NIGERIAN_STATES.map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-black text-slate-500 uppercase">State of Residence</label>
+                <select 
+                  disabled={!isOnBehalf && !!user.profile?.state_of_residence}
+                  className={`w-full h-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-6 text-lg font-bold dark:text-white focus:border-primary outline-none ${!isOnBehalf && user.profile?.state_of_residence ? 'opacity-70 cursor-not-allowed' : ''}`} 
+                  value={stateOfResidence} 
+                  onChange={e => setStateOfResidence(e.target.value)}
+                >
+                  {NIGERIAN_STATES.map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+              </div>
             </div>
-            <div className="space-y-2"><label className="text-sm font-black text-slate-500 uppercase">Full Home Address</label><textarea rows={3} className="w-full p-6 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 text-lg font-bold dark:text-white focus:border-primary outline-none" value={homeAddress} onChange={e => setHomeAddress(e.target.value)} /></div>
+            <div className="space-y-2">
+              <label className="text-sm font-black text-slate-500 uppercase">Full Home Address</label>
+              <textarea 
+                rows={3} 
+                disabled={!isOnBehalf && !!user.profile?.address}
+                className={`w-full p-6 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 text-lg font-bold dark:text-white focus:border-primary outline-none ${!isOnBehalf && user.profile?.address ? 'opacity-70 cursor-not-allowed' : ''}`} 
+                value={homeAddress} 
+                onChange={e => setHomeAddress(e.target.value)} 
+              />
+            </div>
           </div>
           <NavActions isNextDisabled={!homeAddress} />
         </div>
@@ -1166,7 +1307,37 @@ const handleBack = () => {
                 </select>
               </div>
             </div>
-            <div className="space-y-2"><label className="text-sm font-black text-slate-500 uppercase">Contact Address</label><textarea rows={2} className="w-full p-6 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 text-lg font-bold dark:text-white focus:border-primary outline-none" value={nokAddress} onChange={e => setNokAddress(e.target.value)} placeholder="Address" /></div>
+            <div className="space-y-4">
+              <div className="flex justify-between items-center group">
+                <label className="text-sm font-black text-slate-500 uppercase tracking-widest">Contact Address</label>
+                <div 
+                  className={`flex items-center gap-3 cursor-pointer py-2 px-4 rounded-xl transition-all border-2 ${isNokSameAddress ? 'bg-primary/5 border-primary/20 text-primary shadow-sm' : 'border-slate-100 dark:border-slate-800'}`}
+                  onClick={() => setIsNokSameAddress(!isNokSameAddress)}
+                >
+                  <div className={`size-5 rounded-lg border-2 flex items-center justify-center transition-all ${isNokSameAddress ? 'bg-primary border-primary text-white scale-110' : 'border-slate-300'}`}>
+                    {isNokSameAddress && <span className="material-symbols-outlined text-xs font-black">check</span>}
+                  </div>
+                  <span className={`text-xs font-black uppercase tracking-tight select-none ${isNokSameAddress ? 'text-primary' : 'text-slate-400'}`}>
+                    Same address as me
+                  </span>
+                </div>
+              </div>
+              <div className="relative">
+                <textarea 
+                  rows={2} 
+                  disabled={isNokSameAddress}
+                  className={`w-full p-6 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 text-lg font-bold dark:text-white focus:border-primary outline-none transition-all ${isNokSameAddress ? 'opacity-70 cursor-not-allowed border-primary/20 bg-primary/5' : ''}`} 
+                  value={nokAddress} 
+                  onChange={e => { setNokAddress(e.target.value); if (isNokSameAddress) setIsNokSameAddress(false); }} 
+                  placeholder="Street name, City, State" 
+                />
+                {isNokSameAddress && (
+                  <div className="absolute top-4 right-6 pointer-events-none text-primary/40 animate-in fade-in zoom-in duration-300">
+                    <span className="material-symbols-outlined filled">verified</span>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
           <NavActions isNextDisabled={!nokName || !nokRelationship} />
         </div>
