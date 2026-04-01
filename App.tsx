@@ -156,6 +156,7 @@ const AppContent: React.FC = () => {
         avatar_url: data.avatar_url,
         role: data.role,
         new_comer: data.new_comer,
+        referral_code: data.referral_code,
         profile: profileRes.data?.profile || undefined
       });
     } catch (error) {

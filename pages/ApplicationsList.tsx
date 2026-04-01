@@ -21,18 +21,106 @@ const ApplicationsList: React.FC<ApplicationsListProps> = ({ navigate, formatMon
   const [selectedApp, setSelectedApp] = useState<{ id: string, type: string, amount: number, data?: any } | null>(null);
   const [showModal, setShowModal] = useState(false);
 
+  const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
+  const [showLiquidationModal, setShowLiquidationModal] = useState(false);
+  const [liquidationType, setLiquidationType] = useState<'FULL' | 'CUSTOM'>('FULL');
+  const [customAmount, setCustomAmount] = useState<string>('');
+  const [showWarningModal, setShowWarningModal] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [processingMessage, setProcessingMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    const handleClickOutside = () => setOpenDropdownId(null);
+    window.addEventListener('click', handleClickOutside);
+    return () => window.removeEventListener('click', handleClickOutside);
+  }, []);
+
+  const handleLiquidate = (app: any) => {
+    setSelectedApp(app);
+    setLiquidationType('FULL');
+    setCustomAmount('');
+    setShowLiquidationModal(true);
+  };
+
+  const validateLiquidation = () => {
+    if (!selectedApp) return;
+    
+    const amountToLiquidate = liquidationType === 'FULL' ? selectedApp.amount : parseFloat(customAmount);
+    
+    if (isNaN(amountToLiquidate) || amountToLiquidate <= 0) {
+      alert('Please enter a valid amount.');
+      return;
+    }
+    
+    if (amountToLiquidate > selectedApp.amount) {
+      alert('Amount exceeds available investment balance.');
+      return;
+    }
+
+    const maturityDate = selectedApp.data?.maturity_date ? new Date(selectedApp.data.maturity_date) : null;
+    const today = new Date();
+    
+    if (maturityDate && today < maturityDate) {
+      setShowWarningModal(true);
+    } else {
+      processLiquidation();
+    }
+  };
+
+  const processLiquidation = async () => {
+    setShowWarningModal(false);
+    setShowLiquidationModal(false);
+    setIsProcessing(true);
+    
+    try {
+      const amountToLiquidate = liquidationType === 'FULL' ? selectedApp?.amount : parseFloat(customAmount);
+      
+      // Extract numeric ID from e.g. "INV-42"
+      const realId = selectedApp?.id?.replace('INV-', '');
+
+      await axios.post(`${import.meta.env.VITE_API_URL || ''}/api/investments/${realId}/liquidate`, {
+        liquidation_type: liquidationType,
+        amount: amountToLiquidate
+      }, { withCredentials: true });
+
+      setIsProcessing(false);
+      setProcessingMessage(`Your liquidation request for ${selectedApp?.id} is being processed by our CX team. We will notify you once it moves to the next stage.`);
+      
+      // Update local state to reflect is_liquidating status to prevent duplicate clicks without refetching immediately
+      setCompletedApps(prev => prev.map(app => 
+        app.id === selectedApp?.id 
+        ? { ...app, data: { ...app.data, is_liquidating: true } } 
+        : app
+      ));
+
+      setTimeout(() => setProcessingMessage(null), 8000);
+    } catch (err: any) {
+      setIsProcessing(false);
+      alert(err.response?.data?.message || 'Failed to submit liquidation request');
+    }
+  };
+
+
   useEffect(() => {
     setDrafts(storageService.getDrafts());
 
     // Fetch Completed Applications
     const fetchApplications = async () => {
       try {
-        const { data } = await axios.get(`${import.meta.env.VITE_API_URL || ''}/api/loans`, { withCredentials: true });
-        console.log("DEBUG: Fetched Completed Loans:", data);
-        if (Array.isArray(data)) {
+        const [loansRes, investmentsRes] = await Promise.all([
+          axios.get(`${import.meta.env.VITE_API_URL || ''}/api/loans`, { withCredentials: true }).catch(() => ({ data: [] })),
+          axios.get(`${import.meta.env.VITE_API_URL || ''}/api/investments`, { withCredentials: true }).catch(() => ({ data: [] }))
+        ]);
+        
+        console.log("DEBUG: Fetched Completed Loans:", loansRes.data);
+        console.log("DEBUG: Fetched Completed Investments:", investmentsRes.data);
+        
+        let completed: any[] = [];
+        
+        if (Array.isArray(loansRes.data)) {
           // Filter for completed statuses (disbursed, rejected)
           // Also including repayment_started and closed as they are logically completed/advanced steps of disbursed
-          const completed = data.filter((app: any) =>
+          const completedLoans = loansRes.data.filter((app: any) =>
             ['disbursed', 'rejected', 'repayment_started', 'closed', 'approved'].includes(app.status?.toLowerCase())
           ).map(app => ({
             id: String(app.id), // Ensure string for consistency
@@ -67,8 +155,37 @@ const ApplicationsList: React.FC<ApplicationsListProps> = ({ navigate, formatMon
               }
             }
           }));
-          setCompletedApps(completed);
+          completed = [...completed, ...completedLoans];
         }
+
+        if (Array.isArray(investmentsRes.data)) {
+          const completedInvestments = investmentsRes.data.filter((app: any) =>
+            ['active', 'completed', 'liquidated', 'matured', 'approved', 'rejected', 'pending_payment'].includes(app.status?.toLowerCase())
+          ).map((app: any) => ({
+            id: app.id ? `INV-${app.id}` : `INV-${Math.random().toString(36).substr(2, 5)}`,
+            type: app.investment_type?.replace('_', ' ') + ' INVESTMENT' || 'INVESTMENT',
+            amount: parseFloat(app.investment_amount || app.target_amount || 0),
+            submittedAt: formatDate(app.created_at),
+            status: app.status.toUpperCase(),
+            icon: app.status === 'rejected' ? 'cancel' : (app.status === 'active' ? 'lock_clock' : 'trending_up'),
+            data: {
+              ...app,
+              isOnBehalf: app.is_on_behalf,
+              fullName: app.rep_full_name || app.company_name,
+              bankDetails: {
+                bankName: app.bank_name || app.rep_bank_name,
+                accountNumber: app.account_number || app.rep_account_number,
+                accountName: app.account_name || app.rep_account_name
+              }
+            }
+          }));
+          completed = [...completed, ...completedInvestments];
+        }
+
+        // Sort by submitted date descending
+        completed.sort((a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime());
+
+        setCompletedApps(completed);
       } catch (error) {
         console.error("Failed to fetch applications", error);
       }
@@ -262,7 +379,7 @@ const ApplicationsList: React.FC<ApplicationsListProps> = ({ navigate, formatMon
           completedApps.map((item: any) => (
             <div
               key={item.id}
-              className="bg-slate-900 dark:bg-slate-950 text-white rounded-[2.5rem] p-8 flex flex-col md:flex-row items-center gap-8 shadow-2xl relative overflow-hidden"
+              className={`bg-slate-900 dark:bg-slate-950 text-white rounded-[2.5rem] p-8 flex flex-col md:flex-row items-center gap-8 shadow-2xl relative transition-all duration-300 ${openDropdownId === item.id ? 'z-50 ring-2 ring-primary/20' : 'z-10'}`}
             >
               <div className="absolute top-0 right-0 w-64 h-64 bg-primary/10 rounded-full blur-3xl -mr-32 -mt-32 pointer-events-none"></div>
 
@@ -290,39 +407,262 @@ const ApplicationsList: React.FC<ApplicationsListProps> = ({ navigate, formatMon
                 <p className="text-xs text-slate-400 font-medium">Submitted on {item.submittedAt}</p>
               </div>
 
-              <div className="flex flex-col sm:flex-row gap-3 relative z-10">
-                {item.status === 'PENDING_PAYMENT' && !uploadedReceipts[item.id] && (
-                  <button
-                    onClick={() => handleUploadReceipt(item.id)}
-                    disabled={uploadingReceiptId === item.id}
-                    className="px-8 py-4 bg-primary text-white font-black rounded-full hover:bg-primary-dark transition-all flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50"
+                            <div className="relative z-30">
+                <button 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setOpenDropdownId(openDropdownId === item.id ? null : item.id);
+                  }}
+                  className={`flex items-center gap-2 px-8 py-4 rounded-2xl font-black text-xs uppercase tracking-widest transition-all active:scale-95 shadow-xl ${openDropdownId === item.id ? 'bg-white text-primary shadow-white/10' : 'bg-primary text-white shadow-primary/20 hover:bg-primary/90 hover:-translate-y-0.5'}`}
+                >
+                  Actions
+                  <span className={`material-symbols-outlined text-sm transition-transform duration-300 ${openDropdownId === item.id ? 'rotate-180' : ''}`}>expand_more</span>
+                </button>
+
+                {openDropdownId === item.id && (
+                  <div 
+                    className="absolute right-0 mt-4 w-72 bg-white dark:bg-slate-800 rounded-[2.5rem] shadow-[0_20px_50px_rgba(0,0,0,0.5)] border border-slate-100 dark:border-slate-700 py-4 animate-in fade-in slide-in-from-top-4 duration-300 z-[100] opacity-100"
+                    onClick={(e) => e.stopPropagation()}
                   >
-                    {uploadingReceiptId === item.id ? (
-                      <div className="size-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                    ) : (
-                      <span className="material-symbols-outlined">cloud_upload</span>
-                    )}
-                    {uploadingReceiptId === item.id ? 'Uploading...' : 'Upload Receipt'}
-                  </button>
-                )}
-                {uploadedReceipts[item.id] && (
-                  <div className="px-8 py-4 bg-green-500/10 text-green-500 border border-green-500/30 rounded-full font-black flex items-center gap-2">
-                    <span className="material-symbols-outlined filled">check_circle</span>
-                    Receipt Provided
+                    {/* Dropdown Arrow */}
+                    <div className="absolute -top-2 right-8 size-4 bg-white dark:bg-slate-800 rotate-45 border-l border-t border-slate-100 dark:border-slate-700"></div>
+
+                    <div className="px-6 py-2 mb-2 border-b border-slate-50 dark:border-slate-700/50 relative z-10">
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{!item.type.toLowerCase().includes('loan') ? 'Investment Management' : 'Loan Management'}</p>
+                    </div>
+                    <div className="relative z-10">
+                      {!item.type.toLowerCase().includes('loan') && (
+                        <>
+                          {item.data?.is_liquidating ? (
+                            <div className="w-full flex items-center gap-4 px-6 py-4 text-xs font-black text-orange-500 bg-orange-500/5 transition-all uppercase tracking-widest group">
+                              <div className="size-8 rounded-xl flex items-center justify-center">
+                                <span className="material-symbols-outlined text-lg animate-pulse">pending</span>
+                              </div>
+                              Liquidation Processing
+                            </div>
+                          ) : (
+                            <>
+                              {item.status !== 'PENDING_PAYMENT' && (
+                              <button 
+                                onClick={() => {
+                                  setOpenDropdownId(null);
+                                  navigate('INVESTMENT_FLOW', { id: `T-${Math.floor(Math.random() * 9000) + 1000}`, type: 'INVESTMENT', subStep: 0, label: item.type, data: { isTopUp: true, originalInvestmentId: item.id.replace('INV-', ''), selectedPlan: item.type.includes('VAULT') ? 'VAULT' : item.type.includes('SURGE') ? 'SURGE' : 'RISE' }, updatedAt: Date.now() });
+                                }}
+                                className="w-full flex items-center gap-4 px-6 py-4 text-xs font-black text-slate-600 dark:text-slate-300 hover:bg-emerald-500/10 hover:text-emerald-500 transition-all uppercase tracking-widest group"
+                              >
+                                <div className="size-8 rounded-xl bg-emerald-500/10 flex items-center justify-center group-hover:bg-emerald-500 group-hover:text-white transition-colors">
+                                  <span className="material-symbols-outlined text-lg">add_circle</span>
+                                </div>
+                                Top-Up
+                              </button>
+                              )}
+                              <button 
+                                onClick={() => {
+                                  setOpenDropdownId(null);
+                                  handleLiquidate(item);
+                                }}
+                                className="w-full flex items-center gap-4 px-6 py-4 text-xs font-black text-slate-600 dark:text-slate-300 hover:bg-red-500/10 hover:text-red-500 transition-all uppercase tracking-widest group"
+                              >
+                                <div className="size-8 rounded-xl bg-red-500/10 flex items-center justify-center group-hover:bg-red-500 group-hover:text-white transition-colors">
+                                  <span className="material-symbols-outlined text-lg">account_balance_wallet</span>
+                                </div>
+                                Liquidate
+                              </button>
+                            </>
+                          )}
+                        </>
+                      )}
+
+                      {item.status === 'PENDING_PAYMENT' && !uploadedReceipts[item.id] && (
+                        <button 
+                          onClick={() => {
+                            setOpenDropdownId(null);
+                            handleUploadReceipt(item.id);
+                          }}
+                          disabled={uploadingReceiptId === item.id}
+                          className="w-full flex items-center gap-4 px-6 py-4 text-xs font-black text-primary hover:bg-primary/10 transition-all uppercase tracking-widest disabled:opacity-50 group"
+                        >
+                          <div className="size-8 rounded-xl bg-primary/10 flex items-center justify-center group-hover:bg-primary group-hover:text-white transition-colors">
+                            <span className="material-symbols-outlined text-lg">payments</span>
+                          </div>
+                          {uploadingReceiptId === item.id ? 'Verifying...' : 'Complete Payment'}
+                        </button>
+                      )}
+                      {uploadedReceipts[item.id] && (
+                        <div className="w-full flex items-center gap-4 px-6 py-4 text-xs font-black text-green-500 bg-green-500/5 transition-all uppercase tracking-widest disabled:opacity-50 group">
+                          <div className="size-8 rounded-xl flex items-center justify-center">
+                            <span className="material-symbols-outlined text-lg">check_circle</span>
+                          </div>
+                          Receipt Uploaded
+                        </div>
+                      )}
+
+                      <button 
+                        onClick={() => {
+                          setOpenDropdownId(null);
+                          handleShowDetails(item);
+                        }}
+                        className="w-full flex items-center gap-4 px-6 py-4 text-xs font-black text-slate-600 dark:text-slate-300 hover:bg-primary/10 hover:text-primary transition-all uppercase tracking-widest group"
+                      >
+                        <div className="size-8 rounded-xl bg-primary/10 flex items-center justify-center group-hover:bg-primary group-hover:text-white transition-colors">
+                          <span className="material-symbols-outlined text-lg">verified</span>
+                        </div>
+                        Certificate
+                      </button>
+                    </div>
                   </div>
                 )}
-                <button
-                  onClick={() => handleShowDetails(item)}
-                  className="px-8 py-4 bg-white/10 text-white font-black rounded-full hover:bg-white/20 transition-all flex items-center justify-center gap-2"
-                >
-                  Details
-                  <span className="material-symbols-outlined">receipt_long</span>
-                </button>
               </div>
             </div>
           ))
         )}
       </div>
+
+      
+      {processingMessage && (
+        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-[150] w-full max-w-md px-6 animate-in slide-in-from-bottom-8 duration-500">
+          <div className="bg-slate-900 text-white p-6 rounded-[2rem] shadow-2xl border border-white/10 flex items-start gap-4">
+            <div className="size-10 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0">
+              <span className="material-symbols-outlined filled">check_circle</span>
+            </div>
+            <div className="space-y-1">
+              <p className="font-black uppercase tracking-tight text-sm">Request Processing</p>
+              <p className="text-xs text-slate-400 font-medium leading-relaxed">{processingMessage}</p>
+            </div>
+            <button onClick={() => setProcessingMessage(null)} className="text-slate-500 hover:text-white transition-colors">
+              <span className="material-symbols-outlined text-sm">close</span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {isProcessing && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center backdrop-blur-sm bg-slate-900/20">
+          <div className="bg-white dark:bg-slate-800 p-12 rounded-[3rem] shadow-2xl flex flex-col items-center gap-6 animate-in zoom-in duration-300">
+            <div className="size-16 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+            <p className="font-black text-slate-900 dark:text-white uppercase tracking-widest text-sm">Processing Request...</p>
+          </div>
+        </div>
+      )}
+
+      {/* Liquidation Form Modal */}
+      {showLiquidationModal && selectedApp && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 animate-in fade-in duration-300 backdrop-blur-md">
+          <div className="absolute inset-0 bg-slate-900/60" onClick={() => setShowLiquidationModal(false)}></div>
+          <div className="relative bg-white dark:bg-slate-800 w-full max-w-lg rounded-[3rem] shadow-2xl p-8 md:p-12 animate-in zoom-in duration-500 border border-white/20 dark:border-slate-700">
+            <div className="text-center space-y-4 mb-10">
+              <div className="size-20 rounded-[2rem] bg-red-500/10 text-red-500 flex items-center justify-center mx-auto">
+                <span className="material-symbols-outlined text-4xl filled">account_balance_wallet</span>
+              </div>
+              <h2 className="text-3xl font-black text-slate-900 dark:text-white uppercase tracking-tight">Liquidate Investment</h2>
+              <p className="text-slate-500 dark:text-slate-400 font-medium">Available Balance: <span className="text-slate-900 dark:text-white font-black">{formatMoney(selectedApp.amount)}</span></p>
+            </div>
+
+            <div className="space-y-8">
+              <div className="grid grid-cols-2 gap-4">
+                <button 
+                  onClick={() => setLiquidationType('FULL')}
+                  className={`p-6 rounded-3xl border-2 transition-all text-left space-y-2 ${liquidationType === 'FULL' ? 'border-primary bg-primary/5' : 'border-slate-100 dark:border-slate-700 hover:border-slate-200'}`}
+                >
+                  <div className={`size-6 rounded-full border-2 flex items-center justify-center ${liquidationType === 'FULL' ? 'border-primary' : 'border-slate-300'}`}>
+                    {liquidationType === 'FULL' && <div className="size-3 bg-primary rounded-full"></div>}
+                  </div>
+                  <p className="font-black text-slate-900 dark:text-white uppercase tracking-tight text-sm">Full Amount</p>
+                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">{formatMoney(selectedApp.amount)}</p>
+                </button>
+                <button 
+                  onClick={() => setLiquidationType('CUSTOM')}
+                  className={`p-6 rounded-3xl border-2 transition-all text-left space-y-2 ${liquidationType === 'CUSTOM' ? 'border-primary bg-primary/5' : 'border-slate-100 dark:border-slate-700 hover:border-slate-200'}`}
+                >
+                  <div className={`size-6 rounded-full border-2 flex items-center justify-center ${liquidationType === 'CUSTOM' ? 'border-primary' : 'border-slate-300'}`}>
+                    {liquidationType === 'CUSTOM' && <div className="size-3 bg-primary rounded-full"></div>}
+                  </div>
+                  <p className="font-black text-slate-900 dark:text-white uppercase tracking-tight text-sm">Custom Amount</p>
+                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Specify Value</p>
+                </button>
+              </div>
+
+              {liquidationType === 'CUSTOM' && (
+                <div className="space-y-2 animate-in slide-in-from-top-4 duration-300">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">Enter Amount</label>
+                  <div className="relative">
+                    <span className="absolute left-6 top-1/2 -translate-y-1/2 font-black text-slate-400">$</span>
+                    <input 
+                      type="number"
+                      value={customAmount}
+                      onChange={(e) => setCustomAmount(e.target.value)}
+                      placeholder="0.00"
+                      className="w-full h-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-700 pl-10 pr-6 font-black text-xl text-slate-900 dark:text-white focus:border-primary outline-none transition-all"
+                    />
+                  </div>
+                </div>
+              )}
+
+              <div className="flex gap-4 pt-4">
+                <button 
+                  onClick={() => setShowLiquidationModal(false)}
+                  className="flex-1 py-5 rounded-full font-black text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-700 transition-all uppercase tracking-widest text-xs"
+                >
+                  Cancel
+                </button>
+                <button 
+                  onClick={validateLiquidation}
+                  className="flex-[2] py-5 bg-red-500 text-white font-black rounded-full shadow-xl shadow-red-500/20 hover:-translate-y-1 transition-all uppercase tracking-widest text-xs active:scale-95"
+                >
+                  Confirm Liquidation
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Warning Modal for Early Liquidation */}
+      {showWarningModal && (
+        <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 animate-in fade-in duration-300 backdrop-blur-md">
+          <div className="absolute inset-0 bg-slate-900/60" onClick={() => setShowWarningModal(false)}></div>
+          <div className="relative bg-white dark:bg-slate-800 w-full max-w-md rounded-[3rem] shadow-2xl p-8 md:p-12 animate-in zoom-in duration-500 border border-red-100 dark:border-red-900/30">
+            <div className="text-center space-y-6">
+              <div className="size-20 rounded-[2rem] bg-amber-500/10 text-amber-500 flex items-center justify-center mx-auto animate-bounce">
+                <span className="material-symbols-outlined text-4xl filled">warning</span>
+              </div>
+              <div className="space-y-2">
+                <h2 className="text-2xl font-black text-slate-900 dark:text-white uppercase tracking-tight">Early Liquidation Warning</h2>
+                <p className="text-slate-500 dark:text-slate-400 font-medium leading-relaxed">
+                  Your investment has not reached its maturity date. 
+                  Liquidating now will attract a <span className="text-red-500 font-black">10% early termination fee</span> on the principal amount.
+                </p>
+              </div>
+              
+              <div className="p-4 bg-slate-50 dark:bg-slate-900/50 rounded-2xl border border-slate-100 dark:border-slate-700 text-left">
+                <div className="flex justify-between text-xs font-bold mb-2">
+                  <span className="text-slate-400 uppercase tracking-widest">Estimated Fine</span>
+                  <span className="text-red-500">{formatMoney((liquidationType === 'FULL' ? (selectedApp?.amount || 0) : parseFloat(customAmount || '0')) * 0.1)}</span>
+                </div>
+                <div className="flex justify-between text-xs font-black">
+                  <span className="text-slate-900 dark:text-white uppercase tracking-widest">Net Payout</span>
+                  <span className="text-emerald-500">{formatMoney((liquidationType === 'FULL' ? (selectedApp?.amount || 0) : parseFloat(customAmount || '0')) * 0.9)}</span>
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-3 pt-4">
+                <button 
+                  onClick={processLiquidation}
+                  className="w-full py-5 bg-slate-900 dark:bg-white dark:text-slate-900 text-white font-black rounded-full shadow-xl hover:-translate-y-1 transition-all uppercase tracking-widest text-xs active:scale-95"
+                >
+                  I Consent, Proceed
+                </button>
+                <button 
+                  onClick={() => setShowWarningModal(false)}
+                  className="w-full py-5 rounded-full font-black text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-700 transition-all uppercase tracking-widest text-xs"
+                >
+                  Wait for Maturity
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Agreement Modal */}
       {showModal && selectedApp && (

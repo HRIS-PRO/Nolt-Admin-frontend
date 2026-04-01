@@ -5,13 +5,14 @@ import { getStatusStyles } from '../utils/statusStyles';
 import { formatDate } from '../utils/dateFormatter';
 
 interface StaffDashboardProps {
-    user: { name: string; email: string; avatar_url?: string; role?: string };
+    user: { name: string; email: string; avatar_url?: string; role?: string; referral_code?: string };
     onLogout: () => void;
     toggleTheme?: () => void;
     theme?: 'light' | 'dark';
 }
 
 const StaffDashboard: React.FC<StaffDashboardProps> = ({ user, onLogout, toggleTheme, theme }) => {
+    const [copied, setCopied] = useState(false);
     const [stats, setStats] = useState({
         totalLoans: 0,
         totalUsers: 0,
@@ -147,6 +148,43 @@ const StaffDashboard: React.FC<StaffDashboardProps> = ({ user, onLogout, toggleT
                     <div className="absolute right-0 top-0 w-96 h-full bg-blue-500/10 blur-3xl rounded-full translate-x-1/2"></div>
                 </div>
             </div>
+
+            {/* Referral Banner */}
+            {user.referral_code && (
+                <div className="relative overflow-hidden rounded-[2rem] bg-slate-900 border-[3px] border-slate-900 dark:border-slate-800 shadow-xl mb-8 group p-6 md:p-8 flex flex-col md:flex-row items-center justify-between gap-6 hover:shadow-2xl transition-all duration-300">
+                    <div className="absolute inset-0 bg-gradient-to-r from-blue-500/10 to-transparent"></div>
+                    <div className="absolute -left-20 -bottom-20 size-64 bg-blue-500/20 rounded-full blur-[80px]"></div>
+                    
+                    <div className="flex flex-col md:flex-row items-center gap-6 relative z-10 text-center md:text-left w-full">
+                        <div className="size-16 rounded-[1.2rem] bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-lg shadow-blue-500/30 shrink-0 transform group-hover:-rotate-3 transition-transform duration-300">
+                            <span className="material-symbols-outlined text-white text-3xl filled">forum</span>
+                        </div>
+                        <div className="flex-1">
+                            <h3 className="text-white font-black text-xl md:text-2xl uppercase tracking-tight mb-2">Share your referral link</h3>
+                            <p className="text-slate-400 text-sm max-w-lg leading-relaxed">Share your unique referral link for easy performance tracking and rewards.</p>
+                        </div>
+
+                        <div className="flex w-full md:w-auto items-center gap-3 bg-[#1e293b] dark:bg-slate-800/80 rounded-[1.2rem] p-2 border border-slate-700/50">
+                            <div className="flex items-center gap-3 px-4 font-mono text-sm text-slate-300 overflow-hidden flex-1 md:w-64">
+                                <span className="opacity-50 select-none">nolt.finance/join?ref=</span>
+                                <span className="text-white font-bold truncate select-all">{user.referral_code}</span>
+                                <span className="material-symbols-outlined text-sm text-slate-500">link</span>
+                            </div>
+                            <button 
+                                onClick={() => {
+                                    navigator.clipboard.writeText(`https://lms.noltfinance.com/join?ref=${user.referral_code}`);
+                                    setCopied(true);
+                                    setTimeout(() => setCopied(false), 2000);
+                                }}
+                                className={`px-6 py-3.5 rounded-[0.8rem] font-bold text-sm tracking-wide transition-all shadow-md flex items-center gap-2 whitespace-nowrap active:scale-95 ${copied ? 'bg-green-500 text-white shadow-green-500/20' : 'bg-white text-slate-900 hover:bg-slate-50 shadow-white/10'}`}
+                            >
+                                <span className="material-symbols-outlined text-lg">{copied ? 'check' : 'content_copy'}</span>
+                                {copied ? 'COPIED!' : 'COPY LINK'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Stats Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
