@@ -266,11 +266,11 @@ const ProfilePage: React.FC = () => {
                                                     </div>
                                                     <input 
                                                         disabled={profile.is_identity_verified}
-                                                        type="password" 
+                                                        type="text" 
                                                         className="w-full h-14 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border-2 border-slate-100 dark:border-white/5 px-6 text-base font-bold dark:text-white focus:border-primary outline-none transition-all disabled:opacity-50 tracking-[0.5em]" 
                                                         value={profile.bvn} 
                                                         onChange={e => setProfile({...profile, bvn: e.target.value.replace(/\D/g, '').substring(0, 11)})} 
-                                                        placeholder="•••••••••••" 
+                                                        placeholder="..." 
                                                     />
                                                 </div>
                                                 <div className="space-y-3">
