@@ -24,6 +24,7 @@ const StaffInvestmentsPage: React.FC<StaffInvestmentsPageProps> = ({ user, onLog
     const [statusFilter, setStatusFilter] = useState('all');
     const [stageFilter, setStageFilter] = useState('all');
     const [entityFilter, setEntityFilter] = useState('all');
+    const [openDropdownId, setOpenDropdownId] = useState<number | null>(null);
 
     const initialFormData = {
         plan: 'NOLT Rise',
@@ -64,6 +65,40 @@ const StaffInvestmentsPage: React.FC<StaffInvestmentsPageProps> = ({ user, onLog
         }
     };
 
+    const [officers, setOfficers] = useState<any[]>([]);
+    
+    const fetchOfficers = async () => {
+        if (['sales_manager', 'admin', 'super_admin', 'superadmin'].includes(user.role || '')) {
+            try {
+                const response = await axios.get(`/api/staff/users?role=sales_officer&limit=200`, { withCredentials: true });
+                setOfficers(response.data.users.filter((u: any) => u.is_active));
+            } catch (error) {
+                console.error("Failed to fetch officers", error);
+            }
+        }
+    };
+
+    const handleAssignOfficer = async (investmentId: string, officerId: string) => {
+        if (!confirm("Are you sure you want to reassign this investment?")) return;
+        try {
+            await axios.patch(`/api/staff/investments/${investmentId}/assign`, {
+                sales_officer_id: officerId
+            }, { withCredentials: true });
+
+            // Optimistic Update
+            setAllInvestments(prev => prev.map(inv => {
+                if (String(inv.id) === String(investmentId)) {
+                    const officer = officers.find(o => String(o.id) === String(officerId));
+                    return { ...inv, sales_officer_id: officerId, officer_name: officer?.full_name, officer_email: officer?.email };
+                }
+                return inv;
+            }));
+            alert("Investment reassigned successfully");
+        } catch (error: any) {
+            alert(error.response?.data?.message || "Reassignment failed");
+        }
+    };
+
     const fetchRates = async () => {
         try {
             setLoading(true);
@@ -81,6 +116,7 @@ const StaffInvestmentsPage: React.FC<StaffInvestmentsPageProps> = ({ user, onLog
             fetchRates();
         } else {
             fetchInvestments();
+            fetchOfficers();
         }
     }, [activeTab]);
 
@@ -170,6 +206,26 @@ const StaffInvestmentsPage: React.FC<StaffInvestmentsPageProps> = ({ user, onLog
         }
     };
 
+    const handleTopUp = (inv: any) => {
+        const plan = inv.investment_type?.includes('VAULT') ? 'VAULT' : inv.investment_type?.includes('SURGE') ? 'SURGE' : 'RISE';
+        const draft = {
+            id: `T-${Math.floor(Math.random() * 9000) + 1000}`,
+            type: 'INVESTMENT',
+            subStep: 0,
+            label: inv.investment_type || 'NOLT Investment',
+            data: { 
+                isTopUp: true, 
+                selectedPlan: plan,
+                originalInvestmentId: inv.id,
+                currency: inv.currency
+            },
+            updatedAt: Date.now()
+        };
+        
+        // Navigate to customer investment flow with top-up data
+        navigate('/investment', { state: { draft } });
+    };
+
     return (
         <StaffLayout user={user} onLogout={onLogout} toggleTheme={toggleTheme} theme={theme}>
             <div className="space-y-8">
@@ -187,7 +243,7 @@ const StaffInvestmentsPage: React.FC<StaffInvestmentsPageProps> = ({ user, onLog
                         <button
                             onClick={() => { setActiveTab('applications'); handleCloseForm(); }}
                             className={`px-6 py-2 rounded-xl text-xs font-black transition-all uppercase tracking-widest ${activeTab === 'applications'
-                                ? 'bg-white dark:bg-slate-700 text-blue-600 shadow-sm'
+                                ? 'bg-white dark:bg-slate-700 text-purple-600 shadow-sm'
                                 : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
                                 }`}
                         >
@@ -196,7 +252,7 @@ const StaffInvestmentsPage: React.FC<StaffInvestmentsPageProps> = ({ user, onLog
                         <button
                             onClick={() => { setActiveTab('rate_guide'); handleCloseForm(); }}
                             className={`px-6 py-2 rounded-xl text-xs font-black transition-all uppercase tracking-widest ${activeTab === 'rate_guide'
-                                ? 'bg-white dark:bg-slate-700 text-blue-600 shadow-sm'
+                                ? 'bg-white dark:bg-slate-700 text-purple-600 shadow-sm'
                                 : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
                                 }`}
                         >
@@ -275,19 +331,16 @@ const StaffInvestmentsPage: React.FC<StaffInvestmentsPageProps> = ({ user, onLog
 
                         <div className="overflow-x-auto">
                             <table className="w-full text-left">
-                                <thead className="bg-slate-50/50 dark:bg-[#0f172a]/30 text-xs uppercase text-slate-500 font-black tracking-wider">
+                                <thead className="bg-slate-50/50 dark:bg-[#0f172a]/30 text-[10px] uppercase text-slate-500 font-black tracking-widest">
                                     <tr className="border-b border-slate-100 dark:border-slate-800">
                                         <th className="p-4 w-4"></th>
-                                        <th className="p-4">Reference ID</th>
-                                        <th className="p-4">Entity</th>
-                                        <th className="p-4">Applicant</th>
-                                        <th className="p-4">Investment Plan</th>
-                                        <th className="p-4">Principal Amount</th>
-                                        <th className="p-4 text-center">Interest</th>
-                                        <th className="p-4">Tenure</th>
-                                        <th className="p-4">Application Date</th>
-                                        <th className="p-4">Stage</th>
-                                        <th className="p-4">Status</th>
+                                        <th className="p-4 min-w-[120px]">Reference</th>
+                                        <th className="p-4 min-w-[200px]">Applicant</th>
+                                        <th className="p-4 min-w-[150px]">Investment Plan</th>
+                                        <th className="p-4 min-w-[150px]">Officer</th>
+                                        <th className="p-4 min-w-[150px]">Status</th>
+                                        <th className="p-4 min-w-[150px]">Stage</th>
+                                        <th className="p-4 text-right">Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody className="text-sm divide-y divide-slate-100 dark:divide-slate-800">
@@ -299,83 +352,191 @@ const StaffInvestmentsPage: React.FC<StaffInvestmentsPageProps> = ({ user, onLog
                                                         {inv.is_gift && <span className="material-symbols-outlined text-rose-600 text-[10px] font-black">favorite</span>}
                                                     </div>
                                                 </td>
-                                                <td className="p-4 font-mono text-slate-500 dark:text-slate-400 text-xs text-nowrap">
-                                                    INV-{inv.id}
-                                                </td>
                                                 <td className="p-4">
-                                                    <div className={`flex items-center gap-2 px-2 py-1 rounded-lg border w-fit text-[9px] font-black uppercase tracking-widest ${
-                                                        inv.entity_type === 'CORPORATE' ? 'border-blue-500/20 bg-blue-500/10 text-blue-500' : 'border-slate-400/20 bg-slate-400/10 text-slate-500 dark:text-slate-400'
-                                                    }`}>
-                                                        <span className="material-symbols-outlined text-[12px]">
-                                                            {inv.entity_type === 'CORPORATE' ? 'domain' : 'person'}
+                                                    <div className="flex flex-col gap-1">
+                                                        <span className="font-mono text-slate-900 dark:text-white text-xs font-bold text-nowrap">
+                                                            INV-{inv.id}
                                                         </span>
-                                                        {inv.entity_type || 'INDIVIDUAL'}
+                                                        <span className="text-[10px] font-bold text-slate-500 text-nowrap">
+                                                            {new Date(inv.created_at).toLocaleDateString()}
+                                                        </span>
                                                     </div>
                                                 </td>
                                                 <td className="p-4">
                                                     <div className="flex items-center gap-3">
-                                                        <div className={`size-8 rounded-full flex items-center justify-center text-xs font-bold border shrink-0 ${
-                                                            inv.is_gift ? 'bg-rose-100 border-rose-200 text-rose-600' : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-white border-slate-200 dark:border-slate-600'
+                                                        <div className={`size-8 rounded-full flex items-center justify-center text-xs font-black border shrink-0 ${
+                                                            inv.is_gift ? 'bg-rose-100 border-rose-200 text-rose-600' : 'bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-white border-slate-300 dark:border-slate-700'
                                                         }`}>
                                                             {inv.company_name ? inv.company_name.charAt(0) : (inv.rep_full_name ? inv.rep_full_name.charAt(0) : '?')}
                                                         </div>
                                                         <div className="flex flex-col">
                                                             <div className="flex items-center gap-2">
-                                                                <span className="font-bold text-slate-900 dark:text-white text-xs">
+                                                                <span className="font-black text-slate-900 dark:text-white text-xs leading-none">
                                                                     {inv.company_name || inv.rep_full_name || 'Anonymous'}
                                                                 </span>
+                                                                <span className={`px-1.5 py-0.5 rounded border text-[8px] font-black uppercase tracking-widest leading-none ${
+                                                                    inv.entity_type === 'CORPORATE' ? 'border-indigo-500/20 bg-indigo-500/10 text-indigo-500' : 'border-slate-400/20 bg-slate-400/10 text-slate-500 dark:text-slate-400'
+                                                                }`}>
+                                                                    {inv.entity_type === 'CORPORATE' ? 'CORP' : 'INDV'}
+                                                                </span>
+                                                                {inv.is_liquidating && (
+                                                                    <span className="flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-orange-500 text-white text-[8px] font-black uppercase tracking-tighter leading-none">
+                                                                        <span className="material-symbols-outlined text-[8px]">warning</span>
+                                                                        LIQ
+                                                                    </span>
+                                                                )}
                                                                 {inv.is_gift && (
-                                                                    <span className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-rose-500 text-white text-[8px] font-black uppercase tracking-tighter">
+                                                                    <span className="flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-rose-500 text-white text-[8px] font-black uppercase tracking-tighter leading-none">
                                                                         <span className="material-symbols-outlined text-[8px]">featured_seasonal</span>
                                                                         GIFT
                                                                     </span>
                                                                 )}
+                                                                {inv.original_investment_id && (
+                                                                    <span className="flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-purple-600 text-white text-[8px] font-black uppercase tracking-tighter shadow-sm leading-none">
+                                                                        <span className="material-symbols-outlined text-[8px]">add_circle</span>
+                                                                        TOP-UP
+                                                                    </span>
+                                                                )}
                                                             </div>
-                                                            <span className="text-[10px] font-bold text-slate-500">
+                                                            <span className="text-[10px] font-bold text-slate-500 mt-1">
                                                                 {inv.entity_type === 'CORPORATE' ? inv.rep_full_name : inv.customer_email}
                                                             </span>
                                                         </div>
                                                     </div>
                                                 </td>
                                                 <td className="p-4">
-                                                    <span className="px-2 py-1 rounded border border-purple-500/20 bg-purple-500/10 text-[10px] font-black uppercase text-purple-500 dark:text-purple-400 tracking-wider text-nowrap">
-                                                        {inv.investment_type?.replace(/_/g, ' ') || 'INVESTMENT'}
-                                                    </span>
-                                                </td>
-                                                <td className="p-4">
-                                                    <div className="font-black text-slate-900 dark:text-white tracking-tight text-sm">
-                                                        {inv.currency === 'USD' ? '$' : '₦'}{Number(inv.investment_amount).toLocaleString()}
+                                                    <div className="flex flex-col gap-1.5">
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="px-2 py-0.5 rounded border border-purple-500/20 bg-purple-500/10 text-[9px] font-black uppercase text-purple-600 dark:text-purple-400 tracking-wider text-nowrap">
+                                                                {inv.investment_type?.replace(/_/g, ' ') || 'INVESTMENT'}
+                                                            </span>
+                                                            <span className="text-[10px] font-black text-emerald-500 uppercase tracking-widest">{inv.interest_rate}% P.A</span>
+                                                        </div>
+                                                        <div className="flex items-center gap-2 text-xs font-bold text-slate-600 dark:text-slate-300">
+                                                            <span>{inv.currency === 'USD' ? '$' : '₦'}{Number(inv.investment_amount).toLocaleString()}</span>
+                                                            <span className="size-1 rounded-full bg-slate-300 dark:bg-slate-700"></span>
+                                                            <span>{inv.tenure_days / 30} Mos</span>
+                                                        </div>
                                                     </div>
                                                 </td>
-                                                <td className="p-4 text-center">
-                                                    <span className="text-[10px] font-bold text-green-500 uppercase tracking-widest">{inv.interest_rate}% P.A</span>
-                                                </td>
-                                                <td className="p-4 font-bold text-slate-600 dark:text-slate-300 text-xs text-nowrap">
-                                                    {inv.tenure_days / 30} Months
-                                                </td>
-                                                <td className="p-4 text-slate-500 text-xs text-nowrap">
-                                                    {new Date(inv.created_at).toLocaleDateString()}
+                                                <td className="p-4 text-slate-700 dark:text-slate-300 font-bold text-xs" onClick={(e) => e.stopPropagation()}>
+                                                    {['sales_manager', 'admin', 'super_admin', 'superadmin'].includes(user.role || '') ? (
+                                                        <div className="relative group/assign w-fit">
+                                                            <div className="flex items-center gap-2 cursor-pointer p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors border border-transparent hover:border-slate-200 dark:hover:border-slate-700">
+                                                                <span className="material-symbols-outlined text-sm text-slate-400 dark:text-slate-500">person</span>
+                                                                <span className="text-xs font-bold">{inv.officer_name || 'Unassigned'}</span>
+                                                                <span className="material-symbols-outlined text-[10px] text-slate-400 ml-1 opacity-0 group-hover/assign:opacity-100">edit</span>
+                                                            </div>
+                                                            <select
+                                                                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                                                                value={inv.sales_officer_id || ''}
+                                                                onChange={(e) => handleAssignOfficer(inv.id, e.target.value)}
+                                                            >
+                                                                <option value="" disabled>Select Officer</option>
+                                                                {officers.map(officer => (
+                                                                    <option key={officer.id} value={officer.id}>{officer.full_name}</option>
+                                                                ))}
+                                                            </select>
+                                                        </div>
+                                                    ) : (
+                                                        <div className="flex items-center gap-2 text-slate-500 py-1.5">
+                                                            <span className="material-symbols-outlined text-sm font-bold opacity-70">person</span>
+                                                            <span className="text-xs font-bold">{inv.officer_name || 'Unassigned'}</span>
+                                                        </div>
+                                                    )}
                                                 </td>
                                                 <td className="p-4">
-                                                    <span className="px-2 py-1 rounded bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-300 text-[10px] font-black uppercase tracking-wider text-nowrap">
-                                                        {inv.stage?.replace(/_/g, ' ') || 'Submitted'}
-                                                    </span>
-                                                </td>
-                                                <td className="p-4">
-                                                    <div className={`flex items-center gap-2 px-2 py-1 rounded border w-fit text-[10px] font-bold uppercase tracking-widest ${
-                                                        inv.status === 'active' ? 'border-green-500/20 bg-green-500/10 text-green-500' :
-                                                        inv.status === 'completed' ? 'border-blue-500/20 bg-blue-500/10 text-blue-500' :
-                                                        inv.status === 'terminated' ? 'border-red-500/20 bg-red-500/10 text-red-500' :
-                                                        'border-orange-500/20 bg-orange-500/10 text-orange-500'
-                                                    }`}>
-                                                        <span className={`size-1.5 rounded-full ${
-                                                            inv.status === 'active' ? 'bg-green-500' :
-                                                            inv.status === 'completed' ? 'bg-blue-500' :
-                                                            inv.status === 'terminated' ? 'bg-red-500' :
-                                                            'bg-orange-500'
-                                                        }`}></span>
-                                                        {inv.status || 'pending'}
+                                                    <div className="flex flex-col gap-2 w-fit">
+                                                        <div className={`flex items-center gap-1.5 px-2 py-0.5 rounded uppercase tracking-wider text-[9px] font-black border ${
+                                                            inv.status === 'active' ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' :
+                                                            inv.status === 'completed' ? 'border-sky-500/20 bg-sky-500/10 text-sky-600 dark:text-sky-400' :
+                                                            inv.status === 'rejected' || inv.status === 'terminated' ? 'border-rose-500/20 bg-rose-500/10 text-rose-600 dark:text-rose-400' :
+                                                            'border-amber-500/20 bg-amber-500/10 text-amber-600 dark:text-amber-500'
+                                                        }`}>
+                                                            <span className={`size-1.5 rounded-full ${
+                                                                inv.status === 'active' ? 'bg-emerald-500' :
+                                                                inv.status === 'completed' ? 'bg-sky-500' :
+                                                                inv.status === 'rejected' || inv.status === 'terminated' ? 'bg-rose-500' :
+                                                                'bg-amber-500'
+                                                            }`}></span>
+                                                            {inv.status || 'pending'}
+                                                        </div>
+                                                        {/* <span className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest truncate max-w-[120px]">
+                                                            {inv.stage?.replace(/_/g, ' ') || 'Submitted'}
+                                                        </span> */}
                                                     </div>
+                                                </td>
+                                                <td className="p-4">
+                                                    <div className="flex flex-col gap-2 w-fit">
+                                                        {/* <div className={`flex items-center gap-1.5 px-2 py-0.5 rounded uppercase tracking-wider text-[9px] font-black border ${
+                                                            inv.status === 'active' ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' :
+                                                            inv.status === 'completed' ? 'border-sky-500/20 bg-sky-500/10 text-sky-600 dark:text-sky-400' :
+                                                            inv.status === 'rejected' || inv.status === 'terminated' ? 'border-rose-500/20 bg-rose-500/10 text-rose-600 dark:text-rose-400' :
+                                                            'border-amber-500/20 bg-amber-500/10 text-amber-600 dark:text-amber-500'
+                                                        }`}>
+                                                            <span className={`size-1.5 rounded-full ${
+                                                                inv.status === 'active' ? 'bg-emerald-500' :
+                                                                inv.status === 'completed' ? 'bg-sky-500' :
+                                                                inv.status === 'rejected' || inv.status === 'terminated' ? 'bg-rose-500' :
+                                                                'bg-amber-500'
+                                                            }`}></span>
+                                                            {inv.status || 'pending'}
+                                                        </div> */}
+                                                        <span className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest truncate max-w-[120px]">
+                                                            {inv.stage?.replace(/_/g, ' ') || 'Submitted'}
+                                                        </span>
+                                                    </div>
+                                                </td>
+                                                <td className="p-4 text-right">
+                                                    {(inv.status === 'active' || inv.status === 'completed') && (user?.role?.toLowerCase() === 'finance' || user?.role?.toLowerCase() === 'superadmin' || user?.role?.toLowerCase() === 'super_admin') ? (
+                                                        <div className="relative inline-block text-left" onClick={(e) => e.stopPropagation()}>
+                                                            <button 
+                                                                onClick={() => setOpenDropdownId(openDropdownId === inv.id ? null : inv.id)}
+                                                                className={`p-2 rounded-xl transition-all ${openDropdownId === inv.id ? 'bg-purple-600 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-400 hover:text-purple-600'}`}
+                                                            >
+                                                                <span className="material-symbols-outlined text-xl">more_vert</span>
+                                                            </button>
+
+                                                            {openDropdownId === inv.id && (
+                                                                <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-slate-800 rounded-2xl shadow-2xl border border-slate-100 dark:border-slate-700 py-2 z-50 animate-in fade-in slide-in-from-top-2 duration-200">
+                                                                    <div className="px-4 py-2 mb-1 border-b border-slate-50 dark:border-slate-700/50">
+                                                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">Management</p>
+                                                                    </div>
+                                                                    <button 
+                                                                        onClick={() => {
+                                                                            setOpenDropdownId(null);
+                                                                            handleTopUp(inv);
+                                                                        }}
+                                                                        className="w-full flex items-center gap-3 px-4 py-3 text-xs font-black text-slate-600 dark:text-slate-300 hover:bg-emerald-500/10 hover:text-emerald-500 transition-all uppercase tracking-widest group"
+                                                                    >
+                                                                        <div className="size-7 rounded-lg bg-emerald-500/10 flex items-center justify-center group-hover:bg-emerald-500 group-hover:text-white transition-colors text-emerald-500">
+                                                                            <span className="material-symbols-outlined text-base">add_circle</span>
+                                                                        </div>
+                                                                        Top-Up
+                                                                    </button>
+                                                                    <button 
+                                                                        onClick={() => {
+                                                                            setOpenDropdownId(null);
+                                                                            navigate(`/staff/investments/${inv.id}`);
+                                                                        }}
+                                                                        className="w-full flex items-center gap-3 px-4 py-3 text-xs font-black text-slate-600 dark:text-slate-300 hover:bg-blue-500/10 hover:text-blue-500 transition-all uppercase tracking-widest group border-t border-slate-50 dark:border-slate-700/50"
+                                                                    >
+                                                                        <div className="size-7 rounded-lg bg-blue-500/10 flex items-center justify-center group-hover:bg-blue-50 group-hover:text-white transition-colors text-blue-500">
+                                                                            <span className="material-symbols-outlined text-base">visibility</span>
+                                                                        </div>
+                                                                        View Details
+                                                                    </button>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    ) : (
+                                                        <button 
+                                                            onClick={(e) => { e.stopPropagation(); navigate(`/staff/investments/${inv.id}`); }}
+                                                            className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-400 hover:text-blue-600 transition-all"
+                                                        >
+                                                            <span className="material-symbols-outlined text-xl">visibility</span>
+                                                        </button>
+                                                    )}
                                                 </td>
                                             </tr>
                                         ))
@@ -560,12 +721,12 @@ const StaffInvestmentsPage: React.FC<StaffInvestmentsPageProps> = ({ user, onLog
 
                                 <div className="grid grid-cols-2 gap-6">
                                     <div className="space-y-3">
-                                        <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 px-1">Tenure (Months)</label>
+                                        <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 px-1">Tenure (Days)</label>
                                         <input
                                             required
                                             type="number"
                                             min="1"
-                                            placeholder="e.g. 12"
+                                            placeholder="e.g. 30"
                                             value={formData.tenure}
                                             onChange={(e) => setFormData({ ...formData, tenure: e.target.value })}
                                             className="w-full h-14 px-5 rounded-2xl bg-slate-50 dark:bg-slate-800 border-none outline-none font-bold text-sm focus:ring-2 focus:ring-blue-500/50 transition-all"

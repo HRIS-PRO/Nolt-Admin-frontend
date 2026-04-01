@@ -48,6 +48,7 @@ export interface UserState {
   role?: string;
   new_comer?: boolean;
   full_name?: string;
+  referral_code?: string;
   referral_code_used?: string;
   profile?: UserProfile;
 }

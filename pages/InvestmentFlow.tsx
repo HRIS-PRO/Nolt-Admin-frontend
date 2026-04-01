@@ -1,11 +1,12 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import axios from 'axios';
 import { motion } from 'framer-motion';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useLocation } from 'react-router-dom';
 import { AppStep, SavedDraft, Currency, InvestmentPlan, PayoutFrequency, UserState } from '../types';
 import { storageService } from '../services/storageService';
 import { investmentService } from '../services/investmentService';
 import GiftInvestmentFlow from './investment/GiftInvestmentFlow';
+import { PaymentModal } from '../components/PaymentModal';
 
 interface InvestmentFlowProps {
   navigate: (step: AppStep) => void;
@@ -24,9 +25,11 @@ const NIGERIAN_STATES = [
 
 const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, formatMoney, initialDraft, user }) => {
   const [searchParams] = useSearchParams();
+  const location = useLocation();
+  const incomingDraft = initialDraft || location.state?.draft;
   const giftTokenFromUrl = searchParams.get('gift_token') || localStorage.getItem('pending_gift_token') || sessionStorage.getItem('pending_gift_token');
 
-  const [subStep, setSubStep] = useState(initialDraft?.subStep ?? 0);
+  const [subStep, setSubStep] = useState(incomingDraft?.subStep ?? 0);
   const [loading, setLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isClaimingGift, setIsClaimingGift] = useState(false);
@@ -74,12 +77,13 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
   const [businessAddress, setBusinessAddress] = useState(initialDraft?.data?.businessAddress ?? '');
   const [businessNature, setBusinessNature] = useState(initialDraft?.data?.businessNature ?? '');
   const [tin, setTin] = useState(initialDraft?.data?.tin ?? '');
+  const [tinNumber, setTinNumber] = useState(initialDraft?.data?.tinNumber ?? '');
   const [directorCount, setDirectorCount] = useState<number>(initialDraft?.data?.directorCount ?? 1);
   const [directors, setDirectors] = useState<any[]>(initialDraft?.data?.directors ?? [{
-      surname: '', firstName: '', middleName: '', phone: '', gender: '', dob: '', bvn: '', nin: '', isPep: false, photo: null, id_card: null
+    surname: '', firstName: '', middleName: '', phone: '', gender: '', dob: '', bvn: '', nin: '', isPep: false, photo: null, id_card: null
   }]);
   const [companyName, setCompanyName] = useState(initialDraft?.data?.companyName ?? '');
-  
+
   // Name split for Individual (Requested refinement)
   const nameParts = (user.name || '').trim().split(/\s+/);
   const defSurname = nameParts.length > 1 ? nameParts[nameParts.length - 1] : '';
@@ -89,7 +93,7 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
   const [surname, setSurname] = useState(initialDraft?.data?.surname || user.profile?.surname || defSurname);
   const [firstName, setFirstName] = useState(initialDraft?.data?.firstName || user.profile?.first_name || defFirstName);
   const [middleName, setMiddleName] = useState(initialDraft?.data?.middleName || user.profile?.middle_name || defMiddleName);
-  
+
   useEffect(() => {
     if (entityType === 'INDIVIDUAL') {
       setFullName(`${surname} ${firstName} ${middleName}`.replace(/\s+/g, ' ').trim());
@@ -130,8 +134,11 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
 
 
   // Top-Up
-  const [isTopUp, setIsTopUp] = useState(initialDraft?.data?.isTopUp ?? false);
-  const [casaNumber, setCasaNumber] = useState(initialDraft?.data?.casaNumber ?? '');
+  const [isTopUp, setIsTopUp] = useState(incomingDraft?.data?.isTopUp ?? false);
+  const [casaNumber, setCasaNumber] = useState(incomingDraft?.data?.casaNumber ?? '');
+  const [originalInvestmentId, setOriginalInvestmentId] = useState(incomingDraft?.data?.originalInvestmentId ?? null);
+  const [isValidatingCasa, setIsValidatingCasa] = useState(false);
+  const [referralCode, setReferralCode] = useState(initialDraft?.data?.referralCode ?? user.referral_code_used ?? '');
 
   // Documents & Progress
   const [uploadedDocs, setUploadedDocs] = useState<Record<string, { name: string, size: string, url?: string } | null>>(
@@ -193,6 +200,8 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
   const [paymentVerified, setPaymentVerified] = useState(false);
   const [showProductInfo, setShowProductInfo] = useState(false);
   const [showRolloverInfo, setShowRolloverInfo] = useState(false);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [isUploadingReceipt, setIsUploadingReceipt] = useState(false);
 
   // Real Upload State
   const [draftId] = useState(`I-` + Date.now());
@@ -283,21 +292,21 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
           if (!user.profile?.state_of_origin) setStateOfOrigin(latestInfo.rep_state_of_origin || '');
           if (!user.profile?.state_of_residence) setStateOfResidence(latestInfo.rep_state_of_residence || '');
           if (!user.profile?.address) setHomeAddress(latestInfo.rep_street_address || '');
-          
+
           setIsPep(latestInfo.is_pep ?? null);
           setTitle(latestInfo.title || 'Mr');
           if (!user.profile?.gender) setGender(latestInfo.gender || '');
           if (!user.profile?.date_of_birth) setDob(latestInfo.dob ? new Date(latestInfo.dob).toISOString().split('T')[0] : '');
-          
+
           setMaidenName(latestInfo.mother_maiden_name || '');
           setReligion(latestInfo.religion || 'Prefer not to say');
           setMaritalStatus(latestInfo.marital_status || 'Single');
           if (!user.profile?.personal_email) setContactEmail(latestInfo.customer_email || '');
-          
+
           setNokName(latestInfo.nok_name || '');
           setNokRelationship(latestInfo.nok_relationship || '');
           setNokAddress(latestInfo.nok_address || '');
-          
+
           setUploadedDocs(prev => {
             const updated = { ...prev };
             // Basic Docs
@@ -305,14 +314,14 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
             if (latestInfo.utility_bill_url) updated.utility_bill = { name: 'Previous Utility Bill', size: 'Pre-filled', url: latestInfo.utility_bill_url };
             if (latestInfo.rep_selfie_url) updated.selfie = { name: 'Previous Selfie', size: 'Pre-filled', url: latestInfo.rep_selfie_url };
             if (latestInfo.secondary_id_url) updated.secondary_id = { name: 'Previous Secondary ID', size: 'Pre-filled', url: latestInfo.secondary_id_url };
-            
+
             // Corporate Docs (Mapping DB columns to UI IDs)
             if (latestInfo.company_profile_url) updated.company_profile = { name: 'Previous Corporate Doc', size: 'Pre-filled', url: latestInfo.company_profile_url };
             if (latestInfo.status_report_url) updated.status_report = { name: 'Previous Status Report', size: 'Pre-filled', url: latestInfo.status_report_url };
             if (latestInfo.memart_url) updated.memart = { name: 'Previous MeMart', size: 'Pre-filled', url: latestInfo.memart_url };
             if (latestInfo.board_resolution_url) updated.board_resolution = { name: 'Previous Board Resolution', size: 'Pre-filled', url: latestInfo.board_resolution_url };
             if (latestInfo.annual_returns_url) updated.annual_returns = { name: 'Previous Annual Returns', size: 'Pre-filled', url: latestInfo.annual_returns_url };
-            
+
             return updated;
           });
 
@@ -324,24 +333,25 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
             setBusinessAddress(latestInfo.business_address || '');
             setBusinessNature(latestInfo.business_nature || '');
             setTin(latestInfo.tin || '');
+            setTinNumber(latestInfo.tin_number || '');
             setIsAuthorizedRep(latestInfo.is_authorized_rep || false);
             setAuthRepPhone(latestInfo.auth_rep_phone || '');
             if (latestInfo.directors) {
-                try {
-                    const parsedDirectors = typeof latestInfo.directors === 'string' ? JSON.parse(latestInfo.directors) : latestInfo.directors;
-                    setDirectors(parsedDirectors);
-                    setDirectorCount(parsedDirectors.length);
-                    
-                    // Inject director documents from array into uploadedDocs
-                    setUploadedDocs(prev => {
-                      const updated = { ...prev };
-                      parsedDirectors.forEach((dir: any, idx: number) => {
-                        if (dir.photo) updated[`director_photo_${idx}`] = { name: 'Previous Photo', size: 'Pre-filled', url: dir.photo };
-                        if (dir.id_card) updated[`director_id_${idx}`] = { name: 'Previous ID Card', size: 'Pre-filled', url: dir.id_card };
-                      });
-                      return updated;
-                    });
-                } catch (e) { console.error("Error parsing directors:", e); }
+              try {
+                const parsedDirectors = typeof latestInfo.directors === 'string' ? JSON.parse(latestInfo.directors) : latestInfo.directors;
+                setDirectors(parsedDirectors);
+                setDirectorCount(parsedDirectors.length);
+
+                // Inject director documents from array into uploadedDocs
+                setUploadedDocs(prev => {
+                  const updated = { ...prev };
+                  parsedDirectors.forEach((dir: any, idx: number) => {
+                    if (dir.photo) updated[`director_photo_${idx}`] = { name: 'Previous Photo', size: 'Pre-filled', url: dir.photo };
+                    if (dir.id_card) updated[`director_id_${idx}`] = { name: 'Previous ID Card', size: 'Pre-filled', url: dir.id_card };
+                  });
+                  return updated;
+                });
+              } catch (e) { console.error("Error parsing directors:", e); }
             }
           }
         }
@@ -405,7 +415,7 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
   }, [selectedPlan, currency, serverMinAmount]);
 
   // Navigation Logic
-const handleSaveDraft = (nextStep: number) => {
+  const handleSaveDraft = (nextStep: number) => {
     storageService.saveDraft({
       id: draftId,
       progress: Math.floor((nextStep / 12) * 100),
@@ -418,8 +428,8 @@ const handleSaveDraft = (nextStep: number) => {
         entityType, title, fullName, surname, firstName, middleName, isOnBehalf, representativeRelation, isPep,
         gender, dob, maidenName, religion, maritalStatus, countryCode, mobileNumber, contactEmail, bvn, nin,
         stateOfOrigin, stateOfResidence, homeAddress, nokName, nokRelationship, nokAddress,
-        companyName, businessAddress, incorpDate, rcNumber, businessNature, directors, 
-        isAuthorizedRep, authRepPhone, tin, uploadedDocs, isTopUp, casaNumber, giftToken, isClaimingGift
+        companyName, businessAddress, incorpDate, rcNumber, businessNature, directors,
+        isAuthorizedRep, authRepPhone, tin, tinNumber, uploadedDocs, isTopUp, casaNumber, giftToken, isClaimingGift, originalInvestmentId
       }
     } as any);
   };
@@ -445,19 +455,19 @@ const handleSaveDraft = (nextStep: number) => {
     }
 
     if (isClaimingGift) {
-      if (subStep === 9) { 
+      if (subStep === 9) {
         handleSaveDraft(11);
-        setSubStep(11); 
+        setSubStep(11);
         window.scrollTo({ top: 0, behavior: 'smooth' });
         return;
       }
       if (subStep === 11) {
-        handleSubmit(); 
+        preSubmitCheck();
         return;
       }
     } else {
       if (subStep === 11) {
-        handleSubmit(); 
+        preSubmitCheck();
         return;
       }
     }
@@ -472,7 +482,7 @@ const handleSaveDraft = (nextStep: number) => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-const handleBack = () => {
+  const handleBack = () => {
     if (isGift) {
       if (subStep === 0) navigate('PRODUCT_SELECT');
       else setSubStep(prev => prev - 1);
@@ -506,7 +516,7 @@ const handleBack = () => {
       const result = await investmentService.uploadDocument(file, draftId, id);
       const url = result.document.file_url;
       setUploadedDocs(prev => ({ ...prev, [id]: { name: file.name, size: `${(file.size / 1024).toFixed(1)} KB`, url } }));
-      
+
       // Sync with directors array if it's a director document
       if (id.startsWith('director_')) {
         const parts = id.split('_');
@@ -580,42 +590,65 @@ const handleBack = () => {
     handler.openIframe();
   };
 
-  const handleSubmit = async () => {
+  const [preSubmitReference, setPreSubmitReference] = useState<string>('');
+
+  const preSubmitCheck = async () => {
     if (!contactEmail.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) return alert("Please enter a valid email address.");
     if (mobileNumber.length < 10) return alert("Please enter a valid mobile number.");
 
+    if (isClaimingGift || giftToken) {
+      finalizeInvestment(`G_CLAIM_${giftToken || Date.now()}`);
+      return;
+    }
+
+    setPreSubmitReference(`INV_${Date.now()}`);
+    setShowPaymentModal(true);
+  };
+
+  const handlePayOnline = () => {
     setLoading(true);
     try {
-      if (isClaimingGift || giftToken) {
-        finalizeInvestment(`G_CLAIM_${giftToken || Date.now()}`);
-        return;
-      }
-
-      // Proceed to payment directly (Identity verified on profile)
       // @ts-ignore
       const handler = window.PaystackPop.setup({
         key: import.meta.env.VITE_PAYSTACK_PUBLIC_KEY,
         email: contactEmail,
         amount: Math.round(parseFloat(amount) * 100),
         currency: 'NGN',
-        ref: `INV_${Date.now()}`,
+        ref: preSubmitReference,
         callback: (response: any) => {
           finalizeInvestment(response.reference);
         },
         onClose: () => {
           alert('Transaction was not completed, window closed.');
+          setLoading(false);
         }
       });
       handler.openIframe();
     } catch (err: any) {
       console.error("Submission error:", err);
       alert(err.message || "An error occurred during submission.");
-    } finally {
       setLoading(false);
     }
   };
 
-  const finalizeInvestment = async (reference: string) => {
+  const handleUploadReceipt = async (file: File): Promise<string> => {
+    try {
+      const result = await investmentService.uploadDocument(file, draftId, 'payment_receipt');
+      return result.document.file_url;
+    } catch (err) {
+      console.error("Receipt upload failed:", err);
+      // We explicitly throw the error so the Modal catches it and resets state
+      throw new Error("Failed to upload the receipt. Please try again.");
+    }
+  };
+
+  const handleBankTransferSubmit = async (receiptUrl: string) => {
+    setShowPaymentModal(false);
+    // Call finalize with the uploaded receipt URL
+    finalizeInvestment(preSubmitReference, receiptUrl);
+  };
+
+  const finalizeInvestment = async (reference: string, receiptUrl?: string) => {
     setLoading(true);
     try {
       // Step 2: Create Investment
@@ -626,13 +659,15 @@ const handleBack = () => {
         currency,
         giftToken, // For linking if claim
         payment_reference: reference, // reference is already handled by caller (G_CLAIM_... or Paystack ref)
-        
+        payment_receipt_url: receiptUrl,
+
         // Corporate Fields
         entity_type: entityType,
         company_name: entityType === 'CORPORATE' ? companyName : null,
         rc_number: entityType === 'CORPORATE' ? rcNumber : null,
         incorp_date: entityType === 'CORPORATE' ? incorpDate : null,
         tin: entityType === 'CORPORATE' ? tin : null,
+        tin_number: entityType === 'INDIVIDUAL' ? tinNumber : null,
         business_nature: entityType === 'CORPORATE' ? businessNature : null,
         business_address: entityType === 'CORPORATE' ? businessAddress : null,
         is_authorized_rep: entityType === 'CORPORATE' ? isAuthorizedRep : false,
@@ -670,7 +705,11 @@ const handleBack = () => {
         annual_returns_url: uploadedDocs.annual_returns?.url || null,
         is_minor_beneficiary: isMinor,
         guardian_confirmed: isGuardianConfirmed,
-        signatures: [canvasRef.current?.toDataURL() || ""]
+        signatures: [canvasRef.current?.toDataURL() || ""],
+        is_top_up: isTopUp,
+        original_investment_id: originalInvestmentId,
+        casa_account_number: casaNumber,
+        referral_code: referralCode
       };
 
       await investmentService.createInvestment(payload);
@@ -721,8 +760,8 @@ const handleBack = () => {
     </div>
   );
 
-  const totalSteps = selectedPlan === 'RISE' ? 14 : (selectedPlan === 'VAULT' ? 13 : 13);
-  const currentStep = subStep + 1;
+  const totalSteps = isTopUp ? 4 : (selectedPlan === 'RISE' ? 14 : (selectedPlan === 'VAULT' ? 13 : 13));
+  const currentStep = isTopUp ? (subStep === 0 ? 1 : subStep === 10 ? 2 : subStep === 11 ? 3 : 4) : subStep + 1;
 
   // Render Logic - Profile Guard
   if (!user.profile?.is_identity_verified && !isGift) {
@@ -738,7 +777,7 @@ const handleBack = () => {
           </p>
         </div>
         <div className="flex flex-col items-center gap-4">
-          <button 
+          <button
             onClick={() => window.location.href = '/profile'}
             className="px-10 py-5 bg-primary text-white font-black text-lg rounded-2xl shadow-2xl shadow-primary/25 hover:-translate-y-1 transition-all active:scale-95 flex items-center gap-3"
           >
@@ -824,26 +863,104 @@ const handleBack = () => {
         </div>
       )}
 
-      {/* Step 0: Plan Selection */}
+      {/* Step 0: Plan Selection / Top-Up Entry */}
       {subStep === 0 && (
         <div className="space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-500">
-          <div className="text-center md:text-left space-y-3">
-            <h1 className="text-4xl md:text-5xl font-black text-slate-900 dark:text-white tracking-tight">Investment Plan</h1>
-            <p className="text-lg text-slate-500 dark:text-slate-400 font-medium max-w-2xl">Choose a growth strategy that aligns with your financial horizon.</p>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {['RISE', 'SURGE', 'VAULT'].map((plan) => (
-              <button key={plan} onClick={() => { setSelectedPlan(plan as InvestmentPlan); handleNext(); }} className={`group p-8 rounded-[2.5rem] border-2 transition-all text-left flex flex-col gap-5 shadow-xl ${selectedPlan === plan ? 'border-primary bg-white dark:bg-slate-800' : 'border-slate-100 dark:border-slate-800 bg-white/50 hover:border-primary/50'}`}>
-                <div className="size-14 rounded-2xl bg-primary/10 flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-white transition-all">
-                  <span className="material-symbols-outlined text-3xl filled">{plan === 'RISE' ? 'rocket_launch' : plan === 'SURGE' ? 'bolt' : 'lock'}</span>
+          {isTopUp ? (
+            <div className="max-w-2xl mx-auto text-center space-y-10 py-10">
+              <div className="size-24 bg-emerald-500/10 rounded-[2.5rem] flex items-center justify-center text-emerald-500 mx-auto border-2 border-emerald-500/20 shadow-xl shadow-emerald-500/5">
+                <span className="material-symbols-outlined text-5xl font-black">add_circle</span>
+              </div>
+              <div className="space-y-4">
+                <h1 className="text-4xl md:text-5xl font-black text-slate-900 dark:text-white tracking-tight">Investment Top-Up</h1>
+                <p className="text-lg text-slate-500 dark:text-slate-400 font-medium leading-relaxed">
+                  You are adding funds to an existing <span className="text-primary font-black">NOLT {selectedPlan}</span> portfolio.
+                  Please confirm the settlement account below.
+                </p>
+              </div>
+
+              <div className="space-y-6 text-left">
+                <div className="space-y-3">
+                  <label className="text-xs font-black text-slate-400 uppercase tracking-widest px-1">CASA Account Number</label>
+                  <div className="relative">
+                    <span className="absolute left-6 top-1/2 -translate-y-1/2 material-symbols-outlined text-slate-400">account_balance</span>
+                    <input
+                      type="text"
+                      placeholder="Enter CASA Number..."
+                      value={casaNumber}
+                      onChange={(e) => setCasaNumber(e.target.value)}
+                      className="w-full h-20 pl-16 pr-6 rounded-3xl bg-white dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 text-2xl font-black text-slate-900 dark:text-white focus:border-primary outline-none transition-all placeholder:text-slate-300"
+                    />
+                  </div>
+                  <p className="text-[10px] text-slate-400 italic px-1 font-bold">This is the account where your top-up principal and returns will be managed.</p>
                 </div>
-                <div>
-                  <h3 className="text-2xl font-black mb-2 uppercase tracking-tight dark:text-white">NOLT {plan}</h3>
-                  <p className="text-slate-500 font-bold leading-relaxed text-sm">{plan === 'RISE' ? 'Recurring savings for long-term growth.' : plan === 'SURGE' ? 'High yield, flexible liquidity.' : 'Fixed term, guaranteed returns.'}</p>
-                </div>
-              </button>
-            ))}
-          </div>
+
+                <button
+                  disabled={isValidatingCasa}
+                  onClick={async () => {
+                    if (!casaNumber || casaNumber.length < 5) return alert("Please enter a valid CASA number.");
+
+                    setIsValidatingCasa(true);
+                    try {
+                      if (!originalInvestmentId) {
+                        alert("The ID of the investment you are topping up is missing. Please start the Top-Up flow again from the dashboard.");
+                        setIsValidatingCasa(false);
+                        return;
+                      }
+
+                      // Fetch original investment to verify its CASA
+                      const response = await axios.get(`/api/staff/investments/${originalInvestmentId}`);
+                      const original = response.data;
+
+                      if (!original.casa_account_number) {
+                        alert("The original investment does not have a registered CASA number. Please update the original investment first.");
+                        return;
+                      }
+
+                      if (original.casa_account_number !== casaNumber) {
+                        alert(`Invalid CASA Number. The number you entered does not match the account on record for INV-${originalInvestmentId}.`);
+                        return;
+                      }
+
+                      // If matches, proceed
+                      handleSaveDraft(10);
+                      setSubStep(10);
+                    } catch (err) {
+                      console.error("Validation error:", err);
+                      alert("Failed to verify CASA number. Please try again or contact system administrator.");
+                    } finally {
+                      setIsValidatingCasa(false);
+                    }
+                  }}
+                  className={`w-full py-6 bg-primary text-white font-black text-xl rounded-3xl shadow-2xl shadow-primary/30 hover:-translate-y-1 transition-all flex items-center justify-center gap-3 active:scale-95 ${isValidatingCasa ? 'opacity-70 animate-pulse' : ''}`}
+                >
+                  {isValidatingCasa ? 'Validating...' : 'Proceed to Config'}
+                  <span className="material-symbols-outlined">arrow_forward</span>
+                </button>
+                <button onClick={handleBack} className="w-full py-4 text-slate-400 font-black uppercase tracking-widest text-xs hover:text-slate-600 transition-colors">Cancel Top-Up</button>
+              </div>
+            </div>
+          ) : (
+            <>
+              <div className="text-center md:text-left space-y-3">
+                <h1 className="text-4xl md:text-5xl font-black text-slate-900 dark:text-white tracking-tight">Investment Plan</h1>
+                <p className="text-lg text-slate-500 dark:text-slate-400 font-medium max-w-2xl">Choose a growth strategy that aligns with your financial horizon.</p>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {['RISE', 'SURGE', 'VAULT'].map((plan) => (
+                  <button key={plan} onClick={() => { setSelectedPlan(plan as InvestmentPlan); handleNext(); }} className={`group p-8 rounded-[2.5rem] border-2 transition-all text-left flex flex-col gap-5 shadow-xl ${selectedPlan === plan ? 'border-primary bg-white dark:bg-slate-800' : 'border-slate-100 dark:border-slate-800 bg-white/50 hover:border-primary/50'}`}>
+                    <div className="size-14 rounded-2xl bg-primary/10 flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-white transition-all">
+                      <span className="material-symbols-outlined text-3xl filled">{plan === 'RISE' ? 'rocket_launch' : plan === 'SURGE' ? 'bolt' : 'lock'}</span>
+                    </div>
+                    <div>
+                      <h3 className="text-2xl font-black mb-2 uppercase tracking-tight dark:text-white">NOLT {plan}</h3>
+                      <p className="text-slate-500 font-bold leading-relaxed text-sm">{plan === 'RISE' ? 'Recurring savings for long-term growth.' : plan === 'SURGE' ? 'High yield, flexible liquidity.' : 'Fixed term, guaranteed returns.'}</p>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
         </div>
       )}
 
@@ -866,40 +983,40 @@ const handleBack = () => {
       )}
 
       {/* Step 2: Identity Basics */}
-            {subStep === 2 && (
+      {subStep === 2 && (
         <div className="space-y-8 animate-in fade-in slide-in-from-right-4 duration-500">
           <h2 className="text-3xl font-black dark:text-white">Identity Basics</h2>
-          
+
           {entityType === 'INDIVIDUAL' ? (
             <div className="grid gap-8">
               <div className="space-y-4">
                 <label className="text-sm font-black text-slate-500 uppercase tracking-widest">Who are you investing for?</label>
                 <div className="flex gap-4">
-                  <button 
+                  <button
                     onClick={() => {
-                        setIsOnBehalf(false);
-                        // Reset to profile data when switching to 'Self'
-                        if (user.profile) {
-                            const p = user.profile;
-                            setSurname(p.surname || '');
-                            setFirstName(p.first_name || '');
-                            setMiddleName(p.middle_name || '');
-                            setDob(p.date_of_birth ? new Date(p.date_of_birth).toISOString().split('T')[0] : '');
-                            setMobileNumber(p.phone_number || '');
-                            setBvn(p.bvn || '');
-                            setNin(p.nin || '');
-                            setStateOfOrigin(p.state_of_origin || '');
-                            setStateOfResidence(p.state_of_residence || '');
-                            setHomeAddress(p.address || '');
-                        }
-                    }} 
+                      setIsOnBehalf(false);
+                      // Reset to profile data when switching to 'Self'
+                      if (user.profile) {
+                        const p = user.profile;
+                        setSurname(p.surname || '');
+                        setFirstName(p.first_name || '');
+                        setMiddleName(p.middle_name || '');
+                        setDob(p.date_of_birth ? new Date(p.date_of_birth).toISOString().split('T')[0] : '');
+                        setMobileNumber(p.phone_number || '');
+                        setBvn(p.bvn || '');
+                        setNin(p.nin || '');
+                        setStateOfOrigin(p.state_of_origin || '');
+                        setStateOfResidence(p.state_of_residence || '');
+                        setHomeAddress(p.address || '');
+                      }
+                    }}
                     className={`flex-1 h-14 rounded-xl border-2 font-black transition-all flex items-center justify-center gap-3 ${!isOnBehalf ? 'bg-primary border-primary text-white shadow-lg' : 'border-slate-100 dark:border-slate-700 dark:text-white'}`}
                   >
                     <span className="material-symbols-outlined text-sm">person</span>
                     Myself
                   </button>
-                  <button 
-                    onClick={() => setIsOnBehalf(true)} 
+                  <button
+                    onClick={() => setIsOnBehalf(true)}
                     className={`flex-1 h-14 rounded-xl border-2 font-black transition-all flex items-center justify-center gap-3 ${isOnBehalf ? 'bg-primary border-primary text-white shadow-lg' : 'border-slate-100 dark:border-slate-700 dark:text-white'}`}
                   >
                     <span className="material-symbols-outlined text-sm">family_history</span>
@@ -941,9 +1058,9 @@ const handleBack = () => {
               <div className="space-y-4">
                 <label className="flex items-center gap-3 cursor-pointer group">
                   <div className="relative flex items-center">
-                    <input 
-                      type="checkbox" 
-                      checked={isAuthorizedRep} 
+                    <input
+                      type="checkbox"
+                      checked={isAuthorizedRep}
                       onChange={e => setIsAuthorizedRep(e.target.checked)}
                       className="peer size-6 appearance-none rounded-lg border-2 border-slate-200 dark:border-slate-700 checked:bg-primary checked:border-primary transition-all cursor-pointer"
                     />
@@ -994,167 +1111,167 @@ const handleBack = () => {
       )}
 
       {/* Step 3: Personal Details */}
-            {subStep === 3 && (
+      {subStep === 3 && (
         <div className="space-y-8 animate-in fade-in slide-in-from-right-4 duration-500">
-            {entityType === 'INDIVIDUAL' ? (
-              <>
-                <h2 className="text-3xl font-black dark:text-white">Personal Details</h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <label className="text-sm font-black text-slate-500 uppercase">Gender</label>
-                    <select 
-                      disabled={!isOnBehalf && !!user.profile?.gender}
-                      className={`w-full h-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-6 text-lg font-bold dark:text-white focus:border-primary outline-none ${!isOnBehalf && user.profile?.gender ? 'opacity-70 cursor-not-allowed' : ''}`} 
-                      value={gender} 
-                      onChange={e => setGender(e.target.value)}
-                    >
-                      <option value="">Select Gender</option>
-                      <option value="Male">Male</option>
-                      <option value="Female">Female</option>
-                    </select>
-                  </div>
-                  <div className="space-y-4">
-                    <label className="text-sm font-black text-slate-500 uppercase">Date of Birth</label>
-                    <input disabled={!isOnBehalf && !!user.profile?.date_of_birth} type="date" className={`w-full h-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-6 text-lg font-bold dark:text-white focus:border-primary outline-none ${!isOnBehalf && !!user.profile?.date_of_birth ? 'opacity-70 cursor-not-allowed' : ''}`} value={dob} onChange={e => setDob(e.target.value)} />
-                    
-                    {isMinor && (
-                      <div className="p-6 rounded-2xl bg-primary/5 border-2 border-primary/20 flex flex-col gap-4 animate-in slide-in-from-top-2 duration-300">
-                        <div className="flex items-start gap-4">
-                          <div className="size-10 rounded-xl bg-primary text-white flex items-center justify-center shrink-0">
-                            <span className="material-symbols-outlined text-xl">gavel</span>
-                          </div>
-                          <div>
-                            <h4 className="font-black text-primary text-xs uppercase tracking-widest mb-1">Minor Beneficiary Detected</h4>
-                            <p className="text-[10px] font-bold text-slate-500 leading-relaxed uppercase tracking-tight">Investment for minors requires confirmation of legal guardianship.</p>
-                          </div>
-                        </div>
-                        
-                        <label className="flex items-center gap-3 cursor-pointer group bg-white dark:bg-slate-900 p-4 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800 transition-all hover:border-primary/30">
-                          <input 
-                            type="checkbox" 
-                            checked={isGuardianConfirmed}
-                            onChange={e => setIsGuardianConfirmed(e.target.checked)}
-                            className="size-5 rounded border-2 border-slate-300 text-primary focus:ring-primary shadow-sm"
-                          />
-                          <span className="text-xs font-black text-slate-700 dark:text-slate-300 uppercase tracking-tight group-hover:text-primary transition-colors">
-                            I confirm that I am the legal guardian of the beneficiary
-                          </span>
-                        </label>
-                      </div>
-                    )}
-                  </div>
+          {entityType === 'INDIVIDUAL' ? (
+            <>
+              <h2 className="text-3xl font-black dark:text-white">Personal Details</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <label className="text-sm font-black text-slate-500 uppercase">Gender</label>
+                  <select
+                    disabled={!isOnBehalf && !!user.profile?.gender}
+                    className={`w-full h-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-6 text-lg font-bold dark:text-white focus:border-primary outline-none ${!isOnBehalf && user.profile?.gender ? 'opacity-70 cursor-not-allowed' : ''}`}
+                    value={gender}
+                    onChange={e => setGender(e.target.value)}
+                  >
+                    <option value="">Select Gender</option>
+                    <option value="Male">Male</option>
+                    <option value="Female">Female</option>
+                  </select>
                 </div>
-                <NavActions isNextDisabled={!gender || !dob || (isMinor && !isGuardianConfirmed)} />
-              </>
-            ) : (
-              <>
-                <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
-                  <div className="space-y-2">
-                    <h2 className="text-3xl font-black dark:text-white">Director Details</h2>
-                    <p className="text-slate-500 font-medium">Please provide information for at least one director.</p>
-                  </div>
-                  <div className="flex flex-col gap-2 min-w-[200px]">
-                    <label className="text-xs font-black text-slate-500 uppercase tracking-widest">Number of Directors</label>
-                    <select 
-                      className="h-14 rounded-xl bg-white dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 px-4 font-bold dark:text-white outline-none focus:border-primary"
-                      value={directorCount}
-                      onChange={e => {
-                        const count = parseInt(e.target.value);
-                        setDirectorCount(count);
-                        const newDirectors = [...directors];
-                        if (count > newDirectors.length) {
-                          for (let i = newDirectors.length; i < count; i++) {
-                            newDirectors.push({
-                              surname: '', firstName: '', middleName: '', phone: '', gender: '', dob: '', bvn: '', nin: '', isPep: false
-                            });
-                          }
-                        } else {
-                          newDirectors.splice(count);
+                <div className="space-y-4">
+                  <label className="text-sm font-black text-slate-500 uppercase">Date of Birth</label>
+                  <input disabled={!isOnBehalf && !!user.profile?.date_of_birth} type="date" className={`w-full h-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-6 text-lg font-bold dark:text-white focus:border-primary outline-none ${!isOnBehalf && !!user.profile?.date_of_birth ? 'opacity-70 cursor-not-allowed' : ''}`} value={dob} onChange={e => setDob(e.target.value)} />
+
+                  {isMinor && (
+                    <div className="p-6 rounded-2xl bg-primary/5 border-2 border-primary/20 flex flex-col gap-4 animate-in slide-in-from-top-2 duration-300">
+                      <div className="flex items-start gap-4">
+                        <div className="size-10 rounded-xl bg-primary text-white flex items-center justify-center shrink-0">
+                          <span className="material-symbols-outlined text-xl">gavel</span>
+                        </div>
+                        <div>
+                          <h4 className="font-black text-primary text-xs uppercase tracking-widest mb-1">Minor Beneficiary Detected</h4>
+                          <p className="text-[10px] font-bold text-slate-500 leading-relaxed uppercase tracking-tight">Investment for minors requires confirmation of legal guardianship.</p>
+                        </div>
+                      </div>
+
+                      <label className="flex items-center gap-3 cursor-pointer group bg-white dark:bg-slate-900 p-4 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800 transition-all hover:border-primary/30">
+                        <input
+                          type="checkbox"
+                          checked={isGuardianConfirmed}
+                          onChange={e => setIsGuardianConfirmed(e.target.checked)}
+                          className="size-5 rounded border-2 border-slate-300 text-primary focus:ring-primary shadow-sm"
+                        />
+                        <span className="text-xs font-black text-slate-700 dark:text-slate-300 uppercase tracking-tight group-hover:text-primary transition-colors">
+                          I confirm that I am the legal guardian of the beneficiary
+                        </span>
+                      </label>
+                    </div>
+                  )}
+                </div>
+              </div>
+              <NavActions isNextDisabled={!gender || !dob || (isMinor && !isGuardianConfirmed)} />
+            </>
+          ) : (
+            <>
+              <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+                <div className="space-y-2">
+                  <h2 className="text-3xl font-black dark:text-white">Director Details</h2>
+                  <p className="text-slate-500 font-medium">Please provide information for at least one director.</p>
+                </div>
+                <div className="flex flex-col gap-2 min-w-[200px]">
+                  <label className="text-xs font-black text-slate-500 uppercase tracking-widest">Number of Directors</label>
+                  <select
+                    className="h-14 rounded-xl bg-white dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 px-4 font-bold dark:text-white outline-none focus:border-primary"
+                    value={directorCount}
+                    onChange={e => {
+                      const count = parseInt(e.target.value);
+                      setDirectorCount(count);
+                      const newDirectors = [...directors];
+                      if (count > newDirectors.length) {
+                        for (let i = newDirectors.length; i < count; i++) {
+                          newDirectors.push({
+                            surname: '', firstName: '', middleName: '', phone: '', gender: '', dob: '', bvn: '', nin: '', isPep: false
+                          });
                         }
-                        setDirectors(newDirectors);
-                      }}
-                    >
-                      {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(n => <option key={n} value={n}>{n}</option>)}
-                    </select>
-                  </div>
+                      } else {
+                        newDirectors.splice(count);
+                      }
+                      setDirectors(newDirectors);
+                    }}
+                  >
+                    {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(n => <option key={n} value={n}>{n}</option>)}
+                  </select>
                 </div>
+              </div>
 
-                <div className="space-y-12">
-                  {directors.map((director, index) => (
-                    <div key={index} className="p-8 rounded-[2.5rem] bg-white dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-800 shadow-xl space-y-8 relative overflow-hidden">
-                      <div className="absolute top-0 left-0 w-2 h-full bg-primary"></div>
-                      <div className="flex items-center justify-between">
-                        <h3 className="text-xl font-black text-primary uppercase tracking-widest">Director {index + 1}</h3>
-                        {directors.length > 1 && (
-                          <button onClick={() => {
-                              const newDirectors = directors.filter((_, i) => i !== index);
-                              setDirectors(newDirectors);
-                              setDirectorCount(newDirectors.length);
-                            }} className="p-2 text-red-500 hover:bg-red-500/10 rounded-full transition-all" title="Remove Director"
-                          >
-                            <span className="material-symbols-outlined text-lg">delete</span>
-                          </button>
-                        )}
-                      </div>
-                      
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        <div className="space-y-2">
-                          <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Surname</label>
-                          <input className="w-full h-14 rounded-xl bg-slate-50 dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 px-5 text-base font-bold dark:text-white focus:border-primary outline-none" value={director.surname} onChange={e => { const newD = [...directors]; newD[index].surname = e.target.value; setDirectors(newD); }} placeholder="Surname" />
-                        </div>
-                        <div className="space-y-2">
-                          <label className="text-xs font-black text-slate-400 uppercase tracking-widest">First Name</label>
-                          <input className="w-full h-14 rounded-xl bg-slate-50 dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 px-5 text-base font-bold dark:text-white focus:border-primary outline-none" value={director.firstName} onChange={e => { const newD = [...directors]; newD[index].firstName = e.target.value; setDirectors(newD); }} placeholder="First Name" />
-                        </div>
-                        <div className="space-y-2">
-                          <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Middle Name (Optional)</label>
-                          <input className="w-full h-14 rounded-xl bg-slate-50 dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 px-5 text-base font-bold dark:text-white focus:border-primary outline-none" value={director.middleName} onChange={e => { const newD = [...directors]; newD[index].middleName = e.target.value; setDirectors(newD); }} placeholder="Middle Name" />
-                        </div>
-                      </div>
+              <div className="space-y-12">
+                {directors.map((director, index) => (
+                  <div key={index} className="p-8 rounded-[2.5rem] bg-white dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-800 shadow-xl space-y-8 relative overflow-hidden">
+                    <div className="absolute top-0 left-0 w-2 h-full bg-primary"></div>
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-xl font-black text-primary uppercase tracking-widest">Director {index + 1}</h3>
+                      {directors.length > 1 && (
+                        <button onClick={() => {
+                          const newDirectors = directors.filter((_, i) => i !== index);
+                          setDirectors(newDirectors);
+                          setDirectorCount(newDirectors.length);
+                        }} className="p-2 text-red-500 hover:bg-red-500/10 rounded-full transition-all" title="Remove Director"
+                        >
+                          <span className="material-symbols-outlined text-lg">delete</span>
+                        </button>
+                      )}
+                    </div>
 
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div className="space-y-2">
-                          <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Phone Number</label>
-                          <input className="w-full h-14 rounded-xl bg-slate-50 dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 px-5 text-base font-bold dark:text-white focus:border-primary outline-none" value={director.phone} onChange={e => { const newD = [...directors]; newD[index].phone = e.target.value; setDirectors(newD); }} placeholder="080..." />
-                        </div>
-                        <div className="space-y-2">
-                          <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Gender</label>
-                          <select className="w-full h-14 rounded-xl bg-slate-50 dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 px-5 text-base font-bold dark:text-white focus:border-primary outline-none" value={director.gender} onChange={e => { const newD = [...directors]; newD[index].gender = e.target.value; setDirectors(newD); }}>
-                            <option value="">Select Gender</option>
-                            <option value="Male">Male</option>
-                            <option value="Female">Female</option>
-                          </select>
-                        </div>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                      <div className="space-y-2">
+                        <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Surname</label>
+                        <input className="w-full h-14 rounded-xl bg-slate-50 dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 px-5 text-base font-bold dark:text-white focus:border-primary outline-none" value={director.surname} onChange={e => { const newD = [...directors]; newD[index].surname = e.target.value; setDirectors(newD); }} placeholder="Surname" />
                       </div>
-
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        <div className="space-y-2">
-                          <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Date of Birth</label>
-                          <input type="date" className="w-full h-14 rounded-xl bg-slate-50 dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 px-5 text-base font-bold dark:text-white focus:border-primary outline-none" value={director.dob} onChange={e => { const newD = [...directors]; newD[index].dob = e.target.value; setDirectors(newD); }} />
-                        </div>
-                        <div className="space-y-2">
-                          <label className="text-xs font-black text-slate-400 uppercase tracking-widest">BVN</label>
-                          <input className="w-full h-14 rounded-xl bg-slate-50 dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 px-5 text-base font-bold dark:text-white focus:border-primary outline-none" value={director.bvn} onChange={e => { const newD = [...directors]; newD[index].bvn = e.target.value; setDirectors(newD); }} maxLength={11} placeholder="11 digits" />
-                        </div>
-                        <div className="space-y-2">
-                          <label className="text-xs font-black text-slate-400 uppercase tracking-widest">NIN</label>
-                          <input className="w-full h-14 rounded-xl bg-slate-50 dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 px-5 text-base font-bold dark:text-white focus:border-primary outline-none" value={director.nin} onChange={e => { const newD = [...directors]; newD[index].nin = e.target.value; setDirectors(newD); }} maxLength={11} placeholder="11 digits" />
-                        </div>
+                      <div className="space-y-2">
+                        <label className="text-xs font-black text-slate-400 uppercase tracking-widest">First Name</label>
+                        <input className="w-full h-14 rounded-xl bg-slate-50 dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 px-5 text-base font-bold dark:text-white focus:border-primary outline-none" value={director.firstName} onChange={e => { const newD = [...directors]; newD[index].firstName = e.target.value; setDirectors(newD); }} placeholder="First Name" />
                       </div>
-
-                      <div className="space-y-4">
-                        <label className="text-sm font-black text-slate-500 uppercase">Is your Director a Politically Exposed Person (PEP)?</label>
-                        <div className="flex gap-4 max-w-xs">
-                          <button onClick={() => { const newD = [...directors]; newD[index].isPep = true; setDirectors(newD); }} className={`flex-1 h-12 rounded-xl border-2 font-black transition-all ${director.isPep === true ? 'bg-primary border-primary text-white shadow-lg shadow-primary/20' : 'border-slate-100 dark:border-slate-700 dark:text-white'}`}>Yes</button>
-                          <button onClick={() => { const newD = [...directors]; newD[index].isPep = false; setDirectors(newD); }} className={`flex-1 h-12 rounded-xl border-2 font-black transition-all ${director.isPep === false ? 'bg-primary border-primary text-white shadow-lg shadow-primary/20' : 'border-slate-100 dark:border-slate-700 dark:text-white'}`}>No</button>
-                        </div>
+                      <div className="space-y-2">
+                        <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Middle Name (Optional)</label>
+                        <input className="w-full h-14 rounded-xl bg-slate-50 dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 px-5 text-base font-bold dark:text-white focus:border-primary outline-none" value={director.middleName} onChange={e => { const newD = [...directors]; newD[index].middleName = e.target.value; setDirectors(newD); }} placeholder="Middle Name" />
                       </div>
                     </div>
-                  ))}
-                </div>
-                <NavActions isNextDisabled={directors.some(d => !d.surname || !d.firstName || !d.phone || !d.gender || !d.dob || d.bvn.length < 11 || d.nin.length < 11)} />
-              </>
-            )}
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="space-y-2">
+                        <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Phone Number</label>
+                        <input className="w-full h-14 rounded-xl bg-slate-50 dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 px-5 text-base font-bold dark:text-white focus:border-primary outline-none" value={director.phone} onChange={e => { const newD = [...directors]; newD[index].phone = e.target.value; setDirectors(newD); }} placeholder="080..." />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Gender</label>
+                        <select className="w-full h-14 rounded-xl bg-slate-50 dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 px-5 text-base font-bold dark:text-white focus:border-primary outline-none" value={director.gender} onChange={e => { const newD = [...directors]; newD[index].gender = e.target.value; setDirectors(newD); }}>
+                          <option value="">Select Gender</option>
+                          <option value="Male">Male</option>
+                          <option value="Female">Female</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                      <div className="space-y-2">
+                        <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Date of Birth</label>
+                        <input type="date" className="w-full h-14 rounded-xl bg-slate-50 dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 px-5 text-base font-bold dark:text-white focus:border-primary outline-none" value={director.dob} onChange={e => { const newD = [...directors]; newD[index].dob = e.target.value; setDirectors(newD); }} />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-xs font-black text-slate-400 uppercase tracking-widest">BVN</label>
+                        <input className="w-full h-14 rounded-xl bg-slate-50 dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 px-5 text-base font-bold dark:text-white focus:border-primary outline-none" value={director.bvn} onChange={e => { const newD = [...directors]; newD[index].bvn = e.target.value; setDirectors(newD); }} maxLength={11} placeholder="11 digits" />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-xs font-black text-slate-400 uppercase tracking-widest">NIN</label>
+                        <input className="w-full h-14 rounded-xl bg-slate-50 dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 px-5 text-base font-bold dark:text-white focus:border-primary outline-none" value={director.nin} onChange={e => { const newD = [...directors]; newD[index].nin = e.target.value; setDirectors(newD); }} maxLength={11} placeholder="11 digits" />
+                      </div>
+                    </div>
+
+                    <div className="space-y-4">
+                      <label className="text-sm font-black text-slate-500 uppercase">Is your Director a Politically Exposed Person (PEP)?</label>
+                      <div className="flex gap-4 max-w-xs">
+                        <button onClick={() => { const newD = [...directors]; newD[index].isPep = true; setDirectors(newD); }} className={`flex-1 h-12 rounded-xl border-2 font-black transition-all ${director.isPep === true ? 'bg-primary border-primary text-white shadow-lg shadow-primary/20' : 'border-slate-100 dark:border-slate-700 dark:text-white'}`}>Yes</button>
+                        <button onClick={() => { const newD = [...directors]; newD[index].isPep = false; setDirectors(newD); }} className={`flex-1 h-12 rounded-xl border-2 font-black transition-all ${director.isPep === false ? 'bg-primary border-primary text-white shadow-lg shadow-primary/20' : 'border-slate-100 dark:border-slate-700 dark:text-white'}`}>No</button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <NavActions isNextDisabled={directors.some(d => !d.surname || !d.firstName || !d.phone || !d.gender || !d.dob || d.bvn.length < 11 || d.nin.length < 11)} />
+            </>
+          )}
         </div>
       )}
 
@@ -1233,8 +1350,20 @@ const handleBack = () => {
                 placeholder="11-digit NIN"
               />
             </div>
+            {entityType === 'INDIVIDUAL' && (
+              <div className="space-y-2">
+                <label className="text-sm font-black text-slate-500 uppercase">TIN Number</label>
+                <input
+                  disabled={!isOnBehalf && !!user.profile?.tin_number}
+                  className={`w-full h-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-6 text-lg font-bold dark:text-white focus:border-primary outline-none ${!isOnBehalf && user.profile?.tin_number ? 'opacity-70 cursor-not-allowed' : ''}`}
+                  value={tinNumber}
+                  onChange={e => setTinNumber(e.target.value)}
+                  placeholder="Tax Identification Number"
+                />
+              </div>
+            )}
           </div>
-          <NavActions isNextDisabled={bvn.length < 11 || nin.length < 11} />
+          <NavActions isNextDisabled={bvn.length < 11 || nin.length < 11 || (entityType === 'INDIVIDUAL' && !tinNumber)} />
         </div>
       )}
 
@@ -1246,10 +1375,10 @@ const handleBack = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
                 <label className="text-sm font-black text-slate-500 uppercase">State of Origin</label>
-                <select 
+                <select
                   disabled={!isOnBehalf && !!user.profile?.state_of_origin}
-                  className={`w-full h-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-6 text-lg font-bold dark:text-white focus:border-primary outline-none ${!isOnBehalf && user.profile?.state_of_origin ? 'opacity-70 cursor-not-allowed' : ''}`} 
-                  value={stateOfOrigin} 
+                  className={`w-full h-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-6 text-lg font-bold dark:text-white focus:border-primary outline-none ${!isOnBehalf && user.profile?.state_of_origin ? 'opacity-70 cursor-not-allowed' : ''}`}
+                  value={stateOfOrigin}
                   onChange={e => setStateOfOrigin(e.target.value)}
                 >
                   {NIGERIAN_STATES.map(s => <option key={s} value={s}>{s}</option>)}
@@ -1257,10 +1386,10 @@ const handleBack = () => {
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-black text-slate-500 uppercase">State of Residence</label>
-                <select 
+                <select
                   disabled={!isOnBehalf && !!user.profile?.state_of_residence}
-                  className={`w-full h-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-6 text-lg font-bold dark:text-white focus:border-primary outline-none ${!isOnBehalf && user.profile?.state_of_residence ? 'opacity-70 cursor-not-allowed' : ''}`} 
-                  value={stateOfResidence} 
+                  className={`w-full h-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-6 text-lg font-bold dark:text-white focus:border-primary outline-none ${!isOnBehalf && user.profile?.state_of_residence ? 'opacity-70 cursor-not-allowed' : ''}`}
+                  value={stateOfResidence}
                   onChange={e => setStateOfResidence(e.target.value)}
                 >
                   {NIGERIAN_STATES.map(s => <option key={s} value={s}>{s}</option>)}
@@ -1269,12 +1398,12 @@ const handleBack = () => {
             </div>
             <div className="space-y-2">
               <label className="text-sm font-black text-slate-500 uppercase">Full Home Address</label>
-              <textarea 
-                rows={3} 
+              <textarea
+                rows={3}
                 disabled={!isOnBehalf && !!user.profile?.address}
-                className={`w-full p-6 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 text-lg font-bold dark:text-white focus:border-primary outline-none ${!isOnBehalf && user.profile?.address ? 'opacity-70 cursor-not-allowed' : ''}`} 
-                value={homeAddress} 
-                onChange={e => setHomeAddress(e.target.value)} 
+                className={`w-full p-6 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 text-lg font-bold dark:text-white focus:border-primary outline-none ${!isOnBehalf && user.profile?.address ? 'opacity-70 cursor-not-allowed' : ''}`}
+                value={homeAddress}
+                onChange={e => setHomeAddress(e.target.value)}
               />
             </div>
           </div>
@@ -1310,7 +1439,7 @@ const handleBack = () => {
             <div className="space-y-4">
               <div className="flex justify-between items-center group">
                 <label className="text-sm font-black text-slate-500 uppercase tracking-widest">Contact Address</label>
-                <div 
+                <div
                   className={`flex items-center gap-3 cursor-pointer py-2 px-4 rounded-xl transition-all border-2 ${isNokSameAddress ? 'bg-primary/5 border-primary/20 text-primary shadow-sm' : 'border-slate-100 dark:border-slate-800'}`}
                   onClick={() => setIsNokSameAddress(!isNokSameAddress)}
                 >
@@ -1323,13 +1452,13 @@ const handleBack = () => {
                 </div>
               </div>
               <div className="relative">
-                <textarea 
-                  rows={2} 
+                <textarea
+                  rows={2}
                   disabled={isNokSameAddress}
-                  className={`w-full p-6 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 text-lg font-bold dark:text-white focus:border-primary outline-none transition-all ${isNokSameAddress ? 'opacity-70 cursor-not-allowed border-primary/20 bg-primary/5' : ''}`} 
-                  value={nokAddress} 
-                  onChange={e => { setNokAddress(e.target.value); if (isNokSameAddress) setIsNokSameAddress(false); }} 
-                  placeholder="Street name, City, State" 
+                  className={`w-full p-6 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 text-lg font-bold dark:text-white focus:border-primary outline-none transition-all ${isNokSameAddress ? 'opacity-70 cursor-not-allowed border-primary/20 bg-primary/5' : ''}`}
+                  value={nokAddress}
+                  onChange={e => { setNokAddress(e.target.value); if (isNokSameAddress) setIsNokSameAddress(false); }}
+                  placeholder="Street name, City, State"
                 />
                 {isNokSameAddress && (
                   <div className="absolute top-4 right-6 pointer-events-none text-primary/40 animate-in fade-in zoom-in duration-300">
@@ -1393,181 +1522,199 @@ const handleBack = () => {
       {/* Step 10: Config */}
       {subStep === 10 && (
         <div className="space-y-8 animate-in fade-in slide-in-from-right-4 duration-500">
-            <div className="flex justify-between items-start">
-              <h1 className="text-4xl font-black text-slate-900 dark:text-white tracking-tight leading-tight">Investment Configuration</h1>
-            </div>
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
-                <div className="lg:col-span-7 flex flex-col gap-10">
-                    <div className="space-y-4">
-                        <div className="flex justify-between items-end">
-                          <label className="text-sm font-black text-slate-500 uppercase tracking-widest">Investment Amount</label>
-                          <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-xl gap-1">
-                            <button disabled={isClaimingGift} onClick={() => setCurrency('NGN')} className={`px-3 py-1 rounded-lg text-[10px] font-black transition-all ${currency === 'NGN' ? 'bg-white dark:bg-slate-700 text-primary shadow-sm' : 'text-slate-400'}`}>NGN</button>
-                            {(selectedPlan === 'VAULT') && (
-                              <button disabled={isClaimingGift} onClick={() => setCurrency('USD')} className={`px-3 py-1 rounded-lg text-[10px] font-black transition-all ${currency === 'USD' ? 'bg-white dark:bg-slate-700 text-primary shadow-sm' : 'text-slate-400'}`}>USD</button>
-                            )}
-                          </div>
-                        </div>
-                        <div className="relative">
-                            <span className="absolute left-6 top-1/2 -translate-y-1/2 text-2xl font-black text-slate-400">{currency === 'NGN' ? '₦' : '$'}</span>
-                            <input disabled={isClaimingGift} className="w-full h-20 pl-14 pr-6 rounded-3xl bg-white dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 text-3xl font-black text-slate-900 dark:text-white focus:border-primary outline-none transition-all" value={amount} onChange={e => setAmount(e.target.value.replace(/[^0-9]/g, ''))} />
-                        </div>
-                        {(!dynamicInterestRate && !rateLoading && parseFloat(amount) > 0) && (
-                          <p className="text-xs font-bold text-red-500 mt-2 flex items-center gap-1">
-                            <span className="material-symbols-outlined text-sm">warning</span>
-                            No valid interest rate found for this amount and tenure.
-                          </p>
-                        )}
-                        {(parseFloat(amount) < minAmount && amount) && (
-                          <p className="text-xs font-bold text-red-500 mt-2 flex items-center gap-1">
-                            <span className="material-symbols-outlined text-sm">warning</span>
-                            Minimum investment for NOLT {selectedPlan} is {formatMoney(minAmount, currency)}
-                          </p>
-                        )}
-                    </div>
-                    {selectedPlan === 'RISE' && (
-                        <div className="space-y-4">
-                            <label className="text-sm font-black text-slate-500 uppercase tracking-widest">Target Amount (Optional)</label>
-                            <div className="relative">
-                                <span className="absolute left-6 top-1/2 -translate-y-1/2 text-xl font-black text-slate-400">{currency === 'NGN' ? '₦' : '$'}</span>
-                                <input disabled={isClaimingGift} className="w-full h-16 pl-12 pr-6 rounded-2xl bg-white dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 text-xl font-bold dark:text-white focus:border-primary outline-none" value={targetAmount} onChange={e => setTargetAmount(e.target.value)} placeholder="What's your goal?" />
-                            </div>
-                        </div>
+          <div className="flex justify-between items-start">
+            <h1 className="text-4xl font-black text-slate-900 dark:text-white tracking-tight leading-tight">Investment Configuration</h1>
+          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
+            <div className="lg:col-span-7 flex flex-col gap-10">
+              <div className="space-y-4">
+                <div className="flex justify-between items-end">
+                  <label className="text-sm font-black text-slate-500 uppercase tracking-widest">Investment Amount</label>
+                  <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-xl gap-1">
+                    <button disabled={isClaimingGift} onClick={() => setCurrency('NGN')} className={`px-3 py-1 rounded-lg text-[10px] font-black transition-all ${currency === 'NGN' ? 'bg-white dark:bg-slate-700 text-primary shadow-sm' : 'text-slate-400'}`}>NGN</button>
+                    {(selectedPlan === 'VAULT') && (
+                      <button disabled={isClaimingGift} onClick={() => setCurrency('USD')} className={`px-3 py-1 rounded-lg text-[10px] font-black transition-all ${currency === 'USD' ? 'bg-white dark:bg-slate-700 text-primary shadow-sm' : 'text-slate-400'}`}>USD</button>
                     )}
-
-                    {selectedPlan === 'RISE' && (
-                        <div className="space-y-4">
-                            <label className="text-sm font-black text-slate-500 uppercase tracking-widest">Contribution Frequency</label>
-                            <div className="grid grid-cols-3 gap-3">
-                                {[
-                                    { id: 'daily', label: 'Daily' },
-                                    { id: 'weekly', label: 'Weekly' },
-                                    { id: 'monthly', label: 'Monthly' }
-                                ].map(freq => (
-                                    <button 
-                                        key={freq.id}
-                                        disabled={isClaimingGift}
-                                        onClick={() => setContributionFrequency(freq.id as any)}
-                                        className={`py-4 rounded-2xl border-2 font-bold transition-all ${contributionFrequency === freq.id ? 'border-primary bg-primary/5 text-primary' : 'border-slate-100 dark:border-slate-800 text-slate-400'}`}
-                                    >
-                                        {freq.label}
-                                    </button>
-                                ))}
-                            </div>
-                            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Automated contributions to promote disciplined wealth building.</p>
-                        </div>
-                    )}
-
-                    {selectedPlan === 'VAULT' && currency === 'NGN' && (
-                        <div className="space-y-4">
-                            <label className="text-sm font-black text-slate-500 uppercase tracking-widest">Payout Frequency</label>
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                                {[
-                                    { id: 'upfront', label: 'Upfront' },
-                                    { id: 'monthly', label: 'Monthly' },
-                                    { id: 'quarterly', label: 'Quarterly' },
-                                    { id: 'maturity', label: 'At Maturity' }
-                                ].map(freq => (
-                                    <button 
-                                        key={freq.id}
-                                        disabled={isClaimingGift}
-                                        onClick={() => setPayoutFrequency(freq.id as any)}
-                                        className={`py-4 rounded-2xl border-2 font-bold transition-all ${payoutFrequency === freq.id ? 'border-primary bg-primary/5 text-primary' : 'border-slate-100 dark:border-slate-800 text-slate-400'}`}
-                                    >
-                                        {freq.label}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-                    )}
-
-                    <div className="space-y-6">
-                        <div className="flex justify-between items-center">
-                            <label className="text-sm font-black text-slate-500 uppercase tracking-widest">Tenure (Months)</label>
-                            <div className="flex items-center gap-4">
-                                {selectedPlan === 'SURGE' && (
-                                    <label className="flex items-center gap-2 cursor-pointer group">
-                                        <div className="relative flex items-center">
-                                            <input 
-                                                disabled={isClaimingGift}
-                                                type="checkbox" 
-                                                checked={isInfinityTenure} 
-                                                onChange={e => setIsInfinityTenure(e.target.checked)}
-                                                className="peer size-5 appearance-none rounded border-2 border-slate-300 dark:border-slate-700 checked:bg-primary checked:border-primary transition-all cursor-pointer"
-                                            />
-                                            <span className="absolute inset-0 flex items-center justify-center text-white opacity-0 peer-checked:opacity-100 transition-opacity pointer-events-none">
-                                                <span className="material-symbols-outlined text-sm font-bold">all_inclusive</span>
-                                            </span>
-                                        </div>
-                                        <span className="text-xs font-black uppercase tracking-widest text-slate-400 group-hover:text-primary transition-colors">Infinity</span>
-                                    </label>
-                                )}
-                                <span className="bg-primary text-white font-black px-6 py-2 rounded-full text-sm">
-                                    {isInfinityTenure ? '∞' : `${tenure} Mo.`}
-                                </span>
-                            </div>
-                        </div>
-                        {!isInfinityTenure && (
-                            <input 
-                                disabled={isClaimingGift}
-                                type="range" 
-                                min={(selectedPlan === 'VAULT' && currency === 'NGN') || selectedPlan === 'SURGE' ? "1" : "3"} 
-                                max={selectedPlan === 'SURGE' ? "60" : "24"} 
-                                step={(selectedPlan === 'VAULT' && currency === 'NGN') || selectedPlan === 'SURGE' ? "1" : "3"} 
-                                value={tenure} 
-                                onChange={e => setTenure(parseInt(e.target.value))} 
-                                className="w-full h-3 bg-slate-100 dark:bg-slate-900 rounded-full appearance-none cursor-pointer accent-primary" 
-                            />
-                        )}
-                        <div className="flex justify-between text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">
-                            <span>{(selectedPlan === 'VAULT' && currency === 'NGN') || selectedPlan === 'SURGE' ? (selectedPlan === 'SURGE' ? 'Flexible' : '30 Days') : '3 Months'}</span>
-                            <span>{selectedPlan === 'SURGE' ? '5 Years' : '2 Year'}</span>
-                        </div>
-                    </div>
-                    <div className="space-y-4">
-                        <div className="flex items-center gap-2">
-                          <label className="text-sm font-black text-slate-500 uppercase tracking-widest">Rollover Instruction</label>
-                          <button onClick={() => setShowRolloverInfo(!showRolloverInfo)} className="text-slate-400 hover:text-primary transition-colors">
-                            <span className="material-symbols-outlined text-sm">info</span>
-                          </button>
-                        </div>
-                        {showRolloverInfo && (
-                          <div className="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-700 animate-in fade-in slide-in-from-top-1 duration-200">
-                            <p className="text-[11px] font-bold text-slate-500 leading-relaxed">
-                              How would you like to manage your funds upon the completion of your investment term?
-                            </p>
-                          </div>
-                        )}
-                        <select disabled={isClaimingGift} className="w-full h-16 rounded-2xl bg-white dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-6 text-xl font-bold dark:text-white focus:border-primary outline-none" value={rollover} onChange={e => setRollover(e.target.value)}>
-                            <option value="principal_interest">Rollover Principal & Interest</option>
-                            <option value="principal_only">Rollover Principal Only</option>
-                            <option value="none">Payout at Maturity</option>
-                        </select>
-                    </div>
-                    <NavActions isNextDisabled={parseFloat(amount) < minAmount || rateLoading || !dynamicInterestRate} />
+                  </div>
                 </div>
-                <div className="lg:col-span-5">
-                    <div className="bg-slate-900 rounded-[2.5rem] p-10 text-white shadow-2xl space-y-8 relative overflow-hidden">
-                        <div className="absolute top-0 right-0 size-48 bg-primary/20 rounded-full blur-3xl -mr-24 -mt-24"></div>
-                        <h3 className="text-xl font-black uppercase tracking-widest">Returns Estimate</h3>
-                        <div className="bg-white/5 p-8 rounded-3xl border border-white/10 ring-2 ring-primary/20">
-                            <p className="text-xs font-bold text-slate-400 uppercase tracking-[0.2em] mb-3">Expected Maturity Value</p>
-                            <span className="text-5xl font-black text-primary">{formatMoney(returns.total, currency)}</span>
-                        </div>
-                        <div className="space-y-4 pt-4 border-t border-white/10">
-                            <div className="flex justify-between text-sm font-bold">
-                              <span className="text-slate-500 uppercase">Interest Rate</span>
-                              <div className="text-right">
-                                <span className="font-black text-primary">
-                                  {interestRate}% p.a.
-                                </span>
-                              </div>
-                            </div>
-                            <div className="flex justify-between text-sm font-bold"><span className="text-slate-500 uppercase">Total Interest</span><span>{formatMoney(returns.interestEarned, currency)}</span></div>
-                        </div>
-                    </div>
+                <div className="relative">
+                  <span className="absolute left-6 top-1/2 -translate-y-1/2 text-2xl font-black text-slate-400">{currency === 'NGN' ? '₦' : '$'}</span>
+                  <input disabled={isClaimingGift} className="w-full h-20 pl-14 pr-6 rounded-3xl bg-white dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 text-3xl font-black text-slate-900 dark:text-white focus:border-primary outline-none transition-all" value={amount} onChange={e => setAmount(e.target.value.replace(/[^0-9]/g, ''))} />
                 </div>
+                {(!dynamicInterestRate && !rateLoading && parseFloat(amount) > 0) && (
+                  <p className="text-xs font-bold text-red-500 mt-2 flex items-center gap-1">
+                    <span className="material-symbols-outlined text-sm">warning</span>
+                    No valid interest rate found for this amount and tenure.
+                  </p>
+                )}
+                {(parseFloat(amount) < minAmount && amount) && (
+                  <p className="text-xs font-bold text-red-500 mt-2 flex items-center gap-1">
+                    <span className="material-symbols-outlined text-sm">warning</span>
+                    Minimum investment for NOLT {selectedPlan} is {formatMoney(minAmount, currency)}
+                  </p>
+                )}
+              </div>
+              {selectedPlan === 'RISE' && (
+                <div className="space-y-4">
+                  <label className="text-sm font-black text-slate-500 uppercase tracking-widest">Target Amount (Optional)</label>
+                  <div className="relative">
+                    <span className="absolute left-6 top-1/2 -translate-y-1/2 text-xl font-black text-slate-400">{currency === 'NGN' ? '₦' : '$'}</span>
+                    <input disabled={isClaimingGift} className="w-full h-16 pl-12 pr-6 rounded-2xl bg-white dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 text-xl font-bold dark:text-white focus:border-primary outline-none" value={targetAmount} onChange={e => setTargetAmount(e.target.value)} placeholder="What's your goal?" />
+                  </div>
+                </div>
+              )}
+
+              {selectedPlan === 'RISE' && (
+                <div className="space-y-4">
+                  <label className="text-sm font-black text-slate-500 uppercase tracking-widest">Contribution Frequency</label>
+                  <div className="grid grid-cols-3 gap-3">
+                    {[
+                      { id: 'daily', label: 'Daily' },
+                      { id: 'weekly', label: 'Weekly' },
+                      { id: 'monthly', label: 'Monthly' }
+                    ].map(freq => (
+                      <button
+                        key={freq.id}
+                        disabled={isClaimingGift}
+                        onClick={() => setContributionFrequency(freq.id as any)}
+                        className={`py-4 rounded-2xl border-2 font-bold transition-all ${contributionFrequency === freq.id ? 'border-primary bg-primary/5 text-primary' : 'border-slate-100 dark:border-slate-800 text-slate-400'}`}
+                      >
+                        {freq.label}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Automated contributions to promote disciplined wealth building.</p>
+                </div>
+              )}
+
+              {selectedPlan === 'VAULT' && currency === 'NGN' && (
+                <div className="space-y-4">
+                  <label className="text-sm font-black text-slate-500 uppercase tracking-widest">Payout Frequency</label>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    {[
+                      { id: 'upfront', label: 'Upfront' },
+                      { id: 'monthly', label: 'Monthly' },
+                      { id: 'quarterly', label: 'Quarterly' },
+                      { id: 'maturity', label: 'At Maturity' }
+                    ].map(freq => (
+                      <button
+                        key={freq.id}
+                        disabled={isClaimingGift}
+                        onClick={() => setPayoutFrequency(freq.id as any)}
+                        className={`py-4 rounded-2xl border-2 font-bold transition-all ${payoutFrequency === freq.id ? 'border-primary bg-primary/5 text-primary' : 'border-slate-100 dark:border-slate-800 text-slate-400'}`}
+                      >
+                        {freq.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="space-y-6">
+                <div className="flex justify-between items-center">
+                  <label className="text-sm font-black text-slate-500 uppercase tracking-widest">Tenure (Months)</label>
+                  <div className="flex items-center gap-4">
+                    {selectedPlan === 'SURGE' && (
+                      <label className="flex items-center gap-2 cursor-pointer group">
+                        <div className="relative flex items-center">
+                          <input
+                            disabled={isClaimingGift}
+                            type="checkbox"
+                            checked={isInfinityTenure}
+                            onChange={e => setIsInfinityTenure(e.target.checked)}
+                            className="peer size-5 appearance-none rounded border-2 border-slate-300 dark:border-slate-700 checked:bg-primary checked:border-primary transition-all cursor-pointer"
+                          />
+                          <span className="absolute inset-0 flex items-center justify-center text-white opacity-0 peer-checked:opacity-100 transition-opacity pointer-events-none">
+                            <span className="material-symbols-outlined text-sm font-bold">all_inclusive</span>
+                          </span>
+                        </div>
+                        <span className="text-xs font-black uppercase tracking-widest text-slate-400 group-hover:text-primary transition-colors">Infinity</span>
+                      </label>
+                    )}
+                    <span className="bg-primary text-white font-black px-6 py-2 rounded-full text-sm">
+                      {isInfinityTenure ? '∞' : `${tenure} Mo.`}
+                    </span>
+                  </div>
+                </div>
+                {!isInfinityTenure && (
+                  <input
+                    disabled={isClaimingGift}
+                    type="range"
+                    min={(selectedPlan === 'VAULT' && currency === 'NGN') || selectedPlan === 'SURGE' ? "1" : "3"}
+                    max={selectedPlan === 'SURGE' ? "60" : "24"}
+                    step={(selectedPlan === 'VAULT' && currency === 'NGN') || selectedPlan === 'SURGE' ? "1" : "3"}
+                    value={tenure}
+                    onChange={e => setTenure(parseInt(e.target.value))}
+                    className="w-full h-3 bg-slate-100 dark:bg-slate-900 rounded-full appearance-none cursor-pointer accent-primary"
+                  />
+                )}
+                <div className="flex justify-between text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">
+                  <span>{(selectedPlan === 'VAULT' && currency === 'NGN') || selectedPlan === 'SURGE' ? (selectedPlan === 'SURGE' ? 'Flexible' : '30 Days') : '3 Months'}</span>
+                  <span>{selectedPlan === 'SURGE' ? '5 Years' : '2 Year'}</span>
+                </div>
+              </div>
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <label className="text-sm font-black text-slate-500 uppercase tracking-widest">Rollover Instruction</label>
+                  <button onClick={() => setShowRolloverInfo(!showRolloverInfo)} className="text-slate-400 hover:text-primary transition-colors">
+                    <span className="material-symbols-outlined text-sm">info</span>
+                  </button>
+                </div>
+                {showRolloverInfo && (
+                  <div className="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-700 animate-in fade-in slide-in-from-top-1 duration-200">
+                    <p className="text-[11px] font-bold text-slate-500 leading-relaxed">
+                      How would you like to manage your funds upon the completion of your investment term?
+                    </p>
+                  </div>
+                )}
+                <select disabled={isClaimingGift} className="w-full h-16 rounded-2xl bg-white dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-6 text-xl font-bold dark:text-white focus:border-primary outline-none" value={rollover} onChange={e => setRollover(e.target.value)}>
+                  <option value="principal_interest">Rollover Principal & Interest</option>
+                  <option value="principal_only">Rollover Principal Only</option>
+                  <option value="none">Payout at Maturity</option>
+                </select>
+              </div>
+              <NavActions isNextDisabled={parseFloat(amount) < minAmount || rateLoading || !dynamicInterestRate} />
             </div>
+            <div className="lg:col-span-5">
+              <div className="bg-slate-900 rounded-[2.5rem] p-10 text-white shadow-2xl space-y-8 relative overflow-hidden">
+                <div className="absolute top-0 right-0 size-48 bg-primary/20 rounded-full blur-3xl -mr-24 -mt-24"></div>
+                <h3 className="text-xl font-black uppercase tracking-widest">Returns Estimate</h3>
+                <div className="bg-white/5 p-8 rounded-3xl border border-white/10 ring-2 ring-primary/20">
+                  <p className="text-xs font-bold text-slate-400 uppercase tracking-[0.2em] mb-3">Expected Maturity Value</p>
+                  <span className="text-5xl font-black text-primary">{formatMoney(returns.total, currency)}</span>
+                </div>
+                <div className="space-y-4 pt-4 border-t border-white/10">
+                  <div className="flex justify-between text-sm font-bold">
+                    <span className="text-slate-500 uppercase">Interest Rate</span>
+                    <div className="text-right">
+                      <span className="font-black text-primary">
+                        {interestRate}% p.a.
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex justify-between text-sm font-bold"><span className="text-slate-500 uppercase">Total Interest</span><span>{formatMoney(returns.interestEarned, currency)}</span></div>
+                </div>
+
+                {/* Referral Code Field */}
+                {!isTopUp && (
+                  <div className="pt-6 border-t border-white/10 space-y-3">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">Referral / Sales Officer Code</label>
+                    <div className="relative group">
+                      <span className="absolute left-4 top-1/2 -translate-y-1/2 material-symbols-outlined text-slate-500 text-lg group-focus-within:text-primary transition-colors">loyalty</span>
+                      <input
+                        type="text"
+                        value={referralCode}
+                        onChange={(e) => setReferralCode(e.target.value.toUpperCase())}
+                        placeholder="Enter Code (Optional)"
+                        className="w-full h-14 pl-12 pr-4 bg-white/5 border-2 border-white/10 rounded-2xl text-sm font-bold focus:border-primary focus:bg-white/10 outline-none transition-all placeholder:text-slate-600"
+                      />
+                    </div>
+                    <p className="text-[9px] text-slate-500 font-medium italic">Assign this investment to a specific sales representative.</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
@@ -1676,7 +1823,7 @@ const handleBack = () => {
               </button>
             </div>
             <button
-              onClick={handleSubmit}
+              onClick={preSubmitCheck}
               disabled={!acceptedIndemnity || !hasSigned || loading}
               className={`px-12 py-4 rounded-full font-black text-lg transition-all flex items-center gap-3 ${acceptedIndemnity && hasSigned && !loading ? 'bg-primary text-white shadow-xl shadow-primary/30 hover:-translate-y-1' : 'bg-slate-200 text-slate-400 cursor-not-allowed grayscale'}`}
             >
@@ -1732,6 +1879,19 @@ const handleBack = () => {
       )}
 
       <CBNLogo />
+      {/* Payment Modal */}
+      <PaymentModal
+        isOpen={showPaymentModal}
+        onClose={() => setShowPaymentModal(false)}
+        amount={parseFloat(amount)}
+        currency={currency}
+        onPayOnline={() => {
+          setShowPaymentModal(false);
+          handlePayOnline();
+        }}
+        onUploadReceipt={handleUploadReceipt}
+        onBankTransferComplete={handleBankTransferSubmit}
+      />
     </div>
   );
 };
