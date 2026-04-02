@@ -213,7 +213,9 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
   const [serverMinAmount, setServerMinAmount] = useState<number>(initialDraft?.data?.serverMinAmount ?? 0);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const signatureInputRef = useRef<HTMLInputElement>(null);
   const [hasSigned, setHasSigned] = useState(false);
+  const [isDrawing, setIsDrawing] = useState(false);
   const [acceptedIndemnity, setAcceptedIndemnity] = useState(false);
   const [isGuardianConfirmed, setIsGuardianConfirmed] = useState(false);
 
@@ -225,6 +227,100 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
   }, [dob]);
 
   // Handle Gift Claim on Load
+  const clearSignature = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
+    setHasSigned(false);
+  };
+
+  const startDrawing = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const rect = canvas.getBoundingClientRect();
+    let clientX, clientY;
+
+    if ('touches' in e) {
+      clientX = e.touches[0].clientX;
+      clientY = e.touches[0].clientY;
+    } else {
+      clientX = e.clientX;
+      clientY = e.clientY;
+    }
+
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    
+    ctx.strokeStyle = '#0F172A';
+    ctx.lineWidth = 3;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo((clientX - rect.left) * scaleX, (clientY - rect.top) * scaleY);
+    setIsDrawing(true);
+  };
+
+  const draw = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+    if (!isDrawing) return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const rect = canvas.getBoundingClientRect();
+    let clientX, clientY;
+
+    if ('touches' in e) {
+      clientX = e.touches[0].clientX;
+      clientY = e.touches[0].clientY;
+    } else {
+      clientX = e.clientX;
+      clientY = e.clientY;
+    }
+
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+
+    ctx.lineTo((clientX - rect.left) * scaleX, (clientY - rect.top) * scaleY);
+    ctx.stroke();
+    setHasSigned(true);
+  };
+
+  const stopDrawing = () => setIsDrawing(false);
+
+  const handleSignatureUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+      
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      
+      const hRatio = canvas.width / img.width;
+      const vRatio = canvas.height / img.height;
+      const ratio = Math.min(hRatio, vRatio);
+      
+      const centerShift_x = (canvas.width - img.width * ratio) / 2;
+      const centerShift_y = (canvas.height - img.height * ratio) / 2;
+      
+      ctx.drawImage(img, 0, 0, img.width, img.height,
+                    centerShift_x, centerShift_y, img.width * ratio, img.height * ratio);
+                    
+      setHasSigned(true);
+      URL.revokeObjectURL(url);
+    };
+    img.src = url;
+  };
+
   useEffect(() => {
     if (giftToken) {
       const fetchGift = async () => {
@@ -1729,23 +1825,67 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
                   <span className="material-symbols-outlined text-primary text-2xl">description</span>
                   <h3 className="font-black text-xl text-slate-900 dark:text-white">Indemnity Agreement</h3>
                 </div>
-                <button className="flex items-center gap-2 px-4 py-2 bg-primary/10 text-primary text-[10px] font-black uppercase tracking-widest rounded-full hover:bg-primary hover:text-white transition-all">
-                  <span className="material-symbols-outlined text-sm">download</span>
-                  Download PDF
-                </button>
               </div>
-              <div className="p-10 text-sm leading-relaxed text-slate-600 dark:text-slate-300 space-y-8 overflow-y-auto max-h-[500px]">
-                <div className="space-y-4">
-                  <h4 className="font-black text-slate-900 dark:text-white">1. INDEMNITY</h4>
-                  <p className="font-medium">I/We hereby agree to indemnify and hold harmless NOLT Finance from any and all claims, damages, liabilities, and expenses arising out of this investment.</p>
-                </div>
-                <div className="space-y-4">
-                  <h4 className="font-black text-slate-900 dark:text-white">2. ELECTRONIC CONSENT</h4>
-                  <p className="font-medium">By signing this document electronically, I/we acknowledge that my electronic signature is the legal equivalent of my manual signature on this Agreement.</p>
-                </div>
-                <div className="space-y-4">
-                  <h4 className="font-black text-slate-900 dark:text-white">3. RISK ACKNOWLEDGEMENT</h4>
-                  <p className="font-medium">I acknowledge that all financial products carry a level of risk and I have read and understood the terms and conditions associated with the NOLT {selectedPlan} plan.</p>
+              <div className="flex-1 overflow-y-auto p-10 text-[13px] leading-relaxed text-slate-600 dark:text-slate-300 font-medium max-h-[600px]">
+                <div className="prose dark:prose-invert max-w-none space-y-6 text-justify">
+                  <h4 className="text-xl font-black uppercase text-primary text-center tracking-widest mb-6 border-b border-primary/20 pb-4">Electronic Mail Indemnity</h4>
+                  <p>
+                    I/We, <span className="font-bold border-b border-slate-300 px-2">{fullName || '____________________'}</span> (the "Customer") refer to the mandate between NOLT Finance Company Limited, (“the Company”) and the Customer governing the operation of the Customer’s account(s) and credit, investment or other transactions with the Company (the mandate).
+                  </p>
+                  <p>
+                    I/We have requested the Company to consider and/or act on our instructions and/or other requests to the Company communicated from time to time via electronic mail (email) purportedly emanating from the email address(es) shown in the table below or such other email address that the Company may subsequently agree to act upon at the Customer's request (Email Instruction(s)). IN CONSIDERATION of the Company acting upon an Email Instruction, the Customer hereby formally, unreservedly, irrevocably, and unconditionally declares and covenants as follows:
+                  </p>
+                  <p>
+                    1. That the Company is hereby authorized, in its sole discretion, to consider and/or act upon Email Instruction(s) without the necessity of any original signature(s) or conformity of the instruction with any other mandate or any inquiry on the Company's part as to the authority or identity of the person sending or purporting to send such instruction or the requirement of any other confirmation on the part of the Company.
+                  </p>
+                  <p>
+                    2. The Company shall be entitled to treat any e-notice or e-communication described above as fully authorized by and binding upon the Customer and the Company shall be entitled (but not bound) to take such steps in connection with or in reliance upon such communication as the Company may in good faith consider appropriate, whether such communication includes instruction to pay money or credit any account, or relates to the disposition of any money or documents or purports to bind the Customer to any other type of transaction or arrangement whatsoever, regardless of the nature of the transaction or arrangement or the amount of money involved. Notwithstanding, the Company may at its discretion require that a scanned copy of email instructions be duly signed in accordance with the existing mandate.
+                  </p>
+                  <p>
+                    3. In consideration of the Company acting in accordance with the term of this letter, the Customer undertakes to indemnify the Company and to keep the Company indemnified against all losses, claims, actions, proceedings, demands, costs and expenses incurred or sustained by the Company of whatever nature howsoever arising, out of or in connection with such notices, demands or other e-communication, provided that the Company acts in good faith.
+                  </p>
+                  <p>
+                    4. The terms of this letter shall remain in full force and effect unless and until the Company receives a notice of termination from the Customer in writing (or signed by a duly authorized person), save that such termination will not release the Customer from any liability under this authority and indemnity in respect of any act performed by the Company in accordance with the terms of this letter prior to the expiry of such time.
+                  </p>
+                  
+                  <div className="mt-8 p-6 bg-slate-50 dark:bg-slate-900/50 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-4">
+                    <p className="text-[10px] font-black uppercase text-slate-400">Email Address (This email address must be one that previously exists in the Company’s records)</p>
+                    <div className="grid grid-cols-3 items-center gap-4">
+                      <span className="font-bold text-slate-500">Primary email</span>
+                      <div className="col-span-2 h-10 border-b border-primary/30 flex items-center px-2 font-bold text-slate-800 dark:text-white">
+                        {contactEmail || '____________________'}
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-3 items-center gap-4">
+                      <span className="font-bold text-slate-500">Alternate email</span>
+                      <div className="col-span-2 h-10 border-b border-slate-200 dark:border-slate-700 flex items-center px-2 text-slate-500">
+                        ____________________
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-12 mt-6 p-6">
+                    <div className="space-y-6">
+                      <div className="space-y-2">
+                        <p className="text-xs font-bold text-slate-500">Date</p>
+                        <div className="h-8 border-b-2 border-slate-300 font-bold text-slate-800 dark:text-white">
+                          {new Date().toLocaleDateString('en-GB')}
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <p className="text-xs font-bold text-slate-500">Customer Name</p>
+                        <div className="h-8 border-b-2 border-slate-300 font-bold text-slate-800 dark:text-white">
+                          {fullName || '____________________'}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="space-y-2 flex flex-col justify-end">
+                      <p className="text-xs font-bold text-slate-500 text-right">Signature</p>
+                      <div className="h-16 border-b-2 border-slate-300 flex items-end justify-end pb-2 opacity-50">
+                         {hasSigned ? <span className="material-symbols-outlined text-green-500">draw</span> : 'Sign in the box to the right'}
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -1762,38 +1902,34 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
                   ref={canvasRef}
                   width={400}
                   height={220}
+                  onMouseDown={startDrawing}
+                  onMouseMove={draw}
+                  onMouseUp={stopDrawing}
+                  onMouseOut={stopDrawing}
+                  onTouchStart={startDrawing}
+                  onTouchMove={draw}
+                  onTouchEnd={stopDrawing}
                   className="w-full h-56 cursor-crosshair touch-none"
                   style={{ touchAction: 'none' }}
-                  onMouseDown={(e) => {
-                    const rect = canvasRef.current?.getBoundingClientRect();
-                    if (!rect) return;
-                    const ctx = canvasRef.current?.getContext('2d');
-                    if (!ctx) return;
-                    ctx.strokeStyle = '#0F172A';
-                    ctx.lineWidth = 3;
-                    ctx.lineCap = 'round';
-                    ctx.beginPath();
-                    ctx.moveTo(e.clientX - rect.left, e.clientY - rect.top);
-                    const drawFn = (ev: MouseEvent) => {
-                      ctx.lineTo(ev.clientX - rect.left, ev.clientY - rect.top);
-                      ctx.stroke();
-                      setHasSigned(true);
-                    };
-                    window.addEventListener('mousemove', drawFn);
-                    window.addEventListener('mouseup', () => window.removeEventListener('mousemove', drawFn), { once: true });
-                  }}
                 />
                 {!hasSigned && (
                   <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-20">
                     <span className="text-slate-400 text-3xl font-black uppercase tracking-widest">Digital Sign</span>
                   </div>
                 )}
-                <button
-                  onClick={() => { canvasRef.current?.getContext('2d')?.clearRect(0, 0, 400, 220); setHasSigned(false); }}
-                  className="absolute top-4 right-4 text-[9px] font-black uppercase text-red-500 hover:text-white hover:bg-red-500 border border-red-500/20 px-3 py-1 rounded-full transition-all bg-white/80 dark:bg-slate-800/80"
-                >
-                  Clear
-                </button>
+                <div className="absolute top-4 right-4 flex gap-2">
+                  <button onClick={() => signatureInputRef.current?.click()} className="text-[9px] font-black uppercase text-primary hover:text-white hover:bg-primary border border-primary/20 px-3 py-1 rounded-full transition-all bg-white/80 dark:bg-slate-800/80 flex items-center gap-1">
+                    <span className="material-symbols-outlined text-[10px]">photo_camera</span>
+                    Snap/Upload
+                  </button>
+                  <button
+                    onClick={clearSignature}
+                    className="text-[9px] font-black uppercase text-red-500 hover:text-white hover:bg-red-500 border border-red-500/20 px-3 py-1 rounded-full transition-all bg-white/80 dark:bg-slate-800/80"
+                  >
+                    Clear
+                  </button>
+                </div>
+                <input type="file" ref={signatureInputRef} accept="image/*" className="hidden" onChange={handleSignatureUpload} />
               </div>
 
               <div
