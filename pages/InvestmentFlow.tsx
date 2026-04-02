@@ -606,14 +606,17 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
   };
 
   const handleFileUpload = async (id: string, file: File) => {
+    console.log(`DEBUG: Starting upload for ${id}: ${file.name} (${file.size} bytes)`);
     setIsUploading(prev => ({ ...prev, [id]: true }));
     setUploadProgress(prev => ({ ...prev, [id]: 10 }));
+    
     try {
       const result = await investmentService.uploadDocument(file, draftId, id);
+      console.log(`DEBUG: Upload success result:`, result);
       const url = result.document.file_url;
       setUploadedDocs(prev => ({ ...prev, [id]: { name: file.name, size: `${(file.size / 1024).toFixed(1)} KB`, url } }));
-
-      // Sync with directors array if it's a director document
+      
+      // Update signature/etc for directors
       if (id.startsWith('director_')) {
         const parts = id.split('_');
         const type = parts[1]; // photo or id
@@ -629,11 +632,11 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
           });
         }
       }
-
+      
       setUploadProgress(prev => ({ ...prev, [id]: 100 }));
-    } catch (err) {
-      console.error("Upload failed:", err);
-      alert("Upload failed. Please try again.");
+    } catch (err: any) {
+      console.error("Upload process failed:", err);
+      alert(`Upload failed: ${err.message || 'Check connection'}`);
       setUploadProgress(prev => ({ ...prev, [id]: 0 }));
     } finally {
       setIsUploading(prev => ({ ...prev, [id]: false }));

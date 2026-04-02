@@ -33,6 +33,7 @@ export const investmentService = {
         const response = await fetch(`${API_BASE_URL}/upload`, {
             method: 'POST',
             body: formData,
+            credentials: 'include',
         });
 
         if (!response.ok) {
