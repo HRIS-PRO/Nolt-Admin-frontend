@@ -129,7 +129,7 @@ const StaffDashboard: React.FC<StaffDashboardProps> = ({ user, onLogout, toggleT
             </header>
 
             {/* AI Banner */}
-            <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-blue-600 to-cyan-500 p-[1px] shadow-xl shadow-blue-500/10 mb-8">
+            {/* <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-blue-600 to-cyan-500 p-[1px] shadow-xl shadow-blue-500/10 mb-8">
                 <div className="bg-white dark:bg-[#0f172a] rounded-[23px] p-6 relative overflow-hidden flex flex-col md:flex-row items-center justify-between gap-6">
                     <div className="flex flex-col md:flex-row items-center gap-6 relative z-10 text-center md:text-left">
                         <div className="size-14 rounded-2xl bg-blue-500 flex items-center justify-center shadow-lg shadow-blue-500/40 shrink-0">
@@ -144,10 +144,9 @@ const StaffDashboard: React.FC<StaffDashboardProps> = ({ user, onLogout, toggleT
                         GENERATE ANALYSIS
                     </button>
 
-                    {/* Background Decor */}
                     <div className="absolute right-0 top-0 w-96 h-full bg-blue-500/10 blur-3xl rounded-full translate-x-1/2"></div>
                 </div>
-            </div>
+            </div> */}
 
             {/* Referral Banner */}
             {user.referral_code && (
