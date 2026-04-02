@@ -1838,19 +1838,19 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
 
       {/* Step 11: Signature */}
       {subStep === 11 && (
-        <div className="space-y-10 animate-in fade-in slide-in-from-right-4 duration-500 pb-20">
-          <div className="flex flex-col lg:flex-row gap-8 items-stretch">
+        <div className="space-y-6 md:space-y-10 animate-in fade-in slide-in-from-right-4 duration-500 pb-20">
+          <div className="flex flex-col lg:flex-row gap-6 md:gap-8 items-stretch">
             {/* Indemnity Card */}
-            <div className="flex-1 bg-white dark:bg-slate-800 rounded-[2.5rem] shadow-sm border border-slate-100 dark:border-slate-700 overflow-hidden flex flex-col">
-              <div className="p-8 border-b border-slate-50 dark:border-slate-700/50 flex justify-between items-center bg-slate-50/50 dark:bg-slate-900/50">
+            <div className="flex-1 bg-white dark:bg-slate-800 rounded-[2rem] md:rounded-[2.5rem] shadow-sm border border-slate-100 dark:border-slate-700 overflow-hidden flex flex-col">
+              <div className="p-6 md:p-8 border-b border-slate-50 dark:border-slate-700/50 flex justify-between items-center bg-slate-50/50 dark:bg-slate-900/50">
                 <div className="flex items-center gap-3">
                   <span className="material-symbols-outlined text-primary text-2xl">description</span>
                   <h3 className="font-black text-xl text-slate-900 dark:text-white">Indemnity Agreement</h3>
                 </div>
               </div>
-              <div className="flex-1 overflow-y-auto p-10 text-[13px] leading-relaxed text-slate-600 dark:text-slate-300 font-medium max-h-[600px]">
-                <div className="prose dark:prose-invert max-w-none space-y-6 text-justify">
-                  <h4 className="text-xl font-black uppercase text-primary text-center tracking-widest mb-6 border-b border-primary/20 pb-4">Electronic Mail Indemnity</h4>
+              <div className="flex-1 overflow-y-auto p-6 md:p-10 text-[12px] md:text-[13px] leading-relaxed text-slate-600 dark:text-slate-300 font-medium max-h-[400px] md:max-h-[600px]">
+                <div className="prose dark:prose-invert max-w-none space-y-5 md:space-y-6 text-justify">
+                  <h4 className="text-lg md:text-xl font-black uppercase text-primary text-center tracking-widest mb-4 md:mb-6 border-b border-primary/20 pb-4">Electronic Mail Indemnity</h4>
                   <p>
                     I/We, <span className="font-bold border-b border-slate-300 px-2">{fullName || '____________________'}</span> (the "Customer") refer to the mandate between NOLT Finance Company Limited, (“the Company”) and the Customer governing the operation of the Customer’s account(s) and credit, investment or other transactions with the Company (the mandate).
                   </p>
@@ -1870,41 +1870,46 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
                     4. The terms of this letter shall remain in full force and effect unless and until the Company receives a notice of termination from the Customer in writing (or signed by a duly authorized person), save that such termination will not release the Customer from any liability under this authority and indemnity in respect of any act performed by the Company in accordance with the terms of this letter prior to the expiry of such time.
                   </p>
                   
-                  <div className="mt-8 p-6 bg-slate-50 dark:bg-slate-900/50 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-4">
-                    <p className="text-[10px] font-black uppercase text-slate-400">Email Address (This email address must be one that previously exists in the Company’s records)</p>
-                    <div className="grid grid-cols-3 items-center gap-4">
-                      <span className="font-bold text-slate-500">Primary email</span>
-                      <div className="col-span-2 h-10 border-b border-primary/30 flex items-center px-2 font-bold text-slate-800 dark:text-white">
+                  <div className="mt-8 p-4 md:p-6 bg-slate-50 dark:bg-slate-900/50 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-4">
+                    <p className="text-[9px] md:text-[10px] font-black uppercase text-slate-400">Email Address (This email address must be one that previously exists in the Company’s records)</p>
+                    <div className="flex flex-col sm:grid sm:grid-cols-3 sm:items-center gap-2 sm:gap-4">
+                      <span className="font-bold text-slate-500 text-xs sm:text-sm uppercase tracking-tight">Primary email</span>
+                      <div className="sm:col-span-2 h-10 border-b border-primary/30 flex items-center px-1 md:px-2 font-bold text-slate-800 dark:text-white text-sm md:text-base">
                         {contactEmail || '____________________'}
                       </div>
                     </div>
-                    <div className="grid grid-cols-3 items-center gap-4">
-                      <span className="font-bold text-slate-500">Alternate email</span>
-                      <div className="col-span-2 h-10 border-b border-slate-200 dark:border-slate-700 flex items-center px-2 text-slate-500">
+                    <div className="flex flex-col sm:grid sm:grid-cols-3 sm:items-center gap-2 sm:gap-4">
+                      <span className="font-bold text-slate-500 text-xs sm:text-sm uppercase tracking-tight">Alternate email</span>
+                      <div className="sm:col-span-2 h-10 border-b border-slate-200 dark:border-slate-700 flex items-center px-1 md:px-2 text-slate-500 text-sm md:text-base">
                         ____________________
                       </div>
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-12 mt-6 p-6">
-                    <div className="space-y-6">
-                      <div className="space-y-2">
-                        <p className="text-xs font-bold text-slate-500">Date</p>
-                        <div className="h-8 border-b-2 border-slate-300 font-bold text-slate-800 dark:text-white">
+                  <div className="flex flex-col sm:grid sm:grid-cols-2 gap-8 md:gap-12 mt-4 md:mt-6 p-2 md:p-6">
+                    <div className="space-y-4 md:space-y-6 order-2 sm:order-1">
+                      <div className="space-y-1">
+                        <p className="text-xs font-bold text-slate-500 uppercase tracking-tight">Date</p>
+                        <div className="h-8 border-b border-slate-300 font-bold text-slate-800 dark:text-white">
                           {new Date().toLocaleDateString('en-GB')}
                         </div>
                       </div>
-                      <div className="space-y-2">
-                        <p className="text-xs font-bold text-slate-500">Customer Name</p>
-                        <div className="h-8 border-b-2 border-slate-300 font-bold text-slate-800 dark:text-white">
+                      <div className="space-y-1">
+                        <p className="text-xs font-bold text-slate-500 uppercase tracking-tight">Customer Name</p>
+                        <div className="h-8 border-b border-slate-300 font-bold text-slate-800 dark:text-white">
                           {fullName || '____________________'}
                         </div>
                       </div>
                     </div>
-                    <div className="space-y-2 flex flex-col justify-end">
-                      <p className="text-xs font-bold text-slate-500 text-right">Signature</p>
-                      <div className="h-16 border-b-2 border-slate-300 flex items-end justify-end pb-2 opacity-50">
-                         {hasSigned ? <span className="material-symbols-outlined text-green-500">draw</span> : 'Sign in the box to the right'}
+                    <div className="space-y-2 flex flex-col justify-end order-1 sm:order-2">
+                      <p className="text-xs font-bold text-slate-500 sm:text-right uppercase tracking-tight">Digital Signature Verified</p>
+                      <div className="h-16 border-b border-slate-300 flex items-end sm:justify-end pb-2 opacity-80 transition-all">
+                         {hasSigned ? (
+                           <div className="flex items-center gap-2 text-green-500 font-black italic">
+                             <span className="material-symbols-outlined filled">draw</span>
+                             <span className="text-[10px] uppercase">Digitally Signed</span>
+                           </div>
+                         ) : <span className="text-[10px] text-slate-400 uppercase italic">Sign in the box to the right</span>}
                       </div>
                     </div>
                   </div>
@@ -1913,9 +1918,9 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
             </div>
 
             {/* Signature Card */}
-            <div className="w-full lg:w-[450px] bg-white dark:bg-slate-800 rounded-[2.5rem] shadow-lg border border-slate-100 dark:border-slate-700 p-10 flex flex-col gap-8">
+            <div className="w-full lg:w-[450px] bg-white dark:bg-slate-800 rounded-[2rem] md:rounded-[2.5rem] shadow-lg border border-slate-100 dark:border-slate-700 p-6 md:p-10 flex flex-col gap-6 md:gap-8">
               <div>
-                <h3 className="font-black text-2xl text-slate-900 dark:text-white mb-1">Sign Here</h3>
+                <h3 className="font-black text-xl md:text-2xl text-slate-900 dark:text-white mb-1 tracking-tight">Digital Canvas</h3>
                 <p className="text-[10px] text-slate-500 uppercase font-black tracking-widest">Draw your signature in the box below</p>
               </div>
 
@@ -1935,8 +1940,9 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
                   style={{ touchAction: 'none' }}
                 />
                 {!hasSigned && (
-                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-20">
-                    <span className="text-slate-400 text-3xl font-black uppercase tracking-widest">Digital Sign</span>
+                  <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none opacity-20">
+                    <span className="material-symbols-outlined text-5xl mb-2">draw</span>
+                    <span className="text-slate-400 text-xl font-black uppercase tracking-[0.25em]">Digital Sign</span>
                   </div>
                 )}
                 <div className="absolute top-4 right-4 flex gap-2">
@@ -1955,37 +1961,39 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
               </div>
 
               <div
-                className={`p-6 rounded-3xl border-2 transition-all cursor-pointer flex items-start gap-4 ${acceptedIndemnity ? 'border-primary bg-primary/5' : 'border-slate-50 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/50'}`}
+                className={`p-5 md:p-6 rounded-[2rem] border-2 transition-all cursor-pointer flex items-start gap-4 ${acceptedIndemnity ? 'border-primary bg-primary/5' : 'border-slate-50 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/50'}`}
                 onClick={() => setAcceptedIndemnity(!acceptedIndemnity)}
               >
-                <input
-                  type="checkbox"
-                  checked={acceptedIndemnity}
-                  onChange={e => setAcceptedIndemnity(e.target.checked)}
-                  className="size-6 rounded-lg accent-primary border-slate-300 mt-1 cursor-pointer"
-                />
-                <label className="text-sm font-bold text-slate-700 dark:text-slate-300 leading-snug cursor-pointer select-none">
+                <div className="shrink-0 mt-1">
+                  <input
+                    type="checkbox"
+                    checked={acceptedIndemnity}
+                    onChange={e => setAcceptedIndemnity(e.target.checked)}
+                    className="size-6 rounded-lg accent-primary border-slate-300 cursor-pointer"
+                  />
+                </div>
+                <label className="text-xs md:text-sm font-bold text-slate-700 dark:text-slate-300 leading-snug cursor-pointer select-none">
                   I accept the terms of the Indemnity Agreement and confirm that the digital signature above is mine.
                 </label>
               </div>
             </div>
           </div>
 
-          <div className="flex justify-between items-center bg-white dark:bg-slate-900 p-8 rounded-[2rem] border border-slate-100 dark:border-slate-800 mt-8">
-            <div className="flex gap-4">
-              <button onClick={handleBack} className="px-8 py-4 text-slate-500 font-bold hover:bg-slate-50 dark:hover:bg-slate-800 rounded-full transition-all flex items-center gap-2 border border-slate-100 dark:border-slate-700">
+          <div className="flex flex-col sm:flex-row justify-between items-center bg-white dark:bg-slate-900 p-6 md:p-8 rounded-[2rem] border border-slate-100 dark:border-slate-800 mt-6 md:mt-8 gap-6">
+            <div className="flex gap-3 md:gap-4 w-full sm:w-auto">
+              <button onClick={handleBack} className="flex-1 sm:flex-none px-6 md:px-8 py-3 md:py-4 text-slate-500 font-bold hover:bg-slate-50 dark:hover:bg-slate-800 rounded-full transition-all flex items-center justify-center gap-2 border border-slate-100 dark:border-slate-700 text-sm md:text-base">
                 <span className="material-symbols-outlined text-lg">arrow_back</span> Back
               </button>
-              <button onClick={handleSaveAndExit} className="px-8 py-4 text-primary font-bold hover:bg-primary/5 rounded-full transition-all flex items-center gap-2">
+              <button onClick={handleSaveAndExit} className="flex-1 sm:flex-none px-6 md:px-8 py-3 md:py-4 text-primary font-bold hover:bg-primary/5 rounded-full transition-all flex items-center justify-center gap-2 text-sm md:text-base">
                 <span className="material-symbols-outlined text-lg">save_as</span> Save & Exit
               </button>
             </div>
             <button
               onClick={preSubmitCheck}
               disabled={!acceptedIndemnity || !hasSigned || loading}
-              className={`px-12 py-4 rounded-full font-black text-lg transition-all flex items-center gap-3 ${acceptedIndemnity && hasSigned && !loading ? 'bg-primary text-white shadow-xl shadow-primary/30 hover:-translate-y-1' : 'bg-slate-200 text-slate-400 cursor-not-allowed grayscale'}`}
+              className={`w-full sm:w-auto px-10 md:px-12 py-3 md:py-4 rounded-full font-black text-base md:text-lg transition-all flex items-center justify-center gap-3 ${acceptedIndemnity && hasSigned && !loading ? 'bg-primary text-white shadow-xl shadow-primary/30 hover:-translate-y-1' : 'bg-slate-200 text-slate-400 cursor-not-allowed grayscale'}`}
             >
-              {loading ? 'Processing...' : 'Finish'}
+              {loading ? 'Processing...' : 'Finish Investment'}
               {!loading && <span className="material-symbols-outlined">arrow_forward</span>}
             </button>
           </div>
@@ -1997,11 +2005,11 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
         <motion.div
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
-          className="text-center space-y-10 py-12 md:py-20 animate-in fade-in zoom-in duration-700"
+          className="text-center space-y-8 md:space-y-10 py-10 md:py-20 animate-in fade-in zoom-in duration-700 px-4 md:px-0"
         >
           <div className="relative inline-block">
-            <div className="size-32 bg-green-500/10 rounded-full flex items-center justify-center text-green-500 mx-auto shadow-xl ring-8 ring-green-500/5">
-              <span className="material-symbols-outlined text-6xl filled">check_circle</span>
+            <div className="size-24 md:size-32 bg-green-500/10 rounded-full flex items-center justify-center text-green-500 mx-auto shadow-xl ring-8 ring-green-500/5">
+              <span className="material-symbols-outlined text-4xl md:text-6xl filled">check_circle</span>
             </div>
             <motion.div
               animate={{ scale: [1, 1.2, 1], opacity: [0.5, 1, 0.5] }}
@@ -2010,29 +2018,27 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
             />
           </div>
 
-          <div className="space-y-4">
-            <h2 className="text-4xl md:text-6xl font-black text-slate-900 dark:text-white tracking-tight leading-tight">
+          <div className="space-y-3 md:space-y-4">
+            <h2 className="text-3xl md:text-6xl font-black text-slate-900 dark:text-white tracking-tight leading-tight px-2">
               {giftToken ? 'Gift Claimed!' : 'Investment Successful!'}
             </h2>
-            <p className="text-slate-500 dark:text-slate-400 text-lg font-medium max-w-lg mx-auto leading-relaxed">
+            <p className="text-slate-500 dark:text-slate-400 text-sm md:text-lg font-medium max-w-lg mx-auto leading-relaxed">
               {giftToken
                 ? "Your gifted investment has been activated. You can track your returns on the dashboard."
                 : "Your investment has been successfully processed. Welcome to the future of wealth management."}
             </p>
           </div>
 
-          <div className="flex flex-col items-center gap-6">
+          <div className="flex flex-col items-center gap-4 md:gap-6">
             <button
               onClick={() => { onComplete(); navigate('DASHBOARD'); }}
-              className="px-12 py-5 bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-black text-xl rounded-2xl shadow-2xl hover:scale-105 active:scale-95 transition-all flex items-center gap-3 ring-4 ring-slate-900/5 dark:ring-white/10"
+              className="w-full sm:w-auto px-8 md:px-12 py-4 md:py-5 bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-black text-lg md:text-xl rounded-2xl shadow-2xl hover:scale-105 active:scale-95 transition-all flex items-center justify-center gap-3 ring-4 ring-slate-900/5 dark:ring-white/10"
             >
               Back to Dashboard
               <span className="material-symbols-outlined">dashboard</span>
             </button>
-            <p className="text-xs font-bold text-slate-400 uppercase tracking-widest animate-pulse">Redirecting you in a moment...</p>
+            <p className="text-[10px] md:text-xs font-bold text-slate-400 uppercase tracking-widest animate-pulse">Redirecting you in a moment...</p>
           </div>
-
-          {/* Confetti effect simulation via CSS or simple motion divs if needed */}
         </motion.div>
       )}
 
