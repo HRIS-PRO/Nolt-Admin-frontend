@@ -45,6 +45,7 @@ const LoanFlow: React.FC<LoanFlowProps> = ({ initialStep, onComplete, navigate, 
   const [hasSigned, setHasSigned] = useState(initialDraft?.data?.hasSigned ?? false);
   const [acceptedIndemnity, setAcceptedIndemnity] = useState(initialDraft?.data?.acceptedIndemnity ?? false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const signatureInputRef = useRef<HTMLInputElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
 
   // Form Fields
@@ -436,6 +437,38 @@ const LoanFlow: React.FC<LoanFlowProps> = ({ initialStep, onComplete, navigate, 
     const ctx = canvas.getContext('2d');
     if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
     setHasSigned(false);
+  };
+
+  const handleSignatureUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+      
+      // Clear before drawing
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      
+      // Calculate scaling to fit image nicely in canvas
+      const hRatio = canvas.width / img.width;
+      const vRatio = canvas.height / img.height;
+      const ratio = Math.min(hRatio, vRatio);
+      
+      const centerShift_x = (canvas.width - img.width * ratio) / 2;
+      const centerShift_y = (canvas.height - img.height * ratio) / 2;
+      
+      ctx.drawImage(img, 0, 0, img.width, img.height,
+                    centerShift_x, centerShift_y, img.width * ratio, img.height * ratio);
+                    
+      setHasSigned(true);
+      URL.revokeObjectURL(url);
+    };
+    img.src = url;
   };
 
   const uploadFile = async (id: string, file: File) => {
@@ -1186,10 +1219,17 @@ const LoanFlow: React.FC<LoanFlowProps> = ({ initialStep, onComplete, navigate, 
                         onTouchStart={startDrawing}
                         onTouchMove={draw}
                         onTouchEnd={stopDrawing}
-                        className="w-full h-48 bg-slate-50 dark:bg-slate-900 rounded-2xl border-2 border-dashed border-slate-200 dark:border-slate-700 hover:border-primary transition-colors cursor-crosshair relative overflow-hidden"
+                        className="w-full h-48 bg-slate-50 dark:bg-slate-900 rounded-2xl border-2 border-dashed border-slate-200 dark:border-slate-700 hover:border-primary transition-colors cursor-crosshair relative overflow-hidden touch-none"
                       />
                       {!hasSigned && <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none opacity-20"><span className="text-slate-400 text-2xl font-black uppercase tracking-widest">Sign Here</span></div>}
-                      <button onClick={clearSignature} className="absolute top-4 right-4 text-[10px] font-black uppercase text-red-500 hover:text-red-600 bg-white dark:bg-slate-800 px-3 py-1 rounded-full border border-slate-100 dark:border-slate-700 shadow-sm transition-all">Clear</button>
+                      <div className="absolute top-4 right-4 flex gap-2">
+                        <button onClick={() => signatureInputRef.current?.click()} className="text-[10px] font-black uppercase text-primary hover:text-primary/80 bg-white dark:bg-slate-800 px-3 py-1 rounded-full border border-slate-100 dark:border-slate-700 shadow-sm transition-all flex items-center gap-1">
+                          <span className="material-symbols-outlined text-[10px]">photo_camera</span>
+                          Snap/Upload
+                        </button>
+                        <button onClick={clearSignature} className="text-[10px] font-black uppercase text-red-500 hover:text-red-600 bg-white dark:bg-slate-800 px-3 py-1 rounded-full border border-slate-100 dark:border-slate-700 shadow-sm transition-all">Clear</button>
+                      </div>
+                      <input type="file" ref={signatureInputRef} accept="image/*" className="hidden" onChange={handleSignatureUpload} />
                     </div>
 
                     <div className="flex items-start gap-4 p-5 bg-slate-50 dark:bg-slate-900/50 rounded-2xl border border-slate-100 dark:border-slate-700 group cursor-pointer" onClick={() => setAcceptedIndemnity(!acceptedIndemnity)}>

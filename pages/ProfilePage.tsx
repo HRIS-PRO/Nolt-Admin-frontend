@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { profileService, UserProfile } from '../services/profileService';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -33,6 +33,14 @@ const ProfilePage: React.FC = () => {
     const [saving, setSaving] = useState(false);
     const [activeTab, setActiveTab] = useState<TabType>('security');
     const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
+    const formRef = useRef<HTMLDivElement>(null);
+
+    const goToTab = (tab: TabType) => {
+        setActiveTab(tab);
+        setTimeout(() => {
+            formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 100);
+    };
 
     useEffect(() => {
         fetchProfile();
@@ -88,7 +96,7 @@ const ProfilePage: React.FC = () => {
                 setMessage({ type: 'success', text: "BVN verified! Your details have been pre-filled. Please review them in the next tabs." });
                 
                 // Smoothly transition to personal tab after a short delay
-                setTimeout(() => setActiveTab('personal'), 1500);
+                setTimeout(() => goToTab('personal'), 1500);
             } else {
                 setMessage({ type: 'error', text: response.message || "BVN verification failed." });
             }
@@ -98,6 +106,25 @@ const ProfilePage: React.FC = () => {
         } finally {
             setSaving(false);
         }
+    };
+
+    const handleNextToResidential = () => {
+        const requiredFields = [
+            'first_name', 'surname', 'phone_number', 'personal_email', 'date_of_birth'
+        ];
+        
+        for (const field of requiredFields) {
+            if (!profile[field as keyof UserProfile] || profile[field as keyof UserProfile] === '') {
+                setMessage({ type: 'error', text: `Please fill out all required fields to continue (Missing: ${field.replace(/_/g, ' ')})` });
+                setTimeout(() => {
+                    formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }, 100);
+                return;
+            }
+        }
+        
+        setMessage(null);
+        goToTab('residential');
     };
 
     const handleSave = async (e: React.FormEvent) => {
@@ -165,7 +192,7 @@ const ProfilePage: React.FC = () => {
                 <div className="absolute -bottom-[10%] -left-[10%] size-[500px] bg-blue-500/5 rounded-full blur-[120px]" />
             </div>
 
-            <div className="max-w-5xl mx-auto px-6 pt-16 relative z-10">
+            <div ref={formRef} className="max-w-5xl mx-auto px-6 pt-16 relative z-10">
                 {/* Header Section */}
                 <header className="mb-12">
                     <motion.div 
@@ -418,7 +445,19 @@ const ProfilePage: React.FC = () => {
                             </AnimatePresence>
 
                             <div className="flex justify-end pt-4">
-                                {activeTab !== 'security' && (
+                                {activeTab === 'personal' && (
+                                    <button 
+                                        type="button"
+                                        onClick={handleNextToResidential}
+                                        disabled={saving}
+                                        className="h-16 px-12 rounded-2xl font-black text-white uppercase tracking-[0.2em] text-xs transition-all active:scale-95 flex items-center gap-4 bg-slate-800 dark:bg-white/10 shadow-xl shadow-slate-900/20 hover:-translate-y-1"
+                                    >
+                                        Next: Residential Details
+                                        <span className="material-symbols-outlined text-sm">arrow_forward</span>
+                                    </button>
+                                )}
+                                
+                                {activeTab === 'residential' && (
                                     <button 
                                         type="submit"
                                         disabled={saving}
