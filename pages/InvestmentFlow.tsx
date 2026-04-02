@@ -48,7 +48,7 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
   // Core State
   const [selectedPlan, setSelectedPlan] = useState<InvestmentPlan>(initialDraft?.data?.selectedPlan ?? 'RISE');
   const [currency, setCurrency] = useState<Currency>(initialDraft?.data?.currency ?? 'NGN');
-  const [amount, setAmount] = useState<string>(initialDraft?.data?.amount ?? '10000');
+  const [amount, setAmount] = useState<string>(initialDraft?.data?.amount ?? '100000');
   const [tenure, setTenure] = useState<number>(initialDraft?.data?.tenure ?? 12);
   const [rollover, setRollover] = useState(initialDraft?.data?.rollover ?? 'principal_interest');
   const [targetAmount, setTargetAmount] = useState<string>(initialDraft?.data?.targetAmount ?? '');
@@ -1576,43 +1576,62 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
         <div className="space-y-8 animate-in fade-in slide-in-from-right-4 duration-500 pb-20">
           <h2 className="text-3xl font-black dark:text-white">Secure Vault</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {currentDocs.map(doc => (
-              <div key={doc.id} className="relative">
-                <input
-                  type="file"
-                  id={`upload-${doc.id}`}
-                  className="hidden"
-                  onChange={e => e.target.files && handleFileUpload(doc.id, e.target.files[0])}
-                />
-                <label
-                  htmlFor={`upload-${doc.id}`}
-                  className={`p-10 rounded-[2.5rem] border-2 border-dashed transition-all cursor-pointer flex flex-col items-center gap-5 w-full min-h-[200px] justify-center ${uploadedDocs[doc.id] ? 'border-green-500 bg-green-500/5' : 'border-slate-200 dark:border-slate-700 hover:border-primary hover:bg-primary/5'}`}
-                >
-                  {uploadedDocs[doc.id] ? (
-                    <div className="size-16 rounded-full bg-green-500 text-white flex items-center justify-center shadow-lg shadow-green-500/20"><span className="material-symbols-outlined text-3xl">task_alt</span></div>
-                  ) : isUploading[doc.id] ? (
-                    <div className="size-16 border-4 border-primary/20 border-t-primary rounded-full animate-spin"></div>
-                  ) : (
-                    <div className="size-16 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-400 group-hover:bg-primary group-hover:text-white transition-all"><span className="material-symbols-outlined text-3xl">{doc.icon}</span></div>
-                  )}
-                  <div className="text-center space-y-2">
-                    <h4 className="font-black text-sm uppercase tracking-tight dark:text-white">{doc.label}</h4>
-                    <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">{doc.required ? 'Required' : 'Optional'}</p>
-                    {uploadedDocs[doc.id] && <p className="text-[10px] text-primary font-black truncate max-w-[150px] mx-auto bg-primary/10 px-3 py-1 rounded-full">{uploadedDocs[doc.id]?.name}</p>}
-                  </div>
-                  {uploadProgress[doc.id] > 0 && uploadProgress[doc.id] < 100 && (
-                    <div className="w-full h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden mt-2 shadow-inner">
-                      <div className="h-full bg-primary transition-all duration-300" style={{ width: `${uploadProgress[doc.id]}%` }}></div>
+            {currentDocs.map(doc => {
+              const inputId = `upload-${doc.id}`;
+              return (
+                <div key={doc.id} className="relative group">
+                  <input
+                    type="file"
+                    id={inputId}
+                    className="hidden"
+                    onChange={e => {
+                      if (e.target.files?.[0]) {
+                        console.log(`[FILE] Selected ${e.target.files[0].name} for ${doc.id}`);
+                        handleFileUpload(doc.id, e.target.files[0]);
+                      }
+                    }}
+                  />
+                  <div
+                    onClick={() => document.getElementById(inputId)?.click()}
+                    className={`p-10 rounded-[2.5rem] border-2 border-dashed transition-all cursor-pointer flex flex-col items-center gap-5 w-full min-h-[200px] justify-center ${uploadedDocs[doc.id] ? 'border-green-500 bg-green-500/5' : 'border-slate-200 dark:border-slate-700 hover:border-primary hover:bg-primary/5 shadow-sm hover:shadow-xl'}`}
+                  >
+                    {uploadedDocs[doc.id] ? (
+                      <div className="size-16 rounded-full bg-green-500 text-white flex items-center justify-center shadow-lg shadow-green-500/20 animate-in zoom-in"><span className="material-symbols-outlined text-3xl">task_alt</span></div>
+                    ) : isUploading[doc.id] ? (
+                      <div className="flex flex-col items-center gap-4">
+                        <div className="size-16 border-4 border-primary/20 border-t-primary rounded-full animate-spin"></div>
+                        <p className="text-[10px] font-black text-primary animate-pulse">UPDATING VAULT...</p>
+                      </div>
+                    ) : (
+                      <div className="size-16 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-400 group-hover:bg-primary group-hover:text-white transition-all transform group-hover:scale-110"><span className="material-symbols-outlined text-3xl">{doc.icon}</span></div>
+                    )}
+                    <div className="text-center space-y-2">
+                      <h4 className="font-black text-sm uppercase tracking-tight dark:text-white">{doc.label}</h4>
+                      <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">{doc.required ? 'Required Document' : 'Optional Support'}</p>
+                      {uploadedDocs[doc.id] && <p className="text-[10px] text-primary font-black truncate max-w-[150px] mx-auto bg-primary/10 px-3 py-1 rounded-full">{uploadedDocs[doc.id]?.name}</p>}
                     </div>
-                  )}
-                  {uploadedDocs[doc.id] && (
-                    <button onClick={(e) => { e.preventDefault(); removeDoc(doc.id); }} className="absolute top-6 right-6 p-2 text-red-500 hover:bg-red-500/10 rounded-full transition-all">
-                      <span className="material-symbols-outlined text-lg">cancel</span>
-                    </button>
-                  )}
-                </label>
-              </div>
-            ))}
+                    {uploadProgress[doc.id] > 0 && uploadProgress[doc.id] < 100 && (
+                      <div className="w-full h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden mt-2 shadow-inner">
+                        <div className="h-full bg-primary transition-all duration-300" style={{ width: `${uploadProgress[doc.id]}%` }}></div>
+                      </div>
+                    )}
+                    {uploadedDocs[doc.id] && (
+                      <button 
+                         onClick={(e) => { 
+                           e.stopPropagation(); 
+                           removeDoc(doc.id); 
+                           const input = document.getElementById(inputId) as HTMLInputElement;
+                           if (input) input.value = ''; 
+                         }} 
+                         className="absolute top-6 right-6 p-2 text-red-500 hover:bg-red-500/10 rounded-full transition-all hover:rotate-90"
+                      >
+                        <span className="material-symbols-outlined text-lg">cancel</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
           </div>
           <NavActions isNextDisabled={!isSecureVaultComplete} />
         </div>
