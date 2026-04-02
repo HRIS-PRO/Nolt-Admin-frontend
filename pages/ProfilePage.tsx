@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { profileService, UserProfile } from '../services/profileService';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useNavigate } from 'react-router-dom';
 
 const NIGERIAN_STATES = [
     "Abia", "Adamawa", "Akwa Ibom", "Anambra", "Bauchi", "Bayelsa", "Benue", "Borno", 
@@ -14,6 +15,7 @@ const NIGERIAN_STATES = [
 type TabType = 'security' | 'personal' | 'residential';
 
 const ProfilePage: React.FC = () => {
+    const navigate = useNavigate();
     const [profile, setProfile] = useState<Partial<UserProfile>>({
         first_name: '',
         surname: '',
@@ -152,9 +154,13 @@ const ProfilePage: React.FC = () => {
             console.log("[Profile] Update response:", response);
             
             if (response.success) {
-                setMessage({ type: 'success', text: "Profile updated successfully!" });
+                setMessage({ type: 'success', text: "Profile updated successfully! Redirecting..." });
                 setProfile(response.profile);
-                // No reload needed, just update state
+                
+                // Navigate back to dashboard after a short delay to show success message
+                setTimeout(() => {
+                    navigate('/dashboard');
+                }, 2000);
             } else {
                 const errMsg = response.message || "Failed to update profile";
                 setMessage({ type: 'error', text: errMsg });
