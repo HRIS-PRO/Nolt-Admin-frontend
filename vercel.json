@@ -2,7 +2,7 @@
     "rewrites": [
         {
             "source": "/api/:path*",
-            "destination": "https://nolt-admin-backend-production-7761.up.rai   lway.app/api/:path*"
+            "destination": "https://nolt-admin-backend-production-7761.up.railway.app/api/:path*"
         },
         {
             "source": "/auth/:path*",
