@@ -155,8 +155,8 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
               <div className="absolute top-0 right-0 p-3 md:p-4 opacity-10 group-hover:opacity-100 transition-opacity">
                   <span className="material-symbols-outlined text-primary text-sm">content_copy</span>
               </div>
-              <p className="text-primary font-black text-2xl md:text-3xl tracking-tight leading-snug">0123456789</p>
-              <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest mt-1 md:mt-2">NOLT Finance • Access Bank</p>
+              <p className="text-primary font-black text-2xl md:text-3xl tracking-tight leading-snug">5401329231</p>
+              <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest mt-1 md:mt-2">Providus Bank</p>
             </div>
  
             {/* Receipt Upload Area */}

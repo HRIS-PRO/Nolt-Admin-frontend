@@ -139,6 +139,7 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
   const [originalInvestmentId, setOriginalInvestmentId] = useState(incomingDraft?.data?.originalInvestmentId ?? null);
   const [isValidatingCasa, setIsValidatingCasa] = useState(false);
   const [referralCode, setReferralCode] = useState(initialDraft?.data?.referralCode ?? user.referral_code_used ?? '');
+  const [createdInvestment, setCreatedInvestment] = useState<any>(null);
 
   // Documents & Progress
   const [uploadedDocs, setUploadedDocs] = useState<Record<string, { name: string, size: string, url?: string } | null>>(
@@ -255,7 +256,9 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
     const scaleX = canvas.width / rect.width;
     const scaleY = canvas.height / rect.height;
     
+    // Always use dark ink for the signature to ensure it shows clearly on the PDF document
     ctx.strokeStyle = '#0F172A';
+    
     ctx.lineWidth = 3;
     ctx.lineCap = 'round';
     ctx.beginPath();
@@ -811,7 +814,8 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
         referral_code: referralCode
       };
 
-      await investmentService.createInvestment(payload);
+      const result = await investmentService.createInvestment(payload);
+      setCreatedInvestment(result);
       if (giftToken) localStorage.removeItem('pending_gift_token');
       setSubStep(12); // Go to success page
     } catch (err) {
@@ -1857,7 +1861,7 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
                 </div>
 
                 {/* Referral Code Field */}
-                {!isTopUp && (
+                {/* {!isTopUp && (
                   <div className="pt-6 border-t border-white/10 space-y-3">
                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">Referral / Sales Officer Code</label>
                     <div className="relative group">
@@ -1872,7 +1876,7 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
                     </div>
                     <p className="text-[9px] text-slate-500 font-medium italic">Assign this investment to a specific sales representative.</p>
                   </div>
-                )}
+                )} */}
               </div>
             </div>
           </div>
@@ -1967,7 +1971,7 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
                 <p className="text-[10px] text-slate-500 uppercase font-black tracking-widest">Draw your signature in the box below</p>
               </div>
 
-              <div className="relative group rounded-3xl overflow-hidden border-2 border-dashed border-slate-100 dark:border-slate-700 hover:border-primary transition-all bg-slate-50 dark:bg-slate-900/50">
+              <div className="relative group rounded-3xl overflow-hidden border-2 border-dashed border-slate-200 dark:border-slate-600 hover:border-primary transition-all bg-slate-50 shadow-inner">
                 <canvas
                   ref={canvasRef}
                   width={400}
@@ -2080,7 +2084,47 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
               Back to Dashboard
               <span className="material-symbols-outlined">dashboard</span>
             </button>
-            <p className="text-[10px] md:text-xs font-bold text-slate-400 uppercase tracking-widest animate-pulse">Redirecting you in a moment...</p>
+
+            <motion.div 
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.5 }}
+                className="w-full max-w-sm mx-auto p-8 bg-emerald-50/30 dark:bg-emerald-500/10 border-2 border-dashed border-emerald-500/20 rounded-[2.5rem] space-y-5 shadow-inner"
+            >
+                {createdInvestment?.indemnity_document_url ? (
+                    <>
+                        <div className="flex items-center gap-3 justify-center text-emerald-600 dark:text-emerald-400">
+                            <span className="material-symbols-outlined filled text-3xl">description</span>
+                            <span className="text-xs font-black uppercase tracking-widest">Legal Document Prepared</span>
+                        </div>
+                        <p className="text-xs text-slate-500 dark:text-slate-300 font-medium leading-relaxed">
+                            Your signed indemnity agreement is ready. Please download and keep a copy for your records.
+                        </p>
+                        <a 
+                            href={createdInvestment.indemnity_document_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center justify-center gap-3 w-full py-4 bg-emerald-500 text-white font-black rounded-2xl shadow-xl shadow-emerald-500/30 hover:scale-105 transition-all group"
+                        >
+                            <span className="material-symbols-outlined text-xl group-hover:animate-bounce">download</span>
+                            Download Indemnity
+                        </a>
+                    </>
+                ) : (
+                    <div className="flex flex-col items-center gap-3 text-slate-400 py-4 opacity-70">
+                        <span className="material-symbols-outlined text-4xl animate-spin duration-3000">progress_activity</span>
+                        <p className="text-[10px] font-black uppercase tracking-widest">Finalizing Paperwork...</p>
+                    </div>
+                )}
+            </motion.div>
+
+            <button
+              onClick={() => { onComplete(); navigate('DASHBOARD'); }}
+              className="w-full sm:w-auto px-8 md:px-12 py-4 md:py-5 bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-black text-lg md:text-xl rounded-2xl border-2 border-slate-100 dark:border-slate-700 hover:scale-105 active:scale-95 transition-all flex items-center justify-center gap-3 group"
+            >
+              Back to Dashboard
+              <span className="material-symbols-outlined transition-transform group-hover:translate-x-1">dashboard</span>
+            </button>
           </div>
         </motion.div>
       )}
