@@ -139,6 +139,7 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
   const [originalInvestmentId, setOriginalInvestmentId] = useState(incomingDraft?.data?.originalInvestmentId ?? null);
   const [isValidatingCasa, setIsValidatingCasa] = useState(false);
   const [referralCode, setReferralCode] = useState(initialDraft?.data?.referralCode ?? user.referral_code_used ?? '');
+  const [createdInvestment, setCreatedInvestment] = useState<any>(null);
 
   // Documents & Progress
   const [uploadedDocs, setUploadedDocs] = useState<Record<string, { name: string, size: string, url?: string } | null>>(
@@ -255,7 +256,9 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
     const scaleX = canvas.width / rect.width;
     const scaleY = canvas.height / rect.height;
     
+    // Always use dark ink for the signature to ensure it shows clearly on the PDF document
     ctx.strokeStyle = '#0F172A';
+    
     ctx.lineWidth = 3;
     ctx.lineCap = 'round';
     ctx.beginPath();
@@ -811,7 +814,8 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
         referral_code: referralCode
       };
 
-      await investmentService.createInvestment(payload);
+      const result = await investmentService.createInvestment(payload);
+      setCreatedInvestment(result);
       if (giftToken) localStorage.removeItem('pending_gift_token');
       setSubStep(12); // Go to success page
     } catch (err) {
@@ -1315,27 +1319,27 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
 
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                       <div className="space-y-2">
-                        <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Surname</label>
-                        <input className="w-full h-14 rounded-xl bg-slate-50 dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 px-5 text-base font-bold dark:text-white focus:border-primary outline-none" value={director.surname} onChange={e => { const newD = [...directors]; newD[index].surname = e.target.value; setDirectors(newD); }} placeholder="Surname" />
+                        <label className="text-xs font-black text-slate-400 uppercase tracking-widest px-1">Surname</label>
+                        <input className="w-full h-14 rounded-xl bg-slate-50 dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 px-5 text-base font-bold dark:text-white focus:border-primary focus:shadow-lg focus:shadow-primary/5 outline-none transition-all" value={director.surname} onChange={e => { const newD = [...directors]; newD[index].surname = e.target.value; setDirectors(newD); }} placeholder="e.g. Obinali" />
                       </div>
                       <div className="space-y-2">
-                        <label className="text-xs font-black text-slate-400 uppercase tracking-widest">First Name</label>
-                        <input className="w-full h-14 rounded-xl bg-slate-50 dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 px-5 text-base font-bold dark:text-white focus:border-primary outline-none" value={director.firstName} onChange={e => { const newD = [...directors]; newD[index].firstName = e.target.value; setDirectors(newD); }} placeholder="First Name" />
+                        <label className="text-xs font-black text-slate-400 uppercase tracking-widest px-1">First Name</label>
+                        <input className="w-full h-14 rounded-xl bg-slate-50 dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 px-5 text-base font-bold dark:text-white focus:border-primary focus:shadow-lg focus:shadow-primary/5 outline-none transition-all" value={director.firstName} onChange={e => { const newD = [...directors]; newD[index].firstName = e.target.value; setDirectors(newD); }} placeholder="e.g. Divine" />
                       </div>
                       <div className="space-y-2">
-                        <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Middle Name (Optional)</label>
-                        <input className="w-full h-14 rounded-xl bg-slate-50 dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 px-5 text-base font-bold dark:text-white focus:border-primary outline-none" value={director.middleName} onChange={e => { const newD = [...directors]; newD[index].middleName = e.target.value; setDirectors(newD); }} placeholder="Middle Name" />
+                        <label className="text-xs font-black text-slate-400 uppercase tracking-widest px-1">Middle Name (Optional)</label>
+                        <input className="w-full h-14 rounded-xl bg-slate-50 dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 px-5 text-base font-bold dark:text-white focus:border-primary focus:shadow-lg focus:shadow-primary/5 outline-none transition-all" value={director.middleName} onChange={e => { const newD = [...directors]; newD[index].middleName = e.target.value; setDirectors(newD); }} placeholder="e.g. Chinedu" />
                       </div>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div className="space-y-2">
-                        <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Phone Number</label>
-                        <input className="w-full h-14 rounded-xl bg-slate-50 dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 px-5 text-base font-bold dark:text-white focus:border-primary outline-none" value={director.phone} onChange={e => { const newD = [...directors]; newD[index].phone = e.target.value; setDirectors(newD); }} placeholder="080..." />
+                        <label className="text-xs font-black text-slate-400 uppercase tracking-widest px-1">Phone Number</label>
+                        <input className="w-full h-14 rounded-xl bg-slate-50 dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 px-5 text-base font-bold dark:text-white focus:border-primary focus:shadow-lg focus:shadow-primary/5 outline-none transition-all" value={director.phone} onChange={e => { const newD = [...directors]; newD[index].phone = e.target.value; setDirectors(newD); }} placeholder="e.g. 08031234567" />
                       </div>
                       <div className="space-y-2">
-                        <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Gender</label>
-                        <select className="w-full h-14 rounded-xl bg-slate-50 dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 px-5 text-base font-bold dark:text-white focus:border-primary outline-none" value={director.gender} onChange={e => { const newD = [...directors]; newD[index].gender = e.target.value; setDirectors(newD); }}>
+                        <label className="text-xs font-black text-slate-400 uppercase tracking-widest px-1">Gender</label>
+                        <select className="w-full h-14 rounded-xl bg-slate-50 dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 px-5 text-base font-bold dark:text-white focus:border-primary focus:shadow-lg focus:shadow-primary/5 outline-none transition-all" value={director.gender} onChange={e => { const newD = [...directors]; newD[index].gender = e.target.value; setDirectors(newD); }}>
                           <option value="">Select Gender</option>
                           <option value="Male">Male</option>
                           <option value="Female">Female</option>
@@ -1345,16 +1349,16 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
 
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                       <div className="space-y-2">
-                        <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Date of Birth</label>
-                        <input type="date" className="w-full h-14 rounded-xl bg-slate-50 dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 px-5 text-base font-bold dark:text-white focus:border-primary outline-none" value={director.dob} onChange={e => { const newD = [...directors]; newD[index].dob = e.target.value; setDirectors(newD); }} />
+                        <label className="text-xs font-black text-slate-400 uppercase tracking-widest px-1">Date of Birth</label>
+                        <input type="date" className="w-full h-14 rounded-xl bg-slate-50 dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 px-5 text-base font-bold dark:text-white focus:border-primary focus:shadow-lg focus:shadow-primary/5 outline-none transition-all" value={director.dob} onChange={e => { const newD = [...directors]; newD[index].dob = e.target.value; setDirectors(newD); }} />
                       </div>
                       <div className="space-y-2">
-                        <label className="text-xs font-black text-slate-400 uppercase tracking-widest">BVN</label>
-                        <input className="w-full h-14 rounded-xl bg-slate-50 dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 px-5 text-base font-bold dark:text-white focus:border-primary outline-none" value={director.bvn} onChange={e => { const newD = [...directors]; newD[index].bvn = e.target.value; setDirectors(newD); }} maxLength={11} placeholder="11 digits" />
+                        <label className="text-xs font-black text-slate-400 uppercase tracking-widest px-1">BVN</label>
+                        <input className="w-full h-14 rounded-xl bg-slate-50 dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 px-5 text-base font-bold dark:text-white focus:border-primary focus:shadow-lg focus:shadow-primary/5 outline-none transition-all" value={director.bvn} onChange={e => { const newD = [...directors]; newD[index].bvn = e.target.value; setDirectors(newD); }} maxLength={11} placeholder="11-digit BVN" />
                       </div>
                       <div className="space-y-2">
-                        <label className="text-xs font-black text-slate-400 uppercase tracking-widest">NIN</label>
-                        <input className="w-full h-14 rounded-xl bg-slate-50 dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 px-5 text-base font-bold dark:text-white focus:border-primary outline-none" value={director.nin} onChange={e => { const newD = [...directors]; newD[index].nin = e.target.value; setDirectors(newD); }} maxLength={11} placeholder="11 digits" />
+                        <label className="text-xs font-black text-slate-400 uppercase tracking-widest px-1">NIN</label>
+                        <input className="w-full h-14 rounded-xl bg-slate-50 dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 px-5 text-base font-bold dark:text-white focus:border-primary focus:shadow-lg focus:shadow-primary/5 outline-none transition-all" value={director.nin} onChange={e => { const newD = [...directors]; newD[index].nin = e.target.value; setDirectors(newD); }} maxLength={11} placeholder="11-digit NIN" />
                       </div>
                     </div>
 
@@ -1379,10 +1383,25 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
         <div className="space-y-8 animate-in fade-in slide-in-from-right-4 duration-500">
           <h2 className="text-3xl font-black dark:text-white">Further Details</h2>
           <div className="grid gap-6">
-            <div className="space-y-2"><label className="text-sm font-black text-slate-500 uppercase">Mother's Maiden Name</label><input className="w-full h-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-6 text-lg font-bold dark:text-white focus:border-primary outline-none" value={maidenName} onChange={e => setMaidenName(e.target.value)} /></div>
+            <div className="space-y-2">
+              <label className="text-sm font-black text-slate-500 uppercase tracking-widest px-1">Mother's Maiden Name</label>
+              <input className="w-full h-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-6 text-lg font-bold dark:text-white focus:border-primary focus:shadow-xl focus:shadow-primary/5 outline-none transition-all" value={maidenName} onChange={e => setMaidenName(e.target.value)} placeholder="e.g. Adeyemi" />
+            </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-2"><label className="text-sm font-black text-slate-500 uppercase">Religion</label><select className="w-full h-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-6 text-lg font-bold dark:text-white focus:border-primary outline-none" value={religion} onChange={e => setReligion(e.target.value)}><option value="Christianity">Christianity</option><option value="Islam">Islam</option></select></div>
-              <div className="space-y-2"><label className="text-sm font-black text-slate-500 uppercase">Marital Status</label><select className="w-full h-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-6 text-lg font-bold dark:text-white focus:border-primary outline-none" value={maritalStatus} onChange={e => setMaritalStatus(e.target.value)}><option value="Single">Single</option><option value="Married">Married</option></select></div>
+              <div className="space-y-2">
+                <label className="text-sm font-black text-slate-500 uppercase tracking-widest px-1">Religion</label>
+                <select className="w-full h-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-6 text-lg font-bold dark:text-white focus:border-primary focus:shadow-xl focus:shadow-primary/5 outline-none transition-all" value={religion} onChange={e => setReligion(e.target.value)}>
+                  <option value="Christianity">Christianity</option>
+                  <option value="Islam">Islam</option>
+                </select>
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-black text-slate-500 uppercase tracking-widest px-1">Marital Status</label>
+                <select className="w-full h-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-6 text-lg font-bold dark:text-white focus:border-primary focus:shadow-xl focus:shadow-primary/5 outline-none transition-all" value={maritalStatus} onChange={e => setMaritalStatus(e.target.value)}>
+                  <option value="Single">Single</option>
+                  <option value="Married">Married</option>
+                </select>
+              </div>
             </div>
           </div>
           <NavActions isNextDisabled={!maidenName} />
@@ -1395,11 +1414,11 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
           <h2 className="text-3xl font-black dark:text-white">Contact Information</h2>
           <div className="grid gap-6">
             <div className="space-y-2">
-              <label className="text-sm font-black text-slate-500 uppercase">Mobile Number</label>
+              <label className="text-sm font-black text-slate-500 uppercase tracking-widest px-1">Mobile Number</label>
               <input
                 type="tel"
                 disabled={!isOnBehalf && !!user.profile?.phone_number}
-                className={`w-full h-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-6 text-lg font-bold dark:text-white focus:border-primary outline-none ${!isOnBehalf && user.profile?.phone_number ? 'opacity-70 cursor-not-allowed' : ''}`}
+                className={`w-full h-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-6 text-lg font-bold dark:text-white focus:border-primary focus:shadow-xl focus:shadow-primary/5 outline-none transition-all ${(!isOnBehalf && user.profile?.phone_number) ? 'opacity-70 cursor-not-allowed' : ''}`}
                 value={mobileNumber}
                 onChange={e => setMobileNumber(e.target.value.replace(/\D/g, ''))}
                 placeholder="e.g. 08012345678"
@@ -1407,11 +1426,11 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
               />
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-black text-slate-500 uppercase">Email Address</label>
+              <label className="text-sm font-black text-slate-500 uppercase tracking-widest px-1">Email Address</label>
               <input
                 type="email"
                 disabled={!isOnBehalf && entityType === 'INDIVIDUAL'}
-                className={`w-full h-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-6 text-lg font-bold dark:text-white focus:border-primary outline-none ${!isOnBehalf && entityType === 'INDIVIDUAL' ? 'opacity-70 cursor-not-allowed' : ''}`}
+                className={`w-full h-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-6 text-lg font-bold dark:text-white focus:border-primary focus:shadow-xl focus:shadow-primary/5 outline-none transition-all ${(!isOnBehalf && entityType === 'INDIVIDUAL') ? 'opacity-70 cursor-not-allowed' : ''}`}
                 value={contactEmail}
                 onChange={e => setContactEmail(e.target.value)}
                 placeholder="e.g. name@example.com"
@@ -1428,36 +1447,36 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
           <h2 className="text-3xl font-black dark:text-white">Verification</h2>
           <div className="grid gap-6">
             <div className="space-y-2">
-              <label className="text-sm font-black text-slate-500 uppercase">BVN</label>
+              <label className="text-sm font-black text-slate-500 uppercase tracking-widest px-1">BVN</label>
               <input
                 disabled={!isOnBehalf && !!user.profile?.bvn}
-                className={`w-full h-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-6 text-lg font-bold dark:text-white focus:border-primary outline-none ${!isOnBehalf && user.profile?.bvn ? 'opacity-70 cursor-not-allowed' : ''}`}
+                className={`w-full h-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-6 text-lg font-bold dark:text-white focus:border-primary focus:shadow-xl focus:shadow-primary/5 outline-none transition-all ${(!isOnBehalf && user.profile?.bvn) ? 'opacity-70 cursor-not-allowed' : ''}`}
                 value={bvn}
                 onChange={e => setBvn(e.target.value.replace(/\D/g, ''))}
                 maxLength={11}
-                placeholder="11-digit BVN"
+                placeholder="11-digit BVN e.g. 22233344455"
               />
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-black text-slate-500 uppercase">NIN</label>
+              <label className="text-sm font-black text-slate-500 uppercase tracking-widest px-1">NIN</label>
               <input
                 disabled={!isOnBehalf && !!user.profile?.nin}
-                className={`w-full h-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-6 text-lg font-bold dark:text-white focus:border-primary outline-none ${!isOnBehalf && user.profile?.nin ? 'opacity-70 cursor-not-allowed' : ''}`}
+                className={`w-full h-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-6 text-lg font-bold dark:text-white focus:border-primary focus:shadow-xl focus:shadow-primary/5 outline-none transition-all ${(!isOnBehalf && user.profile?.nin) ? 'opacity-70 cursor-not-allowed' : ''}`}
                 value={nin}
                 onChange={e => setNin(e.target.value.replace(/\D/g, ''))}
                 maxLength={11}
-                placeholder="11-digit NIN"
+                placeholder="11-digit NIN e.g. 11122233344"
               />
             </div>
             {entityType === 'INDIVIDUAL' && (
               <div className="space-y-2">
-                <label className="text-sm font-black text-slate-500 uppercase">TIN Number</label>
+                <label className="text-sm font-black text-slate-500 uppercase tracking-widest px-1">TIN Number</label>
                 <input
                   disabled={!isOnBehalf && !!user.profile?.tin_number}
-                  className={`w-full h-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-6 text-lg font-bold dark:text-white focus:border-primary outline-none ${!isOnBehalf && user.profile?.tin_number ? 'opacity-70 cursor-not-allowed' : ''}`}
+                  className={`w-full h-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-6 text-lg font-bold dark:text-white focus:border-primary focus:shadow-xl focus:shadow-primary/5 outline-none transition-all ${(!isOnBehalf && user.profile?.tin_number) ? 'opacity-70 cursor-not-allowed' : ''}`}
                   value={tinNumber}
                   onChange={e => setTinNumber(e.target.value)}
-                  placeholder="Tax Identification Number"
+                  placeholder="e.g. 12345678-0001"
                 />
               </div>
             )}
@@ -1473,36 +1492,38 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
           <div className="grid gap-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
-                <label className="text-sm font-black text-slate-500 uppercase">State of Origin</label>
+                <label className="text-sm font-black text-slate-500 uppercase tracking-widest px-1">State of Origin</label>
                 <select
                   disabled={!isOnBehalf && !!user.profile?.state_of_origin}
-                  className={`w-full h-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-6 text-lg font-bold dark:text-white focus:border-primary outline-none ${!isOnBehalf && user.profile?.state_of_origin ? 'opacity-70 cursor-not-allowed' : ''}`}
+                  className={`w-full h-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-6 text-lg font-bold dark:text-white focus:border-primary focus:shadow-xl focus:shadow-primary/5 outline-none transition-all ${(!isOnBehalf && user.profile?.state_of_origin) ? 'opacity-70 cursor-not-allowed' : ''}`}
                   value={stateOfOrigin}
                   onChange={e => setStateOfOrigin(e.target.value)}
                 >
+                  <option value="">Select State</option>
                   {NIGERIAN_STATES.map(s => <option key={s} value={s}>{s}</option>)}
                 </select>
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-black text-slate-500 uppercase">State of Residence</label>
+                <label className="text-sm font-black text-slate-500 uppercase tracking-widest px-1">State of Residence</label>
                 <select
                   disabled={!isOnBehalf && !!user.profile?.state_of_residence}
-                  className={`w-full h-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-6 text-lg font-bold dark:text-white focus:border-primary outline-none ${!isOnBehalf && user.profile?.state_of_residence ? 'opacity-70 cursor-not-allowed' : ''}`}
+                  className={`w-full h-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-6 text-lg font-bold dark:text-white focus:border-primary focus:shadow-xl focus:shadow-primary/5 outline-none transition-all ${(!isOnBehalf && user.profile?.state_of_residence) ? 'opacity-70 cursor-not-allowed' : ''}`}
                   value={stateOfResidence}
                   onChange={e => setStateOfResidence(e.target.value)}
                 >
+                  <option value="">Select State</option>
                   {NIGERIAN_STATES.map(s => <option key={s} value={s}>{s}</option>)}
                 </select>
               </div>
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-black text-slate-500 uppercase">Full Home Address</label>
+              <label className="text-sm font-black text-slate-500 uppercase tracking-widest px-1">Full Home Address</label>
               <textarea
                 rows={3}
-                disabled={!isOnBehalf && !!user.profile?.address}
-                className={`w-full p-6 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 text-lg font-bold dark:text-white focus:border-primary outline-none ${!isOnBehalf && user.profile?.address ? 'opacity-70 cursor-not-allowed' : ''}`}
+                className="w-full p-6 rounded-3xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 text-lg font-bold dark:text-white focus:border-primary focus:shadow-xl focus:shadow-primary/5 outline-none transition-all leading-relaxed"
                 value={homeAddress}
                 onChange={e => setHomeAddress(e.target.value)}
+                placeholder="e.g. 15, Admiralty Way, Lekki Phase 1, Lagos"
               />
             </div>
           </div>
@@ -1516,11 +1537,19 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
           <h2 className="text-3xl font-black dark:text-white">Next of Kin</h2>
           <div className="grid gap-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-2"><label className="text-sm font-black text-slate-500 uppercase">Full Name</label><input className="w-full h-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-6 text-lg font-bold dark:text-white focus:border-primary outline-none" value={nokName} onChange={e => setNokName(e.target.value)} placeholder="Full Name" /></div>
               <div className="space-y-2">
-                <label className="text-sm font-black text-slate-500 uppercase">Relationship</label>
+                <label className="text-sm font-black text-slate-500 uppercase tracking-widest px-1">Full Name</label>
+                <input 
+                  className="w-full h-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-6 text-lg font-bold dark:text-white focus:border-primary focus:shadow-xl focus:shadow-primary/5 outline-none transition-all" 
+                  value={nokName} 
+                  onChange={e => setNokName(e.target.value)} 
+                  placeholder="e.g. Jane Doe" 
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-black text-slate-500 uppercase tracking-widest px-1">Relationship</label>
                 <select
-                  className="w-full h-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-6 text-lg font-bold dark:text-white focus:border-primary outline-none"
+                  className="w-full h-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-6 text-lg font-bold dark:text-white focus:border-primary focus:shadow-xl focus:shadow-primary/5 outline-none transition-all"
                   value={nokRelationship}
                   onChange={e => setNokRelationship(e.target.value)}
                 >
@@ -1554,10 +1583,10 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
                 <textarea
                   rows={2}
                   disabled={isNokSameAddress}
-                  className={`w-full p-6 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 text-lg font-bold dark:text-white focus:border-primary outline-none transition-all ${isNokSameAddress ? 'opacity-70 cursor-not-allowed border-primary/20 bg-primary/5' : ''}`}
+                  className={`w-full p-6 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 text-lg font-bold dark:text-white focus:border-primary focus:shadow-xl focus:shadow-primary/5 outline-none transition-all ${isNokSameAddress ? 'opacity-70 cursor-not-allowed border-primary/20 bg-primary/5' : ''}`}
                   value={nokAddress}
                   onChange={e => { setNokAddress(e.target.value); if (isNokSameAddress) setIsNokSameAddress(false); }}
-                  placeholder="Street name, City, State"
+                  placeholder="e.g. 15, Admiralty Way, Lekki Phase 1, Lagos"
                 />
                 {isNokSameAddress && (
                   <div className="absolute top-4 right-6 pointer-events-none text-primary/40 animate-in fade-in zoom-in duration-300">
@@ -1655,9 +1684,15 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
                     )}
                   </div>
                 </div>
-                <div className="relative">
-                  <span className="absolute left-6 top-1/2 -translate-y-1/2 text-2xl font-black text-slate-400">{currency === 'NGN' ? '₦' : '$'}</span>
-                  <input disabled={isClaimingGift} className="w-full h-20 pl-14 pr-6 rounded-3xl bg-white dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 text-3xl font-black text-slate-900 dark:text-white focus:border-primary outline-none transition-all" value={amount} onChange={e => setAmount(e.target.value.replace(/[^0-9]/g, ''))} />
+                <div className="relative group">
+                  <span className="absolute left-6 top-1/2 -translate-y-1/2 text-2xl font-black text-slate-400 group-focus-within:text-primary transition-colors">{currency === 'NGN' ? '₦' : '$'}</span>
+                  <input 
+                    disabled={isClaimingGift} 
+                    className="w-full h-20 pl-14 pr-6 rounded-3xl bg-white dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 text-3xl font-black text-slate-900 dark:text-white focus:border-primary focus:shadow-2xl focus:shadow-primary/10 outline-none transition-all" 
+                    value={amount} 
+                    onChange={e => setAmount(e.target.value.replace(/[^0-9]/g, ''))} 
+                    placeholder="e.g. 500,000"
+                  />
                 </div>
                 {(!dynamicInterestRate && !rateLoading && parseFloat(amount) > 0) && (
                   <p className="text-xs font-bold text-red-500 mt-2 flex items-center gap-1">
@@ -1675,9 +1710,15 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
               {selectedPlan === 'RISE' && (
                 <div className="space-y-4">
                   <label className="text-sm font-black text-slate-500 uppercase tracking-widest">Target Amount (Optional)</label>
-                  <div className="relative">
-                    <span className="absolute left-6 top-1/2 -translate-y-1/2 text-xl font-black text-slate-400">{currency === 'NGN' ? '₦' : '$'}</span>
-                    <input disabled={isClaimingGift} className="w-full h-16 pl-12 pr-6 rounded-2xl bg-white dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 text-xl font-bold dark:text-white focus:border-primary outline-none" value={targetAmount} onChange={e => setTargetAmount(e.target.value)} placeholder="What's your goal?" />
+                  <div className="relative group">
+                    <span className="absolute left-6 top-1/2 -translate-y-1/2 text-xl font-black text-slate-400 group-focus-within:text-primary transition-colors">{currency === 'NGN' ? '₦' : '$'}</span>
+                    <input 
+                      disabled={isClaimingGift} 
+                      className="w-full h-16 pl-12 pr-6 rounded-2xl bg-white dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 text-xl font-bold dark:text-white focus:border-primary focus:shadow-xl focus:shadow-primary/5 outline-none transition-all" 
+                      value={targetAmount} 
+                      onChange={e => setTargetAmount(e.target.value)} 
+                      placeholder="What is your savings goal?" 
+                    />
                   </div>
                 </div>
               )}
@@ -1754,16 +1795,22 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
                     </span>
                   </div>
                 </div>
-                {!isInfinityTenure && (
-                  <input
-                    disabled={isClaimingGift}
-                    type="range"
-                    min={(selectedPlan === 'VAULT' && currency === 'NGN') || selectedPlan === 'SURGE' ? "1" : "3"}
-                    max={selectedPlan === 'SURGE' ? "60" : "24"}
-                    step={(selectedPlan === 'VAULT' && currency === 'NGN') || selectedPlan === 'SURGE' ? "1" : "3"}
+                {!isInfinityTenure && !isClaimingGift ? (
+                  <select
                     value={tenure}
                     onChange={e => setTenure(parseInt(e.target.value))}
-                    className="w-full h-3 bg-slate-100 dark:bg-slate-900 rounded-full appearance-none cursor-pointer accent-primary"
+                    className="w-full h-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-6 text-lg font-bold dark:text-white focus:border-primary outline-none transition-all"
+                  >
+                    {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(m => (
+                      <option key={m} value={m}>{m} Month{m > 1 ? 's' : ''}</option>
+                    ))}
+                  </select>
+                ) : !isInfinityTenure && (
+                  <input
+                    disabled
+                    type="text"
+                    value={`${tenure} Months`}
+                    className="w-full h-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-6 text-lg font-bold dark:text-white opacity-70"
                   />
                 )}
                 <div className="flex justify-between text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">
@@ -1814,7 +1861,7 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
                 </div>
 
                 {/* Referral Code Field */}
-                {!isTopUp && (
+                {/* {!isTopUp && (
                   <div className="pt-6 border-t border-white/10 space-y-3">
                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">Referral / Sales Officer Code</label>
                     <div className="relative group">
@@ -1829,7 +1876,7 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
                     </div>
                     <p className="text-[9px] text-slate-500 font-medium italic">Assign this investment to a specific sales representative.</p>
                   </div>
-                )}
+                )} */}
               </div>
             </div>
           </div>
@@ -1924,7 +1971,7 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
                 <p className="text-[10px] text-slate-500 uppercase font-black tracking-widest">Draw your signature in the box below</p>
               </div>
 
-              <div className="relative group rounded-3xl overflow-hidden border-2 border-dashed border-slate-100 dark:border-slate-700 hover:border-primary transition-all bg-slate-50 dark:bg-slate-900/50">
+              <div className="relative group rounded-3xl overflow-hidden border-2 border-dashed border-slate-200 dark:border-slate-600 hover:border-primary transition-all bg-slate-50 shadow-inner">
                 <canvas
                   ref={canvasRef}
                   width={400}
@@ -2037,7 +2084,47 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
               Back to Dashboard
               <span className="material-symbols-outlined">dashboard</span>
             </button>
-            <p className="text-[10px] md:text-xs font-bold text-slate-400 uppercase tracking-widest animate-pulse">Redirecting you in a moment...</p>
+
+            <motion.div 
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.5 }}
+                className="w-full max-w-sm mx-auto p-8 bg-emerald-50/30 dark:bg-emerald-500/10 border-2 border-dashed border-emerald-500/20 rounded-[2.5rem] space-y-5 shadow-inner"
+            >
+                {createdInvestment?.indemnity_document_url ? (
+                    <>
+                        <div className="flex items-center gap-3 justify-center text-emerald-600 dark:text-emerald-400">
+                            <span className="material-symbols-outlined filled text-3xl">description</span>
+                            <span className="text-xs font-black uppercase tracking-widest">Legal Document Prepared</span>
+                        </div>
+                        <p className="text-xs text-slate-500 dark:text-slate-300 font-medium leading-relaxed">
+                            Your signed indemnity agreement is ready. Please download and keep a copy for your records.
+                        </p>
+                        <a 
+                            href={createdInvestment.indemnity_document_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center justify-center gap-3 w-full py-4 bg-emerald-500 text-white font-black rounded-2xl shadow-xl shadow-emerald-500/30 hover:scale-105 transition-all group"
+                        >
+                            <span className="material-symbols-outlined text-xl group-hover:animate-bounce">download</span>
+                            Download Indemnity
+                        </a>
+                    </>
+                ) : (
+                    <div className="flex flex-col items-center gap-3 text-slate-400 py-4 opacity-70">
+                        <span className="material-symbols-outlined text-4xl animate-spin duration-3000">progress_activity</span>
+                        <p className="text-[10px] font-black uppercase tracking-widest">Finalizing Paperwork...</p>
+                    </div>
+                )}
+            </motion.div>
+
+            <button
+              onClick={() => { onComplete(); navigate('DASHBOARD'); }}
+              className="w-full sm:w-auto px-8 md:px-12 py-4 md:py-5 bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-black text-lg md:text-xl rounded-2xl border-2 border-slate-100 dark:border-slate-700 hover:scale-105 active:scale-95 transition-all flex items-center justify-center gap-3 group"
+            >
+              Back to Dashboard
+              <span className="material-symbols-outlined transition-transform group-hover:translate-x-1">dashboard</span>
+            </button>
           </div>
         </motion.div>
       )}

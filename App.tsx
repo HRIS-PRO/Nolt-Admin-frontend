@@ -511,7 +511,7 @@ const AppContent: React.FC = () => {
         {/* Protected Routes */}
         <Route path="/dashboard" element={
           <ProtectedRoute user={user} isLoading={isLoading} theme={theme} onLogout={handleLogoutRequest} onToggleTheme={toggleTheme}>
-            <Dashboard navigate={(step) => handleLegacyNavigate(step)} />
+            <Dashboard user={user} navigate={(step) => handleLegacyNavigate(step)} />
           </ProtectedRoute>
         } />
 
