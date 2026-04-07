@@ -1,10 +1,11 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { AppStep } from '../types';
+import { calculateInvestmentRate, InvestmentPlan } from '../utils/rates';
 
 interface CalculatorProps {
   navigate: (step: AppStep) => void;
-  formatMoney: (amount: number) => string;
+  formatMoney: (amount: number, currency?: string) => string;
 }
 
 const InfoTooltip: React.FC<{ content: string }> = ({ content }) => (
@@ -19,13 +20,96 @@ const InfoTooltip: React.FC<{ content: string }> = ({ content }) => (
   </div>
 );
 
+const LOAN_PRODUCTS = [
+  { id: 'business', name: 'Business Loan', rate: 12 },
+  { id: 'salary', name: 'Salary Advance', rate: 15 },
+];
+
+const INVESTMENT_PRODUCTS = [
+  { id: 'rise', name: 'NOLT Rise', rate: 12.5 },
+  { id: 'surge', name: 'NOLT Surge', rate: 15.0 },
+  { id: 'vault', name: 'NOLT Vault', rate: 18.0 },
+];
+
 const Calculator: React.FC<CalculatorProps> = ({ navigate, formatMoney }) => {
   const [calcType, setCalcType] = useState<'LOAN' | 'INVESTMENT'>('LOAN');
+  const [currency, setCurrency] = useState<'NGN' | 'USD'>('NGN');
+  const [selectedProductId, setSelectedProductId] = useState<string>(calcType === 'LOAN' ? LOAN_PRODUCTS[0].id : INVESTMENT_PRODUCTS[0].id);
   
   // States
   const [principal, setPrincipal] = useState<number>(10000);
-  const [rate, setRate] = useState<number>(calcType === 'LOAN' ? 12 : 15);
+  const [rate, setRate] = useState<number>(calcType === 'LOAN' ? LOAN_PRODUCTS[0].rate : INVESTMENT_PRODUCTS[0].rate);
   const [term, setTerm] = useState<number>(12); // Months
+
+  const minAmount = useMemo(() => {
+    if (calcType === 'LOAN') return 1000;
+    const plan = selectedProductId.toUpperCase();
+    if (plan === 'VAULT') {
+      return currency === 'NGN' ? 100000 : 10000;
+    }
+    return 10000;
+  }, [calcType, selectedProductId, currency]);
+
+  const minTerm = useMemo(() => {
+    if (calcType === 'LOAN') return 1;
+    const plan = selectedProductId.toUpperCase();
+    if (plan === 'SURGE') return 1;
+    if (plan === 'VAULT' && currency === 'NGN') return 1;
+    return 3; // Vault USD and Rise
+  }, [calcType, selectedProductId, currency]);
+
+  // Sync rate for investments
+  useEffect(() => {
+    if (calcType === 'INVESTMENT') {
+      const plan = selectedProductId.toUpperCase() as InvestmentPlan;
+      const newRate = calculateInvestmentRate({
+        amount: principal,
+        tenureMonths: term,
+        plan,
+        currency
+      });
+      setRate(newRate);
+      
+      // Enforce minimum amount on product/currency change
+      if (principal < minAmount) {
+        setPrincipal(minAmount);
+      }
+      
+      // Enforce minimum term
+      if (term < minTerm) {
+        setTerm(minTerm);
+      }
+    }
+  }, [calcType, currency, selectedProductId, minAmount, minTerm]);
+
+  useEffect(() => {
+    if (calcType === 'INVESTMENT') {
+      const plan = selectedProductId.toUpperCase() as InvestmentPlan;
+      const newRate = calculateInvestmentRate({
+        amount: principal,
+        tenureMonths: term,
+        plan,
+        currency
+      });
+      setRate(newRate);
+    }
+  }, [principal, term]);
+
+  const handleCalcTypeChange = (type: 'LOAN' | 'INVESTMENT') => {
+    setCalcType(type);
+    const products = type === 'LOAN' ? LOAN_PRODUCTS : INVESTMENT_PRODUCTS;
+    setSelectedProductId(products[0].id);
+    setRate(products[0].rate);
+  };
+
+  const handleProductChange = (productId: string) => {
+    setSelectedProductId(productId);
+    const products = calcType === 'LOAN' ? LOAN_PRODUCTS : INVESTMENT_PRODUCTS;
+    const product = products.find(p => p.id === productId);
+    if (product) {
+      setRate(product.rate);
+    }
+  };
 
   const results = useMemo(() => {
     if (calcType === 'LOAN') {
@@ -77,21 +161,38 @@ const Calculator: React.FC<CalculatorProps> = ({ navigate, formatMoney }) => {
           <p className="text-slate-500 dark:text-slate-400 text-lg font-medium">Plan your financial moves with precision and flair.</p>
         </div>
 
-        <div className="bg-slate-100 dark:bg-slate-800 p-2 rounded-2xl flex gap-1 shadow-inner">
-          <button 
-            onClick={() => { setCalcType('LOAN'); setRate(12); }}
-            className={`px-8 py-3 rounded-xl font-black text-sm transition-all flex items-center gap-2 ${calcType === 'LOAN' ? 'bg-primary text-white shadow-xl shadow-primary/30' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
-          >
-            <span className="material-symbols-outlined text-xl">payments</span>
-            Loan
-          </button>
-          <button 
-            onClick={() => { setCalcType('INVESTMENT'); setRate(15); }}
-            className={`px-8 py-3 rounded-xl font-black text-sm transition-all flex items-center gap-2 ${calcType === 'INVESTMENT' ? 'bg-primary text-white shadow-xl shadow-primary/30' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
-          >
-            <span className="material-symbols-outlined text-xl">trending_up</span>
-            Investment
-          </button>
+        <div className="flex flex-col md:flex-row gap-4">
+          <div className="bg-slate-100 dark:bg-slate-800 p-2 rounded-2xl flex gap-1 shadow-inner">
+            <button 
+              onClick={() => handleCalcTypeChange('LOAN')}
+              className={`px-8 py-3 rounded-xl font-black text-sm transition-all flex items-center gap-2 ${calcType === 'LOAN' ? 'bg-primary text-white shadow-xl shadow-primary/30' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
+            >
+              <span className="material-symbols-outlined text-xl">payments</span>
+              Loan
+            </button>
+            <button 
+              onClick={() => handleCalcTypeChange('INVESTMENT')}
+              className={`px-8 py-3 rounded-xl font-black text-sm transition-all flex items-center gap-2 ${calcType === 'INVESTMENT' ? 'bg-primary text-white shadow-xl shadow-primary/30' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
+            >
+              <span className="material-symbols-outlined text-xl">trending_up</span>
+              Investment
+            </button>
+          </div>
+
+          <div className="bg-slate-100 dark:bg-slate-800 p-2 rounded-2xl flex gap-1 shadow-inner">
+            <button 
+              onClick={() => setCurrency('NGN')}
+              className={`px-6 py-3 rounded-xl font-black text-sm transition-all ${currency === 'NGN' ? 'bg-primary text-white shadow-xl shadow-primary/30' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
+            >
+              NGN
+            </button>
+            <button 
+              onClick={() => setCurrency('USD')}
+              className={`px-6 py-3 rounded-xl font-black text-sm transition-all ${currency === 'USD' ? 'bg-primary text-white shadow-xl shadow-primary/30' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
+            >
+              USD
+            </button>
+          </div>
         </div>
       </div>
 
@@ -99,22 +200,43 @@ const Calculator: React.FC<CalculatorProps> = ({ navigate, formatMoney }) => {
         {/* Input Section */}
         <div className="lg:col-span-7 bg-white dark:bg-slate-800 rounded-[2.5rem] p-8 md:p-12 border border-slate-100 dark:border-slate-700 shadow-2xl flex flex-col gap-10">
           
-          <div className="space-y-6">
-            <div className="flex justify-between items-end">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div className="space-y-4">
+              <label className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-widest">Select Product</label>
+              <div className="relative">
+                <select 
+                  value={selectedProductId}
+                  onChange={(e) => handleProductChange(e.target.value)}
+                  className="w-full h-16 bg-slate-50 dark:bg-slate-900 border-2 border-transparent focus:border-primary rounded-2xl px-6 text-lg font-black dark:text-white outline-none transition-all appearance-none"
+                >
+                  {(calcType === 'LOAN' ? LOAN_PRODUCTS : INVESTMENT_PRODUCTS).map(p => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
+                  ))}
+                </select>
+                <span className="absolute right-6 top-1/2 -translate-y-1/2 material-symbols-outlined text-slate-400 pointer-events-none">expand_more</span>
+              </div>
+            </div>
+
+            <div className="space-y-4">
               <label className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-widest">
                 {calcType === 'LOAN' ? 'Loan Amount' : 'Investment Principal'}
               </label>
-              <span className="text-2xl font-black text-primary">{formatMoney(principal)}</span>
+              <div className="relative">
+                <input 
+                  type="number" 
+                  value={principal}
+                  onChange={(e) => setPrincipal(parseInt(e.target.value) || 0)}
+                  className={`w-full h-16 bg-slate-50 dark:bg-slate-900 border-2 rounded-2xl px-14 text-xl font-black dark:text-white outline-none transition-all ${principal < minAmount ? 'border-red-500' : 'border-transparent focus:border-primary'}`}
+                />
+                <span className="absolute left-6 top-1/2 -translate-y-1/2 font-black text-primary text-xl">{currency === 'NGN' ? '₦' : '$'}</span>
+              </div>
+              {principal < minAmount && (
+                <p className="text-xs font-bold text-red-500 mt-2 flex items-center gap-1">
+                  <span className="material-symbols-outlined text-sm">warning</span>
+                  Minimum amount is {formatMoney(minAmount)}
+                </p>
+              )}
             </div>
-            <input 
-              type="range"
-              min="1000"
-              max="100000"
-              step="1000"
-              value={principal}
-              onChange={(e) => setPrincipal(parseInt(e.target.value))}
-              className="w-full h-3 bg-slate-100 dark:bg-slate-900 rounded-full appearance-none cursor-pointer accent-primary"
-            />
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -128,10 +250,16 @@ const Calculator: React.FC<CalculatorProps> = ({ navigate, formatMoney }) => {
                   type="number" 
                   value={term}
                   onChange={(e) => setTerm(parseInt(e.target.value) || 0)}
-                  className="w-full h-16 bg-slate-50 dark:bg-slate-900 border-2 border-transparent focus:border-primary rounded-2xl px-6 text-xl font-black dark:text-white outline-none transition-all"
+                  className={`w-full h-16 bg-slate-50 dark:bg-slate-900 border-2 rounded-2xl px-6 text-xl font-black dark:text-white outline-none transition-all ${term < minTerm ? 'border-red-500' : 'border-transparent focus:border-primary'}`}
                 />
                 <span className="absolute right-6 top-1/2 -translate-y-1/2 font-black text-slate-400">Mo</span>
               </div>
+              {term < minTerm && (
+                <p className="text-xs font-bold text-red-500 mt-2 flex items-center gap-1">
+                  <span className="material-symbols-outlined text-sm">warning</span>
+                  Minimum tenure is {minTerm} months
+                </p>
+              )}
             </div>
 
             <div className="space-y-4">
@@ -144,8 +272,9 @@ const Calculator: React.FC<CalculatorProps> = ({ navigate, formatMoney }) => {
                   type="number" 
                   value={rate}
                   step="0.1"
+                  readOnly={calcType === 'INVESTMENT'}
                   onChange={(e) => setRate(parseFloat(e.target.value) || 0)}
-                  className="w-full h-16 bg-slate-50 dark:bg-slate-900 border-2 border-transparent focus:border-primary rounded-2xl px-6 text-xl font-black dark:text-white outline-none transition-all"
+                  className={`w-full h-16 bg-slate-50 dark:bg-slate-900 border-2 border-transparent focus:border-primary rounded-2xl px-6 text-xl font-black dark:text-white outline-none transition-all ${calcType === 'INVESTMENT' ? 'opacity-70 cursor-not-allowed' : ''}`}
                 />
                 <span className="absolute right-6 top-1/2 -translate-y-1/2 font-black text-slate-400">%</span>
               </div>
@@ -171,18 +300,18 @@ const Calculator: React.FC<CalculatorProps> = ({ navigate, formatMoney }) => {
             <div className="relative z-10 space-y-2">
               <h3 className="text-sm font-black text-white/70 uppercase tracking-widest">{results.label}</h3>
               <p className="text-6xl font-black tracking-tighter leading-none">
-                {formatMoney(results.mainValue)}
+                {formatMoney(results.mainValue, currency)}
               </p>
             </div>
 
             <div className="relative z-10 space-y-6 pt-6 border-t border-white/20">
               <div className="flex justify-between items-center">
                 <span className="text-white/60 font-bold uppercase tracking-widest text-xs">{results.interestLabel}</span>
-                <span className="text-xl font-black">+{formatMoney(results.interestValue)}</span>
+                <span className="text-xl font-black">+{formatMoney(results.interestValue, currency)}</span>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-white/60 font-bold uppercase tracking-widest text-xs">{results.totalLabel}</span>
-                <span className="text-xl font-black">{formatMoney(results.totalValue)}</span>
+                <span className="text-xl font-black">{formatMoney(results.totalValue, currency)}</span>
               </div>
             </div>
 

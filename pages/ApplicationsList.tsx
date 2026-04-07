@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { AppStep, SavedDraft } from '../types';
+import { AppStep, SavedDraft, UserState } from '../types';
 import { storageService } from '../services/storageService';
 import axios from 'axios';
 import { formatDate } from '../utils/dateFormatter';
@@ -7,9 +7,10 @@ import { formatDate } from '../utils/dateFormatter';
 interface ApplicationsListProps {
   navigate: (step: AppStep, draft?: SavedDraft | null) => void;
   formatMoney: (amount: number) => string;
+  user: UserState;
 }
 
-const ApplicationsList: React.FC<ApplicationsListProps> = ({ navigate, formatMoney }) => {
+const ApplicationsList: React.FC<ApplicationsListProps> = ({ navigate, formatMoney, user }) => {
   const [activeTab, setActiveTab] = useState<'DRAFTS' | 'COMPLETED'>('DRAFTS');
   const [uploadingReceiptId, setUploadingReceiptId] = useState<string | null>(null);
   const [uploadedReceipts, setUploadedReceipts] = useState<Record<string, boolean>>({});
@@ -241,7 +242,8 @@ const ApplicationsList: React.FC<ApplicationsListProps> = ({ navigate, formatMon
 
   return (
     <div className="max-w-5xl mx-auto px-6 py-12 md:py-20 animate-in fade-in duration-500 print:p-0 print:max-w-none">
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12 print:hidden">
+      <div className="print:hidden">
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12">
         <div className="space-y-2">
           <button
             onClick={() => navigate('DASHBOARD')}
@@ -664,9 +666,12 @@ const ApplicationsList: React.FC<ApplicationsListProps> = ({ navigate, formatMon
         </div>
       )}
 
+
+      </div>
+
       {/* Agreement Modal */}
       {showModal && selectedApp && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 md:p-8 animate-in fade-in duration-300 backdrop-blur-md overflow-y-auto print:fixed print:inset-0 print:z-[1000] print:bg-white print:p-0">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 md:p-8 animate-in fade-in duration-300 backdrop-blur-md overflow-y-auto print:fixed print:inset-0 print:z-[1000] print:bg-white print:p-0 modal-container">
           <div className="absolute inset-0 bg-slate-900/60 print:hidden" onClick={() => setShowModal(false)}></div>
           <div className="relative bg-white dark:bg-slate-800 w-full max-w-4xl rounded-[3rem] shadow-2xl overflow-hidden flex flex-col animate-in zoom-in duration-500 border border-white/20 dark:border-slate-700 print:shadow-none print:border-none print:rounded-none print:w-full print:max-w-none">
             {/* Modal Header */}
@@ -685,202 +690,158 @@ const ApplicationsList: React.FC<ApplicationsListProps> = ({ navigate, formatMon
               </button>
             </div>
 
-            {/* Modal Content - Full Details */}
-            <div className="flex-1 p-8 md:p-12 bg-slate-50 dark:bg-slate-900/50 print:bg-white print:p-8">
+            {/* Print Styles to hide background and force high-quality print */}
+            <style dangerouslySetInnerHTML={{ __html: `
+              @media print {
+                @page { margin: 0; size: auto; }
+                body { 
+                  margin: 0 !important; 
+                  padding: 0 !important; 
+                  background: white !important; 
+                  width: 100% !important;
+                }
+                
+                /* Completely hide UI but leave the Modal path open */
+                header, footer, nav, aside, .no-print, .print-hidden, 
+                .back-button-glow, .bg-slate-900\\/60,
+                #ze-snippet, #launcher, .zEWidget-launcher, .zEWidget-messenger, 
+                iframe[name="launcher"] { 
+                  display: none !important; 
+                }
+
+                /* Force the modal to become the single source of truth */
+                .modal-container {
+                   display: block !important;
+                   position: absolute !important;
+                   left: 0 !important;
+                   top: 0 !important;
+                   width: 100% !important;
+                   height: auto !important;
+                   padding: 0 !important;
+                   margin: 0 !important;
+                   background: white !important;
+                   z-index: 1 !important;
+                   visibility: visible !important;
+                }
+
+                .modal-container > * {
+                  display: block !important;
+                  width: 100% !important;
+                }
+
+                /* Targeted Certificate Alignment */
+                .modal-container .max-w-3xl {
+                  width: 210mm !important; /* A4 Width */
+                  max-width: 100% !important;
+                  margin: 0 auto !important;
+                  padding: 2.5cm !important; /* Proper Page Margins */
+                  background: white !important;
+                  border: none !important;
+                  box-shadow: none !important;
+                  border-radius: 0 !important;
+                }
+
+                /* Remove scrollbars and overflows for print */
+                .overflow-y-auto { overflow: visible !important; }
+                .flex-1 { flex: none !important; display: block !important; }
+
+                * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+              }
+            `}} />
+
+            {/* Modal Content - Full Details (Certificate View) */}
+            <div className="flex-1 overflow-y-auto p-8 md:p-12 bg-slate-50 dark:bg-slate-900/50 print:bg-white print:p-0">
               <div className="max-w-3xl mx-auto bg-white dark:bg-slate-800 p-8 md:p-16 rounded-[2rem] shadow-xl border border-slate-100 dark:border-slate-700 space-y-10 print:shadow-none print:border-none print:p-0">
-                {/* Document Header */}
-                <div className="flex justify-between items-start border-b-2 border-slate-100 dark:border-slate-700 pb-8">
-                  <div>
+                {/* Document Header / Letterhead */}
+                <div className="flex justify-between items-start border-b-2 border-slate-100 dark:border-slate-700 pb-8 min-h-[120px]">
+                  <div className="space-y-6">
                     <div className="flex items-center gap-2 text-primary mb-2">
-                      <img src="/logo.png" className="h-8" alt="NOLT" />
+                       <img 
+                        src="https://noltfinance.s3.us-east-1.amazonaws.com/logo+updated+white.png" 
+                        className="h-12 w-auto object-contain [filter:invert(38%)_sepia(98%)_saturate(2136%)_hue-rotate(187deg)_brightness(101%)_contrast(101%)] dark:[filter:none]" 
+                        alt="NOLT" 
+                      />
                     </div>
-                    <h1 className="text-3xl font-black text-slate-900 dark:text-white uppercase tracking-tight">Loan Application</h1>
+                    <h1 className="text-3xl font-black text-slate-900 dark:text-white uppercase tracking-tight">
+                      {selectedApp.type.toLowerCase().includes('loan') ? 'Loan Agreement' : 'Investment Certificate'}
+                    </h1>
                   </div>
                   <div className="text-right">
-                    <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Status</p>
-                    <p className="font-bold text-primary">{selectedApp.status}</p>
-                    <p className="text-xs text-slate-400 mt-2">Submitted: {selectedApp.submittedAt}</p>
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Date Issued</p>
+                    <p className="font-bold dark:text-white">{selectedApp.submittedAt || new Date().toLocaleDateString()}</p>
+                    <div className="mt-4">
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Status</p>
+                      <p className={`text-xs font-black px-3 py-1 rounded-full inline-block ${selectedApp.status === 'ACTIVE' || selectedApp.status === 'DISBURSED' || selectedApp.status === 'APPROVED' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-primary/10 text-primary'}`}>
+                        {selectedApp.status}
+                      </p>
+                    </div>
                   </div>
                 </div>
 
-                {/* Details Grid */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-8">
+                {/* Agreement Body / Clauses */}
+                <div className="prose dark:prose-invert max-w-none text-slate-600 dark:text-slate-300 leading-relaxed font-medium space-y-8">
+                  <section>
+                    <h4 className="text-slate-900 dark:text-white font-black uppercase text-sm tracking-widest mb-4 flex items-center gap-2">
+                      <span className="size-6 rounded-lg bg-slate-100 dark:bg-slate-700 flex items-center justify-center text-[10px]">01</span>
+                      Parties Involved
+                    </h4>
+                    <p className="pl-8">
+                      This formal certificate serves as an agreement between <strong>NOLT Finance</strong> ("The Provider") and the Applicant identified as <strong>{selectedApp.data?.fullName || user.name}</strong> (Account ID: #{selectedApp.id}).
+                    </p>
+                  </section>
+                  
+                  <section>
+                    <h4 className="text-slate-900 dark:text-white font-black uppercase text-sm tracking-widest mb-4 flex items-center gap-2">
+                      <span className="size-6 rounded-lg bg-slate-100 dark:bg-slate-700 flex items-center justify-center text-[10px]">02</span>
+                      {selectedApp.type.toLowerCase().includes('loan') ? 'Principal Loan Amount' : 'Investment Principal'}
+                    </h4>
+                    <p className="pl-8">
+                      The total sum agreed upon for this {selectedApp.type.toLowerCase().includes('loan') ? 'disbursement' : 'investment plan'} is <strong>{formatMoney(selectedApp.amount)}</strong>. All interest calculations, payment cycles, and maturity terms are strictly governed by the standard operating policy of NOLT Finance.
+                    </p>
+                  </section>
 
-                  {/* Applicant Info */}
-                  <div className="col-span-full">
-                    <h4 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-widest mb-4 border-b border-slate-100 dark:border-slate-700 pb-2">Applicant Information</h4>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 text-sm">
-                      <div>
-                        <p className="text-slate-500 text-xs uppercase font-bold">Full Name</p>
-                        <p className="font-bold dark:text-white">
-                          {selectedApp.data?.applicant_full_name ||
-                            (selectedApp.data?.surname && selectedApp.data?.first_name
-                              ? `${selectedApp.data.surname} ${selectedApp.data.first_name} ${selectedApp.data.middle_name || ''}`
-                              : 'N/A')}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-slate-500 text-xs uppercase font-bold">Mobile</p>
-                        <p className="font-bold dark:text-white">{selectedApp.data?.mobile_number || 'N/A'}</p>
-                      </div>
+                  <section>
+                    <h4 className="text-slate-900 dark:text-white font-black uppercase text-sm tracking-widest mb-4 flex items-center gap-2">
+                      <span className="size-6 rounded-lg bg-slate-100 dark:bg-slate-700 flex items-center justify-center text-[10px]">03</span>
+                      Compliance & Security
+                    </h4>
+                    <p className="pl-8">
+                      The Client agrees to maintain the accuracy of all provided data. NOLT Finance guarantees the security of all funds/data transition and confirms that this {selectedApp.type.toLowerCase().includes('loan') ? 'loan' : 'investment'} follows all registered and regulatory compliance mandates.
+                    </p>
+                  </section>
+                </div>
 
-                      <div>
-                        <p className="text-slate-500 text-xs uppercase font-bold">Email</p>
-                        <p className="font-bold dark:text-white">{selectedApp.data?.personal_email}</p>
-                      </div>
-                      <div>
-                        <p className="text-slate-500 text-xs uppercase font-bold">Date of Birth</p>
-                        <p className="font-bold dark:text-white">{formatDate(selectedApp.data?.date_of_birth)}</p>
-                      </div>
-                      <div>
-                        <p className="text-slate-500 text-xs uppercase font-bold">BVN</p>
-                        <p className="font-bold dark:text-white font-mono tracking-wider">{selectedApp.data?.bvn || 'N/A'}</p>
-                      </div>
-                      <div>
-                        <p className="text-slate-500 text-xs uppercase font-bold">NIN</p>
-                        <p className="font-bold dark:text-white font-mono tracking-wider">{selectedApp.data?.nin || 'N/A'}</p>
-                      </div>
-                      <div>
-                        <p className="text-slate-500 text-xs uppercase font-bold">State of Origin</p>
-                        <p className="font-bold dark:text-white">{selectedApp.data?.state_of_origin || 'N/A'}</p>
-                      </div>
-                      <div>
-                        <p className="text-slate-500 text-xs uppercase font-bold">State of Residence</p>
-                        <p className="font-bold dark:text-white">{selectedApp.data?.state_of_residence || 'N/A'}</p>
-                      </div>
-                      <div className="col-span-full">
-                        <p className="text-slate-500 text-xs uppercase font-bold">Primary Address</p>
-                        <p className="font-bold dark:text-white">{selectedApp.data?.primary_home_address}</p>
-                      </div>
+                {/* Signature Section */}
+                <div className="pt-10 border-t-2 border-slate-100 dark:border-slate-700 flex flex-col md:flex-row justify-between items-end gap-8">
+                  <div className="space-y-4">
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Client Digital Signature</p>
+                    <div className="w-64 h-24 bg-slate-50 dark:bg-slate-900/50 rounded-xl border-2 border-dashed border-slate-200 dark:border-slate-700 flex items-center justify-center relative overflow-hidden">
+                        {/* Display User's REAL signature if available */}
+                        {selectedApp.data?.signatures?.[0] ? (
+                          <img 
+                            src={selectedApp.data.signatures[0]} 
+                            alt="Digital Signature" 
+                            className="w-full h-full object-contain px-4" 
+                          />
+                        ) : (
+                          <svg className="absolute inset-0 w-full h-full text-primary opacity-80" viewBox="0 0 200 80">
+                              <path d="M20,60 C40,20 60,80 80,40 C100,0 120,60 140,20 C160,-20 180,40 190,30" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
+                          </svg>
+                        )}
+                    </div>
+                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em]">Verified via NOLT Platform</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Authorized Seal</p>
+                    <div className="size-24 rounded-full border-4 border-primary/20 flex items-center justify-center text-primary ml-auto relative">
+                        <div className="absolute inset-2 rounded-full border border-primary/10 border-dashed animate-spin-slow"></div>
+                        <span className="material-symbols-outlined text-5xl filled">verified</span>
                     </div>
                   </div>
+                </div>
 
-                  {/* Loan Details */}
-                  <div className="col-span-full">
-                    <h4 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-widest mb-4 border-b border-slate-100 dark:border-slate-700 pb-2">Loan Details</h4>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                      <div>
-                        <p className="text-slate-500 text-xs uppercase font-bold">Amount Requested</p>
-                        <p className="font-bold text-lg text-primary">{formatMoney(selectedApp.amount)}</p>
-                      </div>
-                      <div>
-                        <p className="text-slate-500 text-xs uppercase font-bold">Tenure</p>
-                        <p className="font-bold dark:text-white">{selectedApp.data?.loan_tenure_months} Months</p>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Bank Details */}
-                  <div className="col-span-full">
-                    <h4 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-widest mb-4 border-b border-slate-100 dark:border-slate-700 pb-2">Disbursement Details</h4>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                      <div>
-                        <p className="text-slate-500 text-xs uppercase font-bold">Bank Name</p>
-                        <p className="font-bold dark:text-white">{selectedApp.data?.bankDetails?.bankName || 'N/A'}</p>
-                      </div>
-                      <div>
-                        <p className="text-slate-500 text-xs uppercase font-bold">Account Number</p>
-                        <p className="font-bold dark:text-white tracking-widest">{selectedApp.data?.bankDetails?.accountNumber || 'N/A'}</p>
-                      </div>
-                      <div className="col-span-full">
-                        <p className="text-slate-500 text-xs uppercase font-bold">Account Name</p>
-                        <p className="font-bold dark:text-white">{selectedApp.data?.bankDetails?.accountName || 'N/A'}</p>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Documents */}
-                  <div className="col-span-full">
-                    <h4 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-widest mb-4 border-b border-slate-100 dark:border-slate-700 pb-2">Uploaded Documents</h4>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      {selectedApp.data?.documents?.govt_id && (
-                        <a href={selectedApp.data.documents.govt_id} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 p-4 bg-slate-50 dark:bg-slate-700/50 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors group">
-                          <div className="size-10 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
-                            <span className="material-symbols-outlined">id_card</span>
-                          </div>
-                          <div>
-                            <p className="font-bold text-sm dark:text-white">Government ID</p>
-                            <p className="text-xs text-slate-500">Click to view</p>
-                          </div>
-                        </a>
-                      )}
-                      {selectedApp.data?.documents?.bank_statement && (
-                        <a href={selectedApp.data.documents.bank_statement} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 p-4 bg-slate-50 dark:bg-slate-700/50 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors group">
-                          <div className="size-10 rounded-full bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
-                            <span className="material-symbols-outlined">account_balance</span>
-                          </div>
-                          <div>
-                            <p className="font-bold text-sm dark:text-white">Bank Statement</p>
-                            <p className="text-xs text-slate-500">Click to view</p>
-                          </div>
-                        </a>
-                      )}
-                      {selectedApp.data?.documents?.proof_of_address && (
-                        <a href={selectedApp.data.documents.proof_of_address} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 p-4 bg-slate-50 dark:bg-slate-700/50 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors group">
-                          <div className="size-10 rounded-full bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
-                            <span className="material-symbols-outlined">home_pin</span>
-                          </div>
-                          <div>
-                            <p className="font-bold text-sm dark:text-white">Proof of Address</p>
-                            <p className="text-xs text-slate-500">Click to view</p>
-                          </div>
-                        </a>
-                      )}
-                      {selectedApp.data?.documents?.selfie && (
-                        <a href={selectedApp.data.documents.selfie} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 p-4 bg-slate-50 dark:bg-slate-700/50 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors group">
-                          <div className="size-10 rounded-full bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
-                            <span className="material-symbols-outlined">face</span>
-                          </div>
-                          <div>
-                            <p className="font-bold text-sm dark:text-white">Selfie Verification</p>
-                            <p className="text-xs text-slate-500">Click to view</p>
-                          </div>
-                        </a>
-                      )}
-                      {selectedApp.data?.documents?.work_id && (
-                        <a href={selectedApp.data.documents.work_id} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 p-4 bg-slate-50 dark:bg-slate-700/50 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors group">
-                          <div className="size-10 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
-                            <span className="material-symbols-outlined">badge</span>
-                          </div>
-                          <div>
-                            <p className="font-bold text-sm dark:text-white">Work ID</p>
-                            <p className="text-xs text-slate-500">Click to view</p>
-                          </div>
-                        </a>
-                      )}
-                      {selectedApp.data?.documents?.payslip && (
-                        <a href={selectedApp.data.documents.payslip} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 p-4 bg-slate-50 dark:bg-slate-700/50 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors group">
-                          <div className="size-10 rounded-full bg-teal-100 dark:bg-teal-900/30 text-teal-600 dark:text-teal-400 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
-                            <span className="material-symbols-outlined">payments</span>
-                          </div>
-                          <div>
-                            <p className="font-bold text-sm dark:text-white">Payslip</p>
-                            <p className="text-xs text-slate-500">Click to view</p>
-                          </div>
-                        </a>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* References */}
-                  <div className="col-span-full">
-                    <h4 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-widest mb-4 border-b border-slate-100 dark:border-slate-700 pb-2">References</h4>
-                    <div className="space-y-4">
-                      {(selectedApp.data?.references || []).map((ref: any, i: number) => (
-                        <div key={i} className="flex justify-between items-start text-sm p-3 bg-slate-50 dark:bg-slate-700/30 rounded-lg">
-                          <div>
-                            <p className="font-bold dark:text-white">{ref.fullName}</p>
-                            <p className="text-xs text-slate-500">{ref.relationship}</p>
-                          </div>
-                          <p className="font-bold font-mono">{ref.phoneNumber}</p>
-                        </div>
-                      ))}
-                      {(!selectedApp.data?.references || selectedApp.data.references.length === 0) && (
-                        <p className="text-sm italic text-slate-400">No references provided.</p>
-                      )}
-                    </div>
-                  </div>
-
+                <div className="pt-8 text-center border-t border-slate-100 dark:border-slate-700">
+                   <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.5em]">This is a computer-generated document. No physical signature is required.</p>
                 </div>
               </div>
             </div>

@@ -15,12 +15,13 @@ interface Activity {
 }
 
 interface ActivityTimelineProps {
-    loanId: string | undefined;
+    loanId?: string;
+    investmentId?: string;
     refreshTrigger?: number;
     defaultOpen?: boolean;
 }
 
-const ActivityTimeline: React.FC<ActivityTimelineProps> = ({ loanId, refreshTrigger = 0, defaultOpen = false }) => {
+const ActivityTimeline: React.FC<ActivityTimelineProps> = ({ loanId, investmentId, refreshTrigger = 0, defaultOpen = false }) => {
     const [items, setItems] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [expandedItems, setExpandedItems] = useState<Record<string, boolean>>({});
@@ -32,19 +33,30 @@ const ActivityTimeline: React.FC<ActivityTimelineProps> = ({ loanId, refreshTrig
 
     useEffect(() => {
         const fetchData = async () => {
-            if (!loanId) return;
+            if (!loanId && !investmentId) return;
+            setLoading(true);
             try {
-                const [activitiesRes, commentsRes] = await Promise.all([
-                    axios.get(`/api/staff/loans/${loanId}/activities`, { withCredentials: true }),
-                    axios.get(`/api/staff/loans/${loanId}/comments`, { withCredentials: true })
-                ]);
+                let combined: any[] = [];
+                
+                if (loanId) {
+                    const [activitiesRes, commentsRes] = await Promise.all([
+                        axios.get(`/api/staff/loans/${loanId}/activities`, { withCredentials: true }),
+                        axios.get(`/api/staff/loans/${loanId}/comments`, { withCredentials: true })
+                    ]);
 
-                // Combine and sort
-                const combined = [
-                    ...activitiesRes.data.map((a: any) => ({ ...a, type: 'activity' })),
-                    ...commentsRes.data.map((c: any) => ({ ...c, type: 'comment' }))
-                ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+                    combined = [
+                        ...activitiesRes.data.map((a: any) => ({ ...a, type: 'activity' })),
+                        ...commentsRes.data.map((c: any) => ({ ...c, type: 'comment' }))
+                    ];
+                } else if (investmentId) {
+                    const activitiesRes = await axios.get(`/api/staff/investments/${investmentId}/activities`, { withCredentials: true });
+                    
+                    combined = [
+                        ...activitiesRes.data.map((a: any) => ({ ...a, type: 'activity' }))
+                    ];
+                }
 
+                combined.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
                 setItems(combined);
             } catch (error) {
                 console.error("Failed to fetch timeline:", error);
@@ -90,6 +102,8 @@ const ActivityTimeline: React.FC<ActivityTimelineProps> = ({ loanId, refreshTrig
                                 const isReject = item.action_type === 'reject';
                                 const isApprove = item.action_type === 'approve';
                                 const isReturn = item.action_type === 'return';
+                                const isFinance = item.action_type === 'finance_override';
+                                const isCasa = item.action_type === 'casa_posting';
 
                                 // Color logic
                                 let colorClass = 'bg-slate-400';
@@ -97,6 +111,8 @@ const ActivityTimeline: React.FC<ActivityTimelineProps> = ({ loanId, refreshTrig
                                 else if (isReject) colorClass = 'bg-red-500';
                                 else if (isApprove) colorClass = 'bg-emerald-500';
                                 else if (isReturn) colorClass = 'bg-orange-500';
+                                else if (isFinance) colorClass = 'bg-purple-500';
+                                else if (isCasa) colorClass = 'bg-blue-500';
 
                                 const isExpanded = expandedItems[item.id];
 

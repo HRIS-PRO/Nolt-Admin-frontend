@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import StaffLayout from '../components/layouts/StaffLayout';
+import ActivityTimeline from '../components/ActivityTimeline';
 import axios from 'axios';
 import { getStatusStyles } from '../utils/statusStyles';
 import { formatDate } from '../utils/dateFormatter';
@@ -228,9 +229,9 @@ const StaffInvestmentDetailsPage: React.FC<StaffInvestmentDetailsPageProps> = ({
                         <div className="flex items-center gap-3 mb-1">
                             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">INV-{investment.id}</p>
                             <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border uppercase tracking-wider ${investment.status === 'active' ? 'border-green-500/20 bg-green-500/10 text-green-500' :
-                                    investment.status === 'completed' ? 'border-blue-500/20 bg-blue-500/10 text-blue-500' :
-                                        investment.status === 'rejected' || investment.status === 'terminated' ? 'border-red-500/20 bg-red-500/10 text-red-500' :
-                                            'border-orange-500/20 bg-orange-500/10 text-orange-500'
+                                investment.status === 'completed' ? 'border-blue-500/20 bg-blue-500/10 text-blue-500' :
+                                    investment.status === 'rejected' || investment.status === 'terminated' ? 'border-red-500/20 bg-red-500/10 text-red-500' :
+                                        'border-orange-500/20 bg-orange-500/10 text-orange-500'
                                 }`}>
                                 {investment.status || 'pending'}
                             </span>
@@ -418,6 +419,14 @@ const StaffInvestmentDetailsPage: React.FC<StaffInvestmentDetailsPageProps> = ({
                             <Field label="Name" value={investment.nok_name} />
                             <Field label="Relationship" value={investment.nok_relationship} />
                             <Field label="Address" value={investment.nok_address} />
+                        </CollapsibleGroup>
+                    )}
+
+                    {(investment.bank_name || investment.account_number) && (
+                        <CollapsibleGroup title="Payout Bank Details" icon="account_balance" defaultOpen={true}>
+                            <Field label="Bank Name" value={investment.bank_name} />
+                            <Field label="Account Number" value={investment.account_number} />
+                            <Field label="Account Name" value={investment.account_name} />
                         </CollapsibleGroup>
                     )}
 
@@ -689,17 +698,17 @@ const StaffInvestmentDetailsPage: React.FC<StaffInvestmentDetailsPageProps> = ({
                                         <>
                                             <div className="space-y-2">
                                                 <label className="text-[10px] font-black uppercase text-slate-500">Interest Amount (₦)</label>
-                                                <div className="flex gap-2">
+                                                <div className="flex flex-col 2xl:flex-row gap-2">
                                                     <input
                                                         type="number"
                                                         value={customInterest === '' && !hasValidStoredInterest ? projected : customInterest}
                                                         onChange={(e) => setCustomInterest(e.target.value)}
-                                                        className="flex-1 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 text-sm font-bold text-slate-900 dark:text-white"
+                                                        className="flex-1 w-full min-w-0 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 text-sm font-bold text-slate-900 dark:text-white"
                                                     />
                                                     <button
                                                         onClick={() => handleFinanceUpdate(customInterest || String(projected))}
                                                         disabled={isActioning}
-                                                        className="px-6 py-3 bg-purple-600 text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-purple-700 transition-colors disabled:opacity-50"
+                                                        className="px-6 py-3 w-full 2xl:w-auto shrink-0 bg-purple-600 text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-purple-700 transition-colors disabled:opacity-50"
                                                     >
                                                         Update
                                                     </button>
@@ -766,13 +775,13 @@ const StaffInvestmentDetailsPage: React.FC<StaffInvestmentDetailsPageProps> = ({
                                             </div>
                                         )}
 
-                                        <div className="flex gap-2">
+                                        <div className="flex flex-col 2xl:flex-row gap-2">
                                             <input
                                                 type="text"
                                                 placeholder="Enter CASA Number..."
                                                 defaultValue={investment.casa_account_number || ''}
                                                 id="casa_number_input"
-                                                className="flex-1 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 text-sm font-bold text-slate-900 dark:text-white placeholder:text-slate-400"
+                                                className="flex-1 w-full min-w-0 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 text-sm font-bold text-slate-900 dark:text-white placeholder:text-slate-400"
                                             />
                                             <button
                                                 onClick={() => {
@@ -780,7 +789,7 @@ const StaffInvestmentDetailsPage: React.FC<StaffInvestmentDetailsPageProps> = ({
                                                     handleCASAUpdate(val);
                                                 }}
                                                 disabled={isActioning}
-                                                className="px-6 py-3 bg-purple-600 text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-purple-700 transition-colors disabled:opacity-50"
+                                                className="px-6 py-3 w-full 2xl:w-auto shrink-0 bg-purple-600 text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-purple-700 transition-colors disabled:opacity-50"
                                             >
                                                 Save
                                             </button>
@@ -795,6 +804,10 @@ const StaffInvestmentDetailsPage: React.FC<StaffInvestmentDetailsPageProps> = ({
                                 </div>
                             )}
                         </div>
+                    </div>
+
+                    <div className="bg-white dark:bg-[#1e293b] rounded-[24px] overflow-hidden border border-slate-200 dark:border-slate-800">
+                        <ActivityTimeline investmentId={id} />
                     </div>
                 </div>
             </div>

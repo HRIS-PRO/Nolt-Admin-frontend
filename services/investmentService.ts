@@ -20,6 +20,23 @@ export const investmentService = {
         return response.json();
     },
 
+    createStaffInvestment: async (data: any) => {
+        const response = await fetch(`${API_BASE_URL}/staff/investments/application`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(data),
+        });
+
+        if (!response.ok) {
+            const err = await response.json();
+            throw new Error(err.message || 'Failed to create staff investment');
+        }
+
+        return response.json();
+    },
+
     uploadDocument: async (file: File, investmentId: number | string, docType: string) => {
         const formData = new FormData();
         formData.append('file', file);
