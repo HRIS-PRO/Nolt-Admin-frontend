@@ -118,5 +118,19 @@ export const investmentService = {
         const response = await fetch(`${API_BASE_URL}/investments/latest`);
         if (!response.ok) return null;
         return response.json();
+    },
+
+    verifyIdentity: async (bvn: string, selfieUrl: string) => {
+        const response = await fetch(`${API_BASE_URL}/customer/verify-identity`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ bvn, selfie_url: selfieUrl }),
+        });
+
+        const data = await response.json();
+        if (!response.ok) {
+            throw new Error(data.message || 'Identity verification failed');
+        }
+        return data;
     }
 };

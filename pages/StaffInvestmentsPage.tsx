@@ -1358,6 +1358,7 @@ const StaffInvestmentsPage: React.FC<StaffInvestmentsPageProps> = ({ user, onLog
                                                 <th className="p-4 min-w-[150px]">Investment Plan</th>
                                                 <th className="p-4 min-w-[150px]">Officer</th>
                                                 <th className="p-4 min-w-[150px]">Status</th>
+                                                <th className="p-4 min-w-[120px]">Indemnity</th>
                                                 <th className="p-4 min-w-[150px]">Stage</th>
                                                 <th className="p-4 text-right">Actions</th>
                                             </tr>
@@ -1476,10 +1477,20 @@ const StaffInvestmentsPage: React.FC<StaffInvestmentsPageProps> = ({ user, onLog
                                                                         }`}></span>
                                                                     {inv.status || 'pending'}
                                                                 </div>
-                                                                {/* <span className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest truncate max-w-[120px]">
-                                                            {inv.stage?.replace(/_/g, ' ') || 'Submitted'}
-                                                        </span> */}
                                                             </div>
+                                                        </td>
+                                                        <td className="p-4">
+                                                            {inv.indemnity_document_url ? (
+                                                                <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 text-[10px] font-black uppercase tracking-wider w-fit border border-emerald-200 dark:border-emerald-800/50">
+                                                                    <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                                                                    Signed
+                                                                </span>
+                                                            ) : (
+                                                                <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 text-[10px] font-black uppercase tracking-wider w-fit border border-amber-200 dark:border-amber-800/50">
+                                                                    <span className="size-1.5 rounded-full bg-amber-500"></span>
+                                                                    Pending
+                                                                </span>
+                                                            )}
                                                         </td>
                                                         <td className="p-4">
                                                             <div className="flex flex-col gap-2 w-fit">

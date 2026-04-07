@@ -549,6 +549,7 @@ const AppContent: React.FC = () => {
               formatMoney={formatMoney}
               initialDraft={resumeDraft}
               referralCodeUsed={user.referral_code_used}
+              user={user}
             />
           </ProtectedRoute>
         } />

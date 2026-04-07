@@ -7,6 +7,8 @@ import { storageService } from '../services/storageService';
 import { investmentService } from '../services/investmentService';
 import GiftInvestmentFlow from './investment/GiftInvestmentFlow';
 import { PaymentModal } from '../components/PaymentModal';
+import CameraCapture from '../components/CameraCapture';
+import { AnimatePresence } from 'motion/react';
 
 interface InvestmentFlowProps {
   navigate: (step: AppStep) => void;
@@ -190,11 +192,25 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
     return docs;
   }, [directors]);
 
+  const [showCamera, setShowCamera] = useState(false);
+  const [isVerifyingIdentity, setIsVerifyingIdentity] = useState(false);
+
+  const isIdentityVerifiedWithin6Months = useMemo(() => {
+    if (!user.profile?.is_identity_verified || !user.profile?.last_selfie_verified_at) return false;
+    const lastVerified = new Date(user.profile.last_selfie_verified_at).getTime();
+    const sixMonthsAgo = new Date().getTime() - (180 * 24 * 60 * 60 * 1000);
+    return lastVerified > sixMonthsAgo;
+  }, [user.profile]);
+
   const currentDocs = useMemo(() => entityType === 'CORPORATE' ? corporateDocs : individualDocs, [entityType, corporateDocs, individualDocs]);
 
   const isSecureVaultComplete = useMemo(() => {
-    return currentDocs.filter(d => d.required).every(d => !!uploadedDocs[d.id]);
-  }, [currentDocs, uploadedDocs]);
+    return currentDocs.filter(d => d.required).every(d => {
+      if (d.id === 'selfie' && isIdentityVerifiedWithin6Months) return true;
+      return !!uploadedDocs[d.id];
+    });
+  }, [currentDocs, uploadedDocs, isIdentityVerifiedWithin6Months]);
+
   const [uploadProgress, setUploadProgress] = useState<Record<string, number>>({});
   const [receiptProgress, setReceiptProgress] = useState(0);
   const [receiptFile, setReceiptFile] = useState<{ name: string; size: string, url?: string } | null>(null);
@@ -205,7 +221,6 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [isUploadingReceipt, setIsUploadingReceipt] = useState(false);
 
-  // Real Upload State
   const [draftId] = useState(`I-` + Date.now());
   const [isUploading, setIsUploading] = useState<Record<string, boolean>>({});
 
@@ -1624,6 +1639,22 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {currentDocs.map(doc => {
               const inputId = `upload-${doc.id}`;
+              const isSelfie = doc.id === 'selfie';
+
+              if (isSelfie && isIdentityVerifiedWithin6Months) {
+                return (
+                  <div key={doc.id} className="p-10 rounded-[2.5rem] border-2 border-green-500 bg-green-500/5 flex flex-col items-center gap-5 justify-center relative overflow-hidden">
+                    <div className="size-16 rounded-full bg-green-500 text-white flex items-center justify-center shadow-lg shadow-green-500/20">
+                      <span className="material-symbols-outlined text-3xl">verified</span>
+                    </div>
+                    <div className="text-center space-y-2">
+                       <h4 className="font-black text-sm uppercase tracking-tight dark:text-white">Identity Verified</h4>
+                       <p className="text-[10px] text-green-600 dark:text-green-400 font-black uppercase tracking-widest">Valid for 6 Months</p>
+                    </div>
+                  </div>
+                );
+              }
+
               return (
                 <div key={doc.id} className="relative group">
                   <input
@@ -1638,22 +1669,29 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
                     }}
                   />
                   <div
-                    onClick={() => document.getElementById(inputId)?.click()}
+                    onClick={() => {
+                        if (isSelfie) {
+                            if (!bvn) return alert("Please provide your BVN in the identity section before verification.");
+                            setShowCamera(true);
+                        } else {
+                            document.getElementById(inputId)?.click();
+                        }
+                    }}
                     className={`p-10 rounded-[2.5rem] border-2 border-dashed transition-all cursor-pointer flex flex-col items-center gap-5 w-full min-h-[200px] justify-center ${uploadedDocs[doc.id] ? 'border-green-500 bg-green-500/5' : 'border-slate-200 dark:border-slate-700 hover:border-primary hover:bg-primary/5 shadow-sm hover:shadow-xl'}`}
                   >
                     {uploadedDocs[doc.id] ? (
                       <div className="size-16 rounded-full bg-green-500 text-white flex items-center justify-center shadow-lg shadow-green-500/20 animate-in zoom-in"><span className="material-symbols-outlined text-3xl">task_alt</span></div>
-                    ) : isUploading[doc.id] ? (
+                    ) : (isUploading[doc.id] || (isSelfie && isVerifyingIdentity)) ? (
                       <div className="flex flex-col items-center gap-4">
                         <div className="size-16 border-4 border-primary/20 border-t-primary rounded-full animate-spin"></div>
-                        <p className="text-[10px] font-black text-primary animate-pulse">UPDATING VAULT...</p>
+                        <p className="text-[10px] font-black text-primary animate-pulse">{isVerifyingIdentity ? 'VERIFYING FACE...' : 'UPDATING VAULT...'}</p>
                       </div>
                     ) : (
-                      <div className="size-16 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-400 group-hover:bg-primary group-hover:text-white transition-all transform group-hover:scale-110"><span className="material-symbols-outlined text-3xl">{doc.icon}</span></div>
+                      <div className="size-16 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-400 group-hover:bg-primary group-hover:text-white transition-all transform group-hover:scale-110"><span className="material-symbols-outlined text-3xl">{isSelfie ? 'face' : doc.icon}</span></div>
                     )}
                     <div className="text-center space-y-2">
-                      <h4 className="font-black text-sm uppercase tracking-tight dark:text-white">{doc.label}</h4>
-                      <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">{doc.required ? 'Required Document' : 'Optional Support'}</p>
+                      <h4 className="font-black text-sm uppercase tracking-tight dark:text-white">{isSelfie ? 'Real-Time Identity Verify' : doc.label}</h4>
+                      <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">{isSelfie ? 'Bvn Face Match' : (doc.required ? 'Required Document' : 'Optional Support')}</p>
                       {uploadedDocs[doc.id] && <p className="text-[10px] text-primary font-black truncate max-w-[150px] mx-auto bg-primary/10 px-3 py-1 rounded-full">{uploadedDocs[doc.id]?.name}</p>}
                     </div>
                     {uploadProgress[doc.id] > 0 && uploadProgress[doc.id] < 100 && (
@@ -1661,7 +1699,7 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
                         <div className="h-full bg-primary transition-all duration-300" style={{ width: `${uploadProgress[doc.id]}%` }}></div>
                       </div>
                     )}
-                    {uploadedDocs[doc.id] && (
+                    {uploadedDocs[doc.id] && !isSelfie && (
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
@@ -1679,9 +1717,49 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
               );
             })}
           </div>
-          <NavActions isNextDisabled={!isSecureVaultComplete} />
+          <NavActions isNextDisabled={!isSecureVaultComplete && !isIdentityVerifiedWithin6Months} />
         </div>
       )}
+
+      {/* Camera Modal */}
+      <AnimatePresence>
+        {showCamera && (
+            <CameraCapture 
+                onCapture={async (file) => {
+                    setShowCamera(false);
+                    setIsVerifyingIdentity(true);
+                    try {
+                        // 1. Upload the selfie
+                        const uploadRes = await investmentService.uploadDocument(file, draftId, 'selfie');
+                        const selfieUrl = uploadRes.document.file_url;
+                        
+                        // 2. Perform Face Match with Zeeh Africa via Backend
+                        const verifyRes = await investmentService.verifyIdentity(bvn, selfieUrl);
+                        
+                        if (verifyRes.success) {
+                            setUploadedDocs(prev => ({ 
+                                ...prev, 
+                                selfie: { name: file.name, size: `${(file.size / 1024).toFixed(1)} KB`, url: selfieUrl } 
+                            }));
+                            
+                            // Update local user state immediately so memo recalculates
+                            if (user.profile) {
+                                user.profile.is_identity_verified = true;
+                                user.profile.last_selfie_verified_at = new Date().toISOString();
+                            }
+                            
+                            alert("Identity Verified! Face match successful.");
+                        }
+                    } catch (err: any) {
+                        alert(err.message || "Face Verification Failed. Please try again.");
+                    } finally {
+                        setIsVerifyingIdentity(false);
+                    }
+                }}
+                onClose={() => setShowCamera(false)}
+            />
+        )}
+      </AnimatePresence>
 
       {/* Step 10: Config */}
       {subStep === 10 && (

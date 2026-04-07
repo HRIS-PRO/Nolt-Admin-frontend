@@ -21,6 +21,9 @@ const StaffInvestmentDetailsPage: React.FC<StaffInvestmentDetailsPageProps> = ({
     const [isActioning, setIsActioning] = useState(false);
     const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
     const [customInterest, setCustomInterest] = useState<string>('');
+    const [isProcessingIndemnity, setIsProcessingIndemnity] = useState(false);
+    const [signatureBase64, setSignatureBase64] = useState<string | null>(null);
+    const [directIndemnityUrl, setDirectIndemnityUrl] = useState<string | null>(null);
 
     const fetchInvestment = async () => {
         try {
@@ -90,6 +93,62 @@ const StaffInvestmentDetailsPage: React.FC<StaffInvestmentDetailsPageProps> = ({
             alert(error.response?.data?.message || "Failed to update CASA account");
         } finally {
             setIsActioning(false);
+        }
+    };
+
+    const handleProcessIndemnity = async () => {
+        if (!signatureBase64 && !directIndemnityUrl) {
+            alert("Please provide a signature or a document URL.");
+            return;
+        }
+        setIsProcessingIndemnity(true);
+        try {
+            const payload: any = {};
+            if (signatureBase64) payload.signature_base64 = signatureBase64;
+            if (directIndemnityUrl) payload.indemnity_document_url = directIndemnityUrl;
+
+            await axios.post(`/api/staff/investments/${id}/indemnity`, payload, { withCredentials: true });
+            await fetchInvestment();
+            setSignatureBase64(null);
+            setDirectIndemnityUrl(null);
+            alert("Indemnity Agreement updated successfully.");
+        } catch (error: any) {
+            console.error("Failed to process indemnity", error);
+            alert(error.response?.data?.message || "Failed to process indemnity");
+        } finally {
+            setIsProcessingIndemnity(false);
+        }
+    };
+
+    const handleFileUpload = async (file: File, type: 'signature' | 'indemnity') => {
+        if (type === 'signature') {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                setSignatureBase64(reader.result as string);
+                setDirectIndemnityUrl(null); // Clear direct upload if signature is provided
+            };
+            reader.readAsDataURL(file);
+        } else {
+            setIsProcessingIndemnity(true);
+            try {
+                const uploadData = new FormData();
+                uploadData.append('file', file);
+                uploadData.append('investment_id', String(id));
+                uploadData.append('document_type', 'indemnity_agreement');
+
+                const res = await axios.post('/api/upload', uploadData, {
+                    headers: { 'Content-Type': 'multipart/form-data' },
+                    withCredentials: true
+                });
+                // The upload API returns { document: { file_url: ... } }
+                setDirectIndemnityUrl(res.data.document.file_url);
+                setSignatureBase64(null); // Clear signature if direct upload is provided
+            } catch (err) {
+                console.error("Upload failed", err);
+                alert("Failed to upload document");
+            } finally {
+                setIsProcessingIndemnity(false);
+            }
         }
     };
 
@@ -429,6 +488,81 @@ const StaffInvestmentDetailsPage: React.FC<StaffInvestmentDetailsPageProps> = ({
                             <Field label="Account Name" value={investment.account_name} />
                         </CollapsibleGroup>
                     )}
+
+                    <CollapsibleGroup title="Indemnity Agreement" icon="gavel" defaultOpen={!investment.indemnity_document_url}>
+                        <div className="col-span-full">
+                            {investment.indemnity_document_url ? (
+                                <div className="p-6 rounded-2xl bg-emerald-50 dark:bg-emerald-900/10 border border-emerald-100 dark:border-emerald-900/20 flex items-center justify-between">
+                                    <div className="flex items-center gap-4">
+                                        <div className="size-12 rounded-full bg-emerald-500 text-white flex items-center justify-center">
+                                            <span className="material-symbols-outlined">verified</span>
+                                        </div>
+                                        <div>
+                                            <p className="text-[10px] font-black uppercase text-emerald-600 dark:text-emerald-400 tracking-widest">Agreement Signed</p>
+                                            <p className="text-sm font-bold text-slate-900 dark:text-white">The indemnity document is active and verified.</p>
+                                        </div>
+                                    </div>
+                                    <a href={investment.indemnity_document_url} target="_blank" rel="noopener noreferrer" className="px-6 py-3 rounded-xl bg-white dark:bg-slate-800 border border-emerald-200 dark:border-emerald-800 text-emerald-600 font-black text-xs uppercase tracking-widest hover:bg-emerald-50 transition-all shadow-sm">
+                                        View Document
+                                    </a>
+                                </div>
+                            ) : (
+                                <div className="space-y-6">
+                                    <div className="p-6 rounded-2xl bg-amber-50 dark:bg-amber-900/10 border border-amber-100 dark:border-amber-900/20">
+                                        <p className="text-[10px] font-black uppercase text-amber-600 dark:text-amber-400 tracking-widest mb-2">Action Required</p>
+                                        <p className="text-sm font-bold text-slate-900 dark:text-white mb-4">The indemnity agreement is currently missing for this investment.</p>
+                                        
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                            <div className="space-y-3">
+                                                <label className="text-[10px] font-black uppercase text-slate-500 block">Option 1: Upload Signature Image</label>
+                                                <div className="relative group">
+                                                    <input 
+                                                        type="file" 
+                                                        accept="image/*" 
+                                                        onChange={(e) => e.target.files?.[0] && handleFileUpload(e.target.files[0], 'signature')}
+                                                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                                                    />
+                                                    <div className={`p-8 rounded-2xl border-2 border-dashed transition-all flex flex-col items-center justify-center gap-3 ${signatureBase64 ? 'border-purple-500 bg-purple-50 dark:bg-purple-900/10' : 'border-slate-200 dark:border-slate-700 hover:border-purple-400 dark:hover:border-purple-500/50'}`}>
+                                                        <span className="material-symbols-outlined text-3xl text-slate-400 group-hover:text-purple-500 transition-colors">{signatureBase64 ? 'check_circle' : 'draw'}</span>
+                                                        <p className="text-xs font-bold text-slate-500">{signatureBase64 ? 'Signature Selected' : 'Drop signature image here'}</p>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div className="space-y-3">
+                                                <label className="text-[10px] font-black uppercase text-slate-500 block">Option 2: Direct Document Upload</label>
+                                                <div className="relative group">
+                                                    <input 
+                                                        type="file" 
+                                                        accept="application/pdf" 
+                                                        onChange={(e) => e.target.files?.[0] && handleFileUpload(e.target.files[0], 'indemnity')}
+                                                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                                                    />
+                                                    <div className={`p-8 rounded-2xl border-2 border-dashed transition-all flex flex-col items-center justify-center gap-3 ${directIndemnityUrl ? 'border-purple-500 bg-purple-50 dark:bg-purple-900/10' : 'border-slate-200 dark:border-slate-700 hover:border-purple-400 dark:hover:border-purple-500/50'}`}>
+                                                        <span className="material-symbols-outlined text-3xl text-slate-400 group-hover:text-purple-500 transition-colors">{directIndemnityUrl ? 'check_circle' : 'upload_file'}</span>
+                                                        <p className="text-xs font-bold text-slate-500">{directIndemnityUrl ? 'Document Uploaded' : 'Upload signed PDF'}</p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <button
+                                        onClick={handleProcessIndemnity}
+                                        disabled={isProcessingIndemnity || (!signatureBase64 && !directIndemnityUrl)}
+                                        className="w-full py-4 rounded-2xl bg-purple-600 text-white font-black text-xs uppercase tracking-widest hover:bg-purple-700 transition-all shadow-lg shadow-purple-500/20 disabled:opacity-50 disabled:shadow-none flex items-center justify-center gap-3"
+                                    >
+                                        {isProcessingIndemnity ? (
+                                            <span className="material-symbols-outlined animate-spin">autorenew</span>
+                                        ) : (
+                                            <span className="material-symbols-outlined">task_alt</span>
+                                        )}
+                                        {isProcessingIndemnity ? 'Processing Agreement...' : 'Finalize Indemnity Agreement'}
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    </CollapsibleGroup>
 
                     {(investment.rep_id_url || investment.utility_bill_url || investment.cac_url || investment.secondary_id_url || investment.company_profile_url || investment.status_report_url || investment.memart_url || investment.annual_returns_url || investment.board_resolution_url || investment.signatures) && (
                         <CollapsibleGroup title="Secure Vault Documents" icon="folder_open">
