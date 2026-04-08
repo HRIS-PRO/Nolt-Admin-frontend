@@ -20,6 +20,15 @@ export interface UserProfile {
   is_identity_verified: boolean;
   verification_ref?: string;
   updated_at?: string;
+  
+  // Bank Details
+  bank_name?: string;
+  bank_code?: string;
+  account_number?: string;
+  account_name?: string;
+  bank_statement_url?: string;
+  is_corporate_account?: boolean;
+  bank_verified?: boolean;
 }
 
 export const profileService = {
@@ -35,6 +44,16 @@ export const profileService = {
 
   verifyBVN: async (bvn: string): Promise<{ success: boolean; message?: string; data?: any }> => {
     const response = await axios.post(`${API_URL}/api/profile/verify-bvn`, { bvn }, { withCredentials: true });
+    return response.data;
+  },
+
+  getBanks: async (): Promise<{ success: boolean; data: { name: string; code: string }[] }> => {
+    const response = await axios.get(`${API_URL}/api/profile/banks`, { withCredentials: true });
+    return response.data;
+  },
+
+  verifyBank: async (data: { account_number: string; bank_code: string; bvn_name: string; is_corporate?: boolean }): Promise<{ success: boolean; message?: string; data?: any }> => {
+    const response = await axios.post(`${API_URL}/api/profile/verify-bank`, data, { withCredentials: true });
     return response.data;
   }
 };

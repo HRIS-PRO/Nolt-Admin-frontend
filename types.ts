@@ -36,7 +36,7 @@ export interface UserProfile {
   nin: string;
   date_of_birth: string;
   is_identity_verified: boolean;
-  verification_ref?: string;
+  last_selfie_verified_at?: string;
   updated_at?: string;
 }
 

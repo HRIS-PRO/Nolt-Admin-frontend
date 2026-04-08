@@ -300,10 +300,10 @@ const AppContent: React.FC = () => {
 
 
   // Format money helper
-  const formatMoney = useMemo(() => (amount: number) => {
-    return new Intl.NumberFormat('en-NG', {
+  const formatMoney = useMemo(() => (amount: number, currency?: string) => {
+    return new Intl.NumberFormat(currency === 'USD' ? 'en-US' : 'en-NG', {
       style: 'currency',
-      currency: 'NGN',
+      currency: currency || 'NGN',
       maximumFractionDigits: 0,
     }).format(amount);
   }, []);
@@ -529,7 +529,7 @@ const AppContent: React.FC = () => {
 
         <Route path="/applications" element={
           <ProtectedRoute user={user} isLoading={isLoading} theme={theme} onLogout={handleLogoutRequest} onToggleTheme={toggleTheme}>
-            <ApplicationsList navigate={handleLegacyNavigate} formatMoney={formatMoney} />
+            <ApplicationsList navigate={handleLegacyNavigate} formatMoney={formatMoney} user={user} />
           </ProtectedRoute>
         } />
 
@@ -549,6 +549,7 @@ const AppContent: React.FC = () => {
               formatMoney={formatMoney}
               initialDraft={resumeDraft}
               referralCodeUsed={user.referral_code_used}
+              user={user}
             />
           </ProtectedRoute>
         } />

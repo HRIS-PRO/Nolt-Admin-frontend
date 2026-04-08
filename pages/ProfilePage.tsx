@@ -12,7 +12,7 @@ const NIGERIAN_STATES = [
     "Taraba", "Yobe", "Zamfara"
 ];
 
-type TabType = 'security' | 'personal' | 'residential';
+type TabType = 'security' | 'personal' | 'residential' | 'bank';
 
 const ProfilePage: React.FC = () => {
     const navigate = useNavigate();
@@ -33,8 +33,10 @@ const ProfilePage: React.FC = () => {
 
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
+    const [verifyingBank, setVerifyingBank] = useState(false);
     const [activeTab, setActiveTab] = useState<TabType>('security');
     const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
+    const [banks, setBanks] = useState<{ name: string; code: string }[]>([]);
     const formRef = useRef<HTMLDivElement>(null);
 
     const goToTab = (tab: TabType) => {
@@ -46,7 +48,19 @@ const ProfilePage: React.FC = () => {
 
     useEffect(() => {
         fetchProfile();
+        fetchBanks();
     }, []);
+
+    const fetchBanks = async () => {
+        try {
+            const res = await profileService.getBanks();
+            if (res.success && res.data) {
+                setBanks(res.data);
+            }
+        } catch (err) {
+            console.error("Failed to fetch banks", err);
+        }
+    };
 
     const fetchProfile = async () => {
         try {
@@ -129,13 +143,74 @@ const ProfilePage: React.FC = () => {
         goToTab('residential');
     };
 
+    const handleNextToBank = () => {
+        const requiredFields = [
+            'state_of_origin', 'state_of_residence', 'address'
+        ];
+        
+        for (const field of requiredFields) {
+            if (!profile[field as keyof UserProfile] || profile[field as keyof UserProfile] === '') {
+                setMessage({ type: 'error', text: `Please fill out all residential fields to continue (Missing: ${field.replace(/_/g, ' ')})` });
+                setTimeout(() => {
+                    formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }, 100);
+                return;
+            }
+        }
+        
+        setMessage(null);
+        goToTab('bank');
+    };
+
+    const handleVerifyBankAccount = async () => {
+        if (!profile.account_number || !profile.bank_code || !profile.bank_name) {
+            setMessage({ type: 'error', text: "Please provide Bank, and Account Number." });
+            return;
+        }
+
+        setVerifyingBank(true);
+        setMessage(null);
+        try {
+            const bvn_name = `${profile.first_name || ''} ${profile.surname || ''} ${profile.middle_name || ''}`;
+            const res = await profileService.verifyBank({
+                account_number: profile.account_number,
+                bank_code: profile.bank_code,
+                bvn_name: bvn_name.trim(),
+                is_corporate: profile.is_corporate_account
+            });
+
+            if (res.success) {
+                const { account_name, isMatch, reason } = res.data;
+                setProfile(prev => ({ 
+                    ...prev, 
+                    account_name, 
+                    bank_verified: isMatch && !profile.is_corporate_account
+                }));
+
+                if (isMatch) {
+                    setMessage({ type: 'success', text: `Account Verified: ${account_name}` });
+                } else {
+                    setMessage({ type: 'error', text: `Account name mismatch or Corporate Account. Please upload a bank statement. Name found: ${account_name}` });
+                }
+            } else {
+                setMessage({ type: 'error', text: res.message || "Failed to verify account" });
+            }
+        } catch (err: any) {
+            console.error("Bank verify error", err);
+            setMessage({ type: 'error', text: err.response?.data?.message || err.message || "Bank verification failed." });
+        } finally {
+            setVerifyingBank(false);
+        }
+    };
+
     const handleSave = async (e: React.FormEvent) => {
         e.preventDefault();
         
         // Comprehensive Frontend Validation
         const requiredFields = [
             'first_name', 'surname', 'phone_number', 'personal_email', 
-            'date_of_birth', 'state_of_origin', 'state_of_residence', 'address'
+            'date_of_birth', 'state_of_origin', 'state_of_residence', 'address',
+            'bank_name', 'account_number'
         ];
         
         for (const field of requiredFields) {
@@ -143,6 +218,11 @@ const ProfilePage: React.FC = () => {
                 setMessage({ type: 'error', text: `Please fill out all required fields (Missing: ${field.replace(/_/g, ' ')})` });
                 return;
             }
+        }
+
+        if (!profile.bank_verified && !profile.bank_statement_url) {
+            setMessage({ type: 'error', text: "Your bank account name does not match or it's a corporate account. You MUST upload a bank statement before completing your profile." });
+            return;
         }
 
         setSaving(true);
@@ -238,7 +318,7 @@ const ProfilePage: React.FC = () => {
 
                 {/* Tab Navigation */}
                 <div className="flex flex-wrap gap-2 mb-10 bg-slate-100 dark:bg-slate-900/50 p-2 rounded-2xl w-fit">
-                    {(['security', 'personal', 'residential'] as TabType[]).map((tab) => (
+                    {(['security', 'personal', 'residential', 'bank'] as TabType[]).map((tab) => (
                         <button
                             key={tab}
                             onClick={() => setActiveTab(tab)}
@@ -300,7 +380,7 @@ const ProfilePage: React.FC = () => {
                                                     <input 
                                                         disabled={profile.is_identity_verified}
                                                         type="text" 
-                                                        className="w-full h-14 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border-2 border-slate-100 dark:border-white/5 px-6 text-base font-bold dark:text-white focus:border-primary outline-none transition-all disabled:opacity-50 tracking-[0.5em]" 
+                                                        className="w-full h-14 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border-2 border-slate-100 dark:border-white/5 px-6 text-base font-bold dark:text-white focus:ring-2 focus:ring-primary focus:border-primary focus:shadow-lg focus:shadow-primary/10 outline-none transition-all disabled:opacity-50 tracking-[0.5em]" 
                                                         value={profile.bvn} 
                                                         onChange={e => setProfile({...profile, bvn: e.target.value.replace(/\D/g, '').substring(0, 11)})} 
                                                         placeholder="..." 
@@ -313,7 +393,7 @@ const ProfilePage: React.FC = () => {
                                                     </div>
                                                     <input 
                                                         disabled={profile.is_identity_verified}
-                                                        className="w-full h-14 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border-2 border-slate-100 dark:border-white/5 px-6 text-base font-bold dark:text-white focus:border-primary outline-none transition-all disabled:opacity-50" 
+                                                        className="w-full h-14 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border-2 border-slate-100 dark:border-white/5 px-6 text-base font-bold dark:text-white focus:ring-2 focus:ring-primary focus:border-primary focus:shadow-lg focus:shadow-primary/10 outline-none transition-all disabled:opacity-50" 
                                                         value={profile.nin} 
                                                         onChange={e => setProfile({...profile, nin: e.target.value.replace(/\D/g, '').substring(0, 11)})} 
                                                         placeholder="Enter NIN" 
@@ -372,33 +452,33 @@ const ProfilePage: React.FC = () => {
                                             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                                                 <div className="space-y-2">
                                                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Surname</label>
-                                                    <input disabled={profile.is_identity_verified} className="w-full h-14 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border-2 border-slate-100 dark:border-white/5 px-5 text-base font-bold dark:text-white focus:border-primary outline-none transition-all disabled:opacity-50" value={profile.surname} onChange={e => setProfile({...profile, surname: e.target.value})} placeholder="Surname" />
+                                                    <input disabled={profile.is_identity_verified} className="w-full h-14 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border-2 border-slate-100 dark:border-white/5 px-5 text-base font-bold dark:text-white focus:ring-2 focus:ring-primary focus:border-primary focus:shadow-lg focus:shadow-primary/10 outline-none transition-all disabled:opacity-50" value={profile.surname} onChange={e => setProfile({...profile, surname: e.target.value})} placeholder="e.g. Obinali" />
                                                 </div>
                                                 <div className="space-y-2">
                                                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">First Name</label>
-                                                    <input disabled={profile.is_identity_verified} className="w-full h-14 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border-2 border-slate-100 dark:border-white/5 px-5 text-base font-bold dark:text-white focus:border-primary outline-none transition-all disabled:opacity-50" value={profile.first_name} onChange={e => setProfile({...profile, first_name: e.target.value})} placeholder="First Name" />
+                                                    <input disabled={profile.is_identity_verified} className="w-full h-14 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border-2 border-slate-100 dark:border-white/5 px-5 text-base font-bold dark:text-white focus:ring-2 focus:ring-primary focus:border-primary focus:shadow-lg focus:shadow-primary/10 outline-none transition-all disabled:opacity-50" value={profile.first_name} onChange={e => setProfile({...profile, first_name: e.target.value})} placeholder="e.g. Divine" />
                                                 </div>
                                                 <div className="space-y-2">
                                                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Middle Name</label>
-                                                    <input disabled={profile.is_identity_verified} className="w-full h-14 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border-2 border-slate-100 dark:border-white/5 px-5 text-base font-bold dark:text-white focus:border-primary outline-none transition-all disabled:opacity-50" value={profile.middle_name} onChange={e => setProfile({...profile, middle_name: e.target.value})} placeholder="Optional" />
+                                                    <input disabled={profile.is_identity_verified} className="w-full h-14 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border-2 border-slate-100 dark:border-white/5 px-5 text-base font-bold dark:text-white focus:ring-2 focus:ring-primary focus:border-primary focus:shadow-lg focus:shadow-primary/10 outline-none transition-all disabled:opacity-50" value={profile.middle_name} onChange={e => setProfile({...profile, middle_name: e.target.value})} placeholder="e.g. Chinedu (Optional)" />
                                                 </div>
                                             </div>
 
                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                                 <div className="space-y-2">
                                                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Email Address</label>
-                                                    <input className="w-full h-14 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border-2 border-slate-100 dark:border-white/5 px-5 text-base font-bold dark:text-white focus:border-primary outline-none transition-all" value={profile.personal_email} onChange={e => setProfile({...profile, personal_email: e.target.value})} placeholder="Email" />
+                                                    <input className="w-full h-14 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border-2 border-slate-100 dark:border-white/5 px-5 text-base font-bold dark:text-white focus:ring-2 focus:ring-primary focus:border-primary focus:shadow-lg focus:shadow-primary/10 outline-none transition-all" value={profile.personal_email} onChange={e => setProfile({...profile, personal_email: e.target.value})} placeholder="Email" />
                                                 </div>
                                                 <div className="space-y-2">
                                                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Phone Number</label>
-                                                    <input disabled={profile.is_identity_verified} className="w-full h-14 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border-2 border-slate-100 dark:border-white/5 px-5 text-base font-bold dark:text-white focus:border-primary outline-none transition-all disabled:opacity-50" value={profile.phone_number} onChange={e => setProfile({...profile, phone_number: e.target.value})} placeholder="Phone" />
+                                                    <input disabled={profile.is_identity_verified} className="w-full h-14 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border-2 border-slate-100 dark:border-white/5 px-5 text-base font-bold dark:text-white focus:ring-2 focus:ring-primary focus:border-primary focus:shadow-lg focus:shadow-primary/10 outline-none transition-all disabled:opacity-50" value={profile.phone_number} onChange={e => setProfile({...profile, phone_number: e.target.value})} placeholder="e.g. 080..." />
                                                 </div>
                                             </div>
 
                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                                 <div className="space-y-2">
                                                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Date of Birth</label>
-                                                    <input type="date" disabled={profile.is_identity_verified} className="w-full h-14 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border-2 border-slate-100 dark:border-white/5 px-5 text-base font-bold dark:text-white focus:border-primary outline-none transition-all disabled:opacity-50" value={profile.date_of_birth} onChange={e => setProfile({...profile, date_of_birth: e.target.value})} />
+                                                    <input type="date" disabled={profile.is_identity_verified} className="w-full h-14 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border-2 border-slate-100 dark:border-white/5 px-5 text-base font-bold dark:text-white focus:ring-2 focus:ring-primary focus:border-primary focus:shadow-lg focus:shadow-primary/10 outline-none transition-all disabled:opacity-50" value={profile.date_of_birth} onChange={e => setProfile({...profile, date_of_birth: e.target.value})} />
                                                 </div>
                                             </div>
                                         </div>
@@ -428,14 +508,14 @@ const ProfilePage: React.FC = () => {
                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                                 <div className="space-y-2">
                                                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">State of Origin</label>
-                                                    <select className="w-full h-14 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border-2 border-slate-100 dark:border-white/5 px-5 text-base font-bold dark:text-white focus:border-primary outline-none" value={profile.state_of_origin} onChange={e => setProfile({...profile, state_of_origin: e.target.value})}>
+                                                    <select className="w-full h-14 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border-2 border-slate-100 dark:border-white/5 px-5 text-base font-bold dark:text-white focus:ring-2 focus:ring-primary focus:border-primary focus:shadow-lg focus:shadow-primary/10 outline-none" value={profile.state_of_origin} onChange={e => setProfile({...profile, state_of_origin: e.target.value})}>
                                                         <option value="">Select State</option>
                                                         {NIGERIAN_STATES.map(s => <option key={s} value={s}>{s}</option>)}
                                                     </select>
                                                 </div>
                                                 <div className="space-y-2">
                                                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">State of Residence</label>
-                                                    <select className="w-full h-14 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border-2 border-slate-100 dark:border-white/5 px-5 text-base font-bold dark:text-white focus:border-primary outline-none" value={profile.state_of_residence} onChange={e => setProfile({...profile, state_of_residence: e.target.value})}>
+                                                    <select className="w-full h-14 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border-2 border-slate-100 dark:border-white/5 px-5 text-base font-bold dark:text-white focus:ring-2 focus:ring-primary focus:border-primary focus:shadow-lg focus:shadow-primary/10 outline-none" value={profile.state_of_residence} onChange={e => setProfile({...profile, state_of_residence: e.target.value})}>
                                                         <option value="">Select State</option>
                                                         {NIGERIAN_STATES.map(s => <option key={s} value={s}>{s}</option>)}
                                                     </select>
@@ -443,8 +523,137 @@ const ProfilePage: React.FC = () => {
                                             </div>
                                             <div className="space-y-3">
                                                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Residential Address</label>
-                                                <textarea rows={4} className="w-full p-6 rounded-3xl bg-slate-50 dark:bg-slate-800/50 border-2 border-slate-100 dark:border-white/5 text-base font-bold dark:text-white focus:border-primary outline-none leading-relaxed" value={profile.address} onChange={e => setProfile({...profile, address: e.target.value})} placeholder="Street name, house number, area..." />
+                                                <textarea rows={4} className="w-full p-6 rounded-3xl bg-slate-50 dark:bg-slate-800/50 border-2 border-slate-100 dark:border-white/5 text-base font-bold dark:text-white focus:ring-2 focus:ring-primary focus:border-primary focus:shadow-lg focus:shadow-primary/10 outline-none leading-relaxed" value={profile.address} onChange={e => setProfile({...profile, address: e.target.value})} placeholder="e.g. 12 Nolt Avenue, VI, Lagos" />
                                             </div>
+                                        </div>
+                                </motion.div>
+                                )}
+
+                                {activeTab === 'bank' && (
+                                    <motion.div
+                                        key="bank"
+                                        variants={tabVariants}
+                                        initial="hidden"
+                                        animate="visible"
+                                        exit="exit"
+                                        className="space-y-8"
+                                    >
+                                        <div className="bg-white dark:bg-slate-900/50 backdrop-blur-md p-10 rounded-[2.5rem] shadow-sm border border-slate-100 dark:border-white/5 space-y-10">
+                                            <div className="flex items-center gap-4">
+                                                <div className="size-12 rounded-2xl bg-blue-500/10 flex items-center justify-center text-blue-500">
+                                                    <span className="material-symbols-outlined font-black">account_balance</span>
+                                                </div>
+                                                <div>
+                                                    <h3 className="text-xl font-black text-slate-900 dark:text-white">Bank Details</h3>
+                                                    <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">Provide your primary NUBAN account</p>
+                                                </div>
+                                            </div>
+
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                                <div className="space-y-2">
+                                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Bank Name</label>
+                                                    <select 
+                                                        disabled={profile.bank_verified}
+                                                        className="w-full h-14 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border-2 border-slate-100 dark:border-white/5 px-5 text-base font-bold dark:text-white focus:ring-2 focus:ring-primary focus:border-primary focus:shadow-lg focus:shadow-primary/10 outline-none disabled:opacity-50" 
+                                                        value={profile.bank_code || ''} 
+                                                        onChange={e => {
+                                                            const code = e.target.value;
+                                                            const bank = banks.find(b => b.code === code);
+                                                            setProfile({...profile, bank_code: code, bank_name: bank?.name || ''});
+                                                        }}
+                                                    >
+                                                        <option value="">Select Bank</option>
+                                                        {banks.map(b => <option key={b.code} value={b.code}>{b.name}</option>)}
+                                                    </select>
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Account Number</label>
+                                                    <input 
+                                                        disabled={profile.bank_verified}
+                                                        type="text"
+                                                        maxLength={10}
+                                                        className="w-full h-14 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border-2 border-slate-100 dark:border-white/5 px-5 text-base font-bold dark:text-white focus:ring-2 focus:ring-primary focus:border-primary focus:shadow-lg focus:shadow-primary/10 outline-none disabled:opacity-50" 
+                                                        value={profile.account_number || ''} 
+                                                        onChange={e => setProfile({...profile, account_number: e.target.value.replace(/\D/g, '')})} 
+                                                        placeholder="e.g. 0123456789" 
+                                                    />
+                                                </div>
+                                            </div>
+
+                                            <div className="flex items-center gap-3">
+                                                <input 
+                                                    disabled={profile.bank_verified}
+                                                    type="checkbox" 
+                                                    id="is_corporate" 
+                                                    className="size-5 rounded border-slate-300 text-primary focus:ring-primary"
+                                                    checked={profile.is_corporate_account || false}
+                                                    onChange={e => setProfile({...profile, is_corporate_account: e.target.checked})}
+                                                />
+                                                <label htmlFor="is_corporate" className="text-sm font-bold text-slate-700 dark:text-slate-300">
+                                                    This is a Corporate / Company Account
+                                                </label>
+                                            </div>
+
+                                            {!profile.bank_verified && profile.account_number?.length === 10 && profile.bank_code && (
+                                                <div className="flex justify-start">
+                                                    <button 
+                                                        type="button"
+                                                        onClick={handleVerifyBankAccount}
+                                                        disabled={verifyingBank}
+                                                        className="h-12 px-8 rounded-xl bg-blue-500/10 hover:bg-blue-500/20 text-blue-600 dark:text-blue-400 font-black uppercase tracking-widest text-xs transition-all flex items-center gap-2"
+                                                    >
+                                                        {verifyingBank ? 'Verifying...' : 'Verify Account Name'}
+                                                    </button>
+                                                </div>
+                                            )}
+
+                                            {profile.account_name && (
+                                                <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+                                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Account Name</p>
+                                                    <p className="font-bold text-slate-900 dark:text-white">{profile.account_name}</p>
+                                                </div>
+                                            )}
+
+                                            {(!profile.bank_verified && profile.account_name) || profile.is_corporate_account ? (
+                                                <div className="space-y-3 p-6 rounded-3xl bg-amber-500/5 border border-amber-500/20">
+                                                    <p className="text-xs font-bold text-amber-600 dark:text-amber-500 leading-relaxed">
+                                                        You must upload a bank statement for manual verification because this is a corporate account or the name does not match exactly.
+                                                    </p>
+                                                    <input 
+                                                        type="file" 
+                                                        accept=".pdf,.jpg,.jpeg,.png"
+                                                        onChange={async (e) => {
+                                                            if (e.target.files && e.target.files[0]) {
+                                                                const file = e.target.files[0];
+                                                                const formData = new FormData();
+                                                                formData.append('document', file);
+                                                                try {
+                                                                    const res = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/upload`, {
+                                                                        method: 'POST',
+                                                                        body: formData
+                                                                    });
+                                                                    const data = await res.json();
+                                                                    if (data.url) {
+                                                                        setProfile({...profile, bank_statement_url: data.url});
+                                                                    }
+                                                                } catch (error) {
+                                                                    console.error(error);
+                                                                }
+                                                            }
+                                                        }}
+                                                        className="block w-full text-sm text-slate-500 dark:text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-bold file:bg-primary/10 file:text-primary hover:file:bg-primary/20"
+                                                    />
+                                                    {profile.bank_statement_url && <p className="text-xs text-green-500 font-bold mt-2">Statement Uploaded!</p>}
+                                                </div>
+                                            ) : null}
+
+                                            {profile.bank_verified && (
+                                                <div className="flex items-center gap-2 text-green-500 font-bold bg-green-500/10 p-4 rounded-2xl">
+                                                    <span className="material-symbols-outlined">check_circle</span>
+                                                    <span>Bank Account Successfully Verified</span>
+                                                </div>
+                                            )}
+
                                         </div>
                                     </motion.div>
                                 )}
@@ -465,6 +674,18 @@ const ProfilePage: React.FC = () => {
                                 
                                 {activeTab === 'residential' && (
                                     <button 
+                                        type="button"
+                                        onClick={handleNextToBank}
+                                        disabled={saving}
+                                        className="h-16 px-12 rounded-2xl font-black text-white uppercase tracking-[0.2em] text-xs transition-all active:scale-95 flex items-center gap-4 bg-slate-800 dark:bg-white/10 shadow-xl shadow-slate-900/20 hover:-translate-y-1"
+                                    >
+                                        Next: Bank Details
+                                        <span className="material-symbols-outlined text-sm">arrow_forward</span>
+                                    </button>
+                                )}
+                                
+                                {activeTab === 'bank' && (
+                                    <button 
                                         type="submit"
                                         disabled={saving}
                                         className={`h-16 px-12 rounded-2xl font-black text-white uppercase tracking-[0.2em] text-xs transition-all active:scale-95 flex items-center gap-4 ${saving ? 'bg-slate-300 dark:bg-slate-800 cursor-not-allowed opacity-50' : 'bg-primary shadow-xl shadow-primary/30 hover:-translate-y-1'}`}
@@ -476,7 +697,7 @@ const ProfilePage: React.FC = () => {
                                             </>
                                         ) : (
                                             <>
-                                                Update Profile Details
+                                                Complete & Save Profile
                                                 <span className="material-symbols-outlined text-sm">save</span>
                                             </>
                                         )}
