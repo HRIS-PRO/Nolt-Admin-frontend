@@ -8,6 +8,8 @@ interface CalculatorProps {
   formatMoney: (amount: number, currency?: string) => string;
 }
 
+const TENURE_VALUES = [30, 60, 90, 120, 150, 180, 210, 240, 270, 300, 330, 365];
+
 const InfoTooltip: React.FC<{ content: string }> = ({ content }) => (
   <div className="group relative inline-block ml-2 cursor-help align-middle">
     <span className="material-symbols-outlined text-primary text-base">info</span>
@@ -39,7 +41,7 @@ const Calculator: React.FC<CalculatorProps> = ({ navigate, formatMoney }) => {
   // States
   const [principal, setPrincipal] = useState<number>(10000);
   const [rate, setRate] = useState<number>(calcType === 'LOAN' ? LOAN_PRODUCTS[0].rate : INVESTMENT_PRODUCTS[0].rate);
-  const [term, setTerm] = useState<number>(12); // Months
+  const [term, setTerm] = useState<number>(365); // Default to 365 days for investment, 12 months for loan handled in toggle
 
   const minAmount = useMemo(() => {
     if (calcType === 'LOAN') return 1000;
@@ -53,9 +55,9 @@ const Calculator: React.FC<CalculatorProps> = ({ navigate, formatMoney }) => {
   const minTerm = useMemo(() => {
     if (calcType === 'LOAN') return 1;
     const plan = selectedProductId.toUpperCase();
-    if (plan === 'SURGE') return 1;
-    if (plan === 'VAULT' && currency === 'NGN') return 1;
-    return 3; // Vault USD and Rise
+    if (plan === 'SURGE') return 30;
+    if (plan === 'VAULT' && currency === 'NGN') return 30;
+    return 90; // Vault USD and Rise
   }, [calcType, selectedProductId, currency]);
 
   // Sync rate for investments
@@ -64,7 +66,7 @@ const Calculator: React.FC<CalculatorProps> = ({ navigate, formatMoney }) => {
       const plan = selectedProductId.toUpperCase() as InvestmentPlan;
       const newRate = calculateInvestmentRate({
         amount: principal,
-        tenureMonths: term,
+        tenureDays: term,
         plan,
         currency
       });
@@ -87,7 +89,7 @@ const Calculator: React.FC<CalculatorProps> = ({ navigate, formatMoney }) => {
       const plan = selectedProductId.toUpperCase() as InvestmentPlan;
       const newRate = calculateInvestmentRate({
         amount: principal,
-        tenureMonths: term,
+        tenureDays: term,
         plan,
         currency
       });
@@ -100,6 +102,7 @@ const Calculator: React.FC<CalculatorProps> = ({ navigate, formatMoney }) => {
     const products = type === 'LOAN' ? LOAN_PRODUCTS : INVESTMENT_PRODUCTS;
     setSelectedProductId(products[0].id);
     setRate(products[0].rate);
+    setTerm(type === 'LOAN' ? 12 : 365);
   };
 
   const handleProductChange = (productId: string) => {
@@ -126,7 +129,7 @@ const Calculator: React.FC<CalculatorProps> = ({ navigate, formatMoney }) => {
         interestValue: totalInterest
       };
     } else {
-      const totalInterest = (principal * (rate / 100) * (term / 12));
+      const totalInterest = (principal * (rate / 100) * (term / 365));
       const maturityValue = principal + totalInterest;
       return {
         mainValue: maturityValue,
@@ -242,22 +245,44 @@ const Calculator: React.FC<CalculatorProps> = ({ navigate, formatMoney }) => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             <div className="space-y-4">
               <div className="flex items-center">
-                <label className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-widest">Tenure (Months)</label>
+                <label className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-widest">Tenure ({calcType === 'LOAN' ? 'Months' : 'Days'})</label>
                 <InfoTooltip content={calcType === 'LOAN' ? tooltips.loanTenure : tooltips.invTenure} />
               </div>
-              <div className="relative">
-                <input 
-                  type="number" 
-                  value={term}
-                  onChange={(e) => setTerm(parseInt(e.target.value) || 0)}
-                  className={`w-full h-16 bg-slate-50 dark:bg-slate-900 border-2 rounded-2xl px-6 text-xl font-black dark:text-white outline-none transition-all ${term < minTerm ? 'border-red-500' : 'border-transparent focus:border-primary'}`}
-                />
-                <span className="absolute right-6 top-1/2 -translate-y-1/2 font-black text-slate-400">Mo</span>
-              </div>
+              {calcType === 'INVESTMENT' ? (
+                <div className="relative pt-4">
+                  <div className="flex justify-between items-center mb-4">
+                    <span className="text-xl font-black dark:text-white">{term} Days</span>
+                  </div>
+                  <input 
+                    type="range" 
+                    min="0"
+                    max={TENURE_VALUES.length - 1}
+                    step="1"
+                    value={TENURE_VALUES.indexOf(term) !== -1 ? TENURE_VALUES.indexOf(term) : 0}
+                    onChange={(e) => setTerm(TENURE_VALUES[parseInt(e.target.value)])}
+                    className="w-full h-2 bg-slate-100 dark:bg-slate-800 rounded-lg appearance-none cursor-pointer accent-primary"
+                  />
+                  <div className="flex justify-between mt-2">
+                    <span className="text-[10px] font-bold text-slate-400">30D</span>
+                    <span className="text-[10px] font-bold text-slate-400">180D</span>
+                    <span className="text-[10px] font-bold text-slate-400">365D</span>
+                  </div>
+                </div>
+              ) : (
+                <div className="relative">
+                  <input 
+                    type="number" 
+                    value={term}
+                    onChange={(e) => setTerm(parseInt(e.target.value) || 0)}
+                    className={`w-full h-16 bg-slate-50 dark:bg-slate-900 border-2 rounded-2xl px-6 text-xl font-black dark:text-white outline-none transition-all ${term < minTerm ? 'border-red-500' : 'border-transparent focus:border-primary'}`}
+                  />
+                  <span className="absolute right-6 top-1/2 -translate-y-1/2 font-black text-slate-400">Mo</span>
+                </div>
+              )}
               {term < minTerm && (
                 <p className="text-xs font-bold text-red-500 mt-2 flex items-center gap-1">
                   <span className="material-symbols-outlined text-sm">warning</span>
-                  Minimum tenure is {minTerm} months
+                  Minimum tenure is {minTerm} {calcType === 'LOAN' ? 'months' : 'days'}
                 </p>
               )}
             </div>

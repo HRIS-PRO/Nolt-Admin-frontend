@@ -20,6 +20,8 @@ const NIGERIAN_STATES = [
     "Rivers", "Sokoto", "Taraba", "Yobe", "Zamfara"
 ];
 
+const TENURE_VALUES = [30, 60, 90, 120, 150, 180, 210, 240, 270, 300, 330, 365];
+
 
 const StaffInvestmentsPage: React.FC<StaffInvestmentsPageProps> = ({ user, onLogout, toggleTheme, theme }) => {
     const navigate = useNavigate();
@@ -96,7 +98,7 @@ const StaffInvestmentsPage: React.FC<StaffInvestmentsPageProps> = ({ user, onLog
         amount: '',
         targetAmount: '',
         contributionFrequency: 'monthly',
-        tenure: '12',
+        tenure: '365',
         currency: 'NGN' as Currency,
         rollover: 'principal_interest',
         paymentMethod: 'bank_transfer' as 'bank_transfer' | 'paystack',
@@ -174,7 +176,7 @@ const StaffInvestmentsPage: React.FC<StaffInvestmentsPageProps> = ({ user, onLog
         const principal = parseFloat(wizardData.amount) || 0;
         const tenure = parseInt(wizardData.tenure) || 12;
         const rateToUse = dynamicInterestRate ?? 0;
-        const interestEarned = (principal * rateToUse * (tenure / 12)) / 100;
+        const interestEarned = (principal * rateToUse * (tenure / 365)) / 100;
         return { principal, interestEarned, total: principal + interestEarned };
     }, [wizardData.amount, wizardData.tenure, dynamicInterestRate]);
 
@@ -334,7 +336,7 @@ const StaffInvestmentsPage: React.FC<StaffInvestmentsPageProps> = ({ user, onLog
             const payload = {
                 plan_name: formData.plan,
                 currency: formData.currency,
-                tenure_months: formData.tenure,
+                tenure_days: formData.tenure,
                 min_amount: formData.minAmount,
                 max_amount: max,
                 interest_rate: formData.interest
@@ -361,7 +363,7 @@ const StaffInvestmentsPage: React.FC<StaffInvestmentsPageProps> = ({ user, onLog
         setFormData({
             plan: rate.plan_name,
             currency: rate.currency,
-            tenure: rate.tenure_months.toString(),
+            tenure: rate.tenure_days.toString(),
             minAmount: rate.min_amount.toString(),
             maxAmount: rate.max_amount ? rate.max_amount.toString() : '',
             interest: rate.interest_rate.toString()
@@ -376,7 +378,7 @@ const StaffInvestmentsPage: React.FC<StaffInvestmentsPageProps> = ({ user, onLog
             const payload = {
                 plan_name: rate.plan_name,
                 currency: rate.currency,
-                tenure_months: 1,
+                tenure_days: 30,
                 min_amount: 1,
                 max_amount: 2,
                 interest_rate: 1
@@ -432,7 +434,7 @@ const StaffInvestmentsPage: React.FC<StaffInvestmentsPageProps> = ({ user, onLog
             bankName: '', accountNumber: '', accountName: '',
             companyName: '', rcNumber: '', isAuthorizedRep: false, incorpDate: '', businessAddress: '', businessNature: '', directorCount: 1,
             directors: [{ surname: '', firstName: '', middleName: '', phone: '', gender: '', dob: '', bvn: '', nin: '', isPep: false }],
-            uploadedDocs: {}, plan: 'RISE', amount: '', targetAmount: '', contributionFrequency: 'monthly', tenure: '12', currency: 'NGN', rollover: 'principal_interest', paymentMethod: 'bank_transfer', receiptUrl: ''
+            uploadedDocs: {}, plan: 'RISE', amount: '', targetAmount: '', contributionFrequency: 'monthly', tenure: '365', currency: 'NGN', rollover: 'principal_interest', paymentMethod: 'bank_transfer', receiptUrl: ''
         });
         setWizardStep(1);
     };
@@ -479,7 +481,7 @@ const StaffInvestmentsPage: React.FC<StaffInvestmentsPageProps> = ({ user, onLog
 
         if (step === 4) {
             if (!d.amount || parseFloat(d.amount) <= 0) { alert("Investment amount must be greater than zero"); return false; }
-            if (!d.tenure || parseInt(d.tenure) <= 0) { alert("Tenure must be at least 1 month"); return false; }
+            if (!d.tenure || parseInt(d.tenure) < 30) { alert("Tenure must be at least 30 days"); return false; }
             if (dynamicInterestRate === null) { alert("No valid interest rate found for this configuration. Please adjust amount or tenure."); return false; }
         }
 
@@ -495,7 +497,7 @@ const StaffInvestmentsPage: React.FC<StaffInvestmentsPageProps> = ({ user, onLog
                 amount: parseFloat(wizardData.amount),
                 target_amount: wizardData.targetAmount ? parseFloat(wizardData.targetAmount) : null,
                 contribution_frequency: wizardData.contributionFrequency,
-                tenure_months: parseInt(wizardData.tenure),
+                tenure_days: parseInt(wizardData.tenure),
                 currency: wizardData.currency,
                 rollover_option: wizardData.rollover,
                 interest_rate: dynamicInterestRate,
@@ -1090,9 +1092,30 @@ const StaffInvestmentsPage: React.FC<StaffInvestmentsPageProps> = ({ user, onLog
                                                     <input type="number" value={wizardData.amount} onChange={e => setWizardData({ ...wizardData, amount: e.target.value })} className="w-full h-14 pl-10 pr-5 rounded-2xl bg-slate-50 dark:bg-slate-800 border-none focus:ring-2 focus:ring-purple-500 transition-all font-bold text-sm" placeholder="0.00" />
                                                 </div>
                                             </div>
-                                            <div className="space-y-2">
-                                                <label className="text-[10px] font-black uppercase text-slate-400 px-1">Tenure (Months)</label>
-                                                <input type="number" value={wizardData.tenure} onChange={e => setWizardData({ ...wizardData, tenure: e.target.value })} className="w-full h-14 px-5 rounded-2xl bg-slate-50 dark:bg-slate-800 border-none focus:ring-2 focus:ring-purple-500 transition-all font-bold text-sm" />
+                                            <div className="space-y-3">
+                                                <div className="flex justify-between items-center px-1">
+                                                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Tenure (Days)</label>
+                                                    <span className="text-xs font-black text-purple-600">{wizardData.tenure} Days</span>
+                                                </div>
+                                                <div className="relative pt-2">
+                                                    <input
+                                                        type="range"
+                                                        min="0"
+                                                        max={TENURE_VALUES.length - 1}
+                                                        step="1"
+                                                        value={TENURE_VALUES.indexOf(parseInt(wizardData.tenure)) !== -1 ? TENURE_VALUES.indexOf(parseInt(wizardData.tenure)) : TENURE_VALUES.length - 1}
+                                                        onChange={(e) => {
+                                                            const newTenure = TENURE_VALUES[parseInt(e.target.value)];
+                                                            setWizardData({ ...wizardData, tenure: newTenure.toString() });
+                                                        }}
+                                                        className="w-full h-2 bg-slate-100 dark:bg-slate-800 rounded-lg appearance-none cursor-pointer accent-purple-600"
+                                                    />
+                                                    <div className="flex justify-between mt-2 px-1">
+                                                        <span className="text-[9px] font-bold text-slate-400">30D</span>
+                                                        <span className="text-[9px] font-bold text-slate-400">180D</span>
+                                                        <span className="text-[9px] font-bold text-slate-400">365D</span>
+                                                    </div>
+                                                </div>
                                             </div>
                                         </div>
 
@@ -1157,7 +1180,7 @@ const StaffInvestmentsPage: React.FC<StaffInvestmentsPageProps> = ({ user, onLog
 
                                                 <div>
                                                     <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Plan & Tenure</p>
-                                                    <p className="font-bold text-sm text-purple-300">NOLT {wizardData.plan} ({wizardData.tenure}M)</p>
+                                                    <p className="font-bold text-sm text-purple-300">NOLT {wizardData.plan} ({wizardData.tenure} Days)</p>
                                                 </div>
                                                 <div>
                                                     <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Interest Rate</p>
@@ -1433,7 +1456,7 @@ const StaffInvestmentsPage: React.FC<StaffInvestmentsPageProps> = ({ user, onLog
                                                                 <div className="flex items-center gap-2 text-xs font-bold text-slate-600 dark:text-slate-300">
                                                                     <span>{inv.currency === 'USD' ? '$' : '₦'}{Number(inv.investment_amount).toLocaleString()}</span>
                                                                     <span className="size-1 rounded-full bg-slate-300 dark:bg-slate-700"></span>
-                                                                    <span>{inv.tenure_days / 30} Mos</span>
+                                                                    <span>{inv.tenure_days} Days</span>
                                                                 </div>
                                                             </div>
                                                         </td>
@@ -1624,7 +1647,7 @@ const StaffInvestmentsPage: React.FC<StaffInvestmentsPageProps> = ({ user, onLog
                                                             {currencySymbols[rate.currency]}{Number(rate.min_amount).toLocaleString()} - {rate.max_amount ? `${currencySymbols[rate.currency]}${Number(rate.max_amount).toLocaleString()}` : '∞'}
                                                         </td>
                                                         <td className="px-8 py-6 font-bold text-slate-600 dark:text-slate-300 text-sm">
-                                                            {rate.tenure_months} Months
+                                                            {rate.tenure_days} Days
                                                         </td>
                                                         <td className="px-8 py-6 text-center">
                                                             <span className="px-3 py-1.5 rounded-lg border border-green-500/30 bg-green-500/10 text-green-500 text-[10px] font-black uppercase tracking-widest">
@@ -1745,16 +1768,29 @@ const StaffInvestmentsPage: React.FC<StaffInvestmentsPageProps> = ({ user, onLog
 
                                         <div className="grid grid-cols-2 gap-6">
                                             <div className="space-y-3">
-                                                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 px-1">Tenure (Days)</label>
-                                                <input
-                                                    required
-                                                    type="number"
-                                                    min="1"
-                                                    placeholder="e.g. 30"
-                                                    value={formData.tenure}
-                                                    onChange={(e) => setFormData({ ...formData, tenure: e.target.value })}
-                                                    className="w-full h-14 px-5 rounded-2xl bg-slate-50 dark:bg-slate-800 border-none outline-none font-bold text-sm focus:ring-2 focus:ring-blue-500/50 transition-all"
-                                                />
+                                                <div className="flex justify-between items-center px-1">
+                                                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Tenure (Days)</label>
+                                                    <span className="text-xs font-black text-blue-500">{formData.tenure} Days</span>
+                                                </div>
+                                                <div className="relative pt-2">
+                                                    <input
+                                                        type="range"
+                                                        min="0"
+                                                        max={TENURE_VALUES.length - 1}
+                                                        step="1"
+                                                        value={TENURE_VALUES.indexOf(parseInt(formData.tenure)) !== -1 ? TENURE_VALUES.indexOf(parseInt(formData.tenure)) : 0}
+                                                        onChange={(e) => {
+                                                            const newTenure = TENURE_VALUES[parseInt(e.target.value)];
+                                                            setFormData({ ...formData, tenure: newTenure.toString() });
+                                                        }}
+                                                        className="w-full h-2 bg-slate-100 dark:bg-slate-800 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                                                    />
+                                                    <div className="flex justify-between mt-2 px-1">
+                                                        <span className="text-[9px] font-bold text-slate-400">30D</span>
+                                                        <span className="text-[9px] font-bold text-slate-400">180D</span>
+                                                        <span className="text-[9px] font-bold text-slate-400">365D</span>
+                                                    </div>
+                                                </div>
                                             </div>
                                             <div className="space-y-3">
                                                 <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 px-1">Annual Interest Rate (%)</label>

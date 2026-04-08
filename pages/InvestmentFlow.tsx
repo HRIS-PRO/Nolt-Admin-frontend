@@ -52,7 +52,7 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
   const [selectedPlan, setSelectedPlan] = useState<InvestmentPlan>(initialDraft?.data?.selectedPlan ?? 'RISE');
   const [currency, setCurrency] = useState<Currency>(initialDraft?.data?.currency ?? 'NGN');
   const [amount, setAmount] = useState<string>(initialDraft?.data?.amount ?? '100000');
-  const [tenure, setTenure] = useState<number>(initialDraft?.data?.tenure ?? 12);
+  const [tenure, setTenure] = useState<number>(initialDraft?.data?.tenure ?? 365);
   const [rollover, setRollover] = useState(initialDraft?.data?.rollover ?? 'principal_interest');
   const [targetAmount, setTargetAmount] = useState<string>(initialDraft?.data?.targetAmount ?? '');
   const [payoutFrequency, setPayoutFrequency] = useState<PayoutFrequency>(initialDraft?.data?.payoutFrequency ?? 'maturity');
@@ -524,7 +524,7 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
   const returns = useMemo(() => {
     const principal = parseFloat(amount.replace(/[^0-9.]/g, '')) || 0;
     const rateToUse = interestRate;
-    const interestEarned = (principal * rateToUse * (tenure / 12)) / 100;
+    const interestEarned = (principal * rateToUse * (tenure / 365)) / 100;
     return { principal, interestEarned, total: principal + interestEarned };
   }, [amount, tenure, interestRate]);
 
@@ -778,7 +778,7 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
       const payload = {
         investment_type: `NOLT_${selectedPlan}`,
         investment_amount: parseFloat(amount),
-        tenure_days: tenure * 30, // Months to days approx
+        tenure_days: tenure,
         currency,
         giftToken, // For linking if claim
         payment_reference: reference, // reference is already handled by caller (G_CLAIM_... or Paystack ref)
@@ -1866,7 +1866,7 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
 
               <div className="space-y-6">
                 <div className="flex justify-between items-center">
-                  <label className="text-sm font-black text-slate-500 uppercase tracking-widest">Tenure (Months)</label>
+                  <label className="text-sm font-black text-slate-500 uppercase tracking-widest">Tenure (Days)</label>
                   <div className="flex items-center gap-4">
                     {selectedPlan === 'SURGE' && (
                       <label className="flex items-center gap-2 cursor-pointer group">
@@ -1886,30 +1886,37 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
                       </label>
                     )}
                     <span className="bg-primary text-white font-black px-6 py-2 rounded-full text-sm">
-                      {isInfinityTenure ? '∞' : `${tenure} Mo.`}
+                      {isInfinityTenure ? '∞' : `${tenure} Days`}
                     </span>
                   </div>
                 </div>
                 {!isInfinityTenure && !isClaimingGift ? (
-                  <select
-                    value={tenure}
-                    onChange={e => setTenure(parseInt(e.target.value))}
-                    className="w-full h-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-6 text-lg font-bold dark:text-white focus:ring-2 focus:ring-primary focus:border-primary focus:shadow-lg focus:shadow-primary/10 outline-none transition-all"
-                  >
-                    {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(m => (
-                      <option key={m} value={m}>{m} Month{m > 1 ? 's' : ''}</option>
-                    ))}
-                  </select>
+                  <div className="relative pt-4">
+                    <input
+                      type="range"
+                      min="0"
+                      max={[30, 60, 90, 120, 150, 180, 210, 240, 270, 300, 330, 365].length - 1}
+                      step="1"
+                      value={[30, 60, 90, 120, 150, 180, 210, 240, 270, 300, 330, 365].indexOf(tenure)}
+                      onChange={(e) => setTenure([30, 60, 90, 120, 150, 180, 210, 240, 270, 300, 330, 365][parseInt(e.target.value)])}
+                      className="w-full h-2 bg-slate-100 dark:bg-slate-800 rounded-lg appearance-none cursor-pointer accent-primary"
+                    />
+                    <div className="flex justify-between mt-2 px-1">
+                      <span className="text-[9px] font-bold text-slate-400">30D</span>
+                      <span className="text-[9px] font-bold text-slate-400">180D</span>
+                      <span className="text-[9px] font-bold text-slate-400">365D</span>
+                    </div>
+                  </div>
                 ) : !isInfinityTenure && (
                   <input
                     disabled
                     type="text"
-                    value={`${tenure} Months`}
+                    value={`${tenure} Days`}
                     className="w-full h-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-6 text-lg font-bold dark:text-white opacity-70"
                   />
                 )}
-                <div className="flex justify-between text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">
-                  <span>{(selectedPlan === 'VAULT' && currency === 'NGN') || selectedPlan === 'SURGE' ? (selectedPlan === 'SURGE' ? 'Flexible' : '30 Days') : '3 Months'}</span>
+                <div className="flex justify-between text-[10px] font-black text-slate-400 uppercase tracking-widest px-1 mt-4">
+                  <span>{(selectedPlan === 'VAULT' && currency === 'NGN') || selectedPlan === 'SURGE' ? (selectedPlan === 'SURGE' ? 'Flexible' : '30 Days') : '90 Days'}</span>
                   <span>{selectedPlan === 'SURGE' ? '5 Years' : '2 Year'}</span>
                 </div>
               </div>
