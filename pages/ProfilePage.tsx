@@ -237,9 +237,12 @@ const ProfilePage: React.FC = () => {
                 setMessage({ type: 'success', text: "Profile updated successfully! Redirecting..." });
                 setProfile(response.profile);
                 
-                // Navigate back to dashboard with a hard refresh to update global auth state and clear blockers
+                // Dispatch event to instruct App.tsx to refetch profile state from the DB immediately
+                window.dispatchEvent(new Event('user-profile-updated'));
+
+                // Navigate back to dashboard natively using React Router
                 setTimeout(() => {
-                    window.location.href = '/dashboard';
+                    navigate('/dashboard');
                 }, 2000);
             } else {
                 const errMsg = response.message || "Failed to update profile";
