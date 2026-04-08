@@ -139,12 +139,12 @@ const AppContent: React.FC = () => {
 
   const refreshUser = useCallback(async () => {
     try {
-      const { data } = await axios.get(`${backendUrl}/api/me`, {
+      const { data } = await axios.get(`${backendUrl}/api/me?t=${new Date().getTime()}`, {
         withCredentials: true
       });
 
       // Also fetch profile
-      const profileRes = await axios.get(`${backendUrl}/api/profile`, {
+      const profileRes = await axios.get(`${backendUrl}/api/profile?t=${new Date().getTime()}`, {
         withCredentials: true
       });
 
@@ -169,6 +169,11 @@ const AppContent: React.FC = () => {
 
   useEffect(() => {
     refreshUser();
+
+    // Listen for custom event from ProfilePage (or others) to refresh user state without a hard reload
+    const handleProfileUpdate = () => refreshUser();
+    window.addEventListener('user-profile-updated', handleProfileUpdate);
+    return () => window.removeEventListener('user-profile-updated', handleProfileUpdate);
   }, [refreshUser]);
 
   // console.log("the user", user)
