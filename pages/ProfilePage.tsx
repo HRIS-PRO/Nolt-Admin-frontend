@@ -237,9 +237,9 @@ const ProfilePage: React.FC = () => {
                 setMessage({ type: 'success', text: "Profile updated successfully! Redirecting..." });
                 setProfile(response.profile);
                 
-                // Navigate back to dashboard after a short delay to show success message
+                // Navigate back to dashboard with a hard refresh to update global auth state and clear blockers
                 setTimeout(() => {
-                    navigate('/dashboard');
+                    window.location.href = '/dashboard';
                 }, 2000);
             } else {
                 const errMsg = response.message || "Failed to update profile";
