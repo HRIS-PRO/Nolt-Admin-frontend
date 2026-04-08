@@ -5,7 +5,7 @@ export type Currency = 'NGN' | 'USD';
 
 interface RateParams {
   amount: number;
-  tenureMonths: number;
+  tenureDays: number;
   plan: InvestmentPlan;
   currency: Currency;
   payoutFrequency?: PayoutFrequency;
@@ -14,13 +14,13 @@ interface RateParams {
 
 export const calculateInvestmentRate = ({
   amount,
-  tenureMonths,
+  tenureDays,
   plan,
   currency,
   payoutFrequency = 'maturity',
   promoBoost = 0
 }: RateParams): number => {
-  const days = tenureMonths * 30;
+  const days = tenureDays;
 
   if (currency === 'USD') {
     if (plan === 'VAULT') {

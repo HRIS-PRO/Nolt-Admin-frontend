@@ -275,16 +275,26 @@ const GiftInvestmentFlow: React.FC<GiftInvestmentFlowProps> = (props) => {
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                                 <div className="space-y-6">
                                     <div className="flex justify-between items-center">
-                                        <label className="text-sm font-black text-slate-500 uppercase tracking-widest">Tenure (Months)</label>
+                                        <label className="text-sm font-black text-slate-500 uppercase tracking-widest">Tenure (Days)</label>
                                     </div>
-                                    <div className="relative group">
+                                    <div className="relative pt-4 px-2">
+                                        <div className="flex justify-between items-center mb-4">
+                                            <span className="text-xl font-black dark:text-white">{tenure} Days</span>
+                                        </div>
                                         <input
-                                            type="number"
-                                            className="w-full h-20 rounded-[2rem] bg-white dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-800 px-8 text-xl font-bold dark:text-white focus:border-rose-500 outline-none shadow-sm transition-all"
-                                            value={tenure}
-                                            onChange={e => setTenure(parseInt(e.target.value) || 0)}
+                                            type="range"
+                                            min="0"
+                                            max={[30, 60, 90, 120, 150, 180, 210, 240, 270, 300, 330, 365].length - 1}
+                                            step="1"
+                                            value={[30, 60, 90, 120, 150, 180, 210, 240, 270, 300, 330, 365].indexOf(tenure)}
+                                            onChange={(e) => setTenure([30, 60, 90, 120, 150, 180, 210, 240, 270, 300, 330, 365][parseInt(e.target.value)])}
+                                            className="w-full h-2 bg-slate-100 dark:bg-slate-800 rounded-lg appearance-none cursor-pointer accent-rose-500"
                                         />
-                                        <span className="absolute right-8 top-1/2 -translate-y-1/2 text-slate-400 font-bold uppercase text-[10px] tracking-widest">Months</span>
+                                        <div className="flex justify-between mt-2 px-1">
+                                            <span className="text-[9px] font-bold text-slate-400">30D</span>
+                                            <span className="text-[9px] font-bold text-slate-400">180D</span>
+                                            <span className="text-[9px] font-bold text-slate-400">365D</span>
+                                        </div>
                                     </div>
                                 </div>
                                 <div className="bg-slate-900 rounded-[3rem] p-10 text-white shadow-2xl space-y-8 relative overflow-hidden border border-white/5 flex flex-col justify-center">
@@ -366,7 +376,7 @@ const GiftInvestmentFlow: React.FC<GiftInvestmentFlowProps> = (props) => {
                                         </div>
                                         <div className="text-right">
                                             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Tenure</p>
-                                            <p className="text-xl font-black dark:text-white">{isInfinityTenure ? 'Infinity' : `${tenure} Months`}</p>
+                                            <p className="text-xl font-black dark:text-white">{isInfinityTenure ? 'Infinity' : `${tenure} Days`}</p>
                                         </div>
                                     </div>
                                 </div>
