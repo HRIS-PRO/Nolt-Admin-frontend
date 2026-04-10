@@ -37,6 +37,7 @@ const StaffInvestmentsPage: React.FC<StaffInvestmentsPageProps> = ({ user, onLog
     const [statusFilter, setStatusFilter] = useState('all');
     const [stageFilter, setStageFilter] = useState('all');
     const [entityFilter, setEntityFilter] = useState('all');
+    const [officerFilter, setOfficerFilter] = useState('all');
     const [openDropdownId, setOpenDropdownId] = useState<number | null>(null);
     const [showStaffApplicationFlow, setShowStaffApplicationFlow] = useState(false);
     const [banks, setBanks] = useState<{ name: string; code: string }[]>([]);
@@ -222,7 +223,7 @@ const StaffInvestmentsPage: React.FC<StaffInvestmentsPageProps> = ({ user, onLog
     const [officers, setOfficers] = useState<any[]>([]);
 
     const fetchOfficers = async () => {
-        if (['sales_manager', 'admin', 'super_admin', 'superadmin'].includes(user.role || '')) {
+        if (['sales_manager', 'admin', 'super_admin', 'superadmin', 'customer_experience'].includes(user.role || '')) {
             try {
                 const response = await axios.get(`/api/staff/users?role=sales_officer&limit=200`, { withCredentials: true });
                 setOfficers(response.data.users.filter((u: any) => u.is_active));
@@ -1306,8 +1307,14 @@ const StaffInvestmentsPage: React.FC<StaffInvestmentsPageProps> = ({ user, onLog
                             const matchesStatus = statusFilter === 'all' || inv.status === statusFilter;
                             const matchesStage = stageFilter === 'all' || (inv.stage || 'submitted') === stageFilter;
                             const matchesEntity = entityFilter === 'all' || inv.entity_type === entityFilter;
+                            let matchesOfficer = true;
+                            if (officerFilter === 'unassigned') {
+                                matchesOfficer = !inv.officer_name || inv.officer_name === 'Marketing Promotion';
+                            } else if (officerFilter !== 'all') {
+                                matchesOfficer = inv.officer_name === officerFilter;
+                            }
 
-                            return matchesSearch && matchesStatus && matchesStage && matchesEntity;
+                            return matchesSearch && matchesStatus && matchesStage && matchesEntity && matchesOfficer;
                         });
 
                         return (
@@ -1367,6 +1374,17 @@ const StaffInvestmentsPage: React.FC<StaffInvestmentsPageProps> = ({ user, onLog
                                             <option value="all">All Entities</option>
                                             <option value="INDIVIDUAL">Individual</option>
                                             <option value="CORPORATE">Corporate</option>
+                                        </select>
+                                        <select
+                                            value={officerFilter}
+                                            onChange={(e) => setOfficerFilter(e.target.value)}
+                                            className="px-4 py-2 bg-white dark:bg-[#1e293b] border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300 outline-none"
+                                        >
+                                            <option value="all">All Officers</option>
+                                            <option value="unassigned">Unassigned / Promotion</option>
+                                            {Array.from(new Set(allInvestments.map(i => i.officer_name).filter(Boolean))).map((name: string) => (
+                                                <option key={name} value={name}>{name}</option>
+                                            ))}
                                         </select>
                                     </div>
                                 </div>
@@ -1461,7 +1479,7 @@ const StaffInvestmentsPage: React.FC<StaffInvestmentsPageProps> = ({ user, onLog
                                                             </div>
                                                         </td>
                                                         <td className="p-4 text-slate-700 dark:text-slate-300 font-bold text-xs" onClick={(e) => e.stopPropagation()}>
-                                                            {['sales_manager', 'admin', 'super_admin', 'superadmin'].includes(user.role || '') ? (
+                                                            {['sales_manager', 'admin', 'super_admin', 'superadmin', 'customer_experience'].includes(user.role || '') ? (
                                                                 <div className="relative group/assign w-fit">
                                                                     <div className="flex items-center gap-2 cursor-pointer p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors border border-transparent hover:border-slate-200 dark:hover:border-slate-700">
                                                                         <span className="material-symbols-outlined text-sm text-slate-400 dark:text-slate-500">person</span>

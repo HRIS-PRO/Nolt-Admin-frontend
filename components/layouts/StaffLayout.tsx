@@ -33,6 +33,7 @@ const StaffLayout: React.FC<StaffLayoutProps> = ({ children, user, onLogout, tog
                 { label: 'Dashboard', icon: 'grid_view', path: '/staff-dashboard' },
                 { label: 'Loans', icon: 'credit_card', path: '/staff/loans' },
                 { label: 'Investments', icon: 'account_balance_wallet', path: '/staff/investments' },
+                { label: 'Promotions', icon: 'campaign', path: '/staff/promotions' },
                 { label: 'Reports', icon: 'description', path: '/staff/reports' },
                 { label: 'Timeline', icon: 'timeline', path: '/staff/timeline' },
             ]
@@ -92,14 +93,18 @@ const StaffLayout: React.FC<StaffLayoutProps> = ({ children, user, onLogout, tog
                     {navGroups.map((group, idx) => {
                         // Filter items based on role
                         const filteredItems = group.items.filter(item => {
-                            if (item.label === 'Customers') {
-                                return user?.role === 'super_admin' || user?.role === 'customer_experience';
-                            }
-                            if (item.label === 'Timeline') {
+                            if (item.label === 'Customers' || item.label === 'Timeline') {
                                 return user?.role === 'super_admin' || user?.role === 'customer_experience';
                             }
                             if (item.label === 'Users' || item.label === 'Audit Trail') {
                                 return user?.role === 'super_admin';
+                            }
+                            if (item.label === 'Promotions') {
+                                return user?.role === 'super_admin' || user?.role === 'marketing';
+                            }
+                            if (user?.role === 'marketing') {
+                                // Marketing should only see these specific tabs
+                                return ['Dashboard', 'Investments', 'Promotions'].includes(item.label);
                             }
                             return true;
                         });
