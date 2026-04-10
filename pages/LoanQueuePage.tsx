@@ -19,6 +19,7 @@ const LoanQueuePage: React.FC<LoanQueuePageProps> = ({ user, onLogout, toggleThe
     const searchQuery = searchParams.get('search') || '';
     const statusFilter = searchParams.get('status') || '';
     const stageFilter = searchParams.get('stage') || '';
+    const officerFilter = searchParams.get('officer') || '';
     const currentPage = parseInt(searchParams.get('page') || '1', 10);
     const itemsPerPage = 10;
 
@@ -39,6 +40,7 @@ const LoanQueuePage: React.FC<LoanQueuePageProps> = ({ user, onLogout, toggleThe
                     search: searchQuery,
                     status: statusFilter,
                     stage: stageFilter,
+                    officer: officerFilter,
                     page: currentPage,
                     limit: itemsPerPage
                 },
@@ -142,7 +144,7 @@ const LoanQueuePage: React.FC<LoanQueuePageProps> = ({ user, onLogout, toggleThe
                 socket.off('loan_updated', handleLoanChange);
             };
         });
-    }, [user.role, searchQuery, statusFilter, stageFilter, currentPage]);
+    }, [user.role, searchQuery, statusFilter, stageFilter, officerFilter, currentPage]);
 
     // Re-fetch on params change
 
@@ -208,6 +210,18 @@ const LoanQueuePage: React.FC<LoanQueuePageProps> = ({ user, onLogout, toggleThe
                         <option value="internal_audit">Internal Audit</option>
                         <option value="finance">Finance</option>
                         <option value="disbursed">Disbursed</option>
+                    </select>
+
+                    <select
+                        value={officerFilter}
+                        onChange={(e) => handleFilterChange('officer', e.target.value)}
+                        className="flex-1 md:flex-none px-4 py-2 rounded-lg bg-white dark:bg-[#1e293b] text-slate-600 dark:text-slate-300 text-xs font-bold uppercase tracking-wider border border-slate-200 dark:border-slate-700 shadow-sm outline-none cursor-pointer"
+                    >
+                        <option value="">All Officers</option>
+                        <option value="unassigned">Unassigned / Promotion</option>
+                        {officers.map(officer => (
+                            <option key={officer.id} value={officer.id}>{officer.full_name}</option>
+                        ))}
                     </select>
                     {(user.role === 'sales_officer' || user.role === 'admin' || user.role === 'super_admin') && (
                         <button

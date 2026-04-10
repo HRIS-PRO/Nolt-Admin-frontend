@@ -149,6 +149,7 @@ const UsersPage: React.FC<UsersPageProps> = ({ user, onLogout, toggleTheme, them
             compliance: "text-teal-600 bg-teal-100 dark:bg-teal-500/10 dark:text-teal-400 border-teal-200 dark:border-teal-500/20",
             ed: "text-amber-600 bg-amber-100 dark:bg-amber-500/10 dark:text-amber-400 border-amber-200 dark:border-amber-500/20",
             hr: "text-rose-600 bg-rose-100 dark:bg-rose-500/10 dark:text-rose-400 border-rose-200 dark:border-rose-500/20",
+            marketing: "text-pink-600 bg-pink-100 dark:bg-pink-500/10 dark:text-pink-400 border-pink-200 dark:border-pink-500/20",
             default: "text-slate-600 bg-slate-100 dark:bg-slate-800 dark:text-slate-400 border-slate-200 dark:border-slate-700"
         };
         const style = styles[role] || styles.default;
@@ -279,6 +280,7 @@ const UsersPage: React.FC<UsersPageProps> = ({ user, onLogout, toggleTheme, them
                                                 <option value="internal_audit">Internal Audit</option>
                                                 <option value="compliance">Compliance</option>
                                                 <option value="finance">Finance</option>
+                                                <option value="marketing">Marketing</option>
                                             </select>
                                         ) : (
                                             <div onClick={() => setEditingRoleId(u.id)} className="cursor-pointer hover:opacity-80">
@@ -438,6 +440,7 @@ const UsersPage: React.FC<UsersPageProps> = ({ user, onLogout, toggleTheme, them
                                     <option value="internal_audit">Internal Audit</option>
                                     <option value="compliance">Compliance</option>
                                     <option value="finance">Finance</option>
+                                    <option value="marketing">Marketing</option>
                                     <option value="md">MD</option>
                                     <option value="ed">ED</option>
                                     <option value="hr">HR</option>

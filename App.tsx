@@ -34,6 +34,7 @@ import StaffInvestmentDetailsPage from './pages/StaffInvestmentDetailsPage';
 import VerifyGiftPage from './pages/investment/VerifyGiftPage';
 import ClaimGiftPage from './pages/investment/ClaimGiftPage';
 import ProfilePage from './pages/ProfilePage';
+import StaffPromotionsPage from './pages/StaffPromotionsPage';
 
 import LogoutWarningModal from './components/modals/LogoutWarningModal';
 
@@ -435,6 +436,16 @@ const AppContent: React.FC = () => {
         <Route path="/staff/investments/:id" element={
           isLoading ? null : (user.isLoggedIn && user.role !== 'customer' ? (
             <StaffInvestmentDetailsPage
+              user={user}
+              onLogout={handleLogoutRequest}
+              toggleTheme={toggleTheme}
+              theme={theme}
+            />
+          ) : <Navigate to="/login" />)
+        } />
+        <Route path="/staff/promotions" element={
+          isLoading ? null : (user.isLoggedIn && user.role !== 'customer' ? (
+            <StaffPromotionsPage
               user={user}
               onLogout={handleLogoutRequest}
               toggleTheme={toggleTheme}
