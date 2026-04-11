@@ -281,6 +281,26 @@ const AppContent: React.FC = () => {
     };
   }, [user.isLoggedIn, performLogout]);
 
+    // Periodic Bank List Refresh
+    useEffect(() => {
+        if (!user.isLoggedIn) return;
+
+        const refreshBanks = async () => {
+            try {
+                const { profileService } = await import('./services/profileService');
+                await profileService.getBanks(); // This will use cache or fetch fresh if expired
+            } catch (err) {
+                console.error("Background bank refresh failed", err);
+            }
+        };
+
+        // Initial check/refresh
+        refreshBanks();
+
+        const interval = setInterval(refreshBanks, 6 * 60 * 60 * 1000); // Check every 6 hours
+        return () => clearInterval(interval);
+    }, [user.isLoggedIn]);
+
 
   // Socket Connection Logic
   useEffect(() => {

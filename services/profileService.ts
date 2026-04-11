@@ -47,8 +47,46 @@ export const profileService = {
     return response.data;
   },
 
-  getBanks: async (): Promise<{ success: boolean; data: { name: string; code: string }[] }> => {
+  getBanks: async (forceRefresh: boolean = false): Promise<{ success: boolean; data: { name: string; code: string }[] }> => {
+    const CACHED_BANKS_KEY = 'nolt_banks_cache';
+    const CACHE_TTL = 12 * 60 * 60 * 1000; // 12 hours
+    
+    if (!forceRefresh) {
+      const cached = localStorage.getItem(CACHED_BANKS_KEY);
+      if (cached) {
+        try {
+          const { timestamp, data } = JSON.parse(cached);
+          if (Date.now() - timestamp < CACHE_TTL) {
+            console.log("[ProfileService] Returning cached banks");
+            return { success: true, data };
+          }
+        } catch (e) {
+          console.error("[ProfileService] Failed to parse cached banks", e);
+        }
+      }
+    }
+
+    console.log("[ProfileService] Fetching fresh banks from API");
     const response = await axios.get(`${API_URL}/api/profile/banks`, { withCredentials: true });
+    
+    if (response.data.success && response.data.data) {
+      // Deduplicate banks by code
+      const uniqueBanksMap = new Map();
+      response.data.data.forEach((bank: { name: string; code: string }) => {
+        if (!uniqueBanksMap.has(bank.code)) {
+          uniqueBanksMap.set(bank.code, bank);
+        }
+      });
+      const uniqueBanks = Array.from(uniqueBanksMap.values());
+      
+      localStorage.setItem(CACHED_BANKS_KEY, JSON.stringify({
+        timestamp: Date.now(),
+        data: uniqueBanks
+      }));
+      
+      return { success: true, data: uniqueBanks };
+    }
+    
     return response.data;
   },
 
