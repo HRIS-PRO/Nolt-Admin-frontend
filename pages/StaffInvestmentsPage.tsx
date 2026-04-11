@@ -280,14 +280,7 @@ const StaffInvestmentsPage: React.FC<StaffInvestmentsPageProps> = ({ user, onLog
             try {
                 const response = await profileService.getBanks();
                 if (response.success) {
-                    // Deduplicate banks by code to avoid React key warnings
-                    const uniqueBanksMap = new Map();
-                    response.data.forEach((bank: { name: string; code: string }) => {
-                        if (!uniqueBanksMap.has(bank.code)) {
-                            uniqueBanksMap.set(bank.code, bank);
-                        }
-                    });
-                    setBanks(Array.from(uniqueBanksMap.values()));
+                    setBanks(response.data);
                 }
             } catch (err) {
                 console.error("Failed to fetch banks", err);
