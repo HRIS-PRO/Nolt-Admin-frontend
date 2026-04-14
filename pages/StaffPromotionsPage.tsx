@@ -29,6 +29,7 @@ const StaffPromotionsPage: React.FC<StaffPromotionsPageProps> = ({ user, onLogou
     const [promotions, setPromotions] = useState<Promotion[]>([]);
     const [loading, setLoading] = useState(true);
     const [showCreateModal, setShowCreateModal] = useState(false);
+    const [editingPromo, setEditingPromo] = useState<Promotion | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     // Form data
@@ -77,21 +78,28 @@ const StaffPromotionsPage: React.FC<StaffPromotionsPageProps> = ({ user, onLogou
         };
     }, []);
 
-    const handleCreatePromotion = async (e: React.FormEvent) => {
+    const handleSavePromotion = async (e: React.FormEvent) => {
         e.preventDefault();
         setIsSubmitting(true);
         try {
-            await axios.post('/api/promotions', {
+            const payload = {
                 utm_campaign: formData.utm_campaign,
                 target_product: formData.target_product,
                 utm_source: formData.utm_source,
                 utm_medium: formData.utm_medium,
-                benefit_value: null, // As requested, null for now
+                benefit_value: null,
                 expiry_date: formData.isInfinityExpiry ? null : formData.expiry_date,
                 max_redemptions: formData.max_redemptions ? parseInt(formData.max_redemptions) : null
-            }, { withCredentials: true });
+            };
+
+            if (editingPromo) {
+                await axios.put(`/api/promotions/${editingPromo.id}`, payload, { withCredentials: true });
+            } else {
+                await axios.post('/api/promotions', payload, { withCredentials: true });
+            }
             
             setShowCreateModal(false);
+            setEditingPromo(null);
             fetchPromotions();
             setFormData({
                 utm_campaign: '',
@@ -102,12 +110,40 @@ const StaffPromotionsPage: React.FC<StaffPromotionsPageProps> = ({ user, onLogou
                 isInfinityExpiry: true,
                 expiry_date: ''
             });
-        } catch (error) {
-            console.error('Error creating promotion:', error);
-            alert('Failed to create promotion');
+        } catch (error: any) {
+            console.error('Error saving promotion:', error);
+            alert(error.response?.data?.message || 'Failed to save promotion');
         } finally {
             setIsSubmitting(false);
         }
+    };
+
+    const openEditModal = (promo: Promotion) => {
+        setEditingPromo(promo);
+        setFormData({
+            utm_campaign: promo.utm_campaign,
+            target_product: promo.target_product,
+            utm_source: promo.utm_source || 'nolt_marketing',
+            utm_medium: promo.utm_medium || 'referral_link',
+            max_redemptions: promo.max_redemptions?.toString() || '',
+            isInfinityExpiry: !promo.expiry_date,
+            expiry_date: promo.expiry_date ? new Date(promo.expiry_date).toISOString().split('T')[0] : ''
+        });
+        setShowCreateModal(true);
+    };
+
+    const openCreateModal = () => {
+        setEditingPromo(null);
+        setFormData({
+            utm_campaign: '',
+            target_product: 'ALL_PRODUCTS',
+            utm_source: 'nolt_marketing',
+            utm_medium: 'referral_link',
+            max_redemptions: '',
+            isInfinityExpiry: true,
+            expiry_date: ''
+        });
+        setShowCreateModal(true);
     };
 
     const handleDeletePromotion = async (id: number) => {
@@ -138,7 +174,7 @@ const StaffPromotionsPage: React.FC<StaffPromotionsPageProps> = ({ user, onLogou
                 </div>
                 <div className="flex gap-3">
                     <button
-                        onClick={() => setShowCreateModal(true)}
+                        onClick={openCreateModal}
                         className="h-12 px-6 rounded-xl bg-purple-600 text-white font-bold text-sm hover:bg-purple-700 transition-colors shadow-lg shadow-purple-600/20 flex items-center gap-2"
                     >
                         <span className="material-symbols-outlined text-lg">add</span>
@@ -147,25 +183,33 @@ const StaffPromotionsPage: React.FC<StaffPromotionsPageProps> = ({ user, onLogou
                 </div>
             </div>
 
-            {/* Analytics */}
-            {promotions.length > 0 && !loading && (
-                <div className="bg-white dark:bg-[#1e293b] rounded-[32px] p-8 border border-slate-200 dark:border-slate-800 shadow-xl shadow-slate-200/20 dark:shadow-none mb-8">
-                    <h3 className="text-lg font-black text-slate-900 dark:text-white uppercase mb-6">Performance Analytics</h3>
-                    <div className="h-80 w-full">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <BarChart
-                                data={promotions}
-                                margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
-                            >
-                                <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.5} />
-                                <XAxis dataKey="utm_campaign" stroke="#94a3b8" />
-                                <YAxis stroke="#94a3b8" />
-                                <Tooltip contentStyle={{ backgroundColor: '#1e293b', borderColor: '#334155', borderRadius: '8px' }} />
-                                <Legend />
-                                <Bar dataKey="clicks" name="Clicks" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
-                                <Bar dataKey="current_redemptions" name="Redemptions" fill="#10b981" radius={[4, 4, 0, 0]} />
-                            </BarChart>
-                        </ResponsiveContainer>
+            {/* Summary Cards */}
+            {!loading && (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+                    {/* Active Campaigns */}
+                    <div className="bg-white dark:bg-[#1e293b] rounded-[24px] p-6 border border-slate-200 dark:border-slate-800 shadow-sm flex items-center gap-5">
+                        <div className="size-14 rounded-2xl bg-blue-50 dark:bg-blue-500/10 flex items-center justify-center text-blue-600 dark:text-blue-400">
+                            <span className="material-symbols-outlined text-3xl">campaign</span>
+                        </div>
+                        <div>
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Active Campaigns</p>
+                            <h3 className="text-3xl font-black text-slate-900 dark:text-white">
+                                {promotions.filter(p => !p.expiry_date || new Date(p.expiry_date) >= new Date()).length}
+                            </h3>
+                        </div>
+                    </div>
+
+                    {/* Total Redemptions (Clicks) */}
+                    <div className="bg-white dark:bg-[#1e293b] rounded-[24px] p-6 border border-slate-200 dark:border-slate-800 shadow-sm flex items-center gap-5">
+                        <div className="size-14 rounded-2xl bg-emerald-50 dark:bg-emerald-500/10 flex items-center justify-center text-emerald-600 dark:text-emerald-400">
+                            <span className="material-symbols-outlined text-3xl">ads_click</span>
+                        </div>
+                        <div>
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Redemptions</p>
+                            <h3 className="text-3xl font-black text-slate-900 dark:text-white">
+                                {promotions.reduce((sum, p) => sum + (p.clicks || 0), 0).toLocaleString()}
+                            </h3>
+                        </div>
                     </div>
                 </div>
             )}
@@ -192,63 +236,95 @@ const StaffPromotionsPage: React.FC<StaffPromotionsPageProps> = ({ user, onLogou
                             <thead>
                                 <tr>
                                     <th className="px-4 py-4 border-b border-slate-100 dark:border-slate-800 text-[10px] font-black uppercase text-slate-400 tracking-widest">Campaign Code</th>
-                                    <th className="px-4 py-4 border-b border-slate-100 dark:border-slate-800 text-[10px] font-black uppercase text-slate-400 tracking-widest">Target Product</th>
-                                    <th className="px-4 py-4 border-b border-slate-100 dark:border-slate-800 text-[10px] font-black uppercase text-slate-400 tracking-widest text-center">Redemptions / Max</th>
-                                    <th className="px-4 py-4 border-b border-slate-100 dark:border-slate-800 text-[10px] font-black uppercase text-slate-400 tracking-widest">Created</th>
-                                    <th className="px-4 py-4 border-b border-slate-100 dark:border-slate-800 text-[10px] font-black uppercase text-slate-400 tracking-widest text-right">Action</th>
+                                    <th className="px-4 py-4 border-b border-slate-100 dark:border-slate-800 text-[10px] font-black uppercase text-slate-400 tracking-widest">Benefit</th>
+                                    <th className="px-4 py-4 border-b border-slate-100 dark:border-slate-800 text-[10px] font-black uppercase text-slate-400 tracking-widest">Product Target</th>
+                                    <th className="px-4 py-4 border-b border-slate-100 dark:border-slate-800 text-[10px] font-black uppercase text-slate-400 tracking-widest">Redemptions</th>
+                                    <th className="px-4 py-4 border-b border-slate-100 dark:border-slate-800 text-[10px] font-black uppercase text-slate-400 tracking-widest">Expiry</th>
+                                    <th className="px-4 py-4 border-b border-slate-100 dark:border-slate-800 text-[10px] font-black uppercase text-slate-400 tracking-widest">Status</th>
+                                    <th className="px-4 py-4 border-b border-slate-100 dark:border-slate-800 text-[10px] font-black uppercase text-slate-400 tracking-widest text-right">Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                {promotions.map((promo) => (
-                                    <tr key={promo.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group">
-                                        <td className="px-4 py-4 border-b border-slate-100 dark:border-slate-800">
-                                            <span className="font-bold text-sm text-slate-900 dark:text-white uppercase px-3 py-1 bg-slate-100 dark:bg-slate-800 rounded-lg">
-                                                {promo.utm_campaign}
-                                            </span>
-                                        </td>
-                                        <td className="px-4 py-4 border-b border-slate-100 dark:border-slate-800">
-                                            <span className="text-xs font-bold text-slate-600 dark:text-slate-300">
-                                                {promo.target_product.replace('NOLT_', '')}
-                                            </span>
-                                        </td>
-                                        <td className="px-4 py-4 border-b border-slate-100 dark:border-slate-800 text-center">
-                                            <div className="inline-flex items-center gap-2 justify-center">
-                                                <span className="text-lg font-black text-purple-600">
-                                                    {promo.current_redemptions || 0}
+                                {promotions.map((promo) => {
+                                    const isExpired = promo.expiry_date && new Date(promo.expiry_date) < new Date();
+                                    const progress = promo.max_redemptions ? (promo.current_redemptions / promo.max_redemptions) * 100 : 0;
+                                    
+                                    return (
+                                        <tr key={promo.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group">
+                                            <td className="px-4 py-5 border-b border-slate-100 dark:border-slate-800">
+                                                <div className="flex flex-col">
+                                                    <span className="font-black text-sm text-slate-900 dark:text-white uppercase">
+                                                        {promo.utm_campaign}
+                                                    </span>
+                                                    <span className="text-[10px] text-slate-400 font-bold uppercase truncate max-w-[150px]">
+                                                        {promo.utm_source || 'Nolt Marketing'}
+                                                    </span>
+                                                </div>
+                                            </td>
+                                            <td className="px-4 py-5 border-b border-slate-100 dark:border-slate-800">
+                                                <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase ${promo.benefit_value ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10' : 'bg-slate-50 text-slate-400 dark:bg-slate-800'}`}>
+                                                    {promo.benefit_value ? `+${promo.benefit_value}%` : 'None'}
                                                 </span>
-                                                <span className="text-slate-300 font-bold">/</span>
-                                                <span className="text-lg font-black text-slate-400">
-                                                    {promo.max_redemptions || '∞'}
+                                            </td>
+                                            <td className="px-4 py-5 border-b border-slate-100 dark:border-slate-800">
+                                                <span className="text-xs font-black text-slate-600 dark:text-slate-300 uppercase">
+                                                    {promo.target_product.replace('NOLT_', '').replace('_', ' ')}
                                                 </span>
-                                            </div>
-                                        </td>
-                                        <td className="px-4 py-4 border-b border-slate-100 dark:border-slate-800">
-                                            <span className="text-xs text-slate-500 font-bold">
-                                                {new Date(promo.created_at).toLocaleDateString()}
-                                            </span>
-                                        </td>
-                                        <td className="px-4 py-4 border-b border-slate-100 dark:border-slate-800 text-right">
-                                            <div className="flex items-center justify-end gap-2">
-                                                <button 
-                                                    onClick={() => copyLink(promo.utm_campaign)}
-                                                    className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-purple-600 hover:shadow-md transition-all inline-flex items-center"
-                                                    title="Copy Tracking Link"
-                                                >
-                                                    <span className="material-symbols-outlined text-[20px]">content_copy</span>
-                                                </button>
-                                                {user?.role === 'super_admin' && (
+                                            </td>
+                                            <td className="px-4 py-5 border-b border-slate-100 dark:border-slate-800">
+                                                <div className="flex flex-col gap-1.5 min-w-[140px]">
+                                                    <div className="flex justify-between items-center text-[10px] font-black uppercase">
+                                                        <span className="text-slate-400">{promo.current_redemptions} Used</span>
+                                                        <span className="text-slate-500">{promo.max_redemptions ? `${promo.max_redemptions} Limit` : '∞ Limit'}</span>
+                                                    </div>
+                                                    <div className="h-1.5 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                                                        <div 
+                                                            className={`h-full transition-all duration-500 rounded-full ${isExpired ? 'bg-slate-400' : 'bg-blue-500'}`}
+                                                            style={{ width: `${Math.min(100, progress || (promo.max_redemptions ? 0 : 100))}%` }}
+                                                        />
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td className="px-4 py-5 border-b border-slate-100 dark:border-slate-800">
+                                                <span className="text-xs text-slate-500 font-black tracking-tight">
+                                                    {promo.expiry_date ? new Date(promo.expiry_date).toLocaleDateString('sv-SE') : '∞ INDEFINITE'}
+                                                </span>
+                                            </td>
+                                            <td className="px-4 py-5 border-b border-slate-100 dark:border-slate-800">
+                                                <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase ${isExpired ? 'bg-amber-50 text-amber-600 dark:bg-amber-500/10' : 'bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10'}`}>
+                                                    {isExpired ? 'EXPIRED' : 'ACTIVE'}
+                                                </span>
+                                            </td>
+                                            <td className="px-4 py-5 border-b border-slate-100 dark:border-slate-800 text-right">
+                                                <div className="flex items-center justify-end gap-2">
                                                     <button 
-                                                        onClick={() => handleDeletePromotion(promo.id)}
-                                                        className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 hover:shadow-md transition-all inline-flex items-center"
-                                                        title="Delete Promotion"
+                                                        onClick={() => copyLink(promo.utm_campaign)}
+                                                        className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-purple-600 hover:shadow-md transition-all inline-flex items-center"
+                                                        title="Copy Tracking Link"
                                                     >
-                                                        <span className="material-symbols-outlined text-[20px]">delete</span>
+                                                        <span className="material-symbols-outlined text-[18px]">content_copy</span>
                                                     </button>
-                                                )}
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ))}
+                                                    <button 
+                                                        onClick={() => openEditModal(promo)}
+                                                        className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-blue-500 hover:shadow-md transition-all inline-flex items-center"
+                                                        title="Edit Promotion"
+                                                    >
+                                                        <span className="material-symbols-outlined text-[18px]">edit</span>
+                                                    </button>
+                                                    {user?.role === 'super_admin' && (
+                                                        <button 
+                                                            onClick={() => handleDeletePromotion(promo.id)}
+                                                            className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 hover:shadow-md transition-all inline-flex items-center"
+                                                            title="Delete Promotion"
+                                                        >
+                                                            <span className="material-symbols-outlined text-[18px]">delete</span>
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
                             </tbody>
                         </table>
                     </div>
@@ -263,15 +339,15 @@ const StaffPromotionsPage: React.FC<StaffPromotionsPageProps> = ({ user, onLogou
                         
                         <div className="flex justify-between items-start mb-6">
                             <div>
-                                <h2 className="text-xl font-black text-white uppercase tracking-tight">Create Promotion</h2>
-                                <p className="text-xs text-slate-400 mt-1 font-medium">Define the code behavior and application constraints.</p>
+                                <h2 className="text-xl font-black text-white uppercase tracking-tight">{editingPromo ? 'Edit Promotion' : 'Create Promotion'}</h2>
+                                <p className="text-xs text-slate-400 mt-1 font-medium">{editingPromo ? 'Modify the campaign parameters and limits.' : 'Define the code behavior and application constraints.'}</p>
                             </div>
                             <button onClick={() => setShowCreateModal(false)} className="text-slate-400 hover:text-white transition-colors">
                                 <span className="material-symbols-outlined">close</span>
                             </button>
                         </div>
 
-                        <form onSubmit={handleCreatePromotion} className="space-y-6 max-h-[70vh] overflow-y-auto pr-2 custom-scrollbar">
+                        <form onSubmit={handleSavePromotion} className="space-y-6 max-h-[70vh] overflow-y-auto pr-2 custom-scrollbar">
                             
                             {/* CAMPAIGN IDENTITY */}
                             <div className="space-y-4">
@@ -456,7 +532,7 @@ const StaffPromotionsPage: React.FC<StaffPromotionsPageProps> = ({ user, onLogou
                                     disabled={isSubmitting}
                                     className="h-12 px-8 rounded-xl bg-blue-500 text-white font-black uppercase tracking-widest text-xs hover:bg-blue-600 transition-colors shadow-lg shadow-blue-500/20 disabled:opacity-50"
                                 >
-                                    {isSubmitting ? 'Deploying...' : 'Deploy Campaign'}
+                                    {isSubmitting ? (editingPromo ? 'Updating...' : 'Deploying...') : (editingPromo ? 'Update Campaign' : 'Deploy Campaign')}
                                 </button>
                             </div>
                         </form>
