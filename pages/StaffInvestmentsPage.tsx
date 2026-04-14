@@ -234,23 +234,27 @@ const StaffInvestmentsPage: React.FC<StaffInvestmentsPageProps> = ({ user, onLog
     };
 
     const handleAssignOfficer = async (investmentId: string, officerId: string) => {
-        if (!confirm("Are you sure you want to reassign this investment?")) return;
+        const isUnassign = officerId === 'unassign';
+        if (!confirm(isUnassign ? "Are you sure you want to unassign this investment?" : "Are you sure you want to reassign this investment?")) return;
         try {
             await axios.patch(`/api/staff/investments/${investmentId}/assign`, {
-                sales_officer_id: officerId
+                sales_officer_id: isUnassign ? null : officerId
             }, { withCredentials: true });
 
             // Optimistic Update
             setAllInvestments(prev => prev.map(inv => {
                 if (String(inv.id) === String(investmentId)) {
+                    if (isUnassign) {
+                        return { ...inv, sales_officer_id: null, officer_name: null, officer_email: null };
+                    }
                     const officer = officers.find(o => String(o.id) === String(officerId));
                     return { ...inv, sales_officer_id: officerId, officer_name: officer?.full_name, officer_email: officer?.email };
                 }
                 return inv;
             }));
-            alert("Investment reassigned successfully");
+            alert(isUnassign ? "Investment unassigned successfully" : "Investment reassigned successfully");
         } catch (error: any) {
-            alert(error.response?.data?.message || "Reassignment failed");
+            alert(error.response?.data?.message || "Operation failed");
         }
     };
 
@@ -1485,6 +1489,7 @@ const StaffInvestmentsPage: React.FC<StaffInvestmentsPageProps> = ({ user, onLog
                                                                         onChange={(e) => handleAssignOfficer(inv.id, e.target.value)}
                                                                     >
                                                                         <option value="" disabled>Select Officer</option>
+                                                                        {inv.sales_officer_id && <option value="unassign">❌ Unassign Officer</option>}
                                                                         {officers.map(officer => (
                                                                             <option key={officer.id} value={officer.id}>{officer.full_name}</option>
                                                                         ))}
