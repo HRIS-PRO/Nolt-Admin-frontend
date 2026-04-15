@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
-import { formatDate } from '../../utils/dateFormatter';
+import { formatDate, formatDateTime } from '../../utils/dateFormatter';
+import { maskValue } from '../../utils/maskHelper';
 
 interface CustomerDetailsDrawerProps {
     customerId: number | null;
@@ -39,6 +40,16 @@ interface CustomerProfile {
     bank_verified?: boolean;
     bank_statement_url?: string;
     is_corporate_account?: boolean;
+    is_identity_verified?: boolean;
+    selfie_verification_url?: string;
+}
+
+interface Investment {
+    id: number;
+    investment_amount: number;
+    status: string;
+    created_at: string;
+    investment_type: string;
 }
 
 interface Loan {
@@ -56,9 +67,10 @@ interface Document {
 }
 
 const CustomerDetailsDrawer: React.FC<CustomerDetailsDrawerProps> = ({ customerId, onClose }) => {
-    const [activeTab, setActiveTab] = useState<'overview' | 'loans' | 'documents'>('overview');
+    const [activeTab, setActiveTab] = useState<'overview' | 'loans' | 'investments' | 'documents'>('overview');
     const [profile, setProfile] = useState<CustomerProfile | null>(null);
     const [loans, setLoans] = useState<Loan[]>([]);
+    const [investments, setInvestments] = useState<Investment[]>([]);
     const [documents, setDocuments] = useState<Document[]>([]);
     const [isLoading, setIsLoading] = useState(false);
 
@@ -74,6 +86,7 @@ const CustomerDetailsDrawer: React.FC<CustomerDetailsDrawerProps> = ({ customerI
             const res = await axios.get(`/api/staff/customers/${id}`, { withCredentials: true });
             setProfile(res.data.profile);
             setLoans(res.data.loans);
+            setInvestments(res.data.investments || []);
             setDocuments(res.data.documents);
         } catch (error) {
             console.error("Failed to fetch customer details", error);
@@ -141,23 +154,31 @@ const CustomerDetailsDrawer: React.FC<CustomerDetailsDrawerProps> = ({ customerI
                                 <div>
                                     <h2 className="text-xl font-black text-slate-900 dark:text-white">{profile.full_name}</h2>
                                     <p className="text-sm text-slate-500 dark:text-slate-400">{profile.personal_email || profile.email}</p>
-                                    {profile.employer && (
-                                        <div className="flex items-center gap-1 mt-1 text-xs font-bold text-blue-600 dark:text-blue-400">
-                                            <span className="material-symbols-outlined text-[14px]">work</span>
-                                            {profile.employer}
-                                        </div>
-                                    )}
+                                    <div className="flex items-center gap-2 mt-1">
+                                        {profile.employer && (
+                                            <div className="flex items-center gap-1 text-xs font-bold text-blue-600 dark:text-blue-400">
+                                                <span className="material-symbols-outlined text-[14px]">work</span>
+                                                {profile.employer}
+                                            </div>
+                                        )}
+                                        {profile.is_identity_verified && (
+                                            <div className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-green-500/10 text-green-600 dark:text-green-400 text-[10px] font-black uppercase tracking-wider border border-green-500/20">
+                                                <span className="material-symbols-outlined text-[12px]">verified</span>
+                                                Verified
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
                         </div>
 
                         {/* Tabs */}
                         <div className="flex border-b border-slate-200 dark:border-slate-700">
-                            {['overview', 'loans', 'documents'].map((tab) => (
+                            {['overview', 'loans', 'investments', 'documents'].map((tab) => (
                                 <button
                                     key={tab}
                                     onClick={() => setActiveTab(tab as any)}
-                                    className={`flex-1 py-3 text-sm font-bold uppercase tracking-wider transition-colors border-b-2 ${activeTab === tab
+                                    className={`flex-1 py-3 text-[10px] font-black uppercase tracking-widest transition-colors border-b-2 ${activeTab === tab
                                         ? 'border-blue-600 text-blue-600 dark:text-blue-400'
                                         : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
                                         }`}
@@ -189,10 +210,55 @@ const CustomerDetailsDrawer: React.FC<CustomerDetailsDrawerProps> = ({ customerI
                                     <Section title="Contact & Identity">
                                         <InfoItem label="Mobile" value={profile.mobile_number || profile.phone_number} icon="call" />
                                         <InfoItem label="Email" value={profile.personal_email || profile.email} icon="mail" />
-                                        <InfoItem label="BVN" value={profile.bvn} icon="fingerprint" />
-                                        <InfoItem label="NIN" value={profile.nin} icon="badge" />
+                                        <InfoItem 
+                                            label="BVN" 
+                                            value={profile.is_identity_verified ? maskValue(profile.bvn) : profile.bvn} 
+                                            icon="fingerprint" 
+                                            verified={profile.is_identity_verified}
+                                        />
+                                        <InfoItem 
+                                            label="NIN" 
+                                            value={profile.is_identity_verified ? maskValue(profile.nin) : profile.nin} 
+                                            icon="badge" 
+                                            verified={profile.is_identity_verified}
+                                        />
                                         <InfoItem label="Date of Birth" value={formatDate(profile.date_of_birth)} icon="cake" />
                                     </Section>
+                                    
+                                    {(profile.promotion_source || profile.hear_about_us || profile.marketing_officer) && (
+                                        <Section title="Acquisition Details">
+                                            <InfoItem label="Marketing Source" value={profile.promotion_source || profile.hear_about_us} icon="campaign" />
+                                            <InfoItem label="UTM Medium" value={profile.promotion_medium} icon="ads_click" />
+                                            <InfoItem label="Campaign" value={profile.promotion_campaign} icon="label" />
+                                            <InfoItem label="Referral Code" value={profile.marketing_referral} icon="group_add" />
+                                            <InfoItem label="Assigned Officer" value={profile.marketing_officer} icon="person_pin" />
+                                        </Section>
+                                    )}
+
+                                    {profile.selfie_verification_url && (
+                                        <Section title="Identity Verification">
+                                            <div className="p-4 rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900/40">
+                                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Live Captured Selfie</p>
+                                                <div className="group relative aspect-square w-full max-w-[200px] mx-auto rounded-2xl overflow-hidden border-4 border-slate-50 dark:border-slate-800 shadow-lg">
+                                                    <img 
+                                                        src={profile.selfie_verification_url} 
+                                                        alt="Selfie" 
+                                                        className="size-full object-cover transition-transform duration-500 group-hover:scale-110"
+                                                    />
+                                                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                                        <a 
+                                                            href={profile.selfie_verification_url} 
+                                                            target="_blank" 
+                                                            rel="noreferrer"
+                                                            className="p-3 bg-white/20 backdrop-blur-md rounded-full text-white hover:bg-white/40 transition-colors"
+                                                        >
+                                                            <span className="material-symbols-outlined">zoom_in</span>
+                                                        </a>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </Section>
+                                    )}
 
                                     <Section title="Financial Details">
                                         <InfoItem label="Bank Name" value={profile.bank_name} icon="account_balance" />
@@ -274,8 +340,8 @@ const CustomerDetailsDrawer: React.FC<CustomerDetailsDrawerProps> = ({ customerI
                                                         <div className="text-lg font-black text-slate-900 dark:text-white tracking-tight">
                                                             {new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN' }).format(Number(loan.requested_loan_amount))}
                                                         </div>
-                                                        <div className="text-xs text-slate-500 font-medium">
-                                                            Applied on {formatDate(loan.created_at)}
+                                                        <div className="text-xs text-slate-500 font-medium font-mono">
+                                                            Applied: {formatDateTime(loan.created_at)}
                                                         </div>
                                                     </div>
                                                     <span className={`px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider ${loan.status === 'active' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' :
@@ -287,6 +353,44 @@ const CustomerDetailsDrawer: React.FC<CustomerDetailsDrawerProps> = ({ customerI
                                                 </div>
                                                 <div className="mt-2 pt-2 border-t border-slate-100 dark:border-slate-700 flex justify-between items-center">
                                                     <span className="text-xs text-slate-400 font-bold">{loan.loan_type?.toUpperCase() || 'LOAN'}</span>
+                                                    <span className="text-xs text-blue-500 font-bold cursor-pointer hover:underline">View Details</span>
+                                                </div>
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
+                            )}
+
+                            {activeTab === 'investments' && (
+                                <div className="space-y-4">
+                                    {investments.length === 0 ? (
+                                        <div className="text-center py-12">
+                                            <div className="size-16 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-4 text-slate-400">
+                                                <span className="material-symbols-outlined text-2xl">account_balance_wallet</span>
+                                            </div>
+                                            <p className="text-slate-500 font-medium">No investment history available.</p>
+                                        </div>
+                                    ) : (
+                                        investments.map(inv => (
+                                            <div key={inv.id} className="p-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-sm hover:shadow-md transition-shadow">
+                                                <div className="flex justify-between items-start mb-2">
+                                                    <div>
+                                                        <div className="text-lg font-black text-slate-900 dark:text-white tracking-tight">
+                                                            {new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN' }).format(Number(inv.investment_amount))}
+                                                        </div>
+                                                        <div className="text-xs text-slate-500 font-medium font-mono">
+                                                            Applied: {formatDateTime(inv.created_at)}
+                                                        </div>
+                                                    </div>
+                                                    <span className={`px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider ${inv.status === 'active' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' :
+                                                        inv.status === 'pending' ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400' :
+                                                            'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-400'
+                                                        }`}>
+                                                        {inv.status}
+                                                    </span>
+                                                </div>
+                                                <div className="mt-2 pt-2 border-t border-slate-100 dark:border-slate-700 flex justify-between items-center">
+                                                    <span className="text-xs text-slate-400 font-bold">{inv.investment_type?.replace(/_/g, ' ') || 'INVESTMENT'}</span>
                                                     <span className="text-xs text-blue-500 font-bold cursor-pointer hover:underline">View Details</span>
                                                 </div>
                                             </div>
@@ -320,8 +424,8 @@ const CustomerDetailsDrawer: React.FC<CustomerDetailsDrawerProps> = ({ customerI
                                                     <div className="text-sm font-bold text-slate-900 dark:text-white group-hover:text-blue-600 transition-colors truncate">
                                                         {doc.type}
                                                     </div>
-                                                    <div className="text-[10px] text-slate-400 font-medium">
-                                                        Uploaded: {formatDate(doc.date)}
+                                                    <div className="text-[10px] text-slate-400 font-medium font-mono">
+                                                        Uploaded: {formatDateTime(doc.date)}
                                                     </div>
                                                 </div>
                                                 <span className="material-symbols-outlined text-slate-300 group-hover:text-blue-500 transition-colors text-lg">open_in_new</span>
@@ -347,14 +451,19 @@ const Section: React.FC<{ title: string; children: React.ReactNode }> = ({ title
     </div>
 );
 
-const InfoItem: React.FC<{ label: string; value?: string; icon?: string }> = ({ label, value, icon }) => (
+const InfoItem: React.FC<{ label: string; value?: string; icon?: string; verified?: boolean }> = ({ label, value, icon, verified }) => (
     <div className="flex items-center gap-3 p-3 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group">
         <div className="size-8 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-400 group-hover:text-blue-500 transition-colors">
             <span className="material-symbols-outlined text-sm">{icon || 'info'}</span>
         </div>
         <div className="flex-1">
-            <p className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">{label}</p>
-            <p className="font-medium text-slate-900 dark:text-slate-200 text-sm">{value || 'N/A'}</p>
+            <div className="flex items-center gap-2">
+                <p className="text-[10px] uppercase font-bold text-slate-400 tracking-wider font-sans">{label}</p>
+                {verified && (
+                    <span className="text-[8px] font-black text-green-500 bg-green-500/10 px-1 py-0.5 rounded uppercase tracking-[0.1em] border border-green-500/20">Verified</span>
+                )}
+            </div>
+            <p className="font-bold text-slate-900 dark:text-slate-200 text-[13px] font-mono">{value || 'N/A'}</p>
         </div>
     </div>
 );

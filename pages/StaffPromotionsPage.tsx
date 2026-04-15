@@ -15,6 +15,7 @@ interface Promotion {
     max_redemptions: number | null;
     current_redemptions: number;
     clicks: number;
+    unique_code: string;
     created_at: string;
 }
 
@@ -37,7 +38,9 @@ const StaffPromotionsPage: React.FC<StaffPromotionsPageProps> = ({ user, onLogou
         utm_campaign: '',
         target_product: 'ALL_PRODUCTS',
         utm_source: 'nolt_marketing',
-        utm_medium: 'referral_link',
+        utm_medium: 'link',
+        custom_source: '',
+        custom_medium: '',
         max_redemptions: '',
         isInfinityExpiry: true,
         expiry_date: ''
@@ -85,8 +88,8 @@ const StaffPromotionsPage: React.FC<StaffPromotionsPageProps> = ({ user, onLogou
             const payload = {
                 utm_campaign: formData.utm_campaign,
                 target_product: formData.target_product,
-                utm_source: formData.utm_source,
-                utm_medium: formData.utm_medium,
+                utm_source: formData.utm_source === 'others' ? formData.custom_source : formData.utm_source,
+                utm_medium: formData.utm_medium === 'others' ? formData.custom_medium : formData.utm_medium,
                 benefit_value: null,
                 expiry_date: formData.isInfinityExpiry ? null : formData.expiry_date,
                 max_redemptions: formData.max_redemptions ? parseInt(formData.max_redemptions) : null
@@ -105,7 +108,9 @@ const StaffPromotionsPage: React.FC<StaffPromotionsPageProps> = ({ user, onLogou
                 utm_campaign: '',
                 target_product: 'ALL_PRODUCTS',
                 utm_source: 'nolt_marketing',
-                utm_medium: 'referral_link',
+                utm_medium: 'link',
+                custom_source: '',
+                custom_medium: '',
                 max_redemptions: '',
                 isInfinityExpiry: true,
                 expiry_date: ''
@@ -119,12 +124,20 @@ const StaffPromotionsPage: React.FC<StaffPromotionsPageProps> = ({ user, onLogou
     };
 
     const openEditModal = (promo: Promotion) => {
+        const standardSources = ['nolt_marketing', 'social_media', 'partner', 'direct', 'referral_link'];
+        const standardMediums = ['email', 'sms', 'link', 'social', 'referral_link'];
+        
+        const sourceIsOther = promo.utm_source && !standardSources.includes(promo.utm_source);
+        const mediumIsOther = promo.utm_medium && !standardMediums.includes(promo.utm_medium);
+
         setEditingPromo(promo);
         setFormData({
             utm_campaign: promo.utm_campaign,
             target_product: promo.target_product,
-            utm_source: promo.utm_source || 'nolt_marketing',
-            utm_medium: promo.utm_medium || 'referral_link',
+            utm_source: sourceIsOther ? 'others' : (promo.utm_source || 'nolt_marketing'),
+            utm_medium: mediumIsOther ? 'others' : (promo.utm_medium || 'link'),
+            custom_source: sourceIsOther ? promo.utm_source! : '',
+            custom_medium: mediumIsOther ? promo.utm_medium! : '',
             max_redemptions: promo.max_redemptions?.toString() || '',
             isInfinityExpiry: !promo.expiry_date,
             expiry_date: promo.expiry_date ? new Date(promo.expiry_date).toISOString().split('T')[0] : ''
@@ -138,7 +151,9 @@ const StaffPromotionsPage: React.FC<StaffPromotionsPageProps> = ({ user, onLogou
             utm_campaign: '',
             target_product: 'ALL_PRODUCTS',
             utm_source: 'nolt_marketing',
-            utm_medium: 'referral_link',
+            utm_medium: 'link',
+            custom_source: '',
+            custom_medium: '',
             max_redemptions: '',
             isInfinityExpiry: true,
             expiry_date: ''
@@ -157,8 +172,8 @@ const StaffPromotionsPage: React.FC<StaffPromotionsPageProps> = ({ user, onLogou
         }
     };
 
-    const copyLink = (utm_campaign: string) => {
-        const link = `${window.location.origin}/register?ref=${utm_campaign}`;
+    const copyLink = (promo: Promotion) => {
+        const link = `${window.location.origin}/register?utm_campaign=${encodeURIComponent(promo.utm_campaign)}&utm_medium=${encodeURIComponent(promo.utm_medium || '')}&utm_source=${encodeURIComponent(promo.utm_source || '')}&target_product=${encodeURIComponent(promo.target_product)}&ref=${encodeURIComponent(promo.unique_code || '')}`;
         navigator.clipboard.writeText(link);
         alert('Copied to clipboard!');
     };
@@ -235,7 +250,9 @@ const StaffPromotionsPage: React.FC<StaffPromotionsPageProps> = ({ user, onLogou
                         <table className="w-full text-left border-collapse">
                             <thead>
                                 <tr>
-                                    <th className="px-4 py-4 border-b border-slate-100 dark:border-slate-800 text-[10px] font-black uppercase text-slate-400 tracking-widest">Campaign Code</th>
+                                    <th className="px-4 py-4 border-b border-slate-100 dark:border-slate-800 text-[10px] font-black uppercase text-slate-400 tracking-widest">Campaign & Code</th>
+                                    <th className="px-4 py-4 border-b border-slate-100 dark:border-slate-800 text-[10px] font-black uppercase text-slate-400 tracking-widest">UTM Source</th>
+                                    <th className="px-4 py-4 border-b border-slate-100 dark:border-slate-800 text-[10px] font-black uppercase text-slate-400 tracking-widest">UTM Medium</th>
                                     <th className="px-4 py-4 border-b border-slate-100 dark:border-slate-800 text-[10px] font-black uppercase text-slate-400 tracking-widest">Benefit</th>
                                     <th className="px-4 py-4 border-b border-slate-100 dark:border-slate-800 text-[10px] font-black uppercase text-slate-400 tracking-widest">Product Target</th>
                                     <th className="px-4 py-4 border-b border-slate-100 dark:border-slate-800 text-[10px] font-black uppercase text-slate-400 tracking-widest">Redemptions</th>
@@ -251,15 +268,21 @@ const StaffPromotionsPage: React.FC<StaffPromotionsPageProps> = ({ user, onLogou
                                     
                                     return (
                                         <tr key={promo.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group">
-                                            <td className="px-4 py-5 border-b border-slate-100 dark:border-slate-800">
+                                            <td className="px-4 py-4 border-b border-slate-50 dark:border-slate-800/50">
                                                 <div className="flex flex-col">
-                                                    <span className="font-black text-sm text-slate-900 dark:text-white uppercase">
-                                                        {promo.utm_campaign}
-                                                    </span>
-                                                    <span className="text-[10px] text-slate-400 font-bold uppercase truncate max-w-[150px]">
-                                                        {promo.utm_source || 'Nolt Marketing'}
-                                                    </span>
+                                                    <span className="font-bold text-slate-900 dark:text-white">{promo.utm_campaign}</span>
+                                                    <span className="text-xs font-mono text-purple-600 dark:text-purple-400 font-bold tracking-wider">{promo.unique_code}</span>
                                                 </div>
+                                            </td>
+                                            <td className="px-4 py-5 border-b border-slate-100 dark:border-slate-800">
+                                                <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400">
+                                                    {promo.utm_source || 'Organic'}
+                                                </span>
+                                            </td>
+                                            <td className="px-4 py-5 border-b border-slate-100 dark:border-slate-800">
+                                                <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400">
+                                                    {promo.utm_medium || 'Organic'}
+                                                </span>
                                             </td>
                                             <td className="px-4 py-5 border-b border-slate-100 dark:border-slate-800">
                                                 <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase ${promo.benefit_value ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10' : 'bg-slate-50 text-slate-400 dark:bg-slate-800'}`}>
@@ -274,7 +297,7 @@ const StaffPromotionsPage: React.FC<StaffPromotionsPageProps> = ({ user, onLogou
                                             <td className="px-4 py-5 border-b border-slate-100 dark:border-slate-800">
                                                 <div className="flex flex-col gap-1.5 min-w-[140px]">
                                                     <div className="flex justify-between items-center text-[10px] font-black uppercase">
-                                                        <span className="text-slate-400">{promo.current_redemptions} Used</span>
+                                                        <span className="text-slate-400">{promo.clicks} Used</span>
                                                         <span className="text-slate-500">{promo.max_redemptions ? `${promo.max_redemptions} Limit` : '∞ Limit'}</span>
                                                     </div>
                                                     <div className="h-1.5 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
@@ -298,7 +321,7 @@ const StaffPromotionsPage: React.FC<StaffPromotionsPageProps> = ({ user, onLogou
                                             <td className="px-4 py-5 border-b border-slate-100 dark:border-slate-800 text-right">
                                                 <div className="flex items-center justify-end gap-2">
                                                     <button 
-                                                        onClick={() => copyLink(promo.utm_campaign)}
+                                                        onClick={() => copyLink(promo)}
                                                         className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-purple-600 hover:shadow-md transition-all inline-flex items-center"
                                                         title="Copy Tracking Link"
                                                     >
@@ -395,7 +418,7 @@ const StaffPromotionsPage: React.FC<StaffPromotionsPageProps> = ({ user, onLogou
                                 </div>
                                 
                                 <div className="grid grid-cols-2 gap-4">
-                                    <div className="space-y-1.5">
+                                    <div className="space-y-3">
                                         <label className="text-[9px] font-black uppercase text-slate-400">UTM Source</label>
                                         <div className="relative">
                                             <select
@@ -407,11 +430,25 @@ const StaffPromotionsPage: React.FC<StaffPromotionsPageProps> = ({ user, onLogou
                                                 <option value="social_media">SOCIAL MEDIA</option>
                                                 <option value="partner">PARTNER</option>
                                                 <option value="direct">DIRECT</option>
+                                                <option value="referral_link">REFERRAL LINK</option>
+                                                <option value="others">OTHERS</option>
                                             </select>
                                             <span className="material-symbols-outlined absolute right-3 top-3.5 text-slate-400 pointer-events-none text-lg">expand_more</span>
                                         </div>
+                                        {formData.utm_source === 'others' && (
+                                            <div className="mt-2 animate-in slide-in-from-top-2 duration-200">
+                                                <input
+                                                    type="text"
+                                                    required
+                                                    placeholder="Enter custom source..."
+                                                    value={formData.custom_source}
+                                                    onChange={e => setFormData({ ...formData, custom_source: e.target.value.toLowerCase().replace(/\s+/g, '_') })}
+                                                    className="w-full h-10 px-4 rounded-xl bg-blue-500/10 border border-blue-500/30 text-blue-400 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-all font-bold text-xs"
+                                                />
+                                            </div>
+                                        )}
                                     </div>
-                                    <div className="space-y-1.5">
+                                    <div className="space-y-3">
                                         <label className="text-[9px] font-black uppercase text-slate-400">UTM Medium</label>
                                         <div className="relative">
                                             <select
@@ -423,9 +460,23 @@ const StaffPromotionsPage: React.FC<StaffPromotionsPageProps> = ({ user, onLogou
                                                 <option value="sms">SMS</option>
                                                 <option value="link">LINK</option>
                                                 <option value="social">SOCIAL</option>
+                                                <option value="referral_link">REFERRAL LINK</option>
+                                                <option value="others">OTHERS</option>
                                             </select>
                                             <span className="material-symbols-outlined absolute right-3 top-3.5 text-slate-400 pointer-events-none text-lg">expand_more</span>
                                         </div>
+                                        {formData.utm_medium === 'others' && (
+                                            <div className="mt-2 animate-in slide-in-from-top-2 duration-200">
+                                                <input
+                                                    type="text"
+                                                    required
+                                                    placeholder="Enter custom medium..."
+                                                    value={formData.custom_medium}
+                                                    onChange={e => setFormData({ ...formData, custom_medium: e.target.value.toLowerCase().replace(/\s+/g, '_') })}
+                                                    className="w-full h-10 px-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-all font-bold text-xs"
+                                                />
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             </div>

@@ -5,6 +5,7 @@ import ActivityTimeline from '../components/ActivityTimeline';
 import axios from 'axios';
 import { getStatusStyles } from '../utils/statusStyles';
 import { formatDate } from '../utils/dateFormatter';
+import { maskValue } from '../utils/maskHelper';
 
 interface StaffInvestmentDetailsPageProps {
     user: { name: string; email: string; avatar_url?: string; role?: string };
@@ -24,11 +25,15 @@ const StaffInvestmentDetailsPage: React.FC<StaffInvestmentDetailsPageProps> = ({
     const [isProcessingIndemnity, setIsProcessingIndemnity] = useState(false);
     const [signatureBase64, setSignatureBase64] = useState<string | null>(null);
     const [directIndemnityUrl, setDirectIndemnityUrl] = useState<string | null>(null);
+    const [officers, setOfficers] = useState<any[]>([]);
+    const [draftCASA, setDraftCASA] = useState<string>('');
+
 
     const fetchInvestment = async () => {
         try {
             const response = await axios.get(`/api/staff/investments/${id}`, { withCredentials: true });
             setInvestment(response.data);
+            setDraftCASA(response.data.casa_account_number || '');
             const rawInt = response.data.interest_amount;
             setCustomInterest(rawInt && Number(rawInt) > 0 ? String(Number(rawInt)) : '');
         } catch (error) {
@@ -38,8 +43,35 @@ const StaffInvestmentDetailsPage: React.FC<StaffInvestmentDetailsPageProps> = ({
         }
     };
 
+    const fetchOfficers = async () => {
+        if (['sales_manager', 'admin', 'super_admin', 'superadmin', 'customer_experience', 'marketing'].includes(user.role || '')) {
+            try {
+                const response = await axios.get(`/api/staff/users?role=sales_officer&limit=200`, { withCredentials: true });
+                setOfficers(response.data.users.filter((u: any) => u.is_active));
+            } catch (error) {
+                console.error("Failed to fetch officers", error);
+            }
+        }
+    };
+
+    const handleAssignOfficer = async (officerId: string) => {
+        if (!confirm("Are you sure you want to reassign this investment?")) return;
+        try {
+            await axios.patch(`/api/staff/investments/${id}/assign`, {
+                sales_officer_id: officerId
+            }, { withCredentials: true });
+            await fetchInvestment();
+            alert("Investment reassigned successfully");
+        } catch (error: any) {
+            alert(error.response?.data?.message || "Reassignment failed");
+        }
+    };
+
     useEffect(() => {
-        if (id) fetchInvestment();
+        if (id) {
+            fetchInvestment();
+            fetchOfficers();
+        }
     }, [id, navigate]);
 
     const handleAction = async (action: 'approve' | 'reject') => {
@@ -222,23 +254,31 @@ const StaffInvestmentDetailsPage: React.FC<StaffInvestmentDetailsPageProps> = ({
         </div>
     );
 
-    const MaskedField = ({ label, value }: { label: string, value: string }) => {
+    const MaskedField = ({ label, value, verified = false }: { label: string, value: string, verified?: boolean }) => {
         const [isMasked, setIsMasked] = useState(true);
         if (!value) return <Field label={label} value="" />;
-        const maskedValue = value.replace(/./g, '*');
+        const maskedValueDisplay = verified ? maskValue(value) : value.replace(/./g, '*');
         return (
             <div className="space-y-2">
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center justify-between">
-                    {label}
-                    <button
-                        onClick={() => setIsMasked(!isMasked)}
-                        className="text-slate-500 hover:text-purple-500 transition-colors bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded text-[10px] font-bold"
-                    >
-                        {isMasked ? 'Reveal' : 'Hide'}
-                    </button>
-                </p>
+                <div className="flex items-center justify-between">
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{label}</p>
+                    <div className="flex items-center gap-2">
+                        {verified && (
+                            <span className="flex items-center gap-1 px-2 py-0.5 bg-green-500/10 text-green-600 rounded text-[8px] font-black uppercase tracking-tighter border border-green-500/20">
+                                <span className="material-symbols-outlined text-[10px]">verified</span>
+                                Verified
+                            </span>
+                        )}
+                        <button
+                            onClick={() => setIsMasked(!isMasked)}
+                            className="text-slate-500 hover:text-purple-500 transition-colors bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded text-[10px] font-bold"
+                        >
+                            {isMasked ? 'Reveal' : 'Hide'}
+                        </button>
+                    </div>
+                </div>
                 <p className="font-bold text-slate-900 dark:text-white break-words font-mono">
-                    {isMasked ? maskedValue : value}
+                    {isMasked ? maskedValueDisplay : value}
                 </p>
             </div>
         );
@@ -246,6 +286,35 @@ const StaffInvestmentDetailsPage: React.FC<StaffInvestmentDetailsPageProps> = ({
 
     return (
         <StaffLayout user={user} onLogout={onLogout} toggleTheme={toggleTheme} theme={theme}>
+            {/* Critical Alert for Missing CASA */}
+            {investment && investment.status === 'active' && !investment.casa_account_number && (
+                <div className="mb-8 p-6 rounded-[32px] bg-orange-50 dark:bg-orange-600/10 border-2 border-orange-200 dark:border-orange-500/20 flex flex-col md:flex-row items-center justify-between gap-6 shadow-xl shadow-orange-500/10 animate-in zoom-in-95 duration-500">
+                    <div className="flex items-center gap-5">
+                        <div className="size-14 rounded-2xl bg-orange-500 text-white flex items-center justify-center shadow-lg shadow-orange-500/30 shrink-0">
+                            <span className="material-symbols-outlined text-3xl">warning</span>
+                        </div>
+                        <div>
+                            <h4 className="text-lg font-black text-orange-900 dark:text-orange-200 uppercase tracking-tight">CASA Account Missing</h4>
+                            <p className="text-sm font-bold text-orange-800 dark:text-orange-300/80 leading-relaxed">
+                                This investment is <span className="underline decoration-2 underline-offset-4">ACTIVE</span> but lacks a CASA number. Certificate dispatch is currently <span className="font-black italic">BLOCKED</span>.
+                            </p>
+                        </div>
+                    </div>
+                    <button 
+                        onClick={() => {
+                            const input = document.getElementById('casa-input');
+                            if (input) {
+                                input.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                input.focus();
+                            }
+                        }}
+                        className="px-8 py-4 rounded-2xl bg-orange-500 hover:bg-orange-600 text-white font-black text-xs uppercase tracking-widest transition-all hover:scale-105 active:scale-95 shadow-lg shadow-orange-500/20 whitespace-nowrap"
+                    >
+                        Resolve Now
+                    </button>
+                </div>
+            )}
+
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8">
                 <div className="flex items-center gap-4">
@@ -298,6 +367,11 @@ const StaffInvestmentDetailsPage: React.FC<StaffInvestmentDetailsPageProps> = ({
                         <h1 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight leading-none">
                             {investment.company_name || investment.rep_full_name || investment.customer_name || 'Individual Application'}
                         </h1>
+                        {investment.promotion_source && (
+                            <p className="mt-2 text-xs font-black uppercase tracking-wider text-red-500">
+                                Promotions: {investment.promotion_source}
+                            </p>
+                        )}
                     </div>
                 </div>
                 {investment.gift_id && (
@@ -320,6 +394,37 @@ const StaffInvestmentDetailsPage: React.FC<StaffInvestmentDetailsPageProps> = ({
                             <span className="text-xs font-bold">View Original #INV-{investment.original_investment_id}</span>
                         </div>
                     </button>
+                )}
+            </div>
+            
+            {/* System Priority Warnings */}
+            <div className="space-y-4 mb-8">
+                {!investment.casa_account_number && investment.status === 'active' && (
+                    <div className="p-6 rounded-[24px] bg-orange-50 dark:bg-orange-500/10 border-2 border-orange-200 dark:border-orange-500/20 flex items-start gap-4 animate-in fade-in slide-in-from-top-4 duration-500">
+                        <div className="size-12 rounded-full bg-orange-500 text-white flex items-center justify-center shrink-0 shadow-lg shadow-orange-500/20">
+                            <span className="material-symbols-outlined">warning</span>
+                        </div>
+                        <div className="space-y-1">
+                            <h4 className="font-black text-orange-900 dark:text-orange-400 uppercase text-xs tracking-widest">Missing Account Information</h4>
+                            <p className="text-sm font-bold text-orange-800/80 dark:text-orange-400/80 leading-relaxed">
+                                This investment is <b>ACTIVE</b> but is missing a CASA account number. The investment certificate cannot be dispatched to the client until this information is provided in the account settings below.
+                            </p>
+                        </div>
+                    </div>
+                )}
+
+                {investment.has_failed_selfie && (
+                    <div className="p-6 rounded-[24px] bg-red-50 dark:bg-red-500/10 border-2 border-red-200 dark:border-red-500/20 flex items-start gap-4 animate-in fade-in slide-in-from-top-4 duration-500">
+                        <div className="size-12 rounded-full bg-red-500 text-white flex items-center justify-center shrink-0 shadow-lg shadow-red-500/20">
+                            <span className="material-symbols-outlined">gpp_maybe</span>
+                        </div>
+                        <div className="space-y-1">
+                            <h4 className="font-black text-red-900 dark:text-red-400 uppercase text-xs tracking-widest">Manual KYC Verification Required</h4>
+                            <p className="text-sm font-bold text-red-800/80 dark:text-red-400/80 leading-relaxed">
+                                The customer failed automated selfie verification and bypassed the check on their second attempt. <b>Please manually inspect the verification image</b> in the profile section to ensure identity authenticity before final approval.
+                            </p>
+                        </div>
+                    </div>
                 )}
             </div>
 
@@ -403,22 +508,48 @@ const StaffInvestmentDetailsPage: React.FC<StaffInvestmentDetailsPageProps> = ({
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
                 <div className="lg:col-span-8 space-y-6">
                     <CollapsibleGroup title="Personal & Contact Data" icon="person" defaultOpen={true}>
-                        <Field label="Full Name" value={`${investment.title ? investment.title + ' ' : ''}${investment.rep_full_name || investment.customer_name || 'Individual'}`} />
-                        <Field label="Gender" value={investment.gender} />
-                        <Field label="Date of Birth" value={investment.dob ? formatDate(investment.dob) : ''} />
-                        <Field label="Email Address" value={investment.customer_email} />
-                        <Field label="Phone Number" value={investment.rep_phone_number || investment.customer_phone} />
-                        <Field label="Mother's Maiden Name" value={investment.mother_maiden_name} />
-                        <Field label="Religion" value={investment.religion} />
-                        <Field label="Marital Status" value={investment.marital_status} />
+                        <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-8">
+                            <div className="space-y-8">
+                                <Field label="Full Name" value={`${investment.title ? investment.title + ' ' : ''}${investment.rep_full_name || investment.customer_name || 'Individual'}`} />
+                                <Field label="Gender" value={investment.gender} />
+                                <Field label="Date of Birth" value={investment.dob ? formatDate(investment.dob) : ''} />
+                                <Field label="Email Address" value={investment.customer_email} />
+                                <Field label="Phone Number" value={investment.rep_phone_number || investment.customer_phone} />
+                                <Field label="Mother's Maiden Name" value={investment.mother_maiden_name} />
+                                <Field label="Religion" value={investment.religion} />
+                                <Field label="Marital Status" value={investment.marital_status} />
 
-                        <Field label="State of Origin" value={investment.rep_state_of_origin} />
-                        <Field label="State of Residence" value={investment.rep_state_of_residence} />
-                        <Field label="Home Address" value={`${investment.rep_house_number ? investment.rep_house_number + ', ' : ''}${investment.rep_street_address || ''}`} />
+                                <Field label="State of Origin" value={investment.rep_state_of_origin} />
+                                <Field label="State of Residence" value={investment.rep_state_of_residence} />
+                                <Field label="Home Address" value={`${investment.rep_house_number ? investment.rep_house_number + ', ' : ''}${investment.rep_street_address || ''}`} />
 
-                        <MaskedField label="BVN" value={investment.rep_bvn || investment.bvn} />
-                        <MaskedField label="NIN" value={investment.rep_nin || investment.nin} />
-                        {investment.entity_type === 'INDIVIDUAL' && investment.tin_number && <MaskedField label="TIN Number" value={investment.tin_number} />}
+                                <MaskedField label="BVN" value={investment.rep_bvn || investment.bvn} verified={investment.is_identity_verified} />
+                                <MaskedField label="NIN" value={investment.rep_nin || investment.nin} />
+                                {investment.entity_type === 'INDIVIDUAL' && investment.tin_number && <MaskedField label="TIN Number" value={investment.tin_number} />}
+                            </div>
+
+                            {investment.rep_selfie_url && (
+                                <div className="flex flex-col items-center justify-start pt-4">
+                                    <div className="relative group">
+                                        <div className="absolute -inset-4 bg-gradient-to-tr from-purple-500/20 to-blue-500/20 rounded-[40px] blur-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                                        <div className="relative">
+                                            <img
+                                                src={investment.rep_selfie_url}
+                                                alt="Captured Face"
+                                                className="w-64 h-80 object-cover rounded-[32px] border-4 border-white dark:border-slate-800 shadow-2xl relative z-10"
+                                            />
+                                            <div className="absolute top-4 right-4 z-20">
+                                                <span className="flex items-center gap-1 px-3 py-1 bg-white/90 dark:bg-slate-900/90 backdrop-blur shadow-lg rounded-full text-[10px] font-black uppercase tracking-widest text-slate-900 dark:text-white border border-slate-200 dark:border-slate-700">
+                                                    <span className="material-symbols-outlined text-[14px] text-purple-500">face</span>
+                                                    Live Image
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <p className="mt-6 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Identity Verification Image</p>
+                                </div>
+                            )}
+                        </div>
                     </CollapsibleGroup>
 
                     {investment.entity_type === 'CORPORATE' && (
@@ -449,15 +580,19 @@ const StaffInvestmentDetailsPage: React.FC<StaffInvestmentDetailsPageProps> = ({
                                                     <th className="p-3">Name</th>
                                                     <th className="p-3">Phone</th>
                                                     <th className="p-3">BVN/NIN</th>
+                                                    <th className="p-3">TIN</th>
+                                                    <th className="p-3">Address</th>
                                                     <th className="p-3">PEP?</th>
                                                 </tr>
                                             </thead>
                                             <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
-                                                {(typeof investment.directors === 'string' ? JSON.parse(investment.directors) : investment.directors).map((d: any, i: number) => (
+                                                {(investment.directors ? (typeof investment.directors === 'string' ? JSON.parse(investment.directors) : investment.directors) : []).map((d: any, i: number) => (
                                                     <tr key={i} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30">
                                                         <td className="p-3 font-bold truncate max-w-[150px] capitalize">{`${d.firstName} ${d.surname}`}</td>
                                                         <td className="p-3 font-mono">{d.phone}</td>
-                                                        <td className="p-3 font-mono text-slate-500">{d.bvn}</td>
+                                                        <td className="p-3 font-mono text-slate-500 text-[10px]">{d.bvn}<br/>{d.nin}</td>
+                                                        <td className="p-3 font-mono text-slate-500 text-[10px]">{d.tin || '-'}</td>
+                                                        <td className="p-3 text-slate-500 text-[10px] max-w-[150px] truncate" title={d.address}>{d.address || '-'}</td>
                                                         <td className="p-3">
                                                             <span className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase ${d.isPep ? 'bg-orange-100 text-orange-600' : 'bg-slate-100 text-slate-500'}`}>
                                                                 {d.isPep ? 'YES' : 'NO'}
@@ -511,14 +646,14 @@ const StaffInvestmentDetailsPage: React.FC<StaffInvestmentDetailsPageProps> = ({
                                     <div className="p-6 rounded-2xl bg-amber-50 dark:bg-amber-900/10 border border-amber-100 dark:border-amber-900/20">
                                         <p className="text-[10px] font-black uppercase text-amber-600 dark:text-amber-400 tracking-widest mb-2">Action Required</p>
                                         <p className="text-sm font-bold text-slate-900 dark:text-white mb-4">The indemnity agreement is currently missing for this investment.</p>
-                                        
+
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                             <div className="space-y-3">
                                                 <label className="text-[10px] font-black uppercase text-slate-500 block">Option 1: Upload Signature Image</label>
                                                 <div className="relative group">
-                                                    <input 
-                                                        type="file" 
-                                                        accept="image/*" 
+                                                    <input
+                                                        type="file"
+                                                        accept="image/*"
                                                         onChange={(e) => e.target.files?.[0] && handleFileUpload(e.target.files[0], 'signature')}
                                                         className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
                                                     />
@@ -532,9 +667,9 @@ const StaffInvestmentDetailsPage: React.FC<StaffInvestmentDetailsPageProps> = ({
                                             <div className="space-y-3">
                                                 <label className="text-[10px] font-black uppercase text-slate-500 block">Option 2: Direct Document Upload</label>
                                                 <div className="relative group">
-                                                    <input 
-                                                        type="file" 
-                                                        accept="application/pdf" 
+                                                    <input
+                                                        type="file"
+                                                        accept="application/pdf"
                                                         onChange={(e) => e.target.files?.[0] && handleFileUpload(e.target.files[0], 'indemnity')}
                                                         className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
                                                     />
@@ -563,6 +698,20 @@ const StaffInvestmentDetailsPage: React.FC<StaffInvestmentDetailsPageProps> = ({
                             )}
                         </div>
                     </CollapsibleGroup>
+                    {(investment.promotion_source || investment.hear_about_us) && (
+                        <CollapsibleGroup title="Marketing Data" icon="campaign">
+                            {investment.promotion_source && (
+                                <>
+                                    <Field label="Promotion Source" value={investment.promotion_source} />
+                                    <Field label="Promotion Medium" value={investment.promotion_medium} />
+                                    <Field label="Promotion Campaign" value={investment.promotion_campaign} />
+                                </>
+                            )}
+                            <Field label="Hear About Us" value={investment.hear_about_us} />
+                            {/* <Field label="Referral Code" value={investment.marketing_referral} /> */}
+                            <Field label="Attributed Officer" value={investment.marketing_officer} />
+                        </CollapsibleGroup>
+                    )}
 
                     {(investment.rep_id_url || investment.utility_bill_url || investment.cac_url || investment.secondary_id_url || investment.company_profile_url || investment.status_report_url || investment.memart_url || investment.annual_returns_url || investment.board_resolution_url || investment.signatures) && (
                         <CollapsibleGroup title="Secure Vault Documents" icon="folder_open">
@@ -629,6 +778,43 @@ const StaffInvestmentDetailsPage: React.FC<StaffInvestmentDetailsPageProps> = ({
                 </div>
 
                 <div className="lg:col-span-4 space-y-6 sticky top-8">
+                    {/* CASA Setting Card */}
+                    <div className="bg-white dark:bg-[#1e293b] rounded-[32px] p-8 border border-slate-200 dark:border-slate-800 shadow-xl shadow-slate-200/50 dark:shadow-none mb-6">
+                        <div className="flex items-center gap-3 mb-6">
+                            <div className="size-10 rounded-xl bg-purple-100 dark:bg-purple-900/30 text-purple-600 flex items-center justify-center">
+                                <span className="material-symbols-outlined text-xl">account_balance</span>
+                            </div>
+                            <div>
+                                <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Account Management</p>
+                                <h3 className="text-xl font-black text-slate-900 dark:text-white uppercase tracking-tight">CASA Setting</h3>
+                            </div>
+                        </div>
+
+                        <div className="space-y-4">
+                            <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 block px-1">CASA Account Number</label>
+                            <div className="relative flex items-center gap-3">
+                                <input 
+                                    id="casa-input"
+                                    type="text" 
+                                    value={draftCASA}
+                                    onChange={(e) => setDraftCASA(e.target.value)}
+                                    placeholder="Enter CASA Number..."
+                                    className="flex-1 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl px-6 py-4 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all placeholder:text-slate-400"
+                                />
+                                <button
+                                    onClick={() => handleCASAUpdate(draftCASA)}
+                                    disabled={isActioning}
+                                    className="bg-purple-600 hover:bg-purple-700 text-white font-black text-xs uppercase tracking-widest px-8 py-4 rounded-2xl transition-all shadow-lg shadow-purple-500/20 active:scale-95 disabled:opacity-50 flex items-center justify-center"
+                                >
+                                    {isActioning ? <div className="size-4 border-2 border-white/20 border-t-white rounded-full animate-spin"></div> : 'SAVE'}
+                                </button>
+                            </div>
+                            <p className="text-[10px] font-bold text-slate-400 px-1 italic leading-relaxed">
+                                Clicking "Save" will automatically email the client their certificate if active.
+                            </p>
+                        </div>
+                    </div>
+
                     {/* Liquidation Action Card */}
                     {investment.is_liquidating && (
                         <div className="bg-orange-50 dark:bg-orange-950/20 rounded-[32px] p-8 border-2 border-orange-200 dark:border-orange-500/20 shadow-xl shadow-orange-500/10 mb-6 relative overflow-hidden">
@@ -706,7 +892,51 @@ const StaffInvestmentDetailsPage: React.FC<StaffInvestmentDetailsPageProps> = ({
                             })()}
                         </div>
                     )}
+                    {/* Assignment Control Card */}
+                    {['sales_manager', 'admin', 'super_admin', 'superadmin', 'customer_experience'].includes(user.role?.toLowerCase() || '') && (
+                        <div className="bg-white dark:bg-[#1e293b] rounded-[32px] p-8 border border-slate-200 dark:border-slate-800 shadow-xl shadow-slate-200/50 dark:shadow-none mb-6">
+                            <div className="flex items-center gap-2 mb-4">
+                                <span className="material-symbols-outlined text-blue-500">person_add</span>
+                                <p className="text-xs font-black uppercase tracking-widest text-slate-500 dark:text-slate-400">Account Assignment</p>
+                            </div>
+                            <h3 className="text-2xl font-black mb-6 text-slate-900 dark:text-white">Sales Officer</h3>
+
+                            <div className="space-y-4">
+                                <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-800">
+                                    <div className="flex items-center gap-3">
+                                        <div className="size-10 rounded-full bg-blue-500/10 text-blue-500 flex items-center justify-center font-black">
+                                            {investment.officer_name ? investment.officer_name[0] : 'U'}
+                                        </div>
+                                        <div>
+                                            <p className="text-sm font-black text-slate-900 dark:text-white leading-none mb-1">
+                                                {investment.officer_name || 'Unassigned'}
+                                            </p>
+                                            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-tight text-nowrap truncate max-w-[150px]">
+                                                {investment.officer_email || 'Promotion / Marketing'}
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="relative">
+                                    <select
+                                        value={investment.sales_officer_id || ''}
+                                        onChange={(e) => handleAssignOfficer(e.target.value)}
+                                        className="w-full px-6 py-4 rounded-2xl bg-white dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-800 text-sm font-black text-slate-900 dark:text-white appearance-none cursor-pointer focus:border-blue-500 transition-all outline-none"
+                                    >
+                                        <option value="">Select Officer to Reassign</option>
+                                        {officers.map(off => (
+                                            <option key={off.id} value={off.id}>{off.full_name}</option>
+                                        ))}
+                                    </select>
+                                    <span className="material-symbols-outlined absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">expand_more</span>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
                     <div className="bg-white dark:bg-[#1e293b] rounded-[32px] p-8 border border-slate-200 dark:border-slate-800 shadow-xl shadow-slate-200/50 dark:shadow-none">
+
                         <div className="flex items-center gap-2 mb-4">
                             <span className="material-symbols-outlined text-purple-500">info</span>
                             <p className="text-xs font-black uppercase tracking-widest text-slate-500 dark:text-slate-400">Application Info</p>

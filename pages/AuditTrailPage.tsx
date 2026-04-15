@@ -4,7 +4,7 @@ import { useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import ActivityTimeline from '../components/ActivityTimeline';
 import { getStatusStyles } from '../utils/statusStyles';
-import { formatDate } from '../utils/dateFormatter';
+import { formatDate, formatDateTime } from '../utils/dateFormatter';
 
 interface AuditTrailPageProps {
     user: { name: string; email: string; avatar_url?: string; role?: string };
@@ -122,7 +122,7 @@ const AuditTrailPage: React.FC<AuditTrailPageProps> = ({ user, onLogout, toggleT
                                                 );
                                             })()}
                                         </td>
-                                        <td className="p-4 text-xs text-slate-500">{formatDate(loan.created_at)}</td>
+                                        <td className="p-4 text-xs text-slate-500 font-mono italic">{formatDateTime(loan.created_at)}</td>
                                         <td className="p-4 text-right">
                                             <button className="text-blue-500 hover:text-blue-600 text-xs font-bold uppercase tracking-wider flex items-center gap-1 ml-auto">
                                                 <span className="material-symbols-outlined text-sm">visibility</span>
