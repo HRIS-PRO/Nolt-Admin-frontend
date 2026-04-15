@@ -35,7 +35,7 @@ const StaffLayout: React.FC<StaffLayoutProps> = ({ children, user, onLogout, tog
                 { label: 'Investments', icon: 'account_balance_wallet', path: '/staff/investments' },
                 { label: 'Promotions', icon: 'campaign', path: '/staff/promotions' },
                 { label: 'Reports', icon: 'description', path: '/staff/reports' },
-                { label: 'Timeline', icon: 'timeline', path: '/staff/timeline' },
+                { label: 'BI Dashboard', icon: 'timeline', path: '/staff/timeline' },
             ]
         },
         {
@@ -68,16 +68,16 @@ const StaffLayout: React.FC<StaffLayoutProps> = ({ children, user, onLogout, tog
                 {/* Brand */}
                 <div className="flex items-center justify-between p-8">
                     <Link to="/" className="flex items-center gap-3 cursor-pointer">
-                        <div className="w-10 h-10 rounded-xl flex items-center justify-center overflow-hidden">
+                        <div className="w-50 h-10 rounded-xl flex items-center justify-center overflow-hidden">
                             <img
-                                src="https://isswlcllytiltgjbysjv.supabase.co/storage/v1/object/public/template-images/logo%20file-02%20(1).png"
+                                src="https://noltfinance.s3.us-east-1.amazonaws.com/logo+updated+white.png"
                                 alt="NOLT Finance Logo"
                                 className="w-full h-full object-contain"
                             />
                         </div>
-                        <h1 className="text-xl font-black tracking-tighter text-slate-900 text-white uppercase">
+                        {/* <h1 className="text-xl font-black tracking-tighter text-slate-900 text-white uppercase">
                             NOLT Finance
-                        </h1>
+                        </h1> */}
                     </Link>
                     {/* Mobile Close Button */}
                     <button
@@ -104,7 +104,7 @@ const StaffLayout: React.FC<StaffLayoutProps> = ({ children, user, onLogout, tog
                             }
                             if (user?.role === 'marketing') {
                                 // Marketing should only see these specific tabs
-                                return ['Dashboard', 'Investments', 'Promotions'].includes(item.label);
+                                return ['Dashboard', 'Loans', 'Investments', 'Promotions'].includes(item.label);
                             }
                             return true;
                         });

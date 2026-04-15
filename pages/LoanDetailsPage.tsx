@@ -468,8 +468,33 @@ const LoanDetailsPage: React.FC<LoanDetailsPageProps> = ({ user, onLogout, toggl
     const [loan, setLoan] = useState<any>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [showEditModal, setShowEditModal] = useState(false);
+    const [officers, setOfficers] = useState<any[]>([]);
 
+    const fetchOfficers = async () => {
+        if (['sales_manager', 'admin', 'super_admin', 'superadmin', 'customer_experience'].includes(user.role || '')) {
+            try {
+                const response = await axios.get(`/api/staff/users?role=sales_officer&limit=200`, { withCredentials: true });
+                setOfficers(response.data.users.filter((u: any) => u.is_active));
+            } catch (error) {
+                console.error("Failed to fetch officers", error);
+            }
+        }
+    };
 
+    const handleAssignOfficer = async (officerId: string) => {
+        if (!confirm("Are you sure you want to reassign this loan?")) return;
+        try {
+            await axios.patch(`/api/staff/loans/${id}/assign`, {
+                sales_officer_id: officerId
+            }, { withCredentials: true });
+            // Refresh
+            const response = await axios.get(`/api/staff/loans/${id}`, { withCredentials: true });
+            setLoan(response.data);
+            alert("Loan reassigned successfully");
+        } catch (error: any) {
+            alert(error.response?.data?.message || "Reassignment failed");
+        }
+    };
 
     useEffect(() => {
         const fetchLoan = async () => {
@@ -483,8 +508,10 @@ const LoanDetailsPage: React.FC<LoanDetailsPageProps> = ({ user, onLogout, toggl
             }
         };
 
-        if (id) fetchLoan();
-
+        if (id) {
+            fetchLoan();
+            fetchOfficers();
+        }
 
         // Socket Listeners
         import('../services/socket').then(({ socket }) => {
@@ -695,16 +722,44 @@ const LoanDetailsPage: React.FC<LoanDetailsPageProps> = ({ user, onLogout, toggl
                     </div>
 
                     <CollapsibleGroup title="Personal Information" icon="person" defaultOpen={true}>
-                        <Field label="Full Name" value={loan.applicant_full_name} copy />
-                        <Field label="Gender" value={loan.gender} />
-                        <Field label="Date of Birth" value={formatDate(loan.date_of_birth)} />
-                        <Field label="Marital Status" value={loan.marital_status} />
-                        <Field label="Religion" value={loan.religion} />
-                        <Field label="State of Origin" value={loan.state_of_origin} />
-                        <Field label="State of Residence" value={loan.state_of_residence} />
-                        <Field label="Phone" value={loan.mobile_number} />
-                        <Field label="Email" value={loan.personal_email} />
-                        <Field label="Address" value={loan.primary_home_address} />
+                        <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-8">
+                            <div className="space-y-8">
+                                <Field label="Full Name" value={loan.applicant_full_name} copy />
+                                <Field label="Gender" value={loan.gender} />
+                                <Field label="Date of Birth" value={formatDate(loan.date_of_birth)} />
+                                <Field label="Marital Status" value={loan.marital_status} />
+                                <Field label="Religion" value={loan.religion} />
+                                <Field label="State of Origin" value={loan.state_of_origin} />
+                                <Field label="State of Residence" value={loan.state_of_residence} />
+                                <Field label="Phone" value={loan.mobile_number} />
+                                <Field label="Email" value={loan.personal_email} />
+                                <Field label="Address" value={loan.primary_home_address} />
+                                <SensitiveDataField loanId={loan.id} field="bvn" label="BVN" verified={loan.is_identity_verified} />
+                                <SensitiveDataField loanId={loan.id} field="nin" label="NIN" />
+                            </div>
+
+                            {loan.selfie_verification_url && (
+                                <div className="flex flex-col items-center justify-start pt-4">
+                                    <div className="relative group">
+                                        <div className="absolute -inset-4 bg-gradient-to-tr from-blue-500/20 to-purple-500/20 rounded-[40px] blur-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                                        <div className="relative">
+                                            <img 
+                                                src={loan.selfie_verification_url} 
+                                                alt="Captured Face" 
+                                                className="w-64 h-80 object-cover rounded-[32px] border-4 border-white dark:border-slate-800 shadow-2xl relative z-10"
+                                            />
+                                            <div className="absolute top-4 right-4 z-20">
+                                                <span className="flex items-center gap-1 px-3 py-1 bg-white/90 dark:bg-slate-900/90 backdrop-blur shadow-lg rounded-full text-[10px] font-black uppercase tracking-widest text-slate-900 dark:text-white border border-slate-200 dark:border-slate-700">
+                                                    <span className="material-symbols-outlined text-[14px] text-blue-500">face</span>
+                                                    Live Image
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <p className="mt-6 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Identity Verification Image</p>
+                                </div>
+                            )}
+                        </div>
                     </CollapsibleGroup>
 
                     <CollapsibleGroup title="Financial Profile" icon="trending_up">
@@ -715,8 +770,6 @@ const LoanDetailsPage: React.FC<LoanDetailsPageProps> = ({ user, onLogout, toggl
                         <Field label="IPPIS" value={loan.ippis_number} />
                         <Field label="MDA / Tertiary" value={loan.mda_tertiary} />
                         <Field label="Staff ID" value={loan.staff_id} />
-                        <SensitiveDataField loanId={loan.id} field="bvn" label="BVN" />
-                        <SensitiveDataField loanId={loan.id} field="nin" label="NIN" />
 
                         {/* New Fields */}
                         {loan.casa && <Field label="CASA" value={String(loan.casa).split('.')[0]} />}
@@ -735,6 +788,20 @@ const LoanDetailsPage: React.FC<LoanDetailsPageProps> = ({ user, onLogout, toggl
                         <Field label="Proof of Residence" value={loan.proof_of_residence_url} isLink />
                         <Field label="Selfie" value={loan.selfie_verification_url} isLink />
                     </CollapsibleGroup>
+                    {(loan.promotion_source || loan.hear_about_us) && (
+                        <CollapsibleGroup title="Marketing Data" icon="campaign">
+                            {loan.promotion_source && (
+                                <>
+                                    <Field label="Promotion Source" value={loan.promotion_source} />
+                                    <Field label="Promotion Medium" value={loan.promotion_medium} />
+                                    <Field label="Promotion Campaign" value={loan.promotion_campaign} />
+                                </>
+                            )}
+                            <Field label="Hear About Us" value={loan.hear_about_us} />
+                            <Field label="Referral Code" value={loan.marketing_referral} />
+                            <Field label="Attributed Officer" value={loan.marketing_officer} />
+                        </CollapsibleGroup>
+                    )}
 
                     {/* References */}
                     {loan.customer_references && (
@@ -765,7 +832,51 @@ const LoanDetailsPage: React.FC<LoanDetailsPageProps> = ({ user, onLogout, toggl
                         }}
                     />
 
+                    {/* Assignment Control Card */}
+                    {['sales_manager', 'admin', 'super_admin', 'superadmin', 'customer_experience'].includes(user.role?.toLowerCase() || '') && (
+                        <div className="bg-white dark:bg-[#1e293b] rounded-[24px] p-8 border border-slate-200 dark:border-slate-800 shadow-xl shadow-slate-200/50 dark:shadow-none mb-6">
+                            <div className="flex items-center gap-2 mb-4">
+                                <span className="material-symbols-outlined text-blue-500">person_add</span>
+                                <p className="text-xs font-black uppercase tracking-widest text-slate-500 dark:text-slate-400">Account Assignment</p>
+                            </div>
+                            <h3 className="text-2xl font-black mb-6 text-slate-900 dark:text-white">Sales Officer</h3>
+                            
+                            <div className="space-y-4">
+                                <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-800">
+                                    <div className="flex items-center gap-3">
+                                        <div className="size-10 rounded-full bg-blue-500/10 text-blue-500 flex items-center justify-center font-black">
+                                            {loan.officer_name ? loan.officer_name[0] : 'U'}
+                                        </div>
+                                        <div>
+                                            <p className="text-sm font-black text-slate-900 dark:text-white leading-none mb-1">
+                                                {loan.officer_name || 'Unassigned'}
+                                            </p>
+                                            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-tight text-nowrap truncate max-w-[150px]">
+                                                {loan.officer_email || 'Promotion / Marketing'}
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="relative">
+                                    <select
+                                        value={loan.sales_officer_id || ''}
+                                        onChange={(e) => handleAssignOfficer(e.target.value)}
+                                        className="w-full px-6 py-4 rounded-2xl bg-white dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-800 text-sm font-black text-slate-900 dark:text-white appearance-none cursor-pointer focus:border-blue-500 transition-all outline-none"
+                                    >
+                                        <option value="">Select Officer to Reassign</option>
+                                        {officers.map(off => (
+                                            <option key={off.id} value={off.id}>{off.full_name}</option>
+                                        ))}
+                                    </select>
+                                    <span className="material-symbols-outlined absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">expand_more</span>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
                     <div className="bg-white dark:bg-[#1e293b] rounded-[24px] p-6 border border-slate-200 dark:border-slate-800">
+
                         <DocumentsList loanId={id} refreshTrigger={loan ? new Date(loan.updated_at).getTime() : 0} />
                     </div>
 

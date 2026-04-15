@@ -56,7 +56,7 @@ const LoanQueuePage: React.FC<LoanQueuePageProps> = ({ user, onLogout, toggleThe
     };
 
     const fetchOfficers = async () => {
-        if (['sales_manager', 'admin', 'super_admin', 'superadmin'].includes(user.role || '')) {
+        if (['sales_manager', 'admin', 'super_admin', 'superadmin', 'customer_experience', 'marketing'].includes(user.role || '')) {
             try {
                 // Fetch specifically sales officers with a high limit to ensure we get them all
                 const response = await axios.get(`${''}/api/staff/users?role=sales_officer&limit=200`, { withCredentials: true });
@@ -343,7 +343,7 @@ const LoanQueuePage: React.FC<LoanQueuePageProps> = ({ user, onLogout, toggleThe
                                             </span>
                                         </td>
                                         <td className="p-4 text-slate-700 dark:text-slate-300 font-bold text-xs" onClick={(e) => e.stopPropagation()}>
-                                            {['sales_manager', 'admin', 'super_admin', 'superadmin'].includes(user.role || '') ? (
+                                            {['sales_manager', 'admin', 'super_admin', 'superadmin', 'customer_experience'].includes(user.role || '') ? (
                                                 <div className="relative group/assign">
                                                     <div className="flex items-center gap-2 cursor-pointer p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
                                                         <span className="material-symbols-outlined text-sm text-slate-400 dark:text-slate-500">person</span>

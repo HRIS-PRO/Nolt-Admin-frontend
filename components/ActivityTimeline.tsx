@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
-import { formatDate } from '../utils/dateFormatter';
+import { formatDate, formatDateTime } from '../utils/dateFormatter';
 
 interface Activity {
     id: string;
@@ -135,9 +135,11 @@ const ActivityTimeline: React.FC<ActivityTimelineProps> = ({ loanId, investmentI
                                                         {isComment ? item.comment : item.description}
                                                     </p>
                                                 </div>
-                                                <span className="text-[10px] font-mono text-slate-400 whitespace-nowrap">
-                                                    {formatDate(item.created_at)}
-                                                </span>
+                                                <div className="text-right shrink-0">
+                                                    <p className="text-[10px] font-black text-slate-400 dark:text-slate-500 whitespace-nowrap leading-none mb-1 font-mono uppercase">
+                                                        {formatDateTime(item.created_at)}
+                                                    </p>
+                                                </div>
                                             </div>
 
                                             {/* Expanded Details */}

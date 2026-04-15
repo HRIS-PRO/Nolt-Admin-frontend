@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { profileService, UserProfile } from '../services/profileService';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
+import { maskValue } from '../utils/maskHelper';
 
 const NIGERIAN_STATES = [
     "Abia", "Adamawa", "Akwa Ibom", "Anambra", "Bauchi", "Bayelsa", "Benue", "Borno", 
@@ -384,7 +385,7 @@ const ProfilePage: React.FC = () => {
                                                         disabled={profile.is_identity_verified}
                                                         type="text" 
                                                         className="w-full h-14 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border-2 border-slate-100 dark:border-white/5 px-6 text-base font-bold dark:text-white focus:ring-2 focus:ring-primary focus:border-primary focus:shadow-lg focus:shadow-primary/10 outline-none transition-all disabled:opacity-50 tracking-[0.5em]" 
-                                                        value={profile.bvn} 
+                                                        value={profile.is_identity_verified ? maskValue(profile.bvn) : profile.bvn} 
                                                         onChange={e => setProfile({...profile, bvn: e.target.value.replace(/\D/g, '').substring(0, 11)})} 
                                                         placeholder="..." 
                                                     />
@@ -397,7 +398,7 @@ const ProfilePage: React.FC = () => {
                                                     <input 
                                                         disabled={profile.is_identity_verified}
                                                         className="w-full h-14 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border-2 border-slate-100 dark:border-white/5 px-6 text-base font-bold dark:text-white focus:ring-2 focus:ring-primary focus:border-primary focus:shadow-lg focus:shadow-primary/10 outline-none transition-all disabled:opacity-50" 
-                                                        value={profile.nin} 
+                                                        value={profile.is_identity_verified ? maskValue(profile.nin) : profile.nin} 
                                                         onChange={e => setProfile({...profile, nin: e.target.value.replace(/\D/g, '').substring(0, 11)})} 
                                                         placeholder="Enter NIN" 
                                                     />

@@ -35,6 +35,7 @@ const TimelineReportPage: React.FC<TimelineReportPageProps> = ({ user, onLogout,
     const searchQuery = searchParams.get('search') || '';
     
     const [productType, setProductType] = useState<'LOAN' | 'INVESTMENT'>('LOAN');
+    const [period, setPeriod] = useState<string>('this_month');
     const [isLoading, setIsLoading] = useState(true);
     const [isExporting, setIsExporting] = useState(false);
     
@@ -46,17 +47,19 @@ const TimelineReportPage: React.FC<TimelineReportPageProps> = ({ user, onLogout,
     const [productMix, setProductMix] = useState<any[]>([]);
     const [performance, setPerformance] = useState<{ fastest: any[], slowest: any[] }>({ fastest: [], slowest: [] });
     const [stageVolume, setStageVolume] = useState<any[]>([]);
+    const [chartData, setChartData] = useState<any[]>([]);
 
     const fetchAnalytics = async () => {
         setIsLoading(true);
         try {
-            const response = await axios.get(`/api/staff/reports/tat-summary?type=${productType}`, { withCredentials: true });
+            const response = await axios.get(`/api/staff/reports/tat-summary?type=${productType}&period=${period}`, { withCredentials: true });
             if (response.data) {
                 setSummary(response.data.summary);
                 setDailyApprovals(response.data.dailyApprovals || []);
                 setProductMix(response.data.productMix || []);
                 setPerformance(response.data.performance || { fastest: [], slowest: [] });
                 setStageVolume(response.data.stageVolume || []);
+                setChartData(response.data.chartData || []);
             }
         } catch (error) {
             console.error("Failed to fetch analytics data", error);
@@ -67,7 +70,7 @@ const TimelineReportPage: React.FC<TimelineReportPageProps> = ({ user, onLogout,
 
     useEffect(() => {
         fetchAnalytics();
-    }, [productType, searchQuery]);
+    }, [productType, searchQuery, period]);
 
     const handleExportCsv = async () => {
         setIsExporting(true);
@@ -145,10 +148,10 @@ const TimelineReportPage: React.FC<TimelineReportPageProps> = ({ user, onLogout,
                     className="mb-8 flex flex-col md:flex-row justify-between items-start gap-4"
                 >
                     <div>
-                        <h1 className="text-3xl font-black text-[#fbbf24] tracking-tight uppercase mb-4 drop-shadow-sm flex items-center gap-3">
+                        {/* <h1 className="text-3xl font-black text-[#fbbf24] tracking-tight uppercase mb-4 drop-shadow-sm flex items-center gap-3">
                             <span className="material-symbols-outlined text-3xl">insights</span>
                             {productType} ANALYTICS
-                        </h1>
+                        </h1> */}
                         <div className={`flex p-1 rounded-xl border w-fit transition-colors ${isDark ? 'bg-[#111827] border-slate-800/60' : 'bg-white border-slate-200 shadow-sm'}`}>
                             <button 
                                 onClick={() => setProductType('LOAN')}
@@ -164,7 +167,24 @@ const TimelineReportPage: React.FC<TimelineReportPageProps> = ({ user, onLogout,
                             </button>
                         </div>
                     </div>
-                    <div className="flex flex-col items-end gap-2">
+                    <div className="flex flex-col items-end gap-4">
+                        <div className={`flex p-1 rounded-xl border transition-colors ${isDark ? 'bg-[#111827] border-slate-800/60' : 'bg-white border-slate-200 shadow-sm'}`}>
+                            {[
+                                { label: 'This Wk', value: 'this_week' },
+                                { label: 'Last Wk', value: 'last_week' },
+                                { label: 'This Mo', value: 'this_month' },
+                                { label: 'Last Mo', value: 'last_month' },
+                                { label: 'This Yr', value: 'this_year' },
+                            ].map((p) => (
+                                <button
+                                    key={p.value}
+                                    onClick={() => setPeriod(p.value)}
+                                    className={`px-4 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-tight transition-all ${period === p.value ? 'bg-[#fbbf2415] text-[#fbbf24] border border-[#fbbf2430]' : 'text-slate-500 hover:text-slate-700 border border-transparent'}`}
+                                >
+                                    {p.label}
+                                </button>
+                            ))}
+                        </div>
                         <p className={`text-[10px] font-bold uppercase tracking-widest px-3 py-1.5 rounded-full border transition-colors ${isDark ? 'text-slate-500 bg-slate-900/80 border-slate-800/50' : 'text-slate-400 bg-white border-slate-200 shadow-sm'}`}>
                             Snapshot: {new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
                         </p>
@@ -256,6 +276,36 @@ const TimelineReportPage: React.FC<TimelineReportPageProps> = ({ user, onLogout,
 
                 </div>
 
+                {/* Average TAT Graph */}
+                <motion.div variants={itemVariants} initial="hidden" animate="visible" className={`p-8 rounded-3xl border mb-8 transition-all ${isDark ? 'bg-[#111827]/40 border-slate-800/60' : 'bg-white border-slate-200 shadow-sm'}`}>
+                    <div className="flex justify-between items-center mb-8">
+                        <h2 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] flex items-center gap-2">
+                             Average Stage Turnaround Time (Hours) - Excl. Finance
+                        </h2>
+                        <div className="flex items-center gap-4">
+                            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Target: &lt; 24h</span>
+                        </div>
+                    </div>
+                    <div className="h-[350px] w-full">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <BarChart data={chartData.filter(d => !d.stage.toLowerCase().includes('finance'))}>
+                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={isDark ? '#1f2937' : '#e2e8f0'} opacity={0.6} />
+                                <XAxis dataKey="stage" axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 800, fill: isDark ? '#4b5563' : '#94a3b8' }} dy={10} />
+                                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 800, fill: isDark ? '#4b5563' : '#94a3b8' }} unit="h" />
+                                <Tooltip 
+                                    cursor={{ fill: isDark ? '#fbbf2410' : '#fbbf2405' }} 
+                                    contentStyle={{ backgroundColor: isDark ? '#030712' : '#ffffff', border: `1px solid ${isDark ? '#374151' : '#e2e8f0'}`, borderRadius: '12px', fontSize: '10px', color: isDark ? '#ffffff' : '#0f172a' }} 
+                                />
+                                <Bar dataKey="avgHours" fill="#fbbf24" radius={[6, 6, 0, 0]} barSize={60}>
+                                    {chartData.filter(d => !d.stage.toLowerCase().includes('finance')).map((entry, index) => (
+                                        <Cell key={`cell-${index}`} fill={MIX_COLORS[index % MIX_COLORS.length]} />
+                                    ))}
+                                </Bar>
+                            </BarChart>
+                        </ResponsiveContainer>
+                    </div>
+                </motion.div>
+
                 {/* Performance Monitoring Section */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
                     
@@ -278,17 +328,21 @@ const TimelineReportPage: React.FC<TimelineReportPageProps> = ({ user, onLogout,
                                     <div className="flex justify-between items-center mb-3">
                                         <div className="flex gap-3 items-center">
                                             <span className="text-[9px] font-black text-emerald-500 py-0.5 px-2 bg-emerald-500/10 rounded-full border border-emerald-500/20">{app.ref}</span>
-                                            <span className={`text-[11px] font-black uppercase truncate max-w-[120px] transition-colors ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>{app.name}</span>
+                                            <span className={`text-[11px] font-black uppercase truncate transition-colors ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>{app.name}</span>
                                         </div>
                                         <span className="text-[11px] font-black text-emerald-400 transition-colors">{app.tatHours}h</span>
                                     </div>
-                                    <div className={`w-full h-1.5 rounded-full overflow-hidden transition-colors ${isDark ? 'bg-slate-950' : 'bg-slate-200'}`}>
+                                    <div className={`w-full h-1.5 rounded-full overflow-hidden transition-colors mb-2 ${isDark ? 'bg-slate-950' : 'bg-slate-200'}`}>
                                         <motion.div 
                                             initial={{ width: 0 }} 
                                             animate={{ width: `${Math.min(100, (app.tatHours / (performance.slowest[0]?.tatHours || 100)) * 100)}%` }}
                                             transition={{ duration: 1, delay: 0.5 }}
                                             className="bg-emerald-500 h-full rounded-full"
                                         />
+                                    </div>
+                                    <div className="flex justify-between items-center text-[8px] font-bold text-slate-500 uppercase tracking-widest">
+                                        <span>{app.type}</span>
+                                        <span>{new Date(app.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit' })}</span>
                                     </div>
                                 </motion.div>
                             ))}
@@ -314,17 +368,21 @@ const TimelineReportPage: React.FC<TimelineReportPageProps> = ({ user, onLogout,
                                     <div className="flex justify-between items-center mb-3">
                                         <div className="flex gap-3 items-center">
                                             <span className="text-[9px] font-black text-rose-500 py-0.5 px-2 bg-rose-500/10 rounded-full border border-rose-500/20">{app.ref}</span>
-                                            <span className={`text-[11px] font-black uppercase truncate max-w-[120px] transition-colors ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>{app.name}</span>
+                                            <span className={`text-[11px] font-black uppercase truncate transition-colors ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>{app.name}</span>
                                         </div>
                                         <span className="text-[11px] font-black text-rose-400 transition-colors">{(app.tatHours / 24).toFixed(1)} Days</span>
                                     </div>
-                                    <div className={`w-full h-1.5 rounded-full overflow-hidden transition-colors ${isDark ? 'bg-slate-950' : 'bg-slate-200'}`}>
+                                    <div className={`w-full h-1.5 rounded-full overflow-hidden transition-colors mb-2 ${isDark ? 'bg-slate-950' : 'bg-slate-200'}`}>
                                         <motion.div 
                                             initial={{ width: 0 }} 
                                             animate={{ width: "100%" }}
                                             transition={{ duration: 1, delay: 0.5 }}
                                             className="bg-rose-500 h-full rounded-full opacity-60"
                                         />
+                                    </div>
+                                    <div className="flex justify-between items-center text-[8px] font-bold text-slate-500 uppercase tracking-widest">
+                                        <span>{app.type}</span>
+                                        <span>{new Date(app.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit' })}</span>
                                     </div>
                                 </motion.div>
                             ))}

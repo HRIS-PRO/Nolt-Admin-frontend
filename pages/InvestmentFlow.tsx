@@ -83,7 +83,7 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
   const [tinNumber, setTinNumber] = useState(initialDraft?.data?.tinNumber ?? '');
   const [directorCount, setDirectorCount] = useState<number>(initialDraft?.data?.directorCount ?? 1);
   const [directors, setDirectors] = useState<any[]>(initialDraft?.data?.directors ?? [{
-    surname: '', firstName: '', middleName: '', phone: '', gender: '', dob: '', bvn: '', nin: '', isPep: false, photo: null, id_card: null
+    surname: '', firstName: '', middleName: '', phone: '', gender: '', dob: '', bvn: '', nin: '', tin: '', address: '', isPep: false, photo: null, id_card: null
   }]);
   const [companyName, setCompanyName] = useState(initialDraft?.data?.companyName ?? '');
 
@@ -159,7 +159,7 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
 
   const individualDocs = useMemo(() => [
     { id: 'gov_id', label: 'Government ID', icon: 'badge', required: true },
-    { id: 'utility_bill', label: 'Utility Bill', icon: 'description', required: true },
+    { id: 'utility_bill', label: 'Utility Bill (Last 3 Months)', icon: 'description', required: true },
     { id: 'selfie', label: 'Selfie', icon: 'add_a_photo', required: true },
     { id: 'secondary_id', label: 'Secondary Government ID/Doc', icon: 'assignment_ind', required: false }
   ], []);
@@ -183,11 +183,12 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
     });
     docs.push(
       { id: 'company_profile', label: 'Company Profile', icon: 'business', required: true },
-      { id: 'status_report', label: 'CAC/Status Upload', icon: 'analytics', required: true },
+      { id: 'cac_cert', label: 'CAC Certificate', icon: 'verified', required: true },
+      { id: 'status_report', label: 'Status Report', icon: 'analytics', required: true },
       { id: 'memart', label: 'Memorandum & Articles of Association', icon: 'menu_book', required: true },
       { id: 'board_resolution', label: 'Board Resolution of Authority to Transact with NOLT Finance', icon: 'gavel', required: true },
-      { id: 'annual_returns', label: 'Evidence of Filing of Annual Returns', icon: 'history_edu', required: true },
-      { id: 'utility_bill', label: 'Utility Bill', icon: 'home_work', required: true }
+      { id: 'annual_returns', label: 'Evidence of Filing of Annual Returns', icon: 'history_edu', required: false },
+      { id: 'utility_bill', label: 'Utility Bill (Last 3 Months)', icon: 'home_work', required: true }
     );
     return docs;
   }, [directors]);
@@ -820,7 +821,7 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
         secondary_id_url: uploadedDocs.secondary_id?.url || null,
         utility_bill_url: uploadedDocs.utility_bill?.url || null,
         // Corporate Document Mappings
-        cac_url: uploadedDocs.company_profile?.url || null,
+        cac_url: uploadedDocs.cac_cert?.url || null,
         company_profile_url: uploadedDocs.company_profile?.url || null,
         status_report_url: uploadedDocs.status_report?.url || null,
         memart_url: uploadedDocs.memart?.url || null,
@@ -1315,7 +1316,7 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
                       if (count > newDirectors.length) {
                         for (let i = newDirectors.length; i < count; i++) {
                           newDirectors.push({
-                            surname: '', firstName: '', middleName: '', phone: '', gender: '', dob: '', bvn: '', nin: '', isPep: false
+                            surname: '', firstName: '', middleName: '', phone: '', gender: '', dob: '', bvn: '', nin: '', tin: '', address: '', isPep: false
                           });
                         }
                       } else {
@@ -1392,6 +1393,17 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
                       </div>
                     </div>
 
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="space-y-2">
+                        <label className="text-xs font-black text-slate-400 uppercase tracking-widest px-1">TIN (Tax Identification Number)</label>
+                        <input className="w-full h-14 rounded-xl bg-slate-50 dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 px-5 text-base font-bold dark:text-white focus:ring-2 focus:ring-primary focus:border-primary focus:shadow-lg focus:shadow-primary/10 outline-none transition-all" value={director.tin} onChange={e => { const newD = [...directors]; newD[index].tin = e.target.value; setDirectors(newD); }} placeholder="e.g. 12345678-0001" />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-xs font-black text-slate-400 uppercase tracking-widest px-1">Residential Address</label>
+                        <input className="w-full h-14 rounded-xl bg-slate-50 dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 px-5 text-base font-bold dark:text-white focus:ring-2 focus:ring-primary focus:border-primary focus:shadow-lg focus:shadow-primary/10 outline-none transition-all" value={director.address} onChange={e => { const newD = [...directors]; newD[index].address = e.target.value; setDirectors(newD); }} placeholder="Enter full residential address" />
+                      </div>
+                    </div>
+
                     <div className="space-y-4">
                       <label className="text-sm font-black text-slate-500 uppercase">Is your Director a Politically Exposed Person (PEP)?</label>
                       <div className="flex gap-4 max-w-xs">
@@ -1402,7 +1414,7 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
                   </div>
                 ))}
               </div>
-              <NavActions isNextDisabled={directors.some(d => !d.surname || !d.firstName || !d.phone || !d.gender || !d.dob || d.bvn.length < 11 || d.nin.length < 11)} />
+              <NavActions isNextDisabled={directors.some(d => !d.surname || !d.firstName || !d.phone || !d.gender || !d.dob || !d.tin || !d.address || d.bvn.length < 11 || d.nin.length < 11)} />
             </>
           )}
         </div>
@@ -1997,9 +2009,9 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
                   <h3 className="font-black text-xl text-slate-900 dark:text-white">Indemnity Agreement</h3>
                 </div>
               </div>
-              <div className="flex-1 overflow-y-auto p-6 md:p-10 text-[12px] md:text-[13px] leading-relaxed text-slate-600 dark:text-slate-300 font-medium max-h-[400px] md:max-h-[600px]">
-                <div className="prose dark:prose-invert max-w-none space-y-5 md:space-y-6 text-justify">
-                  <h4 className="text-lg md:text-xl font-black uppercase text-primary text-center tracking-widest mb-4 md:mb-6 border-b border-primary/20 pb-4">Electronic Mail Indemnity</h4>
+              <div className="flex-1 overflow-y-auto p-6 md:p-8 text-[11px] md:text-[12px] leading-relaxed text-slate-600 dark:text-slate-300 font-medium max-h-[400px] md:max-h-[600px]">
+                <div className="prose dark:prose-invert max-w-none space-y-3 md:space-y-4 text-justify">
+                  <h4 className="text-base md:text-lg font-black uppercase text-primary text-center tracking-widest mb-3 md:mb-4 border-b border-primary/20 pb-4">Electronic Mail Indemnity</h4>
                   <p>
                     I/We, <span className="font-bold border-b border-slate-300 px-2">{fullName || '____________________'}</span> (the "Customer") refer to the mandate between NOLT Finance Company Limited, (“the Company”) and the Customer governing the operation of the Customer’s account(s) and credit, investment or other transactions with the Company (the mandate).
                   </p>
@@ -2179,13 +2191,13 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
           </div>
 
           <div className="flex flex-col items-center gap-4 md:gap-6">
-            <button
+            {/* <button
               onClick={() => { onComplete(); navigate('DASHBOARD'); }}
               className="w-full sm:w-auto px-8 md:px-12 py-4 md:py-5 bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-black text-lg md:text-xl rounded-2xl shadow-2xl hover:scale-105 active:scale-95 transition-all flex items-center justify-center gap-3 ring-4 ring-slate-900/5 dark:ring-white/10"
             >
               Back to Dashboard
               <span className="material-symbols-outlined">dashboard</span>
-            </button>
+            </button> */}
 
             <motion.div
               initial={{ opacity: 0, y: 10 }}
