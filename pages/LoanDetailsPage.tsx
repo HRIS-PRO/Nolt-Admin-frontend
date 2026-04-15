@@ -746,9 +746,9 @@ const LoanDetailsPage: React.FC<LoanDetailsPageProps> = ({ user, onLogout, toggl
                                             <img 
                                                 src={loan.selfie_verification_url} 
                                                 alt="Captured Face" 
-                                                className="w-64 h-80 object-cover rounded-[32px] border-4 border-white dark:border-slate-800 shadow-2xl relative z-10"
+                                                className="w-64 h-80 object-cover rounded-[32px] border-4 border-white dark:border-slate-800 shadow-2xl relative z-0"
                                             />
-                                            <div className="absolute top-4 right-4 z-20">
+                                            <div className="absolute top-4 right-4 z-10">
                                                 <span className="flex items-center gap-1 px-3 py-1 bg-white/90 dark:bg-slate-900/90 backdrop-blur shadow-lg rounded-full text-[10px] font-black uppercase tracking-widest text-slate-900 dark:text-white border border-slate-200 dark:border-slate-700">
                                                     <span className="material-symbols-outlined text-[14px] text-blue-500">face</span>
                                                     Live Image
