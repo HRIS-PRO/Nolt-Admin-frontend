@@ -38,6 +38,13 @@ export interface UserProfile {
   is_identity_verified: boolean;
   last_selfie_verified_at?: string;
   updated_at?: string;
+  bank_name?: string;
+  bank_code?: string;
+  account_number?: string;
+  account_name?: string;
+  bank_statement_url?: string;
+  is_corporate_account?: boolean;
+  bank_verified?: boolean;
 }
 
 export interface UserState {

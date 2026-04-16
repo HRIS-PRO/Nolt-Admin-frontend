@@ -19,7 +19,15 @@ interface LoanDetailsPageProps {
 // --- Action Card Component ---
 const ActionCard = ({ loan, userRole, onActionComplete }: { loan: any, userRole: any, onActionComplete: () => void }) => {
     const [actionLoading, setActionLoading] = useState(false);
-    const [eligibleAmount, setEligibleAmount] = useState(loan.topup_amount ? loan.topup_amount.toString() : '');
+    const isSpecialLoan = ['topup', 'add_on', 're-app', 're_app'].includes(loan.loan_type?.toLowerCase());
+    const isBuyOver = loan.loan_type?.toLowerCase() === 'buy_over';
+
+    const [eligibleAmount, setEligibleAmount] = useState(
+        isSpecialLoan 
+            ? (loan.topup_amount?.toString() || '0') 
+            : (loan.requested_loan_amount?.toString() || '0')
+    );
+    const [buyOverAmount, setBuyOverAmount] = useState(loan.buy_over_amount?.toString() || '0');
     const [tenure, setTenure] = useState(loan.loan_tenure_months ? loan.loan_tenure_months.toString() : '');
     const [existingLoanBalance, setExistingLoanBalance] = useState(loan.existing_loan_balance ? loan.existing_loan_balance.toString() : '');
     const [uploadFile, setUploadFile] = useState<File | null>(null);
@@ -33,13 +41,13 @@ const ActionCard = ({ loan, userRole, onActionComplete }: { loan: any, userRole:
     const [applyInsuranceFee, setApplyInsuranceFee] = useState(loan.apply_insurance_fee || false);
 
     // Check if loan is a special type (Top-Up, Add-On, Re-App)
-    const isSpecialLoan = ['topup', 'add_on', 're-app', 're_app'].includes(loan.loan_type?.toLowerCase());
+    // Initial flags moved to top of component
 
     // Calculate Disbursement Amount
     const calculateDisbursementAmount = () => {
         const amount = parseFloat(eligibleAmount) || 0;
         const balance = parseFloat(existingLoanBalance) || 0;
-        const buyOverAmount = parseFloat(loan.buy_over_amount) || 0;
+        const activeBuyOverAmount = parseFloat(buyOverAmount) || 0;
 
         let baseAmountForFees = amount;
 
@@ -58,15 +66,11 @@ const ActionCard = ({ loan, userRole, onActionComplete }: { loan: any, userRole:
         if (applyManagementFee) fees += baseAmountForFees * 0.02; // 2% Management Fee
         if (applyInsuranceFee) fees += baseAmountForFees * 0.005; // 0.5% Insurance Fee
 
-        // Disbursement = Eligible Amount - Existing Balance - Fees (Wait, need to clarify deduction logic)
-        // Standard: Eligible - Fees
-        // TopUp: (Eligible - ExistingBalance) - Fees
-
         let disbursement = amount - fees;
         if (isSpecialLoan) {
             disbursement = disbursement - balance;
-        } else if (loan.loan_type === 'buy_over') {
-            disbursement = disbursement - buyOverAmount;
+        } else if (isBuyOver) {
+            disbursement = disbursement - activeBuyOverAmount;
         }
 
         return disbursement > 0 ? disbursement : 0;
@@ -94,6 +98,10 @@ const ActionCard = ({ loan, userRole, onActionComplete }: { loan: any, userRole:
 
                 if (isSpecialLoan) {
                     payload.data.existing_loan_balance = existingLoanBalance;
+                }
+
+                if (isBuyOver) {
+                    payload.data.buy_over_amount = buyOverAmount;
                 }
             }
 
@@ -195,6 +203,24 @@ const ActionCard = ({ loan, userRole, onActionComplete }: { loan: any, userRole:
                     You have permission to process this application.
                 </p>
 
+                {isBuyOver && (
+                    <div className="mb-6 p-4 rounded-2xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                            <div className="size-8 rounded-lg bg-purple-500 text-white flex items-center justify-center">
+                                <span className="material-symbols-outlined text-sm">payments</span>
+                            </div>
+                            <div>
+                                <p className="text-[10px] font-black uppercase text-purple-600 tracking-widest leading-none">Product Type</p>
+                                <p className="text-xs font-bold text-purple-900 dark:text-purple-400 mt-1">BUY OVER LOAN</p>
+                            </div>
+                        </div>
+                        <div className="text-right">
+                            <p className="text-[10px] font-black uppercase text-slate-500 tracking-widest leading-none">Base Amount</p>
+                            <p className="text-xs font-bold text-slate-900 dark:text-white mt-1">₦{Number(loan.requested_loan_amount).toLocaleString()}</p>
+                        </div>
+                    </div>
+                )}
+
                 {/* Sales Manager / Credit Officer Input */}
                 {(stage === 'credit_check_1' || stage === 'credit_check_2') && (
                     <div className="space-y-4 mb-6">
@@ -253,6 +279,25 @@ const ActionCard = ({ loan, userRole, onActionComplete }: { loan: any, userRole:
                             </div>
                         )}
 
+                        {/* BUY OVER INPUT: Update Buy Over Amount */}
+                        {isBuyOver && (
+                            <div>
+                                <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2 block">
+                                    Buy Over Amount (To Deduct)
+                                </label>
+                                <input
+                                    type="number"
+                                    value={buyOverAmount}
+                                    onChange={(e) => setBuyOverAmount(e.target.value)}
+                                    className="w-full p-4 rounded-xl bg-purple-50 dark:bg-purple-900/10 border border-purple-200 dark:border-purple-700 text-purple-900 dark:text-purple-100 font-bold placeholder:text-purple-300"
+                                    placeholder="Enter buy over amount..."
+                                />
+                                <p className="text-[10px] text-purple-600 mt-1">
+                                    This amount will be deducted from the disbursement.
+                                </p>
+                            </div>
+                        )}
+
                         {/* Fees & Disbursement Checkboxes */}
                         <div className="p-4 bg-slate-50 dark:bg-slate-800 rounded-xl space-y-3 border border-slate-100 dark:border-slate-700">
                             <div className="flex justify-between items-center mb-2">
@@ -289,8 +334,29 @@ const ActionCard = ({ loan, userRole, onActionComplete }: { loan: any, userRole:
                                         </span>
                                     </div>
                                 )}
+
+                                {/* Buy Over Breakdown */}
+                                {isBuyOver && (
+                                    <>
+                                        <div className="mb-2 text-[10px] text-slate-500 flex justify-between">
+                                            <span>Approved Disbursement Amount:</span>
+                                            <span className="font-bold text-slate-700 dark:text-slate-300">
+                                                ₦{(parseFloat(eligibleAmount) || 0).toLocaleString()}
+                                            </span>
+                                        </div>
+                                        <div className="mb-2 text-[10px] text-purple-500 flex justify-between">
+                                            <span>Buy Over Amount (Less):</span>
+                                            <span className="font-bold">
+                                                - ₦{(parseFloat(buyOverAmount) || 0).toLocaleString()}
+                                            </span>
+                                        </div>
+                                    </>
+                                )}
+
                                 <div className="flex justify-between items-center">
-                                    <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Disbursement Amount</span>
+                                    <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                                        {isBuyOver ? 'Final Net Payout' : 'Disbursement Amount'}
+                                    </span>
                                     <span className="text-lg font-black text-slate-900 dark:text-white">₦{calculateDisbursementAmount().toLocaleString()}</span>
                                 </div>
                             </div>
@@ -469,6 +535,71 @@ const LoanDetailsPage: React.FC<LoanDetailsPageProps> = ({ user, onLogout, toggl
     const [isLoading, setIsLoading] = useState(true);
     const [showEditModal, setShowEditModal] = useState(false);
     const [officers, setOfficers] = useState<any[]>([]);
+    
+    // Indemnity Management State
+    const [isProcessingIndemnity, setIsProcessingIndemnity] = useState(false);
+    const [signatureBase64, setSignatureBase64] = useState<string | null>(null);
+    const [directIndemnityUrl, setDirectIndemnityUrl] = useState<string | null>(null);
+
+    const handleFileUpload = async (file: File, type: 'signature' | 'indemnity') => {
+        if (type === 'signature') {
+            const reader = new FileReader();
+            reader.onload = () => {
+                setSignatureBase64(reader.result as string);
+                setDirectIndemnityUrl(null); // Clear direct upload if signature is provided
+            };
+            reader.readAsDataURL(file);
+        } else {
+            setIsProcessingIndemnity(true);
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('loan_id', id || '');
+            formData.append('document_type', 'indemnity');
+
+            try {
+                const res = await axios.post(`/api/upload`, formData, {
+                    headers: { 'Content-Type': 'multipart/form-data' },
+                    withCredentials: true
+                });
+                setDirectIndemnityUrl(res.data.document.file_url);
+                setSignatureBase64(null); // Clear signature if direct upload is provided
+            } catch (error) {
+                console.error("Upload failed:", error);
+                alert("Upload failed.");
+            } finally {
+                setIsProcessingIndemnity(false);
+            }
+        }
+    };
+
+    const handleProcessIndemnity = async () => {
+        if (!signatureBase64 && !directIndemnityUrl) {
+            alert("Please provide a signature or a document URL.");
+            return;
+        }
+
+        setIsProcessingIndemnity(true);
+        try {
+            const payload: any = {};
+            if (signatureBase64) payload.signature_base64 = signatureBase64;
+            if (directIndemnityUrl) payload.indemnity_document_url = directIndemnityUrl;
+
+            await axios.post(`/api/staff/loans/${id}/indemnity`, payload, { withCredentials: true });
+            
+            setSignatureBase64(null);
+            setDirectIndemnityUrl(null);
+            alert("Indemnity Agreement updated successfully.");
+            
+            // Refresh loan data
+            const response = await axios.get(`/api/staff/loans/${id}`, { withCredentials: true });
+            setLoan(response.data);
+        } catch (error: any) {
+            console.error("Indemnity processing failed:", error);
+            alert(error.response?.data?.message || "Failed to process indemnity.");
+        } finally {
+            setIsProcessingIndemnity(false);
+        }
+    };
 
     const fetchOfficers = async () => {
         if (['sales_manager', 'admin', 'super_admin', 'superadmin', 'customer_experience'].includes(user.role || '')) {
@@ -683,42 +814,83 @@ const LoanDetailsPage: React.FC<LoanDetailsPageProps> = ({ user, onLogout, toggl
             <div className="grid grid-cols-1 xl:grid-cols-12 gap-8 items-start">
                 <div className="xl:col-span-8 space-y-8">
                     {/* Summary Card */}
-                    <div className="bg-white dark:bg-slate-900 rounded-[24px] p-8 border border-slate-200 dark:border-slate-800 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 items-start">
-                        <div>
-                            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Loan Type</p>
-                            <h3 className="text-3xl font-black text-slate-900 dark:text-white capitalize">{loan.loan_type?.replace(/_/g, ' ') || 'New'}</h3>
+                    <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 overflow-hidden">
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-slate-200 dark:divide-slate-800">
+
+                            {/* Loan Type */}
+                            <div className="p-6">
+                                <p className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-3">
+                                    Loan Type
+                                </p>
+                                <h3 className="text-2xl font-semibold text-slate-900 dark:text-white capitalize leading-tight">
+                                    {loan.loan_type?.replace(/_/g, ' ') || 'New'}
+                                </h3>
+                            </div>
+
+                            {loan.loan_type === "buy_over" && (
+                            <div className="p-6">
+                                <p className="text-xs font-semibold uppercase tracking-wider text-blue-500 mb-3">
+                                    Loan amount
+                                </p>
+                                <h3 className="text-2xl font-semibold text-blue-600 dark:text-blue-400 leading-tight">
+                                    ₦{Number(loan.requested_loan_amount).toLocaleString()}
+                                </h3>
+                            </div>
+                            )}
+
+                            {/* Amount */}
+                            <div className="p-6">
+                                <p className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-3">
+                                    {['topup', 'add_on', 're-app'].includes(loan.loan_type) ? 'Principal Amount' :
+                                        loan.loan_type === 'buy_over' ? 'Buy Over Amount' : 'Requested Amount'}
+                                </p>
+                                <h3 className="text-2xl font-semibold text-slate-900 dark:text-white leading-tight">
+                                    ₦{Number(
+                                        ['topup', 'add_on', 're-app'].includes(loan.loan_type) ? (loan.topup_amount || loan.requested_loan_amount) :
+                                            loan.loan_type === 'buy_over' ? (loan.buy_over_amount || loan.requested_loan_amount) :
+                                                loan.requested_loan_amount
+                                    ).toLocaleString()}
+                                </h3>
+                            </div>
+
+                            {/* Tenure */}
+                            {['topup', 'add_on', 're-app', 'buy_over', 'new'].includes(loan.loan_type) && (
+                                <div className="p-6">
+                                    <p className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-3">
+                                        Tenure
+                                    </p>
+                                    <h3 className="text-2xl font-semibold text-slate-900 dark:text-white leading-tight">
+                                        {loan.loan_tenure_months || 6} Months
+                                    </h3>
+                                </div>
+                            )}
+
+                            {/* Approved */}
+                            {loan.eligible_amount && (
+                                <div className="p-6">
+                                    <p className="text-xs font-semibold uppercase tracking-wider text-emerald-500 mb-3">
+                                        Approved Amount
+                                    </p>
+                                    <h3 className="text-2xl font-semibold text-emerald-600 dark:text-emerald-400 leading-tight">
+                                        ₦{Number(loan.eligible_amount).toLocaleString()}
+                                    </h3>
+                                </div>
+                            )}
+
+                            {/* Disbursement */}
+                            {loan.disbursement_amount && (
+                                <div className="p-6">
+                                    <p className="text-xs font-semibold uppercase tracking-wider text-blue-500 mb-3">
+                                        Disbursement
+                                    </p>
+                                    <h3 className="text-2xl font-semibold text-blue-600 dark:text-blue-400 leading-tight">
+                                        ₦{Number(loan.disbursement_amount).toLocaleString()}
+                                    </h3>
+                                </div>
+                            )}
+
                         </div>
-                        <div>
-                            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">
-                                {['topup', 'add_on', 're-app'].includes(loan.loan_type) ? 'Principal Amount' :
-                                    loan.loan_type === 'buy_over' ? 'Buy Over Amount' : 'Requested Amount'}
-                            </p>
-                            <h3 className="text-3xl font-black text-slate-900 dark:text-white">
-                                ₦{Number(
-                                    ['topup', 'add_on', 're-app'].includes(loan.loan_type) ? (loan.topup_amount || loan.requested_loan_amount) :
-                                        loan.loan_type === 'buy_over' ? (loan.buy_over_amount || loan.requested_loan_amount) :
-                                            loan.requested_loan_amount
-                                ).toLocaleString()}
-                            </h3>
-                        </div>
-                        {['topup', 'add_on', 're-app', 'buy_over', 'new'].includes(loan.loan_type) && (
-                            <div>
-                                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Tenure</p>
-                                <h3 className="text-3xl font-black text-slate-900 dark:text-white">{loan.loan_tenure_months || 6} Months</h3>
-                            </div>
-                        )}
-                        {loan.eligible_amount && (
-                            <div>
-                                <p className="text-[10px] font-black uppercase tracking-widest text-green-500 mb-1">Approved Amount</p>
-                                <h3 className="text-3xl font-black text-green-600 dark:text-green-400">₦{Number(loan.eligible_amount).toLocaleString()}</h3>
-                            </div>
-                        )}
-                        {loan.disbursement_amount && (
-                            <div>
-                                <p className="text-[10px] font-black uppercase tracking-widest text-blue-500 mb-1">Disbursement</p>
-                                <h3 className="text-3xl font-black text-blue-600 dark:text-blue-400">₦{Number(loan.disbursement_amount).toLocaleString()}</h3>
-                            </div>
-                        )}
                     </div>
 
                     <CollapsibleGroup title="Personal Information" icon="person" defaultOpen={true}>
@@ -802,6 +974,138 @@ const LoanDetailsPage: React.FC<LoanDetailsPageProps> = ({ user, onLogout, toggl
                             <Field label="Attributed Officer" value={loan.marketing_officer} />
                         </CollapsibleGroup>
                     )}
+
+                    <CollapsibleGroup title="Indemnity Agreement" icon="gavel" defaultOpen={!loan.indemnity_document_url}>
+                        {loan.indemnity_document_url ? (
+                            <div className="md:col-span-2 space-y-6">
+                                <div className="p-6 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-between">
+                                    <div className="flex items-center gap-4">
+                                        <div className="size-12 rounded-xl bg-emerald-500 text-white flex items-center justify-center">
+                                            <span className="material-symbols-outlined">description</span>
+                                        </div>
+                                        <div>
+                                            <p className="text-sm font-black text-emerald-900 dark:text-emerald-400 font-mono">INDEMNITY_AGREEMENT_L-{loan.id}.pdf</p>
+                                            <p className="text-[10px] font-bold text-emerald-600">Agreement Signed & Verified</p>
+                                        </div>
+                                    </div>
+                                    <a
+                                        href={loan.indemnity_document_url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="px-5 py-2.5 rounded-xl bg-emerald-600 text-white text-[10px] font-black uppercase tracking-widest hover:bg-emerald-700 transition-all flex items-center gap-2"
+                                    >
+                                        <span className="material-symbols-outlined text-[14px]">download</span>
+                                        Download PDF
+                                    </a>
+                                </div>
+                                <div className="mt-8 pt-8 border-t border-slate-100 dark:border-slate-800">
+                                    <h4 className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-4">Update Agreement</h4>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                        <div className="space-y-4">
+                                            <label className="text-[10px] font-black uppercase text-slate-500 block">Option 1: Upload Signature Image</label>
+                                            <div className="relative group">
+                                                <input
+                                                    type="file"
+                                                    accept="image/*"
+                                                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                                                    onChange={(e) => e.target.files?.[0] && handleFileUpload(e.target.files[0], 'signature')}
+                                                />
+                                                <div className={`p-8 rounded-2xl border-2 border-dashed transition-all flex flex-col items-center justify-center gap-3 ${signatureBase64 ? 'border-purple-500 bg-purple-50 dark:bg-purple-900/10' : 'border-slate-200 dark:border-slate-700 hover:border-purple-400 dark:hover:border-purple-500/50'}`}>
+                                                    <span className="material-symbols-outlined text-3xl text-slate-400 group-hover:text-purple-500 transition-colors">{signatureBase64 ? 'check_circle' : 'draw'}</span>
+                                                    <p className="text-xs font-bold text-slate-500">{signatureBase64 ? 'Signature Selected' : 'Drop signature image here'}</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div className="space-y-4">
+                                            <label className="text-[10px] font-black uppercase text-slate-500 block">Option 2: Direct PDF Upload</label>
+                                            <div className="relative group">
+                                                <input
+                                                    type="file"
+                                                    accept=".pdf"
+                                                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                                                    onChange={(e) => e.target.files?.[0] && handleFileUpload(e.target.files[0], 'indemnity')}
+                                                />
+                                                <div className={`p-8 rounded-2xl border-2 border-dashed transition-all flex flex-col items-center justify-center gap-3 ${directIndemnityUrl ? 'border-purple-500 bg-purple-50 dark:bg-purple-900/10' : 'border-slate-200 dark:border-slate-700 hover:border-purple-400 dark:hover:border-purple-500/50'}`}>
+                                                    <span className="material-symbols-outlined text-3xl text-slate-400 group-hover:text-purple-500 transition-colors">{directIndemnityUrl ? 'check_circle' : 'upload_file'}</span>
+                                                    <p className="text-xs font-bold text-slate-500">{directIndemnityUrl ? 'Document Uploaded' : 'Upload signed PDF'}</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <button
+                                        onClick={handleProcessIndemnity}
+                                        disabled={isProcessingIndemnity || (!signatureBase64 && !directIndemnityUrl)}
+                                        className="w-full mt-6 py-4 rounded-xl bg-slate-900 text-white font-black text-sm uppercase tracking-widest hover:bg-black transition-all flex items-center justify-center gap-3 disabled:opacity-50"
+                                    >
+                                        {isProcessingIndemnity ? (
+                                            <div className="size-4 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+                                        ) : (
+                                            <span className="material-symbols-outlined text-lg">verified</span>
+                                        )}
+                                        {isProcessingIndemnity ? 'Processing Agreement...' : 'Finalize Indemnity Agreement'}
+                                    </button>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="md:col-span-2 space-y-8 animate-in fade-in slide-in-from-bottom-4">
+                                <div className="bg-rose-500/5 border border-rose-500/10 rounded-2xl p-6 flex flex-col items-center text-center gap-3">
+                                    <div className="size-12 rounded-2xl bg-rose-500/10 text-rose-500 flex items-center justify-center">
+                                        <span className="material-symbols-outlined filled">pending_actions</span>
+                                    </div>
+                                    <div>
+                                        <h4 className="text-sm font-black text-rose-900 dark:text-rose-400 uppercase tracking-widest">Agreement Pending</h4>
+                                        <p className="text-xs font-bold text-rose-600/70 mt-1">This loan application requires a signed indemnity agreement before it can be finalized.</p>
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                    <div className="space-y-4">
+                                        <label className="text-[10px] font-black uppercase text-slate-500 block">Option 1: Upload Signature Image</label>
+                                        <div className="relative group">
+                                            <input
+                                                type="file"
+                                                accept="image/*"
+                                                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                                                onChange={(e) => e.target.files?.[0] && handleFileUpload(e.target.files[0], 'signature')}
+                                            />
+                                            <div className={`p-8 rounded-2xl border-2 border-dashed transition-all flex flex-col items-center justify-center gap-3 ${signatureBase64 ? 'border-purple-500 bg-purple-50 dark:bg-purple-900/10' : 'border-slate-200 dark:border-slate-700 hover:border-purple-400 dark:hover:border-purple-500/50'}`}>
+                                                <span className="material-symbols-outlined text-3xl text-slate-400 group-hover:text-purple-500 transition-colors">{signatureBase64 ? 'check_circle' : 'draw'}</span>
+                                                <p className="text-xs font-bold text-slate-500">{signatureBase64 ? 'Signature Selected' : 'Drop signature image here'}</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="space-y-4">
+                                        <label className="text-[10px] font-black uppercase text-slate-500 block">Option 2: Direct PDF Upload</label>
+                                        <div className="relative group">
+                                            <input
+                                                type="file"
+                                                accept=".pdf"
+                                                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                                                onChange={(e) => e.target.files?.[0] && handleFileUpload(e.target.files[0], 'indemnity')}
+                                            />
+                                            <div className={`p-8 rounded-2xl border-2 border-dashed transition-all flex flex-col items-center justify-center gap-3 ${directIndemnityUrl ? 'border-purple-500 bg-purple-50 dark:bg-purple-900/10' : 'border-slate-200 dark:border-slate-700 hover:border-purple-400 dark:hover:border-purple-500/50'}`}>
+                                                <span className="material-symbols-outlined text-3xl text-slate-400 group-hover:text-purple-500 transition-colors">{directIndemnityUrl ? 'check_circle' : 'upload_file'}</span>
+                                                <p className="text-xs font-bold text-slate-500">{directIndemnityUrl ? 'Document Uploaded' : 'Upload signed PDF'}</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <button
+                                    onClick={handleProcessIndemnity}
+                                    disabled={isProcessingIndemnity || (!signatureBase64 && !directIndemnityUrl)}
+                                    className="w-full mt-6 py-4 rounded-xl bg-slate-900 text-white font-black text-sm uppercase tracking-widest hover:bg-black transition-all flex items-center justify-center gap-3 disabled:opacity-50"
+                                >
+                                    {isProcessingIndemnity ? (
+                                        <div className="size-4 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+                                    ) : (
+                                        <span className="material-symbols-outlined text-lg">verified</span>
+                                    )}
+                                    {isProcessingIndemnity ? 'Processing Agreement...' : 'Finalize Indemnity Agreement'}
+                                </button>
+                            </div>
+                        )}
+                    </CollapsibleGroup>
 
                     {/* References */}
                     {loan.customer_references && (

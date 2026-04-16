@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import axios from 'axios';
-import { AppStep, SavedDraft } from '../types';
+import { AppStep, SavedDraft, UserState } from '../types';
 import { getFinancialAdvice } from '../services/geminiService';
 import { storageService } from '../services/storageService';
 import SuccessScreen from './SuccessScreen';
@@ -14,6 +14,7 @@ interface LoanFlowProps {
   formatMoney: (amount: number) => string;
   initialDraft?: SavedDraft | null;
   referralCodeUsed?: string;
+  user: UserState;
 }
 
 const isValidEmail = (email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
@@ -30,12 +31,13 @@ const NIGERIAN_STATES = [
 
 const isValidAccountNumber = (acc: string) => /^\d{10}$/.test(acc);
 
-const LoanFlow: React.FC<LoanFlowProps> = ({ initialStep, onComplete, navigate, formatMoney, initialDraft, referralCodeUsed }) => {
+const LoanFlow: React.FC<LoanFlowProps> = ({ initialStep, onComplete, navigate, formatMoney, initialDraft, referralCodeUsed, user }) => {
 
   const [subStep, setSubStep] = useState(initialDraft?.subStep ?? (initialStep === 'TYPE' ? 0 : 1));
   const [loading, setLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
+  const [indemnityUrl, setIndemnityUrl] = useState<string | null>(null);
 
   // Form State
   const [draftId] = useState(initialDraft?.id ?? `L-${Math.floor(Math.random() * 9000) + 1000}`);
@@ -61,7 +63,7 @@ const LoanFlow: React.FC<LoanFlowProps> = ({ initialStep, onComplete, navigate, 
   const [maidenName, setMaidenName] = useState(initialDraft?.data?.maidenName ?? '');
   const [maritalStatus, setMaritalStatus] = useState(initialDraft?.data?.maritalStatus ?? 'Single');
   const [religion, setReligion] = useState(initialDraft?.data?.religion ?? 'Prefer not to say');
-  const [countryCode, setCountryCode] = useState(initialDraft?.data?.countryCode ?? '+1');
+  const [countryCode, setCountryCode] = useState(initialDraft?.data?.countryCode ?? '+234');
   const [mobileNumber, setMobileNumber] = useState(initialDraft?.data?.mobileNumber ?? '');
   const [contactEmail, setContactEmail] = useState(initialDraft?.data?.contactEmail ?? '');
   const [bvn, setBvn] = useState(initialDraft?.data?.bvn ?? '');
@@ -98,6 +100,7 @@ const LoanFlow: React.FC<LoanFlowProps> = ({ initialStep, onComplete, navigate, 
   const [ippisNumber, setIppisNumber] = useState(initialDraft?.data?.ippisNumber ?? '');
   const [staffId, setStaffId] = useState(initialDraft?.data?.staffId ?? '');
   const [referralCode, setReferralCode] = useState(referralCodeUsed || initialDraft?.data?.referralCode || '');
+  const [submitting, setSubmitting] = useState(false)
 
   // Bank Details
   const [bankDetails, setBankDetails] = useState(initialDraft?.data?.bankDetails ?? {
@@ -154,7 +157,7 @@ const LoanFlow: React.FC<LoanFlowProps> = ({ initialStep, onComplete, navigate, 
     try {
       const canvas = canvasRef.current;
       const signatureUrl = canvas ? canvas.toDataURL() : '';
-
+      setSubmitting(true)
       const payload = {
         applying_for_others: isOnBehalf,
         relationship_to_applicant: isOnBehalf ? representativeRelation : null,
@@ -209,20 +212,28 @@ const LoanFlow: React.FC<LoanFlowProps> = ({ initialStep, onComplete, navigate, 
         // Bank Details
         bank_name: bankDetails.bankName,
         account_number: bankDetails.accountNumber,
-        account_name: bankDetails.accountName
+        account_name: bankDetails.accountName,
+        loan_type: currentLoanLabel
       };
 
       console.log("Submitting Loan Payload:", payload);
 
       const backendUrl = ''; // Use proxy
-      await axios.post(`${backendUrl}/api/loans`, payload, { withCredentials: true });
+      const response = await axios.post(`${backendUrl}/api/loans`, payload, { withCredentials: true });
+
+      if (response.data && response.data.indemnity_document_url) {
+        setIndemnityUrl(response.data.indemnity_document_url);
+      }
 
       storageService.deleteDraft(draftId);
       setIsSuccess(true);
       // onComplete();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error submitting loan:", error);
-      alert("Failed to submit loan application. Please try again.");
+      const serverMessage = error.response?.data?.message || "Failed to submit loan application. Please try again.";
+      alert(serverMessage);
+    } finally {
+      setSubmitting(false)
     }
   };
 
@@ -242,49 +253,77 @@ const LoanFlow: React.FC<LoanFlowProps> = ({ initialStep, onComplete, navigate, 
     fetchBanks();
   }, []);
 
-  // Hydrate form from previous loan if available
+  // Auto-Prefill from Existing Data
   useEffect(() => {
-    const fetchPreviousData = async () => {
-      if (initialDraft) return; // Don't overwrite draft
+    // If we are resuming a draft, don't stomp over it with old data
+    if (initialDraft) {
+      console.log("Resuming draft, skipping auto-prefill");
+      return;
+    }
 
+    const prefillData = async () => {
+      // 1. Prioritize Profile Data (Source of Truth)
+      if (user.profile) {
+        const p = user.profile;
+        if (p.surname) setSurname(p.surname);
+        if (p.first_name) setFirstName(p.first_name);
+        if (p.middle_name) setMiddleName(p.middle_name);
+        if (p.date_of_birth) setDob(new Date(p.date_of_birth).toISOString().split('T')[0]);
+        if (p.gender) setGender(p.gender);
+        if (p.phone_number) setMobileNumber(p.phone_number);
+        if (p.personal_email) setContactEmail(p.personal_email);
+        if (p.bvn) setBvn(p.bvn);
+        if (p.nin) setNin(p.nin);
+        if (p.state_of_origin) setStateOfOrigin(p.state_of_origin);
+        if (p.state_of_residence) setStateOfResidence(p.state_of_residence);
+        if (p.address) setHomeAddress(p.address);
+        
+        // Banking from Profile
+        if (p.bank_name || p.account_number) {
+          setBankDetails({
+            bankName: p.bank_name || '',
+            accountNumber: p.account_number || '',
+            accountName: p.account_name || ''
+          });
+        }
+      }
+
+      // 2. Fetch Latest Loan for non-profile fields & documents
       try {
         const backendUrl = '';
-        // Reuse existing endpoint to get all loans, sorted by newest first
         const response = await axios.get(`${backendUrl}/api/loans`, { withCredentials: true });
 
         if (response.data && Array.isArray(response.data) && response.data.length > 0) {
           const latestLoan = response.data[0];
           console.log("Hydrating from previous loan:", latestLoan);
 
-          // Personal
-          setTitle(latestLoan.title || 'Mr');
-          setSurname(latestLoan.surname || '');
-          setFirstName(latestLoan.first_name || '');
-          setMiddleName(latestLoan.middle_name || '');
-          setIsOnBehalf(latestLoan.applying_for_others || false);
-          setRepresentativeRelation(latestLoan.relationship_to_applicant || '');
-          setIsPep(latestLoan.is_politically_exposed); // boolean
-          setGender(latestLoan.gender || '');
-          if (latestLoan.date_of_birth) {
+          // Only fill if not already set by profile (profile is priority)
+          if (!user.profile?.surname && latestLoan.surname) setSurname(latestLoan.surname);
+          if (!user.profile?.first_name && latestLoan.first_name) setFirstName(latestLoan.first_name);
+          if (!user.profile?.middle_name && latestLoan.middle_name) setMiddleName(latestLoan.middle_name);
+          if (latestLoan.is_politically_exposed !== undefined) setIsPep(latestLoan.is_politically_exposed);
+          if (!user.profile?.gender && latestLoan.gender) setGender(latestLoan.gender);
+          if (!user.profile?.date_of_birth && latestLoan.date_of_birth) {
             setDob(new Date(latestLoan.date_of_birth).toISOString().split('T')[0]);
           }
+
+          setTitle(latestLoan.title || 'Mr');
           setMaidenName(latestLoan.mothers_maiden_name || '');
           setMaritalStatus(latestLoan.marital_status || 'Single');
           setReligion(latestLoan.religion || 'Prefer not to say');
 
           // Contact
-          setCountryCode('+234'); // Defaulting/Resetting or we could store this too
-          setMobileNumber(latestLoan.mobile_number || '');
-          setContactEmail(latestLoan.personal_email || '');
+          if (!user.profile?.phone_number && latestLoan.mobile_number) setMobileNumber(latestLoan.mobile_number);
+          if (!user.profile?.personal_email && latestLoan.personal_email) setContactEmail(latestLoan.personal_email);
 
           // IDs
-          setBvn(latestLoan.bvn || '');
-          setNin(latestLoan.nin || '');
+          if (!user.profile?.bvn && latestLoan.bvn) setBvn(latestLoan.bvn);
+          if (!user.profile?.nin && latestLoan.nin) setNin(latestLoan.nin);
 
           // Address
-          setStateOfOrigin(latestLoan.state_of_origin || '');
-          setStateOfResidence(latestLoan.state_of_residence || '');
-          setHomeAddress(latestLoan.primary_home_address || '');
+          if (!user.profile?.state_of_origin && latestLoan.state_of_origin) setStateOfOrigin(latestLoan.state_of_origin);
+          if (!user.profile?.state_of_residence && latestLoan.state_of_residence) setStateOfResidence(latestLoan.state_of_residence);
+          if (!user.profile?.address && latestLoan.primary_home_address) setHomeAddress(latestLoan.primary_home_address);
           setResidentialStatus(latestLoan.residential_status || 'Rent');
 
           // Financial
@@ -305,15 +344,16 @@ const LoanFlow: React.FC<LoanFlowProps> = ({ initialStep, onComplete, navigate, 
           setIppisNumber(latestLoan.ippis_number || '');
           setStaffId(latestLoan.staff_id || '');
 
-          // Banking
-          setBankDetails({
-            bankName: latestLoan.bank_name || '',
-            accountNumber: latestLoan.account_number || '',
-            accountName: latestLoan.account_name || ''
-          });
+          // Banking - Fallback to latest loan if profile didn't have it
+          if (!user.profile?.bank_name && !user.profile?.account_number) {
+            setBankDetails({
+              bankName: latestLoan.bank_name || '',
+              accountNumber: latestLoan.account_number || '',
+              accountName: latestLoan.account_name || ''
+            });
+          }
 
-          // Uploaded Docs - Map URLs back to "uploaded" state so they appear valid
-          // We mark them with a special 'Previous Upload' name so user knows
+          // Uploaded Docs
           setUploadedDocs(prev => ({
             ...prev,
             national_id: latestLoan.govt_id_url ? { name: 'Previous Upload', size: 'Existing', url: latestLoan.govt_id_url } : null,
@@ -324,33 +364,33 @@ const LoanFlow: React.FC<LoanFlowProps> = ({ initialStep, onComplete, navigate, 
             selfie: latestLoan.selfie_verification_url ? { name: 'Previous Upload', size: 'Existing', url: latestLoan.selfie_verification_url } : null,
           }));
 
+          setIsOnBehalf(latestLoan.applying_for_others || false);
+          setRepresentativeRelation(latestLoan.relationship_to_applicant || '');
+          setReferralCode(latestLoan.referral_code || '');
+
           // References
-          // Handle both stringified JSON (from DB text column) or direct array
           let refs = [];
-          if (typeof latestLoan.customer_references === 'string') {
-            try { refs = JSON.parse(latestLoan.customer_references); } catch (e) { }
-          } else if (Array.isArray(latestLoan.customer_references)) {
-            refs = latestLoan.customer_references;
+          if (typeof latestLoan.references === 'string') {
+            try { refs = JSON.parse(latestLoan.references); } catch (e) { }
+          } else if (Array.isArray(latestLoan.references)) {
+            refs = latestLoan.references;
           }
 
-          if (refs.length > 0) {
-            setReferences(refs.map((r: any) => ({
+          if (Array.isArray(refs) && refs.length > 0) {
+            setReferences(refs.map(r => ({
               name: r.fullName || r.name || '',
               phone: r.phoneNumber || r.phone || '',
               relationship: r.relationship || ''
             })));
           }
-
-          // Note: We intentionally do NOT pre-fill 'desiredAmount', 'repaymentPeriod', 'selectedLoanId'
-          // as these should be fresh for a new application.
         }
       } catch (error) {
         console.error("Failed to load previous data", error);
       }
     };
 
-    fetchPreviousData();
-  }, [initialDraft]);
+    prefillData();
+  }, [initialDraft, user.profile]);
 
   const handleBack = () => {
     if (subStep > 0) {
@@ -608,6 +648,7 @@ const LoanFlow: React.FC<LoanFlowProps> = ({ initialStep, onComplete, navigate, 
         }}
         formatMoney={formatMoney}
         productType="LOAN"
+        indemnityUrl={indemnityUrl}
       />
     );
   }
@@ -831,11 +872,11 @@ const LoanFlow: React.FC<LoanFlowProps> = ({ initialStep, onComplete, navigate, 
               <div className="grid gap-6">
                 <div className="space-y-2">
                   <label className="text-sm font-black text-slate-500 uppercase">Bank Verification Number (BVN)</label>
-                  <input className="w-full h-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-6 text-lg font-bold dark:text-white focus:border-primary outline-none" value={bvn} onChange={e => setBvn(e.target.value.replace(/[^0-9]/g, ''))} placeholder="11 digits" maxLength={11} />
+                  <input className="w-full h-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-6 text-lg font-bold dark:text-white focus:border-primary outline-none disabled:opacity-50 disabled:cursor-not-allowed" value={bvn} onChange={e => setBvn(e.target.value.replace(/[^0-9]/g, ''))} placeholder="11 digits" maxLength={11} disabled={!!user.profile?.bvn} title={user.profile?.bvn ? "Verified from profile" : ""} />
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-black text-slate-500 uppercase">National Identity Number (NIN)</label>
-                  <input className="w-full h-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-6 text-lg font-bold dark:text-white focus:border-primary outline-none" value={nin} onChange={e => setNin(e.target.value.replace(/[^0-9]/g, ''))} placeholder="11 digits" maxLength={11} />
+                  <input className="w-full h-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-6 text-lg font-bold dark:text-white focus:border-primary outline-none disabled:opacity-50 disabled:cursor-not-allowed" value={nin} onChange={e => setNin(e.target.value.replace(/[^0-9]/g, ''))} placeholder="11 digits" maxLength={11} disabled={!!user.profile?.nin} title={user.profile?.nin ? "Verified from profile" : ""} />
                 </div>
               </div>
               <NavActions isNextDisabled={!isValidBVN(bvn) || !isValidNIN(nin)} />
@@ -1161,85 +1202,167 @@ const LoanFlow: React.FC<LoanFlowProps> = ({ initialStep, onComplete, navigate, 
                   </div>
                   <NavActions nextLabel="Submit Application" isNextDisabled={parseFloat(desiredAmount.replace(/[^0-9.]/g, '')) < 100000 || parseFloat(desiredAmount.replace(/[^0-9.]/g, '')) > 500000 && !uploadedDocs.bank_statement} />
                 </div>
-                {/* <div className="lg:col-span-5"><div className="bg-slate-900 text-white rounded-[2.5rem] p-10 flex flex-col gap-8 shadow-2xl overflow-hidden relative"><div className="absolute top-0 right-0 w-64 h-64 bg-primary/10 rounded-full blur-3xl -mr-24 -mt-24 pointer-events-none"></div><h3 className="text-xl font-black text-white/90 uppercase tracking-widest">Summary</h3><div className="bg-white/5 backdrop-blur-md rounded-3xl p-8 border border-white/10"><p className="text-slate-400 text-xs font-black uppercase tracking-widest mb-3">Est. Monthly Payment</p><span className="text-5xl font-black text-primary tracking-tighter">{formatMoney(calculation.monthly)}</span></div><div className="space-y-4 pt-4 text-sm font-bold"><div className="flex justify-between py-4 border-b border-white/10"><span className="text-slate-400 uppercase tracking-widest">Rate (APR)</span><span className="text-primary">{calculation.rate}%</span></div><div className="flex justify-between pt-6"><span className="text-white uppercase tracking-widest">Total Repayment</span><span className="text-2xl text-primary">{formatMoney(calculation.total)}</span></div></div></div></div> */}
               </div>
             </div>
           )}
 
-          {/* Step 13: Indemnity & Signature */}
           {subStep === 13 && (
-            <div className="space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-24">
-              <div className="flex flex-col gap-2">
-                <h1 className="text-text-main dark:text-white text-3xl md:text-5xl font-black leading-tight tracking-tight">
-                  Indemnity & Signature
-                </h1>
-                <p className="text-slate-500 dark:text-slate-400 text-lg font-medium">
-                  Please review the indemnity agreement carefully and sign below to proceed.
-                </p>
-              </div>
-
-              <div className="flex flex-col lg:flex-row gap-8">
-                <div className="flex-1 bg-white dark:bg-slate-800 rounded-3xl shadow-sm border border-slate-100 dark:border-slate-700 overflow-hidden flex flex-col h-[600px] lg:h-auto">
-                  <div className="p-6 border-b border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 flex justify-between items-center">
-                    <h3 className="font-bold text-lg text-slate-900 dark:text-white flex items-center gap-2">
-                      <span className="material-symbols-outlined text-primary">description</span>
-                      Indemnity Agreement
-                    </h3>
+            <div className="space-y-6 md:space-y-10 animate-in fade-in slide-in-from-right-4 duration-500 pb-20">
+              <div className="flex flex-col lg:flex-row gap-6 md:gap-8 items-stretch">
+                {/* Indemnity Card */}
+                <div className="flex-1 bg-white dark:bg-slate-800 rounded-[2rem] md:rounded-[2.5rem] shadow-sm border border-slate-100 dark:border-slate-700 overflow-hidden flex flex-col">
+                  <div className="p-6 md:p-8 border-b border-slate-50 dark:border-slate-700/50 flex justify-between items-center bg-slate-50/50 dark:bg-slate-900/50">
+                    <div className="flex items-center gap-3">
+                      <span className="material-symbols-outlined text-primary text-2xl">description</span>
+                      <h3 className="font-black text-xl text-slate-900 dark:text-white">Indemnity Agreement</h3>
+                    </div>
                   </div>
-                  <div className="flex-1 overflow-y-auto p-8 text-sm leading-relaxed text-slate-600 dark:text-slate-300 font-medium">
-                    <div className="prose dark:prose-invert max-w-none space-y-8">
-                      <div>
-                        <h4 className="text-lg font-bold mb-4 uppercase text-slate-900 dark:text-white">1. Indemnity</h4>
-                        <p>I/We hereby agree to indemnify and hold harmless NOLT Finance from any and all claims, damages, liabilities, costs, and expenses arising out of any breach of representations made by me/us in this application.</p>
+                  <div className="flex-1 overflow-y-auto p-6 md:p-8 text-[11px] md:text-[12px] leading-relaxed text-slate-600 dark:text-slate-300 font-medium max-h-[400px] md:max-h-[600px]">
+                    <div className="prose dark:prose-invert max-w-none space-y-3 md:space-y-4 text-justify">
+                      <h4 className="text-base md:text-lg font-black uppercase text-primary text-center tracking-widest mb-3 md:mb-4 border-b border-primary/20 pb-4">Electronic Mail Indemnity</h4>
+                      <p>
+                        I/We, <span className="font-bold border-b border-slate-300 px-2">{surname} {firstName} {middleName}</span> (the "Customer") refer to the mandate between NOLT Finance Company Limited, (“the Company”) and the Customer governing the operation of the Customer’s account(s) and credit, investment or other transactions with the Company (the mandate).
+                      </p>
+                      <p>
+                        I/We have requested the Company to consider and/or act on our instructions and/or other requests to the Company communicated from time to time via electronic mail (email) purportedly emanating from the email address(es) shown in the table below or such other email address that the Company may subsequently agree to act upon at the Customer's request (Email Instruction(s)). IN CONSIDERATION of the Company acting upon an Email Instruction, the Customer hereby formally, unreservedly, irrevocably, and unconditionally declares and covenants as follows:
+                      </p>
+                      <p>
+                        1. That the Company is hereby authorized, in its sole discretion, to consider and/or act upon Email Instruction(s) without the necessity of any original signature(s) or conformity of the instruction with any other mandate or any inquiry on the Company's part as to the authority or identity of the person sending or purporting to send such instruction or the requirement of any other confirmation on the part of the Company.
+                      </p>
+                      <p>
+                        2. The Company shall be entitled to treat any e-notice or e-communication described above as fully authorized by and binding upon the Customer and the Company shall be entitled (but not bound) to take such steps in connection with or in reliance upon such communication as the Company may in good faith consider appropriate, whether such communication includes instruction to pay money or credit any account, or relates to the disposition of any money or documents or purports to bind the Customer to any other type of transaction or arrangement whatsoever, regardless of the nature of the transaction or arrangement or the amount of money involved. Notwithstanding, the Company may at its discretion require that a scanned copy of email instructions be duly signed in accordance with the existing mandate.
+                      </p>
+                      <p>
+                        3. In consideration of the Company acting in accordance with the term of this letter, the Customer undertakes to indemnify the Company and to keep the Company indemnified against all losses, claims, actions, proceedings, demands, costs and expenses incurred or sustained by the Company of whatever nature howsoever arising, out of or in connection with such notices, demands or other e-communication, provided that the Company acts in good faith.
+                      </p>
+                      <p>
+                        4. The terms of this letter shall remain in full force and effect unless and until the Company receives a notice of termination from the Customer in writing (or signed by a duly authorized person), save that such termination will not release the Customer from any liability under this authority and indemnity in respect of any act performed by the Company in accordance with the terms of this letter prior to the expiry of such time.
+                      </p>
+
+                      <div className="mt-8 p-4 md:p-6 bg-slate-50 dark:bg-slate-900/50 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-4">
+                        <p className="text-[9px] md:text-[10px] font-black uppercase text-slate-400">Email Address (This email address must be one that previously exists in the Company’s records)</p>
+                        <div className="flex flex-col sm:grid sm:grid-cols-3 sm:items-center gap-2 sm:gap-4">
+                          <span className="font-bold text-slate-500 text-xs sm:text-sm uppercase tracking-tight">Primary email</span>
+                          <div className="sm:col-span-2 h-10 border-b border-primary/30 flex items-center px-1 md:px-2 font-bold text-slate-800 dark:text-white text-sm md:text-base">
+                            {contactEmail || '____________________'}
+                          </div>
+                        </div>
+                        <div className="flex flex-col sm:grid sm:grid-cols-3 sm:items-center gap-2 sm:gap-4">
+                          <span className="font-bold text-slate-500 text-xs sm:text-sm uppercase tracking-tight">Alternate email</span>
+                          <div className="sm:col-span-2 h-10 border-b border-slate-200 dark:border-slate-700 flex items-center px-1 md:px-2 text-slate-500 text-sm md:text-base">
+                            ____________________
+                          </div>
+                        </div>
                       </div>
-                      <div>
-                        <h4 className="text-lg font-bold mb-4 uppercase text-slate-900 dark:text-white">2. Electronic Signature Consent</h4>
-                        <p>By signing this document electronically, I/we acknowledge that my electronic signature is the legal equivalent of my handwritten signature.</p>
+
+                      <div className="flex flex-col sm:grid sm:grid-cols-2 gap-8 md:gap-12 mt-4 md:mt-6 p-2 md:p-6">
+                        <div className="space-y-4 md:space-y-6 order-2 sm:order-1">
+                          <div className="space-y-1">
+                            <p className="text-xs font-bold text-slate-500 uppercase tracking-tight">Date</p>
+                            <div className="h-8 border-b border-slate-300 font-bold text-slate-800 dark:text-white">
+                              {new Date().toLocaleDateString('en-GB')}
+                            </div>
+                          </div>
+                          <div className="space-y-1">
+                            <p className="text-xs font-bold text-slate-500 uppercase tracking-tight">Customer Name</p>
+                            <div className="h-8 border-b border-slate-300 font-bold text-slate-800 dark:text-white">
+                              {surname} {firstName} {middleName}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="space-y-2 flex flex-col justify-end order-1 sm:order-2">
+                          <p className="text-xs font-bold text-slate-500 sm:text-right uppercase tracking-tight">Digital Signature Verified</p>
+                          <div className="h-16 border-b border-slate-300 flex items-end sm:justify-end pb-2 opacity-80 transition-all">
+                            {hasSigned ? (
+                              <div className="flex items-center gap-2 text-green-500 font-black italic">
+                                <span className="material-symbols-outlined filled">draw</span>
+                                <span className="text-[10px] uppercase">Digitally Signed</span>
+                              </div>
+                            ) : <span className="text-[10px] text-slate-400 uppercase italic">Sign in the box to the right</span>}
+                          </div>
+                        </div>
                       </div>
                     </div>
                   </div>
                 </div>
 
-                <div className="w-full lg:w-[420px] flex flex-col gap-6">
-                  <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-lg border border-slate-100 dark:border-slate-700 p-8 flex flex-col gap-8 sticky top-32">
-                    <div>
-                      <h3 className="font-bold text-xl text-slate-900 dark:text-white mb-1">Sign Here</h3>
-                      <p className="text-xs text-slate-500 uppercase tracking-widest font-black">Draw your signature in the box below</p>
-                    </div>
+                {/* Signature Card */}
+                <div className="w-full lg:w-[450px] bg-white dark:bg-slate-800 rounded-[2rem] md:rounded-[2.5rem] shadow-lg border border-slate-100 dark:border-slate-700 p-6 md:p-10 flex flex-col gap-6 md:gap-8">
+                  <div>
+                    <h3 className="font-black text-xl md:text-2xl text-slate-900 dark:text-white mb-1 tracking-tight">Digital Canvas</h3>
+                    <p className="text-[10px] text-slate-500 uppercase font-black tracking-widest">Draw your signature in the box below</p>
+                  </div>
 
-                    <div className="relative group">
-                      <canvas
-                        ref={canvasRef}
-                        width={400}
-                        height={200}
-                        onMouseDown={startDrawing}
-                        onMouseMove={draw}
-                        onMouseUp={stopDrawing}
-                        onMouseOut={stopDrawing}
-                        onTouchStart={startDrawing}
-                        onTouchMove={draw}
-                        onTouchEnd={stopDrawing}
-                        className="w-full h-48 bg-slate-50 dark:bg-slate-900 rounded-2xl border-2 border-dashed border-slate-200 dark:border-slate-700 hover:border-primary transition-colors cursor-crosshair relative overflow-hidden touch-none"
+                  <div className="relative group rounded-3xl overflow-hidden border-2 border-dashed border-slate-200 dark:border-slate-600 hover:border-primary transition-all bg-slate-50 shadow-inner">
+                    <canvas
+                      ref={canvasRef}
+                      width={400}
+                      height={220}
+                      onMouseDown={startDrawing}
+                      onMouseMove={draw}
+                      onMouseUp={stopDrawing}
+                      onMouseOut={stopDrawing}
+                      onTouchStart={startDrawing}
+                      onTouchMove={draw}
+                      onTouchEnd={stopDrawing}
+                      className="w-full h-56 cursor-crosshair touch-none"
+                      style={{ touchAction: 'none' }}
+                    />
+                    {!hasSigned && (
+                      <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none opacity-20">
+                        <span className="material-symbols-outlined text-5xl mb-2">draw</span>
+                        <span className="text-slate-400 text-xl font-black uppercase tracking-[0.25em]">Digital Sign</span>
+                      </div>
+                    )}
+                    <div className="absolute top-4 right-4 flex gap-2">
+                      <button onClick={() => signatureInputRef.current?.click()} className="text-[9px] font-black uppercase text-primary hover:text-white hover:bg-primary border border-primary/20 px-3 py-1 rounded-full transition-all bg-white/80 dark:bg-slate-800/80 flex items-center gap-1">
+                        <span className="material-symbols-outlined text-[10px]">photo_camera</span>
+                        Snap/Upload
+                      </button>
+                      <button
+                        onClick={clearSignature}
+                        className="text-[9px] font-black uppercase text-red-500 hover:text-white hover:bg-red-500 border border-red-500/20 px-3 py-1 rounded-full transition-all bg-white/80 dark:bg-slate-800/80"
+                      >
+                        Clear
+                      </button>
+                    </div>
+                    <input type="file" ref={signatureInputRef} accept="image/*" className="hidden" onChange={handleSignatureUpload} />
+                  </div>
+
+                  <div
+                    className={`p-5 md:p-6 rounded-[2rem] border-2 transition-all cursor-pointer flex items-start gap-4 ${acceptedIndemnity ? 'border-primary bg-primary/5' : 'border-slate-50 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/50'}`}
+                    onClick={() => setAcceptedIndemnity(!acceptedIndemnity)}
+                  >
+                    <div className="shrink-0 mt-1">
+                      <input
+                        type="checkbox"
+                        checked={acceptedIndemnity}
+                        onChange={e => setAcceptedIndemnity(e.target.checked)}
+                        className="size-6 rounded-lg accent-primary border-slate-300 cursor-pointer"
                       />
-                      {!hasSigned && <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none opacity-20"><span className="text-slate-400 text-2xl font-black uppercase tracking-widest">Sign Here</span></div>}
-                      <div className="absolute top-4 right-4 flex gap-2">
-                        <button onClick={() => signatureInputRef.current?.click()} className="text-[10px] font-black uppercase text-primary hover:text-primary/80 bg-white dark:bg-slate-800 px-3 py-1 rounded-full border border-slate-100 dark:border-slate-700 shadow-sm transition-all flex items-center gap-1">
-                          <span className="material-symbols-outlined text-[10px]">photo_camera</span>
-                          Snap/Upload
-                        </button>
-                        <button onClick={clearSignature} className="text-[10px] font-black uppercase text-red-500 hover:text-red-600 bg-white dark:bg-slate-800 px-3 py-1 rounded-full border border-slate-100 dark:border-slate-700 shadow-sm transition-all">Clear</button>
-                      </div>
-                      <input type="file" ref={signatureInputRef} accept="image/*" className="hidden" onChange={handleSignatureUpload} />
                     </div>
-
-                    <div className="flex items-start gap-4 p-5 bg-slate-50 dark:bg-slate-900/50 rounded-2xl border border-slate-100 dark:border-slate-700 group cursor-pointer" onClick={() => setAcceptedIndemnity(!acceptedIndemnity)}>
-                      <input className="peer size-6 appearance-none rounded-lg border-2 border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 checked:bg-primary checked:border-primary focus:ring-2 focus:ring-primary focus:ring-offset-0 cursor-pointer transition-all" type="checkbox" checked={acceptedIndemnity} onChange={(e) => setAcceptedIndemnity(e.target.checked)} />
-                      <label className="text-sm font-bold text-slate-600 dark:text-slate-400 cursor-pointer leading-snug">I accept the terms of the Indemnity Agreement and confirm that the digital signature above is mine.</label>
-                    </div>
+                    <label className="text-xs md:text-sm font-bold text-slate-700 dark:text-slate-300 leading-snug cursor-pointer select-none">
+                      I accept the terms of the Indemnity Agreement and confirm that the digital signature above is mine.
+                    </label>
                   </div>
                 </div>
               </div>
-              <NavActions nextLabel="Complete Application" isNextDisabled={!hasSigned || !acceptedIndemnity} />
+
+              <div className="flex flex-col sm:flex-row justify-between items-center bg-white dark:bg-slate-900 p-6 md:p-8 rounded-[2rem] border border-slate-100 dark:border-slate-800 mt-6 md:mt-8 gap-6">
+                <div className="flex gap-3 md:gap-4 w-full sm:w-auto">
+                  <button onClick={() => setSubStep(12)} className="flex-1 sm:flex-none px-6 md:px-8 py-3 md:py-4 text-slate-500 font-bold hover:bg-slate-50 dark:hover:bg-slate-800 rounded-full transition-all flex items-center justify-center gap-2 border border-slate-100 dark:border-slate-700 text-sm md:text-base">
+                    <span className="material-symbols-outlined text-lg">arrow_back</span> Back
+                  </button>
+                </div>
+                <button
+                  onClick={submitLoan}
+                  disabled={!acceptedIndemnity || !hasSigned || loading}
+                  className={`w-full sm:w-auto px-10 md:px-12 py-3 md:py-4 rounded-full font-black text-base md:text-lg transition-all flex items-center justify-center gap-3 ${acceptedIndemnity && hasSigned && !loading ? 'bg-primary text-white shadow-xl shadow-primary/30 hover:-translate-y-1' : 'bg-slate-200 text-slate-400 cursor-not-allowed grayscale'}`}
+                >
+                  {submitting ? 'Processing...' : 'Complete Application'}
+                  {!submitting && <span className="material-symbols-outlined">arrow_forward</span>}
+                </button>
+              </div>
             </div>
           )}
         </main>

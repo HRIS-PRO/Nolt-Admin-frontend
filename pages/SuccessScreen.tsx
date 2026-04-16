@@ -8,13 +8,18 @@ interface SuccessProps {
   loan: LoanState;
   formatMoney: (amount: number) => string;
   productType?: 'LOAN' | 'INVESTMENT';
+  indemnityUrl?: string | null;
 }
 
-const SuccessScreen: React.FC<SuccessProps> = ({ onDashboard, loan, formatMoney, productType = 'LOAN' }) => {
+const SuccessScreen: React.FC<SuccessProps> = ({ onDashboard, loan, formatMoney, productType = 'LOAN', indemnityUrl }) => {
   const isInvestment = productType === 'INVESTMENT';
   const navigate = useNavigate();
 
   const handleDownload = () => {
+    if (indemnityUrl) {
+      window.open(indemnityUrl, '_blank');
+      return;
+    }
     const link = document.createElement('a');
     link.href = '#';
     link.setAttribute('download', `NOLT_Agreement_${Math.floor(Math.random() * 10000)}.pdf`);
@@ -74,21 +79,17 @@ const SuccessScreen: React.FC<SuccessProps> = ({ onDashboard, loan, formatMoney,
                 <span className="material-symbols-outlined text-2xl">file_download</span>
               </div>
               <div className="flex-1 text-center md:text-left">
-                <h4 className="text-lg font-black text-primary uppercase tracking-tight mb-0.5">Loan Agreement</h4>
+                <h4 className="text-lg font-black text-primary uppercase tracking-tight mb-0.5">Indemnity Agreement</h4>
                 <p className="text-xs text-slate-500 dark:text-slate-400 font-bold leading-relaxed">
-                  Your official loan agreement will be sent to you when it is ready.
-                  {/* <span className="text-primary cursor-pointer font-black underline" onClick={handleDownload}>
-                    download
-                  </span>{' '} */}
-                  {/* and keep a copy for your records and future reference. */}
+                  Your signed indemnity agreement is available for download. Keep a copy for your records.
                 </p>
               </div>
-              {/* <button
+              <button
                 onClick={handleDownload}
-                className="w-full md:w-auto px-8 py-3.5 bg-primary text-white rounded-2xl text-[13px] font-black uppercase tracking-widest hover:bg-primary-dark transition-all shadow-lg shadow-primary/20 active:scale-95"
+                className="w-full md:w-auto px-8 py-3.5 bg-primary text-white rounded-2xl text-[13px] font-black uppercase tracking-widest hover:bg-primary/90 transition-all shadow-lg shadow-primary/20 active:scale-95"
               >
                 Download
-              </button> */}
+              </button>
             </div>
           </div>
         )}
