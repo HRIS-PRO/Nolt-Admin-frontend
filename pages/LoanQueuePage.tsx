@@ -46,6 +46,7 @@ const LoanQueuePage: React.FC<LoanQueuePageProps> = ({ user, onLogout, toggleThe
                 },
                 withCredentials: true
             });
+            console.log(response.data.loans.filter((l: any) => l.id === 740))
             setLoans(response.data.loans);
             setTotalLoans(response.data.total);
         } catch (error) {
@@ -282,6 +283,7 @@ const LoanQueuePage: React.FC<LoanQueuePageProps> = ({ user, onLogout, toggleThe
                                 <th className="p-4">Amount</th>
                                 <th className="p-4">Disbursement</th>
                                 <th className="p-4">Date</th>
+                                <th className="p-4">Indemnity</th>
                                 <th className="p-4">Status</th>
                                 {/* <th className="p-4 text-right">Actions</th> */}
                             </tr>
@@ -379,6 +381,19 @@ const LoanQueuePage: React.FC<LoanQueuePageProps> = ({ user, onLogout, toggleThe
                                             {loan.disbursement_amount ? `₦${Number(loan.disbursement_amount).toLocaleString()}` : '-'}
                                         </td>
                                         <td className="p-4 text-slate-500 text-xs">{formatDate(loan.created_at)}</td>
+                                        <td className="p-4">
+                                            {loan.indemnity_document_url ? (
+                                                <div className="flex items-center gap-2 px-2 py-1 rounded border border-emerald-500/20 bg-emerald-500/10 text-[10px] font-bold uppercase tracking-widest text-emerald-600 dark:text-emerald-400 w-fit">
+                                                    <span className="material-symbols-outlined text-[12px] font-black">verified</span>
+                                                    Signed
+                                                </div>
+                                            ) : (
+                                                <div className="flex items-center gap-2 px-2 py-1 rounded border border-rose-500/20 bg-rose-500/10 text-[10px] font-bold uppercase tracking-widest text-rose-600 dark:text-rose-400 w-fit">
+                                                    <span className="material-symbols-outlined text-[12px] font-black">pending_actions</span>
+                                                    Pending
+                                                </div>
+                                            )}
+                                        </td>
                                         <td className="p-4">
                                             {(() => {
                                                 const styles = getStatusStyles(loan.status);
