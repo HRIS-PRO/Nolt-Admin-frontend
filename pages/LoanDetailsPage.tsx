@@ -345,7 +345,7 @@ const ActionCard = ({ loan, userRole, onActionComplete }: { loan: any, userRole:
                 <div className="space-y-3">
                     <button
                         onClick={() => handleAction('approve')}
-                        disabled={actionLoading || (stage === 'credit_check_2' && !eligibleAmount)}
+                        disabled={actionLoading}
                         className="w-full py-4 rounded-xl bg-blue-600 text-white font-black text-sm uppercase tracking-wider hover:bg-blue-700 transition-all shadow-lg flex items-center justify-center gap-2"
                     >
                         {actionLoading ? <span className="size-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : 'Approve & Proceed'}
@@ -743,9 +743,9 @@ const LoanDetailsPage: React.FC<LoanDetailsPageProps> = ({ user, onLogout, toggl
                                     <div className="relative group">
                                         <div className="absolute -inset-4 bg-gradient-to-tr from-blue-500/20 to-purple-500/20 rounded-[40px] blur-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
                                         <div className="relative">
-                                            <img 
-                                                src={loan.selfie_verification_url} 
-                                                alt="Captured Face" 
+                                            <img
+                                                src={loan.selfie_verification_url}
+                                                alt="Captured Face"
                                                 className="w-64 h-80 object-cover rounded-[32px] border-4 border-white dark:border-slate-800 shadow-2xl relative z-0"
                                             />
                                             <div className="absolute top-4 right-4 z-10">
@@ -840,7 +840,7 @@ const LoanDetailsPage: React.FC<LoanDetailsPageProps> = ({ user, onLogout, toggl
                                 <p className="text-xs font-black uppercase tracking-widest text-slate-500 dark:text-slate-400">Account Assignment</p>
                             </div>
                             <h3 className="text-2xl font-black mb-6 text-slate-900 dark:text-white">Sales Officer</h3>
-                            
+
                             <div className="space-y-4">
                                 <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-800">
                                     <div className="flex items-center gap-3">
