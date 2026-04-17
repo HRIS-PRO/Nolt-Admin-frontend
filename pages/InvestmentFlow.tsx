@@ -497,6 +497,7 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
         const data = await investmentService.getRate({
           plan: selectedPlan,
           currency,
+          contribution_frequency: contributionFrequency,
           amount: numericAmount,
           tenure
         });
@@ -518,7 +519,7 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
 
     const debounceTimer = setTimeout(fetchRate, 500);
     return () => clearTimeout(debounceTimer);
-  }, [amount, tenure, selectedPlan, currency]);
+  }, [amount, tenure, selectedPlan, currency, contributionFrequency]);
 
   const interestRate = dynamicInterestRate ?? 0;
 
@@ -1786,6 +1787,7 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
                   <label className="text-sm font-black text-slate-500 uppercase tracking-widest">Investment Amount</label>
                   <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-xl gap-1">
                     <button disabled={isClaimingGift} onClick={() => setCurrency('NGN')} className={`px-3 py-1 rounded-lg text-[10px] font-black transition-all ${currency === 'NGN' ? 'bg-white dark:bg-slate-700 text-primary shadow-sm' : 'text-slate-400'}`}>NGN</button>
+                    <button disabled={isClaimingGift} onClick={() => setCurrency('USD')} className={`px-3 py-1 rounded-lg text-[10px] font-black transition-all ${currency === 'USD' ? 'bg-white dark:bg-slate-700 text-primary shadow-sm' : 'text-slate-400'}`}>USD</button>
                     {(selectedPlan === 'VAULT') && (
                       <button disabled={isClaimingGift} onClick={() => setCurrency('USD')} className={`px-3 py-1 rounded-lg text-[10px] font-black transition-all ${currency === 'USD' ? 'bg-white dark:bg-slate-700 text-primary shadow-sm' : 'text-slate-400'}`}>USD</button>
                     )}

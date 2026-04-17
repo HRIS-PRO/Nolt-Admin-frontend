@@ -158,6 +158,7 @@ const StaffInvestmentsPage: React.FC<StaffInvestmentsPageProps> = ({ user, onLog
                 const data = await investmentService.getRate({
                     plan: wizardData.plan,
                     currency: wizardData.currency,
+                    contribution_frequency: wizardData.contributionFrequency,
                     amount: numericAmount,
                     tenure: parseInt(wizardData.tenure) || 12
                 });
@@ -184,6 +185,7 @@ const StaffInvestmentsPage: React.FC<StaffInvestmentsPageProps> = ({ user, onLog
     const initialFormData = {
         plan: 'NOLT Rise',
         currency: 'NGN',
+        contributionFrequency: 'monthly',
         tenure: '',
         minAmount: '',
         maxAmount: '',
@@ -334,6 +336,7 @@ const StaffInvestmentsPage: React.FC<StaffInvestmentsPageProps> = ({ user, onLog
             const payload = {
                 plan_name: formData.plan,
                 currency: formData.currency,
+                contribution_frequency: formData.contributionFrequency,
                 tenure_days: formData.tenure,
                 min_amount: formData.minAmount,
                 max_amount: max,
@@ -361,6 +364,7 @@ const StaffInvestmentsPage: React.FC<StaffInvestmentsPageProps> = ({ user, onLog
         setFormData({
             plan: rate.plan_name,
             currency: rate.currency,
+            contributionFrequency: rate.contribution_frequency || 'monthly',
             tenure: rate.tenure_days.toString(),
             minAmount: rate.min_amount.toString(),
             maxAmount: rate.max_amount ? rate.max_amount.toString() : '',
@@ -376,6 +380,7 @@ const StaffInvestmentsPage: React.FC<StaffInvestmentsPageProps> = ({ user, onLog
             const payload = {
                 plan_name: rate.plan_name,
                 currency: rate.currency,
+                contribution_frequency: rate.contribution_frequency || 'monthly',
                 tenure_days: 30,
                 min_amount: 1,
                 max_amount: 2,
@@ -1125,9 +1130,9 @@ const StaffInvestmentsPage: React.FC<StaffInvestmentsPageProps> = ({ user, onLog
                                             <div className="space-y-2">
                                                 <label className="text-[10px] font-black uppercase text-slate-400 px-1">Contribution Frequency</label>
                                                 <select value={wizardData.contributionFrequency} onChange={e => setWizardData({ ...wizardData, contributionFrequency: e.target.value })} className="w-full h-14 px-5 rounded-2xl bg-slate-50 dark:bg-slate-800 border-none focus:ring-2 focus:ring-purple-500 transition-all font-bold text-sm appearance-none">
-                                                    <option value="once">One-time</option>
+                                                    <option value="daily">Daily</option>
+                                                    <option value="weekly">Weekly</option>
                                                     <option value="monthly">Monthly</option>
-                                                    <option value="quarterly">Quarterly</option>
                                                 </select>
                                             </div>
                                         </div>
@@ -1646,6 +1651,7 @@ const StaffInvestmentsPage: React.FC<StaffInvestmentsPageProps> = ({ user, onLog
                                                 <th className="px-8 py-4 text-left text-[10px] font-black uppercase tracking-widest text-slate-400">Range (₦)</th>
                                                 <th className="px-8 py-4 text-left text-[10px] font-black uppercase tracking-widest text-slate-400">Tenure</th>
                                                 <th className="px-8 py-4 text-left text-[10px] font-black uppercase tracking-widest text-slate-400 text-center">Interest</th>
+                                                <th className="px-8 py-4 text-left text-[10px] font-black uppercase tracking-widest text-slate-400 text-center">Frequency</th>
                                                 <th className="px-8 py-4 text-right text-[10px] font-black uppercase tracking-widest text-slate-400">Actions</th>
                                             </tr>
                                         </thead>
@@ -1669,6 +1675,9 @@ const StaffInvestmentsPage: React.FC<StaffInvestmentsPageProps> = ({ user, onLog
                                                             <span className="px-3 py-1.5 rounded-lg border border-green-500/30 bg-green-500/10 text-green-500 text-[10px] font-black uppercase tracking-widest">
                                                                 {rate.interest_rate}% P.A
                                                             </span>
+                                                        </td>
+                                                        <td className="px-8 py-6 text-center font-bold text-slate-600 dark:text-slate-300 text-sm uppercase">
+                                                            {rate.contribution_frequency}
                                                         </td>
                                                         <td className="px-8 py-6">
                                                             <div className="flex justify-end gap-2">
@@ -1778,6 +1787,21 @@ const StaffInvestmentsPage: React.FC<StaffInvestmentsPageProps> = ({ user, onLog
                                                     <option value="USD">USD ($)</option>
                                                     <option value="GBP">GBP (£)</option>
                                                     <option value="EUR">EUR (€)</option>
+                                                </select>
+                                            </div>
+                                        </div>
+
+                                        <div className="grid grid-cols-1 gap-6">
+                                            <div className="space-y-3">
+                                                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 px-1">Contribution Frequency</label>
+                                                <select
+                                                    value={formData.contributionFrequency}
+                                                    onChange={(e) => setFormData({ ...formData, contributionFrequency: e.target.value })}
+                                                    className="w-full h-14 px-5 rounded-2xl bg-slate-50 dark:bg-slate-800 border-none outline-none font-bold text-sm focus:ring-2 focus:ring-blue-500/50 transition-all appearance-none cursor-pointer"
+                                                >
+                                                    <option value="daily">Daily</option>
+                                                    <option value="weekly">Weekly</option>
+                                                    <option value="monthly">Monthly</option>
                                                 </select>
                                             </div>
                                         </div>

@@ -61,10 +61,11 @@ export const investmentService = {
         return response.json();
     },
 
-    getRate: async (params: { plan: string, currency: string, amount: number, tenure: number }) => {
+    getRate: async (params: { plan: string, currency: string, contribution_frequency: string, amount: number, tenure: number }) => {
         const queryParams = new URLSearchParams({
             plan: params.plan,
             currency: params.currency,
+            contribution_frequency: params.contribution_frequency,
             amount: params.amount.toString(),
             tenure: params.tenure.toString()
         });
