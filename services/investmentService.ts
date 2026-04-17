@@ -61,14 +61,15 @@ export const investmentService = {
         return response.json();
     },
 
-    getRate: async (params: { plan: string, currency: string, contribution_frequency: string, amount: number, tenure: number }) => {
+    getRate: async (params: { plan: string, currency: string, amount: number, tenure: number, payout_frequency?: string, contribution_frequency?: string }) => {
         const queryParams = new URLSearchParams({
             plan: params.plan,
             currency: params.currency,
-            contribution_frequency: params.contribution_frequency,
             amount: params.amount.toString(),
             tenure: params.tenure.toString()
         });
+        if (params.payout_frequency) queryParams.append('payout_frequency', params.payout_frequency);
+        if (params.contribution_frequency) queryParams.append('contribution_frequency', params.contribution_frequency);
 
         const response = await fetch(`${API_BASE_URL}/yield-rates/calculate?${queryParams}`, {
             method: 'GET',
