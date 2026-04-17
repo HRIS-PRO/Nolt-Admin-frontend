@@ -56,7 +56,6 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
   const [rollover, setRollover] = useState(initialDraft?.data?.rollover ?? 'principal_interest');
   const [targetAmount, setTargetAmount] = useState<string>(initialDraft?.data?.targetAmount ?? '');
   const [payoutFrequency, setPayoutFrequency] = useState<PayoutFrequency>(initialDraft?.data?.payoutFrequency ?? 'maturity');
-  const [contributionFrequency, setContributionFrequency] = useState<'daily' | 'weekly' | 'monthly'>(initialDraft?.data?.contributionFrequency ?? 'monthly');
 
   // Entity & Identity
   const [entityType, setEntityType] = useState<'INDIVIDUAL' | 'CORPORATE'>(initialDraft?.data?.entityType ?? 'INDIVIDUAL');
@@ -494,13 +493,18 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
 
       setRateLoading(true);
       try {
-        const data = await investmentService.getRate({
+        const payload: any = {
           plan: selectedPlan,
           currency,
-          contribution_frequency: contributionFrequency,
           amount: numericAmount,
           tenure
-        });
+        };
+        
+        if (selectedPlan === 'VAULT') {
+          payload.payout_frequency = payoutFrequency;
+        }
+
+        const data = await investmentService.getRate(payload);
 
         if (data) {
           setDynamicInterestRate(data.interest_rate);
@@ -519,7 +523,7 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
 
     const debounceTimer = setTimeout(fetchRate, 500);
     return () => clearTimeout(debounceTimer);
-  }, [amount, tenure, selectedPlan, currency, contributionFrequency]);
+  }, [amount, tenure, selectedPlan, currency, payoutFrequency]);
 
   const interestRate = dynamicInterestRate ?? 0;
 
@@ -546,7 +550,7 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
       amount: parseFloat(amount.replace(/[^0-9.]/g, '') || '0'),
       subStep: nextStep,
       data: {
-        selectedPlan, currency, amount, tenure, rollover, targetAmount, payoutFrequency, contributionFrequency,
+        selectedPlan, currency, amount, tenure, rollover, targetAmount, payoutFrequency,
         entityType, title, fullName, surname, firstName, middleName, isOnBehalf, representativeRelation, isPep,
         gender, dob, maidenName, religion, maritalStatus, countryCode, mobileNumber, contactEmail, bvn, nin,
         stateOfOrigin, stateOfResidence, homeAddress, nokName, nokRelationship, nokAddress,
@@ -811,7 +815,8 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
         is_pep: isPep,
         directors_are_pep: isPep, // Corporate PEP flag
         nok_name: nokName, nok_relationship: nokRelationship, nok_address: nokAddress,
-        target_amount: targetAmount, rollover_option: rollover, contribution_frequency: contributionFrequency,
+        target_amount: targetAmount, rollover_option: rollover, 
+        ...(selectedPlan === 'VAULT' ? { payout_frequency: payoutFrequency } : {}),
         interest_rate: dynamicInterestRate,
         custom_email: contactEmail, // For record keeping
         rep_house_number: '', // Add if needed, using empty for now
@@ -1832,28 +1837,7 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
                 </div>
               )}
 
-              {selectedPlan === 'RISE' && (
-                <div className="space-y-4">
-                  <label className="text-sm font-black text-slate-500 uppercase tracking-widest">Contribution Frequency</label>
-                  <div className="grid grid-cols-3 gap-3">
-                    {[
-                      { id: 'daily', label: 'Daily' },
-                      { id: 'weekly', label: 'Weekly' },
-                      { id: 'monthly', label: 'Monthly' }
-                    ].map(freq => (
-                      <button
-                        key={freq.id}
-                        disabled={isClaimingGift}
-                        onClick={() => setContributionFrequency(freq.id as any)}
-                        className={`py-4 rounded-2xl border-2 font-bold transition-all ${contributionFrequency === freq.id ? 'border-primary bg-primary/5 text-primary' : 'border-slate-100 dark:border-slate-800 text-slate-400'}`}
-                      >
-                        {freq.label}
-                      </button>
-                    ))}
-                  </div>
-                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Automated contributions to promote disciplined wealth building.</p>
-                </div>
-              )}
+
 
               {selectedPlan === 'VAULT' && currency === 'NGN' && (
                 <div className="space-y-4">

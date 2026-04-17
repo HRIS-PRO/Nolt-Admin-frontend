@@ -98,7 +98,7 @@ const StaffInvestmentsPage: React.FC<StaffInvestmentsPageProps> = ({ user, onLog
         plan: 'RISE' as InvestmentPlan,
         amount: '',
         targetAmount: '',
-        contributionFrequency: 'monthly',
+        payoutFrequency: 'monthly',
         tenure: '365',
         currency: 'NGN' as Currency,
         rollover: 'principal_interest',
@@ -155,13 +155,16 @@ const StaffInvestmentsPage: React.FC<StaffInvestmentsPageProps> = ({ user, onLog
             }
             setRateLoading(true);
             try {
-                const data = await investmentService.getRate({
+                const payload: any = {
                     plan: wizardData.plan,
                     currency: wizardData.currency,
-                    contribution_frequency: wizardData.contributionFrequency,
                     amount: numericAmount,
                     tenure: parseInt(wizardData.tenure) || 12
-                });
+                };
+                if (wizardData.plan === 'VAULT') {
+                    payload.payout_frequency = wizardData.payoutFrequency;
+                }
+                const data = await investmentService.getRate(payload);
                 setDynamicInterestRate(data ? data.interest_rate : null);
             } catch (err) {
                 console.error("Error fetching rate:", err);
@@ -185,7 +188,7 @@ const StaffInvestmentsPage: React.FC<StaffInvestmentsPageProps> = ({ user, onLog
     const initialFormData = {
         plan: 'NOLT Rise',
         currency: 'NGN',
-        contributionFrequency: 'monthly',
+        payoutFrequency: 'monthly',
         tenure: '',
         minAmount: '',
         maxAmount: '',
@@ -333,15 +336,17 @@ const StaffInvestmentsPage: React.FC<StaffInvestmentsPageProps> = ({ user, onLog
                 return;
             }
 
-            const payload = {
+            const payload: any = {
                 plan_name: formData.plan,
                 currency: formData.currency,
-                contribution_frequency: formData.contributionFrequency,
                 tenure_days: formData.tenure,
                 min_amount: formData.minAmount,
                 max_amount: max,
                 interest_rate: formData.interest
             };
+            if (formData.plan === 'NOLT Vault') {
+                payload.payout_frequency = formData.payoutFrequency;
+            }
 
             if (editingId) {
                 await axios.put(`/api/yield-rates/${editingId}`, payload);
@@ -364,7 +369,7 @@ const StaffInvestmentsPage: React.FC<StaffInvestmentsPageProps> = ({ user, onLog
         setFormData({
             plan: rate.plan_name,
             currency: rate.currency,
-            contributionFrequency: rate.contribution_frequency || 'monthly',
+            payoutFrequency: rate.payout_frequency || rate.contribution_frequency || 'monthly',
             tenure: rate.tenure_days.toString(),
             minAmount: rate.min_amount.toString(),
             maxAmount: rate.max_amount ? rate.max_amount.toString() : '',
@@ -377,15 +382,17 @@ const StaffInvestmentsPage: React.FC<StaffInvestmentsPageProps> = ({ user, onLog
 
     const handleDuplicateRate = async (rate: any) => {
         try {
-            const payload = {
+            const payload: any = {
                 plan_name: rate.plan_name,
                 currency: rate.currency,
-                contribution_frequency: rate.contribution_frequency || 'monthly',
                 tenure_days: 30,
                 min_amount: 1,
                 max_amount: 2,
                 interest_rate: 1
             };
+            if (rate.plan_name === 'NOLT Vault') {
+                payload.payout_frequency = rate.payout_frequency || rate.contribution_frequency || 'monthly';
+            }
 
             await axios.post('/api/yield-rates', payload);
             fetchRates();
@@ -431,13 +438,8 @@ const StaffInvestmentsPage: React.FC<StaffInvestmentsPageProps> = ({ user, onLog
 
     const resetWizardData = () => {
         setWizardData({
-            entityType: 'INDIVIDUAL', email: '', phoneNumber: '', bvn: '', nin: '', tin: '',
-            title: 'Mr', firstName: '', lastName: '', middleName: '', isPep: false, gender: '', dob: '', maidenName: '', religion: 'Prefer not to say', maritalStatus: 'Single',
-            stateOfOrigin: 'Abia', stateOfResidence: 'Abia', homeAddress: '', nokName: '', nokRelationship: '', nokAddress: '', isNokSameAddress: false,
-            bankName: '', accountNumber: '', accountName: '',
-            companyName: '', rcNumber: '', isAuthorizedRep: false, incorpDate: '', businessAddress: '', businessNature: '', directorCount: 1,
-            directors: [{ surname: '', firstName: '', middleName: '', phone: '', gender: '', dob: '', bvn: '', nin: '', isPep: false }],
-            uploadedDocs: {}, plan: 'RISE', amount: '', targetAmount: '', contributionFrequency: 'monthly', tenure: '365', currency: 'NGN', rollover: 'principal_interest', paymentMethod: 'bank_transfer', receiptUrl: ''
+            entityType: 'INDIVIDUAL', email: '', phoneNumber: '', bvn: '', nin: '', tin: '', title: 'Mr', firstName: '', lastName: '', middleName: '', isPep: false, gender: '', dob: '', maidenName: '', religion: 'Prefer not to say', maritalStatus: 'Single', stateOfOrigin: 'Abia', stateOfResidence: 'Abia', homeAddress: '', nokName: '', nokRelationship: '', nokAddress: '', isNokSameAddress: false, companyName: '', rcNumber: '', isAuthorizedRep: false, incorpDate: '', businessAddress: '', businessNature: '', directorCount: 1, directors: [{ surname: '', firstName: '', middleName: '', phone: '', gender: '', dob: '', bvn: '', nin: '', isPep: false }], bankName: '', bankCode: '', accountNumber: '', accountName: '',
+            uploadedDocs: {}, plan: 'RISE', amount: '', targetAmount: '', payoutFrequency: 'monthly', tenure: '365', currency: 'NGN', rollover: 'principal_interest', paymentMethod: 'bank_transfer', receiptUrl: ''
         });
         setWizardStep(1);
     };
@@ -499,8 +501,8 @@ const StaffInvestmentsPage: React.FC<StaffInvestmentsPageProps> = ({ user, onLog
                 selectedPlan: wizardData.plan,
                 amount: parseFloat(wizardData.amount),
                 target_amount: wizardData.targetAmount ? parseFloat(wizardData.targetAmount) : null,
-                contribution_frequency: wizardData.contributionFrequency,
                 tenure_days: parseInt(wizardData.tenure),
+                ...((wizardData.plan === 'VAULT') ? { payout_frequency: wizardData.payoutFrequency } : {}),
                 currency: wizardData.currency,
                 rollover_option: wizardData.rollover,
                 interest_rate: dynamicInterestRate,
@@ -1127,14 +1129,17 @@ const StaffInvestmentsPage: React.FC<StaffInvestmentsPageProps> = ({ user, onLog
                                                 <label className="text-[10px] font-black uppercase text-slate-400 px-1">Target Amount (Optional)</label>
                                                 <input type="number" value={wizardData.targetAmount} onChange={e => setWizardData({ ...wizardData, targetAmount: e.target.value })} className="w-full h-14 px-5 rounded-2xl bg-slate-50 dark:bg-slate-800 border-none focus:ring-2 focus:ring-purple-500 transition-all font-bold text-sm" placeholder="Goal amount" />
                                             </div>
-                                            <div className="space-y-2">
-                                                <label className="text-[10px] font-black uppercase text-slate-400 px-1">Contribution Frequency</label>
-                                                <select value={wizardData.contributionFrequency} onChange={e => setWizardData({ ...wizardData, contributionFrequency: e.target.value })} className="w-full h-14 px-5 rounded-2xl bg-slate-50 dark:bg-slate-800 border-none focus:ring-2 focus:ring-purple-500 transition-all font-bold text-sm appearance-none">
-                                                    <option value="daily">Daily</option>
-                                                    <option value="weekly">Weekly</option>
-                                                    <option value="monthly">Monthly</option>
-                                                </select>
-                                            </div>
+                                            {wizardData.plan === 'VAULT' && (
+                                                <div className="space-y-2">
+                                                    <label className="text-[10px] font-black uppercase text-slate-400 px-1">Payout Frequency</label>
+                                                    <select value={wizardData.payoutFrequency} onChange={e => setWizardData({ ...wizardData, payoutFrequency: e.target.value })} className="w-full h-14 px-5 rounded-2xl bg-slate-50 dark:bg-slate-800 border-none focus:ring-2 focus:ring-purple-500 transition-all font-bold text-sm appearance-none">
+                                                        <option value="upfront">Upfront</option>
+                                                        <option value="monthly">Monthly</option>
+                                                        <option value="quarterly">Quarterly</option>
+                                                        <option value="maturity">At Maturity</option>
+                                                    </select>
+                                                </div>
+                                            )}
                                         </div>
 
                                         <div className="space-y-2">
@@ -1651,7 +1656,7 @@ const StaffInvestmentsPage: React.FC<StaffInvestmentsPageProps> = ({ user, onLog
                                                 <th className="px-8 py-4 text-left text-[10px] font-black uppercase tracking-widest text-slate-400">Range (₦)</th>
                                                 <th className="px-8 py-4 text-left text-[10px] font-black uppercase tracking-widest text-slate-400">Tenure</th>
                                                 <th className="px-8 py-4 text-left text-[10px] font-black uppercase tracking-widest text-slate-400 text-center">Interest</th>
-                                                <th className="px-8 py-4 text-left text-[10px] font-black uppercase tracking-widest text-slate-400 text-center">Frequency</th>
+                                                <th className="px-8 py-4 text-left text-[10px] font-black uppercase tracking-widest text-slate-400 text-center">Payout Freq. (Vault)</th>
                                                 <th className="px-8 py-4 text-right text-[10px] font-black uppercase tracking-widest text-slate-400">Actions</th>
                                             </tr>
                                         </thead>
@@ -1677,7 +1682,7 @@ const StaffInvestmentsPage: React.FC<StaffInvestmentsPageProps> = ({ user, onLog
                                                             </span>
                                                         </td>
                                                         <td className="px-8 py-6 text-center font-bold text-slate-600 dark:text-slate-300 text-sm uppercase">
-                                                            {rate.contribution_frequency}
+                                                            {rate.plan_name === 'NOLT Vault' ? (rate.payout_frequency || rate.contribution_frequency || '-') : '-'}
                                                         </td>
                                                         <td className="px-8 py-6">
                                                             <div className="flex justify-end gap-2">
@@ -1791,20 +1796,23 @@ const StaffInvestmentsPage: React.FC<StaffInvestmentsPageProps> = ({ user, onLog
                                             </div>
                                         </div>
 
-                                        <div className="grid grid-cols-1 gap-6">
-                                            <div className="space-y-3">
-                                                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 px-1">Contribution Frequency</label>
-                                                <select
-                                                    value={formData.contributionFrequency}
-                                                    onChange={(e) => setFormData({ ...formData, contributionFrequency: e.target.value })}
-                                                    className="w-full h-14 px-5 rounded-2xl bg-slate-50 dark:bg-slate-800 border-none outline-none font-bold text-sm focus:ring-2 focus:ring-blue-500/50 transition-all appearance-none cursor-pointer"
-                                                >
-                                                    <option value="daily">Daily</option>
-                                                    <option value="weekly">Weekly</option>
-                                                    <option value="monthly">Monthly</option>
-                                                </select>
+                                        {formData.plan === 'NOLT Vault' && (
+                                            <div className="grid grid-cols-1 gap-6">
+                                                <div className="space-y-3">
+                                                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 px-1">Payout Frequency</label>
+                                                    <select
+                                                        value={formData.payoutFrequency}
+                                                        onChange={(e) => setFormData({ ...formData, payoutFrequency: e.target.value })}
+                                                        className="w-full h-14 px-5 rounded-2xl bg-slate-50 dark:bg-slate-800 border-none outline-none font-bold text-sm focus:ring-2 focus:ring-blue-500/50 transition-all appearance-none cursor-pointer"
+                                                    >
+                                                        <option value="upfront">Upfront</option>
+                                                        <option value="monthly">Monthly</option>
+                                                        <option value="quarterly">Quarterly</option>
+                                                        <option value="maturity">At Maturity</option>
+                                                    </select>
+                                                </div>
                                             </div>
-                                        </div>
+                                        )}
 
                                         <div className="grid grid-cols-2 gap-6">
                                             <div className="space-y-3">
