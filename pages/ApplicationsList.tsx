@@ -126,7 +126,7 @@ const ApplicationsList: React.FC<ApplicationsListProps> = ({ navigate, formatMon
           ).map(app => ({
             id: String(app.id), // Ensure string for consistency
             type: 'Business Loan', // Default type or derive from data if available
-            amount: parseFloat(app.requested_loan_amount),
+            amount: parseFloat(['topup', 'add_on', 'add-on', 're-app', 're_app'].includes(app.loan_type?.toLowerCase()) ? app.topup_amount : app.loan_type === 'buy_over' ? app.buy_over_amount : app.requested_loan_amount || 0),
             submittedAt: formatDate(app.created_at),
             status: app.status.toUpperCase(),
             icon: app.status === 'rejected' ? 'cancel' : 'check_circle',
