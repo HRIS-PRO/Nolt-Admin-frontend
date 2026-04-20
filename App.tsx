@@ -35,8 +35,30 @@ import VerifyGiftPage from './pages/investment/VerifyGiftPage';
 import ClaimGiftPage from './pages/investment/ClaimGiftPage';
 import ProfilePage from './pages/ProfilePage';
 import StaffPromotionsPage from './pages/StaffPromotionsPage';
-
 import LogoutWarningModal from './components/modals/LogoutWarningModal';
+
+// Setup Global Axios Interceptor for GPS Tracking
+axios.interceptors.request.use((config) => {
+  const gpsLocation = localStorage.getItem('user_gps_location');
+  if (gpsLocation) {
+    config.headers['X-User-Location'] = gpsLocation;
+  }
+  return config;
+}, (error) => Promise.reject(error));
+
+// Silently try to get location if we don't have it (won't aggressively block, just requests once)
+if ('geolocation' in navigator) {
+  navigator.geolocation.getCurrentPosition(
+    (position) => {
+      const loc = `${position.coords.latitude},${position.coords.longitude}`;
+      localStorage.setItem('user_gps_location', loc);
+    },
+    (error) => {
+      console.log("GPS Location unavailable or denied:", error.message);
+    },
+    { enableHighAccuracy: true, timeout: 5000, maximumAge: 60000 }
+  );
+}
 
 // ProtectedRoute Component extracted to prevent re-renders
 interface ProtectedRouteProps {
