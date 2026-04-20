@@ -372,7 +372,7 @@ const LoanQueuePage: React.FC<LoanQueuePageProps> = ({ user, onLogout, toggleThe
                                         </td>
                                         <td className="p-4 font-black text-slate-900 dark:text-white">
                                             ₦{Number(
-                                                loan.loan_type === 'topup' || loan.loan_type === 're-app' || loan.loan_type === 'add-on' ? loan.topup_amount :
+                                                ['topup', 'add_on', 'add-on', 're-app', 're_app'].includes(loan.loan_type?.toLowerCase()) ? loan.topup_amount :
                                                     loan.loan_type === 'buy_over' ? loan.buy_over_amount :
                                                         loan.requested_loan_amount
                                             ).toLocaleString()}

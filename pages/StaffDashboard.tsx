@@ -81,7 +81,7 @@ const StaffDashboard: React.FC<StaffDashboardProps> = ({ user, onLogout, toggleT
                     `"${loan.applicant_email || ''}"`, // Assuming email might be available, otherwise blank
                     `"${loan.stage || ''}"`,
                     `"${loan.officer_name || 'Unassigned'}"`,
-                    `${loan.requested_loan_amount || 0}`,
+                    `${['topup', 'add_on', 'add-on', 're-app', 're_app'].includes(loan.loan_type?.toLowerCase()) ? loan.topup_amount : loan.loan_type === 'buy_over' ? loan.buy_over_amount : (loan.requested_loan_amount || 0)}`,
                     `"${loan.status || ''}"`,
                     `"${loan.product_type || ''}"`,
                     `"${formatDate(loan.created_at)}"`
@@ -287,7 +287,7 @@ const StaffDashboard: React.FC<StaffDashboardProps> = ({ user, onLogout, toggleT
                                         </td>
                                         <td className="p-4 font-black text-slate-900 dark:text-white">
                                             ₦{Number(
-                                                loan.loan_type === 'topup' || loan.loan_type === 're-app' || loan.loan_type === 'add-on' ? loan.topup_amount :
+                                                ['topup', 'add_on', 'add-on', 're-app', 're_app'].includes(loan.loan_type?.toLowerCase()) ? loan.topup_amount :
                                                     loan.loan_type === 'buy_over' ? loan.buy_over_amount :
                                                         loan.requested_loan_amount
                                             ).toLocaleString()}

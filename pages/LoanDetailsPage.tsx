@@ -847,7 +847,7 @@ const LoanDetailsPage: React.FC<LoanDetailsPageProps> = ({ user, onLogout, toggl
                                 </p>
                                 <h3 className="text-2xl font-semibold text-slate-900 dark:text-white leading-tight">
                                     ₦{Number(
-                                        ['topup', 'add_on', 're-app'].includes(loan.loan_type) ? (loan.topup_amount || loan.requested_loan_amount) :
+                                        ['topup', 'add_on', 'add-on', 're-app', 're_app'].includes(loan.loan_type?.toLowerCase()) ? (loan.topup_amount || loan.requested_loan_amount) :
                                             loan.loan_type === 'buy_over' ? (loan.buy_over_amount || loan.requested_loan_amount) :
                                                 loan.requested_loan_amount
                                     ).toLocaleString()}
