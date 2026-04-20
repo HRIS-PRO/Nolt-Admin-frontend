@@ -211,7 +211,7 @@ const AuditTrailPage: React.FC<AuditTrailPageProps> = ({ user, onLogout, toggleT
                                                 height="100%" 
                                                 style={{ border: 0 }} 
                                                 loading="lazy" 
-                                                src={`https://maps.google.com/maps?q=${selectedLog.metadata.location.lat},${selectedLog.metadata.location.lng}&t=&z=13&ie=UTF8&iwloc=&output=embed`}
+                                                src={`https://www.openstreetmap.org/export/embed.html?bbox=${Number(selectedLog.metadata.location.lng) - 0.05},${Number(selectedLog.metadata.location.lat) - 0.05},${Number(selectedLog.metadata.location.lng) + 0.05},${Number(selectedLog.metadata.location.lat) + 0.05}&layer=mapnik&marker=${selectedLog.metadata.location.lat},${selectedLog.metadata.location.lng}`}
                                             ></iframe>
                                         </div>
                                     </div>
