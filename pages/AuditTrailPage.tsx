@@ -133,7 +133,13 @@ const AuditTrailPage: React.FC<AuditTrailPageProps> = ({ user, onLogout, toggleT
                                                 {log.target_entity_id || `User ${log.actor_id}`}
                                             </td>
                                             <td className="p-4 font-mono text-xs text-slate-500">
-                                                {log.ip_address}
+                                                <div>{log.ip_address}</div>
+                                                {log.metadata?.location?.country && (
+                                                    <div className="text-[10px] text-slate-400 mt-1 flex items-center gap-1 font-sans">
+                                                        <span className="material-symbols-outlined text-[12px]">location_on</span>
+                                                        {log.metadata.location.city ? `${log.metadata.location.city}, ` : ''}{log.metadata.location.country}
+                                                    </div>
+                                                )}
                                             </td>
                                             <td className="p-4 text-xs text-slate-500 font-mono italic">
                                                 {formatDateTime(log.created_at)}
