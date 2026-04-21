@@ -173,6 +173,7 @@ const AppContent: React.FC = () => {
 
       console.log(data)
       setUser({
+        id: data.id,
         email: data.email,
         name: data.full_name || data.name || 'User',
         isLoggedIn: true,

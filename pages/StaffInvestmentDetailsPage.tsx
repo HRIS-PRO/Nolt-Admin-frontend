@@ -8,11 +8,79 @@ import { formatDate } from '../utils/dateFormatter';
 import { maskValue } from '../utils/maskHelper';
 
 interface StaffInvestmentDetailsPageProps {
-    user: { name: string; email: string; avatar_url?: string; role?: string };
+    user: { id?: string | number; name: string; email: string; avatar_url?: string; role?: string };
     onLogout: () => void;
     toggleTheme?: () => void;
     theme?: 'light' | 'dark';
 }
+
+const CollapsibleGroup = ({ title, icon, children, defaultOpen = false }: any) => {
+    const [isOpen, setIsOpen] = useState(defaultOpen);
+    return (
+        <div className="bg-white dark:bg-[#1e293b] rounded-[24px] border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden mb-6">
+            <div onClick={() => setIsOpen(!isOpen)} className="flex items-center justify-between p-6 cursor-pointer bg-slate-50/50 hover:bg-slate-50 transition-colors">
+                <div className="flex items-center gap-4">
+                    <span className="material-symbols-outlined text-2xl text-slate-400">{icon}</span>
+                    <h3 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight">{title}</h3>
+                </div>
+                <span className={`material-symbols-outlined transition-transform ${isOpen ? 'rotate-180' : ''}`}>keyboard_arrow_down</span>
+            </div>
+            {isOpen && <div className="p-8 border-t border-slate-100 dark:border-slate-800 grid grid-cols-1 md:grid-cols-2 gap-8">{children}</div>}
+        </div>
+    );
+};
+
+const Field = ({ label, value, isLink = false, copy = false, docId = undefined, onRemove = undefined }: any) => (
+    <div className="space-y-2">
+        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{label}</p>
+        {isLink && value ? (
+            <div className="flex items-center gap-3">
+                <a href={value} target="_blank" rel="noopener noreferrer" className="text-purple-600 font-bold underline truncate max-w-full text-sm">View Document</a>
+                {onRemove && docId && (
+                    <button 
+                        onClick={() => onRemove(docId)} 
+                        className="text-red-500 hover:text-red-600 bg-red-50 hover:bg-red-100 dark:bg-red-900/20 dark:hover:bg-red-900/40 p-1 rounded transition-colors flex items-center justify-center shadow-sm"
+                        title="Delete Document"
+                    >
+                        <span className="material-symbols-outlined text-[14px]">delete</span>
+                    </button>
+                )}
+            </div>
+        ) : (
+            <p className="font-bold text-slate-900 dark:text-white break-words">{value || 'Not provided'}</p>
+        )}
+    </div>
+);
+
+const MaskedField = ({ label, value, verified = false }: { label: string, value: string, verified?: boolean }) => {
+    const [isMasked, setIsMasked] = useState(true);
+    if (!value) return <Field label={label} value="" />;
+    const maskedValueDisplay = verified ? maskValue(value) : value.replace(/./g, '*');
+    return (
+        <div className="space-y-2">
+            <div className="flex items-center justify-between">
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{label}</p>
+                <div className="flex items-center gap-2">
+                    {verified && (
+                        <span className="flex items-center gap-1 px-2 py-0.5 bg-green-500/10 text-green-600 rounded text-[8px] font-black uppercase tracking-tighter border border-green-500/20">
+                            <span className="material-symbols-outlined text-[10px]">verified</span>
+                            Verified
+                        </span>
+                    )}
+                    <button
+                        onClick={() => setIsMasked(!isMasked)}
+                        className="text-slate-500 hover:text-purple-500 transition-colors bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded text-[10px] font-bold"
+                    >
+                        {isMasked ? 'Reveal' : 'Hide'}
+                    </button>
+                </div>
+            </div>
+            <p className="font-bold text-slate-900 dark:text-white break-words font-mono">
+                {isMasked ? maskedValueDisplay : value}
+            </p>
+        </div>
+    );
+};
 
 const StaffInvestmentDetailsPage: React.FC<StaffInvestmentDetailsPageProps> = ({ user, onLogout, toggleTheme, theme }) => {
     const { id } = useParams();
@@ -20,6 +88,8 @@ const StaffInvestmentDetailsPage: React.FC<StaffInvestmentDetailsPageProps> = ({
     const [investment, setInvestment] = useState<any>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [isActioning, setIsActioning] = useState(false);
+    const [uploadFile, setUploadFile] = useState<File | null>(null);
+    const [uploadLoading, setUploadLoading] = useState(false);
     const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
     const [customInterest, setCustomInterest] = useState<string>('');
     const [isProcessingIndemnity, setIsProcessingIndemnity] = useState(false);
@@ -30,6 +100,7 @@ const StaffInvestmentDetailsPage: React.FC<StaffInvestmentDetailsPageProps> = ({
     const [showReturnModal, setShowReturnModal] = useState(false);
     const [returnTargetStage, setReturnTargetStage] = useState<string>('');
     const [reason, setReason] = useState('');
+    const [activePanel, setActivePanel] = useState<'overview' | 'manage' | 'activity'>('overview');
 
 
     const fetchInvestment = async () => {
@@ -93,6 +164,50 @@ const StaffInvestmentDetailsPage: React.FC<StaffInvestmentDetailsPageProps> = ({
         } catch (error: any) {
             console.error(`Failed to ${action} investment`, error);
             alert(error.response?.data?.message || `Failed to ${action}`);
+        } finally {
+            setIsActioning(false);
+        }
+    };
+
+    const handleStaffUpload = async () => {
+        if (!uploadFile || !id) return;
+        setUploadLoading(true);
+        const formData = new FormData();
+        formData.append('file', uploadFile);
+        formData.append('investment_id', id);
+        formData.append('document_type', 'staff_supporting_doc');
+
+        try {
+            await axios.post(`/api/upload`, formData, {
+                headers: { 'Content-Type': 'multipart/form-data' },
+                withCredentials: true
+            });
+            setUploadFile(null);
+            const fileInput = document.getElementById('staff-upload-input') as HTMLInputElement;
+            if (fileInput) fileInput.value = '';
+            await fetchInvestment();
+            alert("Document uploaded successfully");
+        } catch (error: any) {
+            console.error("Upload failed", error);
+            alert(error.response?.data?.message || "Upload failed");
+        } finally {
+            setUploadLoading(false);
+        }
+    };
+
+    const handleDeleteDocument = async (docId: string | number) => {
+        if (!confirm('Are you sure you want to delete this document? This action cannot be undone.')) return;
+        setIsActioning(true);
+        try {
+            await axios.delete(`/api/upload/${docId}`, {
+                data: { investment_id: id },
+                withCredentials: true
+            });
+            await fetchInvestment();
+            alert("Document deleted successfully");
+        } catch (error: any) {
+            console.error("Delete failed", error);
+            alert(error.response?.data?.message || "Failed to delete document");
         } finally {
             setIsActioning(false);
         }
@@ -237,62 +352,6 @@ const StaffInvestmentDetailsPage: React.FC<StaffInvestmentDetailsPageProps> = ({
         );
     }
 
-    const CollapsibleGroup = ({ title, icon, children, defaultOpen = false }: any) => {
-        const [isOpen, setIsOpen] = useState(defaultOpen);
-        return (
-            <div className="bg-white dark:bg-[#1e293b] rounded-[24px] border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden mb-6">
-                <div onClick={() => setIsOpen(!isOpen)} className="flex items-center justify-between p-6 cursor-pointer bg-slate-50/50 hover:bg-slate-50 transition-colors">
-                    <div className="flex items-center gap-4">
-                        <span className="material-symbols-outlined text-2xl text-slate-400">{icon}</span>
-                        <h3 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight">{title}</h3>
-                    </div>
-                    <span className={`material-symbols-outlined transition-transform ${isOpen ? 'rotate-180' : ''}`}>keyboard_arrow_down</span>
-                </div>
-                {isOpen && <div className="p-8 border-t border-slate-100 dark:border-slate-800 grid grid-cols-1 md:grid-cols-2 gap-8">{children}</div>}
-            </div>
-        );
-    };
-
-    const Field = ({ label, value, isLink = false, copy = false }: any) => (
-        <div className="space-y-2">
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{label}</p>
-            {isLink && value ? (
-                <a href={value} target="_blank" rel="noopener noreferrer" className="text-purple-600 font-bold underline truncate block max-w-full text-sm">View Document</a>
-            ) : (
-                <p className="font-bold text-slate-900 dark:text-white break-words">{value || 'Not provided'}</p>
-            )}
-        </div>
-    );
-
-    const MaskedField = ({ label, value, verified = false }: { label: string, value: string, verified?: boolean }) => {
-        const [isMasked, setIsMasked] = useState(true);
-        if (!value) return <Field label={label} value="" />;
-        const maskedValueDisplay = verified ? maskValue(value) : value.replace(/./g, '*');
-        return (
-            <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{label}</p>
-                    <div className="flex items-center gap-2">
-                        {verified && (
-                            <span className="flex items-center gap-1 px-2 py-0.5 bg-green-500/10 text-green-600 rounded text-[8px] font-black uppercase tracking-tighter border border-green-500/20">
-                                <span className="material-symbols-outlined text-[10px]">verified</span>
-                                Verified
-                            </span>
-                        )}
-                        <button
-                            onClick={() => setIsMasked(!isMasked)}
-                            className="text-slate-500 hover:text-purple-500 transition-colors bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded text-[10px] font-bold"
-                        >
-                            {isMasked ? 'Reveal' : 'Hide'}
-                        </button>
-                    </div>
-                </div>
-                <p className="font-bold text-slate-900 dark:text-white break-words font-mono">
-                    {isMasked ? maskedValueDisplay : value}
-                </p>
-            </div>
-        );
-    };
 
     return (
         <StaffLayout user={user} onLogout={onLogout} toggleTheme={toggleTheme} theme={theme}>
@@ -723,7 +782,7 @@ const StaffInvestmentDetailsPage: React.FC<StaffInvestmentDetailsPageProps> = ({
                         </CollapsibleGroup>
                     )}
 
-                    {(investment.rep_id_url || investment.utility_bill_url || investment.cac_url || investment.secondary_id_url || investment.company_profile_url || investment.status_report_url || investment.memart_url || investment.annual_returns_url || investment.board_resolution_url || investment.signatures) && (
+                    {(investment.rep_id_url || investment.utility_bill_url || investment.cac_url || investment.secondary_id_url || investment.company_profile_url || investment.status_report_url || investment.memart_url || investment.annual_returns_url || investment.board_resolution_url || investment.signatures || (investment.documents && investment.documents.length > 0)) && (
                         <CollapsibleGroup title="Secure Vault Documents" icon="folder_open">
                             <Field label="Passport / Government ID" value={investment.rep_id_url} isLink />
                             <Field label="Utility Bill" value={investment.utility_bill_url} isLink />
@@ -742,6 +801,80 @@ const StaffInvestmentDetailsPage: React.FC<StaffInvestmentDetailsPageProps> = ({
                             )}
 
                             {investment.signatures && investment.signatures.length > 0 && <Field label="Signature" value={investment.signatures[0]} isLink />}
+
+                            {/* Additional Documents from Staff or Post-Submission */}
+                            {(() => {
+                                const explicitDocTypes = ['selfie', 'rep_selfie', 'payment_receipt', 'indemnity_agreement', 'passport', 'id_card', 'utility_bill', 'cac_document', 'board_resolution', 'memart'];
+                                const filteredDocs = (investment.documents || []).filter((doc: any) => 
+                                    !explicitDocTypes.includes(doc.document_type?.toLowerCase())
+                                );
+                                
+                                const uniqueDocs: any[] = [];
+                                const seenUrls = new Set();
+                                filteredDocs.forEach((doc: any) => {
+                                    if (doc.file_url && !seenUrls.has(doc.file_url)) {
+                                        seenUrls.add(doc.file_url);
+                                        uniqueDocs.push(doc);
+                                    }
+                                });
+
+                                if (uniqueDocs.length === 0) return null;
+
+                                return (
+                                    <div className="col-span-full mt-6 pt-6 border-t border-slate-100 dark:border-slate-800 space-y-4">
+                                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Additional Documents</p>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                            {uniqueDocs.map((doc: any) => (
+                                                <Field 
+                                                    key={doc.id} 
+                                                    label={doc.document_type?.replace(/_/g, ' ') || 'Document'} 
+                                                    value={doc.file_url} 
+                                                    isLink 
+                                                    docId={doc.id}
+                                                    onRemove={handleDeleteDocument}
+                                                />
+                                            ))}
+                                        </div>
+                                    </div>
+                                );
+                            })()}
+
+                            {/* Staff Upload Section */}
+                            {(() => {
+                                const userRole = user.role?.toLowerCase();
+                                const isAssigned = investment.sales_officer_id === user.id;
+                                const isCX = userRole === 'customer_experience' || userRole === 'cx';
+                                const isAdmin = ['admin', 'super_admin', 'superadmin'].includes(userRole || '');
+                                
+                                if (isAssigned || isCX || isAdmin) {
+                                    return (
+                                        <div className="col-span-full mt-8 p-6 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-dashed border-slate-200 dark:border-slate-800">
+                                            <div className="flex items-center gap-2 mb-4">
+                                                <span className="material-symbols-outlined text-purple-500">add_circle</span>
+                                                <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Staff Upload Control</p>
+                                            </div>
+                                            
+                                            <div className="flex flex-col md:flex-row gap-4 items-center">
+                                                <input 
+                                                    id="staff-upload-input"
+                                                    type="file" 
+                                                    onChange={(e) => setUploadFile(e.target.files?.[0] || null)}
+                                                    className="flex-1 text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-purple-50 file:text-purple-700 hover:file:bg-purple-100 dark:file:bg-purple-900/40 dark:file:text-purple-300"
+                                                />
+                                                <button
+                                                    onClick={handleStaffUpload}
+                                                    disabled={!uploadFile || uploadLoading}
+                                                    className="bg-purple-600 hover:bg-purple-700 text-white font-black text-xs uppercase tracking-widest px-8 py-3 rounded-xl transition-all shadow-lg shadow-purple-500/20 disabled:opacity-50 flex items-center justify-center min-w-[140px]"
+                                                >
+                                                    {uploadLoading ? <span className="size-4 border-2 border-white/20 border-t-white rounded-full animate-spin"></span> : 'UPLOAD DOC'}
+                                                </button>
+                                            </div>
+                                            <p className="mt-2 text-[10px] text-slate-400 italic">Visible to all authorized staff. Use for missing documentation.</p>
+                                        </div>
+                                    );
+                                }
+                                return null;
+                            })()}
                         </CollapsibleGroup>
                     )}
 
@@ -787,418 +920,438 @@ const StaffInvestmentDetailsPage: React.FC<StaffInvestmentDetailsPageProps> = ({
                     )}
                 </div>
 
-                <div className="lg:col-span-4 space-y-6 sticky top-8">
-                    {/* CASA Setting Card */}
-                    <div className="bg-white dark:bg-[#1e293b] rounded-[32px] p-8 border border-slate-200 dark:border-slate-800 shadow-xl shadow-slate-200/50 dark:shadow-none mb-6">
-                        <div className="flex items-center gap-3 mb-6">
-                            <div className="size-10 rounded-xl bg-purple-100 dark:bg-purple-900/30 text-purple-600 flex items-center justify-center">
-                                <span className="material-symbols-outlined text-xl">account_balance</span>
-                            </div>
-                            <div>
-                                <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Account Management</p>
-                                <h3 className="text-xl font-black text-slate-900 dark:text-white uppercase tracking-tight">CASA Setting</h3>
-                            </div>
-                        </div>
-
-                        <div className="space-y-4">
-                            <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 block px-1">CASA Account Number</label>
-                            <div className="relative flex items-center gap-3">
-                                <input 
-                                    id="casa-input"
-                                    type="text" 
-                                    value={draftCASA}
-                                    onChange={(e) => setDraftCASA(e.target.value)}
-                                    placeholder="Enter CASA Number..."
-                                    className="flex-1 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl px-6 py-4 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all placeholder:text-slate-400"
-                                />
-                                <button
-                                    onClick={() => handleCASAUpdate(draftCASA)}
-                                    disabled={isActioning}
-                                    className="bg-purple-600 hover:bg-purple-700 text-white font-black text-xs uppercase tracking-widest px-8 py-4 rounded-2xl transition-all shadow-lg shadow-purple-500/20 active:scale-95 disabled:opacity-50 flex items-center justify-center"
-                                >
-                                    {isActioning ? <div className="size-4 border-2 border-white/20 border-t-white rounded-full animate-spin"></div> : 'SAVE'}
-                                </button>
-                            </div>
-                            <p className="text-[10px] font-bold text-slate-400 px-1 italic leading-relaxed">
-                                Clicking "Save" will automatically email the client their certificate if active.
-                            </p>
-                        </div>
+                                <div className="lg:col-span-4 space-y-6 sticky top-8 lg:top-24">
+                    <div className="bg-white dark:bg-[#1e293b] rounded-2xl p-2 border border-slate-200 dark:border-slate-800 shadow-sm flex items-center justify-between gap-1">
+                        <button 
+                            onClick={() => setActivePanel('overview')} 
+                            className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 ${activePanel === 'overview' ? 'bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/50'}`}
+                        >
+                            <span className="material-symbols-outlined text-[16px]">page_info</span>
+                            Status
+                        </button>
+                        {['sales_manager', 'admin', 'super_admin', 'superadmin', 'finance', 'customer_experience'].includes(user?.role?.toLowerCase() || '') && (
+                            <button 
+                                onClick={() => setActivePanel('manage')} 
+                                className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 ${activePanel === 'manage' ? 'bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/50'}`}
+                            >
+                                <span className="material-symbols-outlined text-[16px]">tune</span>
+                                Manage
+                            </button>
+                        )}
+                        <button 
+                            onClick={() => setActivePanel('activity')} 
+                            className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 ${activePanel === 'activity' ? 'bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/50'}`}
+                        >
+                            <span className="material-symbols-outlined text-[16px]">history</span>
+                            Activity
+                        </button>
                     </div>
 
-                    {/* Liquidation Action Card */}
-                    {investment.is_liquidating && (
-                        <div className="bg-orange-50 dark:bg-orange-950/20 rounded-[32px] p-8 border-2 border-orange-200 dark:border-orange-500/20 shadow-xl shadow-orange-500/10 mb-6 relative overflow-hidden">
-                            <div className="absolute top-0 right-0 w-32 h-32 bg-orange-500/10 rounded-full blur-2xl -mr-10 -mt-10"></div>
-
-                            <div className="flex items-center gap-3 mb-6 relative z-10">
-                                <div className="size-10 rounded-xl bg-orange-500 text-white flex items-center justify-center animate-pulse">
-                                    <span className="material-symbols-outlined text-xl">account_balance_wallet</span>
-                                </div>
-                                <div>
-                                    <h3 className="text-xl font-black text-slate-900 dark:text-white uppercase tracking-tight">Active Liquidation</h3>
-                                    <p className="text-[10px] font-black uppercase tracking-widest text-orange-600 dark:text-orange-400">
-                                        Stage: {investment.liquidation_stage?.replace(/_/g, ' ') || 'Unknown'}
-                                    </p>
-                                </div>
-                            </div>
-
-                            <div className="space-y-3 mb-6 bg-white dark:bg-slate-900/50 p-5 rounded-2xl border border-orange-100 dark:border-orange-900/40 relative z-10">
-                                <div className="flex justify-between items-center pb-2 border-b border-orange-50 dark:border-orange-900/20">
-                                    <span className="text-[10px] font-black uppercase text-slate-500">Requested</span>
-                                    <span className="text-sm font-black text-slate-900 dark:text-white">
-                                        ₦{Number(investment.liquidation_requested_amount || 0).toLocaleString()}
-                                    </span>
-                                </div>
-                                <div className="flex justify-between items-center pb-2 border-b border-orange-50 dark:border-orange-900/20">
-                                    <span className="text-[10px] font-black uppercase text-slate-500">Penalty Fee</span>
-                                    <span className="text-sm font-black text-red-500">
-                                        ₦{Number(investment.liquidation_penalty_amount || 0).toLocaleString()}
-                                    </span>
-                                </div>
-                                <div className="flex justify-between items-center pt-1">
-                                    <span className="text-[10px] font-black uppercase text-slate-500">Net Payout</span>
-                                    <span className="text-lg font-black text-green-500">
-                                        ₦{Math.max(0, Number(investment.liquidation_requested_amount || 0) - Number(investment.liquidation_penalty_amount || 0)).toLocaleString()}
-                                    </span>
-                                </div>
-                            </div>
-
-                            {(() => {
-                                const userRole = user?.role?.toLowerCase();
-                                const stage = investment.liquidation_stage;
-                                const canApproveLiq = (
-                                    userRole === 'super_admin' || userRole === 'superadmin' ||
-                                    (stage === 'customer_experience' && userRole === 'customer_experience') ||
-                                    (stage === 'internal_audit' && userRole === 'internal_audit') ||
-                                    (stage === 'md' && userRole === 'md') ||
-                                    (stage === 'finance' && userRole === 'finance')
-                                );
-
-                                if (canApproveLiq) {
-                                    return (
-                                        <div className="flex gap-3 relative z-10">
-                                            <button
-                                                onClick={() => handleLiquidationAction('REJECT')}
-                                                disabled={isActioning}
-                                                className="flex-1 py-4 text-[10px] uppercase tracking-widest font-black rounded-xl text-red-600 bg-white dark:bg-slate-900 border border-red-200 dark:border-red-900/50 hover:bg-red-50 transition-colors disabled:opacity-50"
-                                            >
-                                                Reject
-                                            </button>
-                                            <button
-                                                onClick={() => handleLiquidationAction('APPROVE')}
-                                                disabled={isActioning}
-                                                className="flex-[2] py-4 text-[10px] uppercase tracking-widest font-black rounded-xl text-white bg-orange-500 hover:bg-orange-600 transition-colors shadow-lg shadow-orange-500/20 disabled:opacity-50"
-                                            >
-                                                {isActioning ? 'Processing...' : 'Approve & Pass'}
-                                            </button>
-                                        </div>
-                                    );
-                                }
-                                return (
-                                    <p className="text-[10px] font-black text-orange-500/60 uppercase text-center relative z-10">
-                                        Waiting for {stage?.replace(/_/g, ' ')} department validation.
-                                    </p>
-                                );
-                            })()}
-                        </div>
-                    )}
-                    {/* Assignment Control Card */}
-                    {['sales_manager', 'admin', 'super_admin', 'superadmin', 'customer_experience'].includes(user.role?.toLowerCase() || '') && (
-                        <div className="bg-white dark:bg-[#1e293b] rounded-[32px] p-8 border border-slate-200 dark:border-slate-800 shadow-xl shadow-slate-200/50 dark:shadow-none mb-6">
-                            <div className="flex items-center gap-2 mb-4">
-                                <span className="material-symbols-outlined text-blue-500">person_add</span>
-                                <p className="text-xs font-black uppercase tracking-widest text-slate-500 dark:text-slate-400">Account Assignment</p>
-                            </div>
-                            <h3 className="text-2xl font-black mb-6 text-slate-900 dark:text-white">Sales Officer</h3>
-
-                            <div className="space-y-4">
-                                <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-800">
-                                    <div className="flex items-center gap-3">
-                                        <div className="size-10 rounded-full bg-blue-500/10 text-blue-500 flex items-center justify-center font-black">
-                                            {investment.officer_name ? investment.officer_name[0] : 'U'}
-                                        </div>
-                                        <div>
-                                            <p className="text-sm font-black text-slate-900 dark:text-white leading-none mb-1">
-                                                {investment.officer_name || 'Unassigned'}
-                                            </p>
-                                            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-tight text-nowrap truncate max-w-[150px]">
-                                                {investment.officer_email || 'Promotion / Marketing'}
-                                            </p>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div className="relative">
-                                    <select
-                                        value={investment.sales_officer_id || ''}
-                                        onChange={(e) => handleAssignOfficer(e.target.value)}
-                                        className="w-full px-6 py-4 rounded-2xl bg-white dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-800 text-sm font-black text-slate-900 dark:text-white appearance-none cursor-pointer focus:border-blue-500 transition-all outline-none"
-                                    >
-                                        <option value="">Select Officer to Reassign</option>
-                                        {officers.map(off => (
-                                            <option key={off.id} value={off.id}>{off.full_name}</option>
-                                        ))}
-                                    </select>
-                                    <span className="material-symbols-outlined absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">expand_more</span>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-
-                    <div className="bg-white dark:bg-[#1e293b] rounded-[32px] p-8 border border-slate-200 dark:border-slate-800 shadow-xl shadow-slate-200/50 dark:shadow-none">
-
-                        <div className="flex items-center gap-2 mb-4">
-                            <span className="material-symbols-outlined text-purple-500">info</span>
-                            <p className="text-xs font-black uppercase tracking-widest text-slate-500 dark:text-slate-400">Application Info</p>
-                        </div>
-                        <h3 className="text-2xl font-black mb-6 text-slate-900 dark:text-white">Status Tracking</h3>
-
-                        <div className="space-y-4">
-                            <div className="flex justify-between items-center py-3 border-b border-slate-100 dark:border-slate-800">
-                                <span className="text-sm font-bold text-slate-500">Submission Date</span>
-                                <span className="text-sm font-black text-slate-900 dark:text-white">{formatDate(investment.created_at)}</span>
-                            </div>
-                            <div className="flex justify-between items-center py-3 border-b border-slate-100 dark:border-slate-800">
-                                <span className="text-sm font-bold text-slate-500">Current Stage</span>
-                                <span className="text-sm font-black text-slate-900 dark:text-white uppercase">{investment.stage?.replace(/_/g, ' ') || 'Submitted'}</span>
-                            </div>
-
-                            {investment.referral_code && (
-                                <div className="flex justify-between items-center py-3 border-b border-slate-100 dark:border-slate-800">
-                                    <span className="text-sm font-bold text-slate-500">Referral Code</span>
-                                    <span className="px-2 py-1 bg-purple-500/10 text-purple-600 rounded text-[10px] font-black uppercase tracking-widest border border-purple-500/20">{investment.referral_code}</span>
-                                </div>
-                            )}
-                            <div className="flex justify-between items-center py-3 border-b border-slate-100 dark:border-slate-800">
-                                <span className="text-sm font-bold text-slate-500">Start Date</span>
-                                <span className="text-sm font-black text-slate-900 dark:text-white">{investment.start_date ? formatDate(investment.start_date) : '-'}</span>
-                            </div>
-                            <div className="flex justify-between items-center py-3 border-b border-slate-100 dark:border-slate-800">
-                                <span className="text-sm font-bold text-slate-500">Maturity Date</span>
-                                <span className="text-sm font-black text-slate-900 dark:text-white">{investment.maturity_date ? formatDate(investment.maturity_date) : '-'}</span>
-                            </div>
-                        </div>
-
-                        {investment.status === 'pending' && (() => {
-                            const userRole = user?.role;
-                            const stage = investment.stage || 'submitted';
-                            const canApprove = (
-                                (stage === 'submitted' && (userRole === 'customer_experience' || userRole === 'super_admin')) ||
-                                (stage === 'compliance_review' && (userRole === 'compliance' || userRole === 'super_admin')) ||
-                                (stage === 'finance_review' && (userRole === 'finance' || userRole === 'super_admin'))
-                            );
-
-                            if (canApprove) {
-                                return (
-                                    <div className="mt-8 pt-6 border-t border-slate-100 dark:border-slate-800">
-                                        <p className="text-xs font-bold text-slate-500 mb-4 text-center">You have the necessary permissions to review this stage.</p>
-                                        <div className="flex gap-4 mb-4">
-                                            <button
-                                                onClick={() => handleAction('reject')}
-                                                disabled={isActioning}
-                                                className="flex-1 py-4 text-sm font-bold rounded-xl text-red-600 bg-red-50 hover:bg-red-100 dark:bg-red-500/10 dark:text-red-400 dark:hover:bg-red-500/20 transition-colors disabled:opacity-50"
-                                            >
-                                                Reject Application
-                                            </button>
-                                            <button
-                                                onClick={() => handleAction('approve')}
-                                                disabled={isActioning}
-                                                className="flex-1 py-4 text-sm font-bold rounded-xl text-white bg-purple-600 hover:bg-purple-700 transition-colors shadow-lg shadow-purple-500/30 disabled:opacity-50 flex justify-center items-center"
-                                            >
-                                                {isActioning ? <span className="material-symbols-outlined animate-spin">autorenew</span> : 'Approve & Proceed'}
-                                            </button>
-                                        </div>
-
-                                        {stage !== 'submitted' && (
-                                            <button
-                                                onClick={() => {
-                                                    setReason('');
-                                                    setReturnTargetStage('');
-                                                    setShowReturnModal(true);
-                                                }}
-                                                disabled={isActioning}
-                                                className="w-full py-3 rounded-xl bg-amber-50 dark:bg-amber-900/10 text-amber-600 dark:text-amber-400 font-bold text-xs uppercase tracking-wider hover:bg-amber-100 transition-all border border-amber-200"
-                                            >
-                                                Return
-                                            </button>
-                                        )}
-                                    </div>
-                                );
-                            }
-                            return (
-                                <div className="mt-8 pt-6 border-t border-slate-100 dark:border-slate-800 text-center">
-                                    <p className="text-xs font-bold text-slate-500">Waiting for review from the appropriate department.</p>
-                                </div>
-                            );
-                        })()}
-                    </div>
-
-                    {/* Finance Overrides Card */}
-                    {(user?.role?.toLowerCase() === 'finance' || user?.role?.toLowerCase() === 'super_admin' || user?.role?.toLowerCase() === 'superadmin') && (
-                        <div className="bg-white dark:bg-[#1e293b] rounded-[32px] p-8 border border-slate-200 dark:border-slate-800 shadow-xl shadow-slate-200/50 dark:shadow-none">
-                            <div className="flex items-center gap-2 mb-4">
-                                <span className="material-symbols-outlined text-green-500">payments</span>
-                                <p className="text-xs font-black uppercase tracking-widest text-slate-500 dark:text-slate-400">Finance Control</p>
-                            </div>
-                            <h3 className="text-2xl font-black mb-6 text-slate-900 dark:text-white">Finance Overrides</h3>
-
-                            <div className="space-y-6">
-                                {(() => {
-                                    const principal = Number(investment.investment_amount) || 0;
-                                    const rate = Number(investment.interest_rate) || 0;
-                                    const tenureDays = Number(investment.tenure_days) || 0;
-                                    const type = investment.investment_type || '';
-
-                                    let projected = 0;
-                                    const isSurge = type.includes('SURGE');
-                                    const isRiseOrVault = type.includes('RISE') || type.includes('VAULT');
-
-                                    if (isSurge) {
-                                        let balance = principal;
-                                        let daysRemaining = tenureDays;
-                                        let totalGrossInterest = 0;
-                                        while (daysRemaining >= 30) {
-                                            const periodInterest = balance * (rate / 100) * (30 / 365);
-                                            const periodWht = periodInterest * 0.10;
-                                            totalGrossInterest += periodInterest;
-                                            balance += (periodInterest - periodWht);
-                                            daysRemaining -= 30;
-                                        }
-                                        if (daysRemaining > 0) {
-                                            const periodInterest = balance * (rate / 100) * (daysRemaining / 365);
-                                            const periodWht = periodInterest * 0.10;
-                                            totalGrossInterest += periodInterest;
-                                            balance += (periodInterest - periodWht);
-                                        }
-                                        projected = totalGrossInterest;
-                                    } else if (isRiseOrVault) {
-                                        projected = principal * (rate / 100) * (tenureDays / 365);
-                                    }
-
-                                    projected = Math.round(projected * 100) / 100;
-
-                                    const hasValidStoredInterest = investment.interest_amount && Number(investment.interest_amount) > 0;
-                                    const activeInterest = customInterest !== '' ? Number(customInterest) : (hasValidStoredInterest ? Number(investment.interest_amount) : projected);
-                                    const activeWht = Math.round(activeInterest * 0.10 * 100) / 100;
-                                    const netMaturity = principal + activeInterest - activeWht;
-
-                                    return (
-                                        <>
-                                            <div className="space-y-2">
-                                                <label className="text-[10px] font-black uppercase text-slate-500">Interest Amount (₦)</label>
-                                                <div className="flex flex-col 2xl:flex-row gap-2">
-                                                    <input
-                                                        type="number"
-                                                        value={customInterest === '' && !hasValidStoredInterest ? projected : customInterest}
-                                                        onChange={(e) => setCustomInterest(e.target.value)}
-                                                        className="flex-1 w-full min-w-0 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 text-sm font-bold text-slate-900 dark:text-white"
-                                                    />
-                                                    <button
-                                                        onClick={() => handleFinanceUpdate(customInterest || String(projected))}
-                                                        disabled={isActioning}
-                                                        className="px-6 py-3 w-full 2xl:w-auto shrink-0 bg-purple-600 text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-purple-700 transition-colors disabled:opacity-50"
-                                                    >
-                                                        Update
-                                                    </button>
-                                                </div>
-                                                {customInterest === '' && !hasValidStoredInterest && (
-                                                    <p className="text-[10px] italic text-slate-400">Value is implicitly calculated. Type to override.</p>
+                    {activePanel === 'overview' && (
+                        <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                            {/* Liquidation Action Card */}
+                                                {investment.is_liquidating && (
+                                                    <div className="bg-white dark:bg-[#1e293b] rounded-2xl p-6 border border-orange-200 dark:border-orange-500/30 shadow-sm relative overflow-hidden">
+                                                        <div className="absolute top-0 right-0 w-32 h-32 bg-orange-500/5 rounded-full blur-2xl -mr-10 -mt-10 pointer-events-none"></div>
+                            
+                                                        <div className="flex items-center gap-3 mb-6 pb-4 border-b border-orange-100 dark:border-orange-900/20 relative z-10">
+                                                            <div className="flex items-center justify-center size-10 rounded-xl bg-orange-50 dark:bg-orange-500/10 text-orange-600 dark:text-orange-400 animate-pulse">
+                                                                <span className="material-symbols-outlined text-[20px]">account_balance_wallet</span>
+                                                            </div>
+                                                            <div>
+                                                                <h3 className="text-base font-bold text-slate-900 dark:text-white">Active Liquidation</h3>
+                                                                <p className="text-xs font-semibold text-orange-600 dark:text-orange-400">
+                                                                    Stage: {investment.liquidation_stage?.replace(/_/g, ' ') || 'Unknown'}
+                                                                </p>
+                                                            </div>
+                                                        </div>
+                            
+                                                        <div className="space-y-1 mb-6 bg-orange-50/50 dark:bg-orange-900/10 p-4 rounded-xl border border-orange-100 dark:border-orange-500/20 relative z-10">
+                                                            <div className="flex justify-between items-center py-1.5">
+                                                                <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Requested</span>
+                                                                <span className="text-sm font-semibold text-slate-900 dark:text-white">
+                                                                    ₦{Number(investment.liquidation_requested_amount || 0).toLocaleString()}
+                                                                </span>
+                                                            </div>
+                                                            <div className="flex justify-between items-center py-1.5">
+                                                                <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Penalty Fee</span>
+                                                                <span className="text-sm font-semibold text-red-500">
+                                                                    ₦{Number(investment.liquidation_penalty_amount || 0).toLocaleString()}
+                                                                </span>
+                                                            </div>
+                                                            <div className="flex justify-between items-center py-2 mt-2 border-t border-orange-100 dark:border-orange-500/20">
+                                                                <span className="text-xs font-bold text-slate-700 dark:text-slate-300">Net Payout</span>
+                                                                <span className="text-base font-bold text-emerald-600 dark:text-emerald-400">
+                                                                    ₦{Math.max(0, Number(investment.liquidation_requested_amount || 0) - Number(investment.liquidation_penalty_amount || 0)).toLocaleString()}
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                            
+                                                        {(() => {
+                                                            const userRole = user?.role?.toLowerCase();
+                                                            const stage = investment.liquidation_stage;
+                                                            const canApproveLiq = (
+                                                                userRole === 'super_admin' || userRole === 'superadmin' ||
+                                                                (stage === 'customer_experience' && userRole === 'customer_experience') ||
+                                                                (stage === 'internal_audit' && userRole === 'internal_audit') ||
+                                                                (stage === 'md' && userRole === 'md') ||
+                                                                (stage === 'finance' && userRole === 'finance')
+                                                            );
+                            
+                                                            if (canApproveLiq) {
+                                                                return (
+                                                                    <div className="flex gap-3 relative z-10">
+                                                                        <button
+                                                                            onClick={() => handleLiquidationAction('REJECT')}
+                                                                            disabled={isActioning}
+                                                                            className="flex-1 py-2.5 text-sm font-semibold rounded-xl text-red-600 bg-white dark:bg-[#1e293b] border border-red-200 dark:border-red-900/50 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors disabled:opacity-50"
+                                                                        >
+                                                                            Reject
+                                                                        </button>
+                                                                        <button
+                                                                            onClick={() => handleLiquidationAction('APPROVE')}
+                                                                            disabled={isActioning}
+                                                                            className="flex-[2] py-2.5 text-sm font-semibold rounded-xl text-white bg-slate-900 dark:bg-white dark:text-slate-900 hover:bg-slate-800 dark:hover:bg-slate-100 transition-colors shadow-sm disabled:opacity-50"
+                                                                        >
+                                                                            {isActioning ? 'Processing...' : 'Approve & Pass'}
+                                                                        </button>
+                                                                    </div>
+                                                                );
+                                                            }
+                                                            return (
+                                                                <div className="relative z-10 text-center bg-slate-50 dark:bg-slate-800/50 py-2 px-3 rounded-lg">
+                                                                    <p className="text-xs text-slate-500">
+                                                                        Waiting for {stage?.replace(/_/g, ' ')} department validation.
+                                                                    </p>
+                                                                </div>
+                                                            );
+                                                        })()}
+                                                    </div>
                                                 )}
-                                            </div>
-                                            <div className="grid grid-cols-2 gap-4 pt-4 border-t border-slate-100 dark:border-slate-800">
-                                                <div>
-                                                    <p className="text-[10px] font-black uppercase text-slate-500 mb-1">Derived WHT (10%)</p>
-                                                    <p className="text-lg font-black text-red-500">₦{activeWht.toLocaleString()}</p>
+
+                            <div className="bg-white dark:bg-[#1e293b] rounded-2xl p-6 border border-slate-200 dark:border-slate-800 shadow-sm">
+                                                    <div className="flex items-center gap-3 mb-6 pb-4 border-b border-slate-100 dark:border-slate-800/60">
+                                                        <div className="flex items-center justify-center size-10 rounded-xl bg-purple-50 dark:bg-purple-500/10 text-purple-600 dark:text-purple-400">
+                                                            <span className="material-symbols-outlined text-[20px]">info</span>
+                                                        </div>
+                                                        <div>
+                                                            <h3 className="text-base font-bold text-slate-900 dark:text-white">Status Tracking</h3>
+                                                            <p className="text-xs font-medium text-slate-500">Application Info</p>
+                                                        </div>
+                                                    </div>
+                            
+                                                    <div className="space-y-1">
+                                                        <div className="flex justify-between items-center py-2">
+                                                            <span className="text-sm font-medium text-slate-500 dark:text-slate-400">Submission Date</span>
+                                                            <span className="text-sm font-semibold text-slate-900 dark:text-white">{formatDate(investment.created_at)}</span>
+                                                        </div>
+                                                        <div className="flex justify-between items-center py-2">
+                                                            <span className="text-sm font-medium text-slate-500 dark:text-slate-400">Current Stage</span>
+                                                            <span className="text-[11px] font-bold text-slate-900 dark:text-white uppercase tracking-wider bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-md">{investment.stage?.replace(/_/g, ' ') || 'Submitted'}</span>
+                                                        </div>
+                            
+                                                        {investment.referral_code && (
+                                                            <div className="flex justify-between items-center py-2">
+                                                                <span className="text-sm font-medium text-slate-500 dark:text-slate-400">Referral Code</span>
+                                                                <span className="px-2 py-1 bg-purple-50 dark:bg-purple-500/10 text-purple-600 dark:text-purple-400 rounded-md text-[11px] font-bold uppercase tracking-wider border border-purple-100 dark:border-purple-500/20">{investment.referral_code}</span>
+                                                            </div>
+                                                        )}
+                                                        <div className="flex justify-between items-center py-2">
+                                                            <span className="text-sm font-medium text-slate-500 dark:text-slate-400">Start Date</span>
+                                                            <span className="text-sm font-semibold text-slate-900 dark:text-white">{investment.start_date ? formatDate(investment.start_date) : '-'}</span>
+                                                        </div>
+                                                        <div className="flex justify-between items-center py-2">
+                                                            <span className="text-sm font-medium text-slate-500 dark:text-slate-400">Maturity Date</span>
+                                                            <span className="text-sm font-semibold text-slate-900 dark:text-white">{investment.maturity_date ? formatDate(investment.maturity_date) : '-'}</span>
+                                                        </div>
+                                                    </div>
+                            
+                                                    {investment.status === 'pending' && (() => {
+                                                        const userRole = user?.role;
+                                                        const stage = investment.stage || 'submitted';
+                                                        const canApprove = (
+                                                            (stage === 'submitted' && (userRole === 'customer_experience' || userRole === 'super_admin')) ||
+                                                            (stage === 'compliance_review' && (userRole === 'compliance' || userRole === 'super_admin')) ||
+                                                            (stage === 'finance_review' && (userRole === 'finance' || userRole === 'super_admin'))
+                                                        );
+                            
+                                                        if (canApprove) {
+                                                            return (
+                                                                <div className="mt-6 pt-6 border-t border-slate-100 dark:border-slate-800/60">
+                                                                    <p className="text-xs text-slate-500 mb-4 text-center">You have the necessary permissions to review this stage.</p>
+                                                                    <div className="flex flex-col gap-3">
+                                                                        <button
+                                                                            onClick={() => handleAction('approve')}
+                                                                            disabled={isActioning}
+                                                                            className="w-full py-2.5 bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-sm font-semibold rounded-xl hover:bg-slate-800 dark:hover:bg-slate-100 transition-colors shadow-sm disabled:opacity-50 flex justify-center items-center gap-2"
+                                                                        >
+                                                                            {isActioning ? <span className="material-symbols-outlined animate-spin text-[18px]">autorenew</span> : null}
+                                                                            Approve & Proceed
+                                                                        </button>
+                                                                        
+                                                                        <div className="flex gap-3">
+                                                                            <button
+                                                                                onClick={() => handleAction('reject')}
+                                                                                disabled={isActioning}
+                                                                                className="flex-1 py-2.5 bg-white dark:bg-[#1e293b] border border-red-200 dark:border-red-900/50 text-red-600 dark:text-red-400 text-sm font-semibold rounded-xl hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors disabled:opacity-50"
+                                                                            >
+                                                                                Reject
+                                                                            </button>
+                                                                            {stage !== 'submitted' && (
+                                                                                <button
+                                                                                    onClick={() => {
+                                                                                        setReason('');
+                                                                                        setReturnTargetStage('');
+                                                                                        setShowReturnModal(true);
+                                                                                    }}
+                                                                                    disabled={isActioning}
+                                                                                    className="flex-1 py-2.5 bg-white dark:bg-[#1e293b] border border-amber-200 dark:border-amber-900/50 text-amber-600 dark:text-amber-400 text-sm font-semibold rounded-xl hover:bg-amber-50 dark:hover:bg-amber-500/10 transition-colors disabled:opacity-50"
+                                                                                >
+                                                                                    Return
+                                                                                </button>
+                                                                            )}
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            );
+                                                        }
+                                                        return (
+                                                            <div className="mt-6 pt-6 border-t border-slate-100 dark:border-slate-800/60 text-center">
+                                                                <p className="text-xs text-slate-500 bg-slate-50 dark:bg-slate-800/50 py-2 px-3 rounded-lg inline-block">Waiting for appropriate department review</p>
+                                                            </div>
+                                                        );
+                                                    })()}
                                                 </div>
-                                                <div>
-                                                    <p className="text-[10px] font-black uppercase text-slate-500 mb-1">Net Maturity Value</p>
-                                                    <p className="text-lg font-black text-green-500">₦{netMaturity.toLocaleString()}</p>
-                                                </div>
-                                            </div>
-                                        </>
-                                    );
-                                })()}
-                            </div>
                         </div>
                     )}
 
-                    {/* CASA Account Input Card */}
-                    <div className="bg-white dark:bg-[#1e293b] rounded-[32px] p-8 border border-slate-200 dark:border-slate-800 shadow-xl shadow-slate-200/50 dark:shadow-none">
-                        <div className="flex items-center gap-2 mb-4">
-                            <span className="material-symbols-outlined text-blue-500">account_balance</span>
-                            <p className="text-xs font-black uppercase tracking-widest text-slate-500 dark:text-slate-400">Account Management</p>
-                        </div>
-                        <h3 className="text-2xl font-black mb-6 text-slate-900 dark:text-white">CASA Setting</h3>
+                    {activePanel === 'manage' && (
+                        <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                            {/* Assignment Control Card */}
+                                                {['sales_manager', 'admin', 'super_admin', 'superadmin', 'customer_experience'].includes(user.role?.toLowerCase() || '') && (
+                                                    <div className="bg-white dark:bg-[#1e293b] rounded-2xl p-6 border border-slate-200 dark:border-slate-800 shadow-sm">
+                                                        <div className="flex items-center gap-3 mb-6 pb-4 border-b border-slate-100 dark:border-slate-800/60">
+                                                            <div className="flex items-center justify-center size-10 rounded-xl bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400">
+                                                                <span className="material-symbols-outlined text-[20px]">person_add</span>
+                                                            </div>
+                                                            <div>
+                                                                <h3 className="text-base font-bold text-slate-900 dark:text-white">Account Assignment</h3>
+                                                                <p className="text-xs font-medium text-slate-500">Manage sales officer</p>
+                                                            </div>
+                                                        </div>
+                            
+                                                        <div className="space-y-4">
+                                                            <div className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-700/50">
+                                                                <div className="size-10 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 flex items-center justify-center font-bold text-sm tracking-tighter shrink-0">
+                                                                    {investment.officer_name ? investment.officer_name[0] : 'U'}
+                                                                </div>
+                                                                <div className="flex-1 min-w-0">
+                                                                    <p className="text-sm font-semibold text-slate-900 dark:text-white truncate">
+                                                                        {investment.officer_name || 'Unassigned'}
+                                                                    </p>
+                                                                    <p className="text-xs text-slate-500 truncate mt-0.5">
+                                                                        {investment.officer_email || 'General Marketing'}
+                                                                    </p>
+                                                                </div>
+                                                            </div>
+                            
+                                                            <div className="relative">
+                                                                <select
+                                                                    value={investment.sales_officer_id || ''}
+                                                                    onChange={(e) => handleAssignOfficer(e.target.value)}
+                                                                    className="w-full pl-4 pr-10 py-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-sm font-medium text-slate-700 dark:text-slate-300 appearance-none cursor-pointer focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all outline-none hover:bg-slate-50 dark:hover:bg-slate-800 focus:bg-white"
+                                                                >
+                                                                    <option value="">Select Officer to Reassign</option>
+                                                                    {officers.map(off => (
+                                                                        <option key={off.id} value={off.id}>{off.full_name}</option>
+                                                                    ))}
+                                                                </select>
+                                                                <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-slate-400">
+                                                                    <span className="material-symbols-outlined text-[18px]">expand_more</span>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                )}
 
-                        <div className="space-y-4">
-                            {['sales_manager', 'admin', 'super_admin', 'superadmin', 'finance'].includes(user?.role?.toLowerCase() || '') ? (
-                                <>
-                                    {!investment.casa_account_number && investment.status === 'active' && (
-                                        <div className="p-4 bg-orange-50 dark:bg-orange-500/10 border border-orange-200 dark:border-orange-500/20 rounded-2xl flex items-start gap-3">
-                                            <span className="material-symbols-outlined text-orange-500 mt-0.5">warning</span>
-                                            <p className="text-xs font-bold text-orange-800 dark:text-orange-400 leading-relaxed">
-                                                This investment is ACTIVE but missing a CASA number. Certificate cannot be dispatched until provided.
-                                            </p>
-                                        </div>
-                                    )}
+                            {/* Finance Overrides Card */}
+                                                {(user?.role?.toLowerCase() === 'finance' || user?.role?.toLowerCase() === 'super_admin' || user?.role?.toLowerCase() === 'superadmin') && (
+                                                    <div className="bg-white dark:bg-[#1e293b] rounded-2xl p-6 border border-slate-200 dark:border-slate-800 shadow-sm">
+                                                        <div className="flex items-center gap-3 mb-6 pb-4 border-b border-slate-100 dark:border-slate-800/60">
+                                                            <div className="flex items-center justify-center size-10 rounded-xl bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                                                                <span className="material-symbols-outlined text-[20px]">payments</span>
+                                                            </div>
+                                                            <div>
+                                                                <h3 className="text-base font-bold text-slate-900 dark:text-white">Finance Overrides</h3>
+                                                                <p className="text-xs font-medium text-slate-500">Finance Control</p>
+                                                            </div>
+                                                        </div>
+                            
+                                                        <div className="space-y-5">
+                                                            {(() => {
+                                                                const principal = Number(investment.investment_amount) || 0;
+                                                                const rate = Number(investment.interest_rate) || 0;
+                                                                const tenureDays = Number(investment.tenure_days) || 0;
+                                                                const type = investment.investment_type || '';
+                            
+                                                                let projected = 0;
+                                                                const isSurge = type.includes('SURGE');
+                                                                const isRiseOrVault = type.includes('RISE') || type.includes('VAULT');
+                            
+                                                                if (isSurge) {
+                                                                    let balance = principal;
+                                                                    let daysRemaining = tenureDays;
+                                                                    let totalGrossInterest = 0;
+                                                                    while (daysRemaining >= 30) {
+                                                                        const periodInterest = balance * (rate / 100) * (30 / 365);
+                                                                        const periodWht = periodInterest * 0.10;
+                                                                        totalGrossInterest += periodInterest;
+                                                                        balance += (periodInterest - periodWht);
+                                                                        daysRemaining -= 30;
+                                                                    }
+                                                                    if (daysRemaining > 0) {
+                                                                        const periodInterest = balance * (rate / 100) * (daysRemaining / 365);
+                                                                        const periodWht = periodInterest * 0.10;
+                                                                        totalGrossInterest += periodInterest;
+                                                                        balance += (periodInterest - periodWht);
+                                                                    }
+                                                                    projected = totalGrossInterest;
+                                                                } else if (isRiseOrVault) {
+                                                                    projected = principal * (rate / 100) * (tenureDays / 365);
+                                                                }
+                            
+                                                                projected = Math.round(projected * 100) / 100;
+                            
+                                                                const hasValidStoredInterest = investment.interest_amount && Number(investment.interest_amount) > 0;
+                                                                const activeInterest = customInterest !== '' ? Number(customInterest) : (hasValidStoredInterest ? Number(investment.interest_amount) : projected);
+                                                                const activeWht = Math.round(activeInterest * 0.10 * 100) / 100;
+                                                                const netMaturity = principal + activeInterest - activeWht;
+                            
+                                                                return (
+                                                                    <>
+                                                                        <div className="space-y-2">
+                                                                            <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">Interest Amount (₦)</label>
+                                                                            <div className="flex flex-col 2xl:flex-row gap-3">
+                                                                                <input
+                                                                                    type="number"
+                                                                                    value={customInterest === '' && !hasValidStoredInterest ? projected : customInterest}
+                                                                                    onChange={(e) => setCustomInterest(e.target.value)}
+                                                                                    className="flex-1 w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm font-medium text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all outline-none"
+                                                                                />
+                                                                                <button
+                                                                                    onClick={() => handleFinanceUpdate(customInterest || String(projected))}
+                                                                                    disabled={isActioning}
+                                                                                    className="px-5 py-2.5 w-full 2xl:w-auto shrink-0 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-xl text-sm font-semibold hover:bg-slate-800 dark:hover:bg-slate-100 transition-colors disabled:opacity-50 shadow-sm"
+                                                                                >
+                                                                                    Update
+                                                                                </button>
+                                                                            </div>
+                                                                            {customInterest === '' && !hasValidStoredInterest && (
+                                                                                <p className="text-[11px] text-slate-500">Value is implicitly calculated. Type to override.</p>
+                                                                            )}
+                                                                        </div>
+                                                                        <div className="grid grid-cols-2 gap-4 pt-4 border-t border-slate-100 dark:border-slate-800/60">
+                                                                            <div>
+                                                                                <p className="text-xs font-medium text-slate-500 mb-1">Derived WHT (10%)</p>
+                                                                                <p className="text-base font-bold text-red-500">₦{activeWht.toLocaleString()}</p>
+                                                                            </div>
+                                                                            <div>
+                                                                                <p className="text-xs font-medium text-slate-500 mb-1">Net Maturity Value</p>
+                                                                                <p className="text-base font-bold text-emerald-600 dark:text-emerald-400">₦{netMaturity.toLocaleString()}</p>
+                                                                            </div>
+                                                                        </div>
+                                                                    </>
+                                                                );
+                                                            })()}
+                                                        </div>
+                                                    </div>
+                                                )}
 
-                                    <div className="space-y-4">
-                                        <label className="text-[10px] font-black uppercase text-slate-500">CASA Account Number</label>
-
-                                        {!investment.casa_account_number && investment.suggested_casa_number && (
-                                            <div className="mb-3 p-3 bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/20 rounded-xl flex items-center justify-between">
-                                                <div className="flex flex-col">
-                                                    <p className="text-[10px] font-black uppercase text-blue-600 dark:text-blue-400">Previous Account Found</p>
-                                                    <p className="text-sm font-bold text-blue-900 dark:text-blue-300 tracking-wider font-mono">{investment.suggested_casa_number}</p>
+                            {/* CASA Account Input Card */}
+                                                <div className="bg-white dark:bg-[#1e293b] rounded-2xl p-6 border border-slate-200 dark:border-slate-800 shadow-sm">
+                                                    <div className="flex items-center gap-3 mb-6 pb-4 border-b border-slate-100 dark:border-slate-800/60">
+                                                        <div className="flex items-center justify-center size-10 rounded-xl bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400">
+                                                            <span className="material-symbols-outlined text-[20px]">account_balance</span>
+                                                        </div>
+                                                        <div>
+                                                            <h3 className="text-base font-bold text-slate-900 dark:text-white">CASA Setting</h3>
+                                                            <p className="text-xs font-medium text-slate-500">Account Management</p>
+                                                        </div>
+                                                    </div>
+                            
+                                                    <div className="space-y-4">
+                                                        {['sales_manager', 'admin', 'super_admin', 'superadmin', 'finance'].includes(user?.role?.toLowerCase() || '') ? (
+                                                            <>
+                                                                {!investment.casa_account_number && investment.status === 'active' && (
+                                                                    <div className="p-3 bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 rounded-xl flex items-start gap-2 mb-2">
+                                                                        <span className="material-symbols-outlined text-amber-500 text-[18px] mt-0.5">warning</span>
+                                                                        <p className="text-xs font-medium text-amber-800 dark:text-amber-400 leading-relaxed">
+                                                                            This investment is ACTIVE but missing a CASA number. Certificate cannot be dispatched until provided.
+                                                                        </p>
+                                                                    </div>
+                                                                )}
+                            
+                                                                <div className="space-y-3">
+                                                                    <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">CASA Account Number</label>
+                            
+                                                                    {!investment.casa_account_number && investment.suggested_casa_number && (
+                                                                        <div className="p-3 bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/20 rounded-xl flex items-center justify-between">
+                                                                            <div>
+                                                                                <p className="text-[11px] font-medium text-blue-600 dark:text-blue-400 mb-0.5">Previous Account Found</p>
+                                                                                <p className="text-sm font-bold text-blue-900 dark:text-blue-300 font-mono">{investment.suggested_casa_number}</p>
+                                                                            </div>
+                                                                            <button
+                                                                                onClick={() => {
+                                                                                    const el = document.getElementById('casa_number_input') as HTMLInputElement;
+                                                                                    if (el) el.value = investment.suggested_casa_number;
+                                                                                }}
+                                                                                className="px-3 py-1.5 bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-500/30 rounded-lg text-xs font-semibold hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors shadow-sm"
+                                                                            >
+                                                                                Use This
+                                                                            </button>
+                                                                        </div>
+                                                                    )}
+                            
+                                                                    <div className="flex flex-col 2xl:flex-row gap-3 mt-2">
+                                                                        <input
+                                                                            type="text"
+                                                                            placeholder="Enter CASA Number..."
+                                                                            defaultValue={investment.casa_account_number || ''}
+                                                                            id="casa_number_input"
+                                                                            className="flex-1 w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all outline-none"
+                                                                        />
+                                                                        <button
+                                                                            onClick={() => {
+                                                                                const val = (document.getElementById('casa_number_input') as HTMLInputElement).value;
+                                                                                handleCASAUpdate(val);
+                                                                            }}
+                                                                            disabled={isActioning}
+                                                                            className="px-5 py-2.5 w-full 2xl:w-auto shrink-0 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-xl text-sm font-semibold hover:bg-slate-800 dark:hover:bg-slate-100 transition-colors disabled:opacity-50 shadow-sm"
+                                                                        >
+                                                                            Save Settings
+                                                                        </button>
+                                                                    </div>
+                                                                    <p className="text-[11px] text-slate-500 mt-1">Clicking "Save Settings" will automatically email the client their certificate if active.</p>
+                                                                </div>
+                                                            </>
+                                                        ) : (
+                                                            <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-700/50 flex justify-between items-center">
+                                                                <span className="text-sm font-medium text-slate-500 dark:text-slate-400">Assigned Number</span>
+                                                                <span className="text-sm font-semibold text-slate-900 dark:text-white font-mono">{investment.casa_account_number || 'Pending'}</span>
+                                                            </div>
+                                                        )}
+                                                    </div>
                                                 </div>
-                                                <button
-                                                    onClick={() => {
-                                                        const el = document.getElementById('casa_input') as HTMLInputElement;
-                                                        if (el) el.value = investment.suggested_casa_number;
-                                                    }}
-                                                    className="px-4 py-2 bg-blue-600 text-white rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-blue-700 transition"
-                                                >
-                                                    Use This
-                                                </button>
-                                            </div>
-                                        )}
-
-                                        <div className="flex flex-col 2xl:flex-row gap-2">
-                                            <input
-                                                type="text"
-                                                placeholder="Enter CASA Number..."
-                                                defaultValue={investment.casa_account_number || ''}
-                                                id="casa_number_input"
-                                                className="flex-1 w-full min-w-0 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 text-sm font-bold text-slate-900 dark:text-white placeholder:text-slate-400"
-                                            />
-                                            <button
-                                                onClick={() => {
-                                                    const val = (document.getElementById('casa_number_input') as HTMLInputElement).value;
-                                                    handleCASAUpdate(val);
-                                                }}
-                                                disabled={isActioning}
-                                                className="px-6 py-3 w-full 2xl:w-auto shrink-0 bg-purple-600 text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-purple-700 transition-colors disabled:opacity-50"
-                                            >
-                                                Save
-                                            </button>
-                                        </div>
-                                        <p className="text-[10px] text-slate-400 italic">Clicking "Save" will automatically email the client their certificate if active.</p>
-                                    </div>
-                                </>
-                            ) : (
-                                <div className="flex justify-between items-center py-3 border-b border-slate-100 dark:border-slate-800">
-                                    <span className="text-sm font-bold text-slate-500 text-nowrap">Assigned CASA Number</span>
-                                    <span className="text-sm font-black text-slate-900 dark:text-white uppercase">{investment.casa_account_number || 'Pending'}</span>
-                                </div>
-                            )}
                         </div>
-                    </div>
+                    )}
 
-                    <div className="bg-white dark:bg-[#1e293b] rounded-[24px] overflow-hidden border border-slate-200 dark:border-slate-800">
-                        <ActivityTimeline investmentId={id} />
-                    </div>
-
-                    {/* Return Application Modal */}
+                    {activePanel === 'activity' && (
+                        <div className="bg-white dark:bg-[#1e293b] rounded-[24px] overflow-hidden border border-slate-200 dark:border-slate-800 shadow-sm max-h-[75vh] overflow-y-auto animate-in fade-in slide-in-from-bottom-2 duration-300">
+                            <ActivityTimeline investmentId={id} />
+                        </div>
+                    )}
+                    
+{/* Return Application Modal */}
                     {showReturnModal && (
                         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
                             <div className="bg-white dark:bg-slate-900 rounded-2xl w-full max-w-md shadow-2xl border border-slate-100 dark:border-slate-800 p-6 space-y-6">
