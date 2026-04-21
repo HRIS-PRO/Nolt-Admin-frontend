@@ -27,6 +27,9 @@ const StaffInvestmentDetailsPage: React.FC<StaffInvestmentDetailsPageProps> = ({
     const [directIndemnityUrl, setDirectIndemnityUrl] = useState<string | null>(null);
     const [officers, setOfficers] = useState<any[]>([]);
     const [draftCASA, setDraftCASA] = useState<string>('');
+    const [showReturnModal, setShowReturnModal] = useState(false);
+    const [returnTargetStage, setReturnTargetStage] = useState<string>('');
+    const [reason, setReason] = useState('');
 
 
     const fetchInvestment = async () => {
@@ -74,11 +77,18 @@ const StaffInvestmentDetailsPage: React.FC<StaffInvestmentDetailsPageProps> = ({
         }
     }, [id, navigate]);
 
-    const handleAction = async (action: 'approve' | 'reject') => {
-        if (!confirm(`Are you sure you want to ${action} this investment at the current stage?`)) return;
+    const handleAction = async (action: 'approve' | 'reject' | 'return', targetStage?: string) => {
+        if (action !== 'return') {
+            if (!confirm(`Are you sure you want to ${action} this investment at the current stage?`)) return;
+        }
         setIsActioning(true);
         try {
-            await axios.put(`/api/staff/investments/${id}/action`, { action }, { withCredentials: true });
+            const payload: any = { action };
+            if (action === 'return') {
+                payload.target_stage = targetStage;
+                payload.reason = reason;
+            }
+            await axios.put(`/api/staff/investments/${id}/action`, payload, { withCredentials: true });
             await fetchInvestment(); // Re-fetch to see updated stage
         } catch (error: any) {
             console.error(`Failed to ${action} investment`, error);
@@ -982,7 +992,7 @@ const StaffInvestmentDetailsPage: React.FC<StaffInvestmentDetailsPageProps> = ({
                                 return (
                                     <div className="mt-8 pt-6 border-t border-slate-100 dark:border-slate-800">
                                         <p className="text-xs font-bold text-slate-500 mb-4 text-center">You have the necessary permissions to review this stage.</p>
-                                        <div className="flex gap-4">
+                                        <div className="flex gap-4 mb-4">
                                             <button
                                                 onClick={() => handleAction('reject')}
                                                 disabled={isActioning}
@@ -998,6 +1008,20 @@ const StaffInvestmentDetailsPage: React.FC<StaffInvestmentDetailsPageProps> = ({
                                                 {isActioning ? <span className="material-symbols-outlined animate-spin">autorenew</span> : 'Approve & Proceed'}
                                             </button>
                                         </div>
+
+                                        {stage !== 'submitted' && (
+                                            <button
+                                                onClick={() => {
+                                                    setReason('');
+                                                    setReturnTargetStage('');
+                                                    setShowReturnModal(true);
+                                                }}
+                                                disabled={isActioning}
+                                                className="w-full py-3 rounded-xl bg-amber-50 dark:bg-amber-900/10 text-amber-600 dark:text-amber-400 font-bold text-xs uppercase tracking-wider hover:bg-amber-100 transition-all border border-amber-200"
+                                            >
+                                                Return
+                                            </button>
+                                        )}
                                     </div>
                                 );
                             }
@@ -1173,6 +1197,86 @@ const StaffInvestmentDetailsPage: React.FC<StaffInvestmentDetailsPageProps> = ({
                     <div className="bg-white dark:bg-[#1e293b] rounded-[24px] overflow-hidden border border-slate-200 dark:border-slate-800">
                         <ActivityTimeline investmentId={id} />
                     </div>
+
+                    {/* Return Application Modal */}
+                    {showReturnModal && (
+                        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+                            <div className="bg-white dark:bg-slate-900 rounded-2xl w-full max-w-md shadow-2xl border border-slate-100 dark:border-slate-800 p-6 space-y-6">
+                                <div className="flex justify-between items-start">
+                                    <div className="space-y-1">
+                                        <h3 className="text-xl font-black text-slate-900 dark:text-white">Return Application</h3>
+                                        <p className="text-sm text-slate-500">Select where to return this application to.</p>
+                                    </div>
+                                    <button onClick={() => setShowReturnModal(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-white transition-colors">
+                                        <span className="material-symbols-outlined">close</span>
+                                    </button>
+                                </div>
+
+                                <div className="space-y-4">
+                                    <div>
+                                        <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2 block">Return To Stage</label>
+                                        <select
+                                            className="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white font-bold appearance-none outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all"
+                                            value={returnTargetStage}
+                                            onChange={(e) => setReturnTargetStage(e.target.value)}
+                                        >
+                                            <option value="">Select Stage...</option>
+                                            {(() => {
+                                                const allStages = [
+                                                    { id: 'submitted', label: 'Customer Exp.' },
+                                                    { id: 'compliance_review', label: 'Compliance' },
+                                                    { id: 'finance_review', label: 'Finance' }
+                                                ];
+                                                const currentIdx = allStages.findIndex(s => s.id === investment.stage);
+                                                return allStages.filter((_, idx) => idx < currentIdx).map(s => (
+                                                    <option key={s.id} value={s.id}>{s.label}</option>
+                                                ));
+                                            })()}
+                                        </select>
+                                    </div>
+
+                                    <div>
+                                        <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2 block">
+                                            Reason for Return <span className="text-red-500">*</span>
+                                        </label>
+                                        <textarea
+                                            value={reason}
+                                            onChange={(e) => setReason(e.target.value)}
+                                            className="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white text-sm min-h-[100px] outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all placeholder:text-slate-400"
+                                            placeholder="Please explain why you are returning this application..."
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="flex gap-3 pt-2">
+                                    <button
+                                        onClick={() => setShowReturnModal(false)}
+                                        className="flex-1 py-3 rounded-xl font-bold text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            if (!returnTargetStage) {
+                                                alert("Please select a target stage.");
+                                                return;
+                                            }
+                                            if (!reason.trim()) {
+                                                alert("Please provide a reason.");
+                                                return;
+                                            }
+                                            handleAction('return', returnTargetStage);
+                                            setShowReturnModal(false);
+                                        }}
+                                        disabled={isActioning || !returnTargetStage || !reason.trim()}
+                                        className="flex-1 py-3 rounded-xl bg-amber-500 text-white font-bold shadow-lg shadow-amber-500/20 hover:bg-amber-600 hover:shadow-amber-500/30 hover:-translate-y-0.5 transition-all disabled:opacity-50 disabled:shadow-none disabled:translate-y-0"
+                                    >
+                                        {isActioning ? 'Processing...' : 'Confirm Return'}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
                 </div>
             </div>
         </StaffLayout>
