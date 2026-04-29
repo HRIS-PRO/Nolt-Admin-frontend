@@ -37,6 +37,7 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
   const [isSaving, setIsSaving] = useState(false);
   const [isClaimingGift, setIsClaimingGift] = useState(false);
   const [giftToken, setGiftToken] = useState<string | null>(giftTokenFromUrl);
+  const [jointToken, setJointToken] = useState<string | null>(searchParams.get('joint_token'));
 
   // Gifting State
   const [isGift, setIsGift] = useState<boolean>(initialDraft?.data?.isGift ?? false);
@@ -58,7 +59,8 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
   const [payoutFrequency, setPayoutFrequency] = useState<PayoutFrequency>(initialDraft?.data?.payoutFrequency ?? 'maturity');
 
   // Entity & Identity
-  const [entityType, setEntityType] = useState<'INDIVIDUAL' | 'CORPORATE'>(initialDraft?.data?.entityType ?? 'INDIVIDUAL');
+  const [entityType, setEntityType] = useState<'INDIVIDUAL' | 'CORPORATE' | 'JOINT'>(initialDraft?.data?.entityType ?? 'INDIVIDUAL');
+  const [partnerEmail, setPartnerEmail] = useState(initialDraft?.data?.partnerEmail ?? '');
   const [title, setTitle] = useState(initialDraft?.data?.title ?? 'Mr');
   const [fullName, setFullName] = useState(initialDraft?.data?.fullName ?? '');
   const [isOnBehalf, setIsOnBehalf] = useState(initialDraft?.data?.isOnBehalf ?? false);
@@ -97,7 +99,7 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
   const [middleName, setMiddleName] = useState(initialDraft?.data?.middleName || user.profile?.middle_name || defMiddleName);
 
   useEffect(() => {
-    if (entityType === 'INDIVIDUAL') {
+    if (entityType === 'INDIVIDUAL' || entityType === 'JOINT') {
       setFullName(`${surname} ${firstName} ${middleName}`.replace(/\s+/g, ' ').trim());
     }
   }, [surname, firstName, middleName, entityType]);
@@ -123,7 +125,7 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
 
   // Sync fullName for Individuals
   useEffect(() => {
-    if (entityType === 'INDIVIDUAL') {
+    if (entityType === 'INDIVIDUAL' || entityType === 'JOINT') {
       const parts = [firstName, middleName, surname].filter(Boolean);
       setFullName(parts.join(' '));
     }
@@ -370,6 +372,28 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
     }
   }, [giftToken]);
 
+  useEffect(() => {
+    if (jointToken) {
+      const fetchJointInvitation = async () => {
+        try {
+            const response = await axios.get(`/api/investments/joint/validate/${jointToken}`);
+            const invitation = response.data;
+            if (invitation) {
+                setEntityType('JOINT');
+                setAmount(invitation.investment_amount.toString());
+                setSelectedPlan(invitation.investment_type);
+                // Skip directly to Identity Basics (Step 2)
+                setSubStep(2);
+            }
+        } catch (err) {
+            console.error("Joint invitation error:", err);
+            setJointToken(null);
+        }
+      };
+      fetchJointInvitation();
+    }
+  }, [jointToken]);
+
   const isStaff = creatorRole === 'staff';
 
   // Auto-Prefill from Existing Investment
@@ -562,7 +586,7 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
 
   const handleNext = () => {
     // Age Logic
-    if (subStep === 3 && entityType === 'INDIVIDUAL' && dob) {
+    if (subStep === 3 && (entityType === 'INDIVIDUAL' || entityType === 'JOINT') && dob) {
       if (isMinor && !isGuardianConfirmed) {
         alert("Please confirm that you are the legal guardian of the beneficiary.");
         return;
@@ -792,11 +816,12 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
 
         // Corporate Fields
         entity_type: entityType,
+        partner_email: entityType === 'JOINT' ? partnerEmail : null,
         company_name: entityType === 'CORPORATE' ? companyName : null,
         rc_number: entityType === 'CORPORATE' ? rcNumber : null,
         incorp_date: entityType === 'CORPORATE' ? incorpDate : null,
         tin: entityType === 'CORPORATE' ? tin : null,
-        tin_number: entityType === 'INDIVIDUAL' ? tinNumber : null,
+        tin_number: (entityType === 'INDIVIDUAL' || entityType === 'JOINT') ? tinNumber : null,
         business_nature: entityType === 'CORPORATE' ? businessNature : null,
         business_address: entityType === 'CORPORATE' ? businessAddress : null,
         is_authorized_rep: entityType === 'CORPORATE' ? isAuthorizedRep : false,
@@ -842,15 +867,24 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
         referral_code: referralCode
       };
 
-      const result = isStaff 
-        ? await investmentService.createStaffInvestment({
-            ...payload,
-            entity_type: entityType,
-            email: contactEmail,
-            phone: mobileNumber,
-            fullName: fullName,
-          })
-        : await investmentService.createInvestment(payload);
+      let result;
+      if (jointToken) {
+        const acceptResponse = await axios.post('/api/investments/joint/accept', {
+          ...payload,
+          token: jointToken
+        }, { withCredentials: true });
+        result = acceptResponse.data;
+      } else if (isStaff) {
+        result = await investmentService.createStaffInvestment({
+          ...payload,
+          entity_type: entityType,
+          email: contactEmail,
+          phone: mobileNumber,
+          fullName: fullName,
+        });
+      } else {
+        result = await investmentService.createInvestment(payload);
+      }
 
       setCreatedInvestment(result);
       if (giftToken) localStorage.removeItem('pending_gift_token');
@@ -1117,6 +1151,10 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
               <div className="size-20 rounded-3xl bg-primary/10 text-primary flex items-center justify-center shrink-0 group-hover:bg-primary group-hover:text-white transition-all"><span className="material-symbols-outlined text-4xl filled">business</span></div>
               <div className="flex-1"><h3 className="text-2xl font-black uppercase tracking-tight dark:text-white">Corporate</h3><p className="text-slate-500 font-bold text-sm">Business reserves or treasury.</p></div>
             </button>
+            <button onClick={() => { setEntityType('JOINT'); handleNext(); }} className={`group p-10 rounded-[3rem] border-2 transition-all text-left flex items-center gap-8 ${entityType === 'JOINT' ? 'border-primary bg-white dark:bg-slate-800 shadow-xl' : 'border-slate-100 dark:border-slate-800 bg-white/50 hover:border-primary/50'}`}>
+              <div className="size-20 rounded-3xl bg-primary/10 text-primary flex items-center justify-center shrink-0 group-hover:bg-primary group-hover:text-white transition-all"><span className="material-symbols-outlined text-4xl filled">group</span></div>
+              <div className="flex-1"><h3 className="text-2xl font-black uppercase tracking-tight dark:text-white">Joint</h3><p className="text-slate-500 font-bold text-sm">Invest together with a partner.</p></div>
+            </button>
           </div>
           <button onClick={handleBack} className="flex items-center gap-2 text-slate-400 font-black uppercase tracking-widest text-sm hover:text-primary transition-colors"><span className="material-symbols-outlined">arrow_back</span> Back</button>
         </div>
@@ -1127,7 +1165,7 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
         <div className="space-y-8 animate-in fade-in slide-in-from-right-4 duration-500">
           <h2 className="text-3xl font-black dark:text-white">Identity Basics</h2>
 
-          {entityType === 'INDIVIDUAL' ? (
+          {(entityType === 'INDIVIDUAL' || entityType === 'JOINT') ? (
             <div className="grid gap-8">
               <div className="space-y-4">
                 <label className="text-sm font-black text-slate-500 uppercase tracking-widest">Who are you investing for?</label>
@@ -1187,6 +1225,13 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
                   <button onClick={() => setIsPep(false)} className={`flex-1 h-14 rounded-xl border-2 font-black transition-all ${isPep === false ? 'bg-primary border-primary text-white' : 'border-slate-100 dark:border-slate-700 dark:text-white'}`}>No</button>
                 </div>
               </div>
+              {entityType === 'JOINT' && !jointToken && (
+                <div className="space-y-2 animate-in fade-in slide-in-from-top-2 duration-300">
+                  <label className="text-sm font-black text-slate-500 uppercase">Partner's Email Address</label>
+                  <input type="email" className={`w-full h-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-6 text-lg font-bold dark:text-white focus:ring-2 focus:ring-primary focus:border-primary focus:shadow-lg focus:shadow-primary/10 outline-none`} value={partnerEmail} onChange={e => setPartnerEmail(e.target.value)} placeholder="partner@example.com" />
+                  <p className="text-xs font-bold text-slate-400 mt-2">We will send them an invitation link to complete their own KYC form and join this investment.</p>
+                </div>
+              )}
             </div>
           ) : (
             <div className="grid gap-6">
@@ -1246,14 +1291,14 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
               </div>
             </div>
           )}
-          <NavActions isNextDisabled={entityType === 'INDIVIDUAL' ? (!fullName || isPep === null) : (!companyName || !rcNumber || !incorpDate || !businessAddress)} />
+          <NavActions isNextDisabled={(entityType === 'INDIVIDUAL' || entityType === 'JOINT') ? (!fullName || isPep === null || (entityType === 'JOINT' && !jointToken && (!partnerEmail || !partnerEmail.includes('@')))) : (!companyName || !rcNumber || !incorpDate || !businessAddress)} />
         </div>
       )}
 
       {/* Step 3: Personal Details */}
       {subStep === 3 && (
         <div className="space-y-8 animate-in fade-in slide-in-from-right-4 duration-500">
-          {entityType === 'INDIVIDUAL' ? (
+          {(entityType === 'INDIVIDUAL' || entityType === 'JOINT') ? (
             <>
               <h2 className="text-3xl font-black dark:text-white">Personal Details</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -1479,8 +1524,8 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
               <label className="text-sm font-black text-slate-500 uppercase tracking-widest px-1">Email Address</label>
               <input
                 type="email"
-                disabled={!isStaff && !isOnBehalf && entityType === 'INDIVIDUAL'}
-                className={`w-full h-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-6 text-lg font-bold dark:text-white focus:ring-2 focus:ring-primary focus:border-primary focus:shadow-xl focus:shadow-primary/10 outline-none transition-all ${(!isStaff && !isOnBehalf && entityType === 'INDIVIDUAL') ? 'opacity-70 cursor-not-allowed' : ''}`}
+                disabled={!isStaff && !isOnBehalf && (entityType === 'INDIVIDUAL' || entityType === 'JOINT')}
+                className={`w-full h-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-6 text-lg font-bold dark:text-white focus:ring-2 focus:ring-primary focus:border-primary focus:shadow-xl focus:shadow-primary/10 outline-none transition-all ${(!isStaff && !isOnBehalf && (entityType === 'INDIVIDUAL' || entityType === 'JOINT')) ? 'opacity-70 cursor-not-allowed' : ''}`}
                 value={contactEmail}
                 onChange={e => setContactEmail(e.target.value)}
                 placeholder="e.g. name@example.com"
@@ -1518,7 +1563,7 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
                 placeholder="11-digit NIN e.g. 11122233344"
               />
             </div>
-            {entityType === 'INDIVIDUAL' && (
+            {(entityType === 'INDIVIDUAL' || entityType === 'JOINT') && (
               <div className="space-y-2">
                 <label className="text-sm font-black text-slate-500 uppercase tracking-widest px-1">TIN Number</label>
                 <input
@@ -1531,7 +1576,7 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
               </div>
             )}
           </div>
-          <NavActions isNextDisabled={bvn.length < 11 || nin.length < 11 || (entityType === 'INDIVIDUAL' && !tinNumber)} />
+          <NavActions isNextDisabled={bvn.length < 11 || nin.length < 11 || ((entityType === 'INDIVIDUAL' || entityType === 'JOINT') && !tinNumber)} />
         </div>
       )}
 

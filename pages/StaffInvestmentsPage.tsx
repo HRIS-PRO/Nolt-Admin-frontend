@@ -1440,11 +1440,18 @@ const StaffInvestmentsPage: React.FC<StaffInvestmentsPageProps> = ({ user, onLog
                                                                     <div className="flex items-center gap-2">
                                                                         <span className="font-black text-slate-900 dark:text-white text-xs leading-none">
                                                                             {inv.company_name || inv.rep_full_name || 'Anonymous'}
+                                                                            {inv.entity_type === 'JOINT' && inv.partner_name ? ` & ${inv.partner_name}` : ''}
                                                                         </span>
-                                                                        <span className={`px-1.5 py-0.5 rounded border text-[8px] font-black uppercase tracking-widest leading-none ${inv.entity_type === 'CORPORATE' ? 'border-indigo-500/20 bg-indigo-500/10 text-indigo-500' : 'border-slate-400/20 bg-slate-400/10 text-slate-500 dark:text-slate-400'
+                                                                        <span className={`px-1.5 py-0.5 rounded border text-[8px] font-black uppercase tracking-widest leading-none ${inv.entity_type === 'CORPORATE' ? 'border-indigo-500/20 bg-indigo-500/10 text-indigo-500' : inv.entity_type === 'JOINT' ? 'border-sky-500/20 bg-sky-500/10 text-sky-500' : 'border-slate-400/20 bg-slate-400/10 text-slate-500 dark:text-slate-400'
                                                                             }`}>
-                                                                            {inv.entity_type === 'CORPORATE' ? 'CORP' : 'INDV'}
+                                                                            {inv.entity_type === 'CORPORATE' ? 'CORP' : inv.entity_type === 'JOINT' ? 'JOINT' : 'INDV'}
                                                                         </span>
+                                                                        {inv.is_pending_partner && (
+                                                                            <span className="flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-amber-500 text-white text-[8px] font-black uppercase tracking-tighter leading-none">
+                                                                                <span className="material-symbols-outlined text-[8px]">hourglass_empty</span>
+                                                                                PARTNER
+                                                                            </span>
+                                                                        )}
                                                                         {inv.is_minor_beneficiary && (
                                                                             <span className="px-1.5 py-0.5 rounded border border-teal-500/20 bg-teal-500/10 text-[8px] font-black uppercase tracking-widest leading-none text-teal-600 dark:text-teal-400">
                                                                                 For Minor

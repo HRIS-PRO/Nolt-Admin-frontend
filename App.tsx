@@ -37,6 +37,7 @@ import ProfilePage from './pages/ProfilePage';
 import StaffPromotionsPage from './pages/StaffPromotionsPage';
 import StaffCalculatorPage from './pages/StaffCalculatorPage';
 import LogoutWarningModal from './components/modals/LogoutWarningModal';
+import JointAcceptancePage from './pages/investment/JointAcceptancePage';
 
 // Setup Global Axios Interceptor for GPS Tracking
 axios.interceptors.request.use((config) => {
@@ -141,17 +142,21 @@ const AppContent: React.FC = () => {
   useEffect(() => {
     if (user.isLoggedIn) {
       const pendingToken = localStorage.getItem('pending_gift_token');
-      if (pendingToken) {
-        // If we are on login/register/success/verify, or if we were just redirected to dashboard
-        const currentPath = window.location.pathname;
-        const isAuthPath = ['/login', '/register', '/verify', '/dashboard'].includes(currentPath);
-        
-        if (isAuthPath || searchParams.get('login') === 'success') {
+      const pendingJointToken = localStorage.getItem('pending_joint_token');
+      
+      const currentPath = window.location.pathname;
+      const isAuthPath = ['/login', '/register', '/verify', '/dashboard'].includes(currentPath);
+      
+      if (isAuthPath || searchParams.get('login') === 'success') {
+        if (pendingToken) {
             console.log("Resuming pending gift claim from path:", currentPath, "Token:", pendingToken);
-            // We DON'T remove the token here anymore, let the target flow or user action handle it
-            // Use a slight delay to ensure other effects have settled
             setTimeout(() => {
                 navigateRouter(`/investment?gift_token=${pendingToken}`, { replace: true });
+            }, 100);
+        } else if (pendingJointToken) {
+            console.log("Resuming pending joint acceptance from path:", currentPath, "Token:", pendingJointToken);
+            setTimeout(() => {
+                navigateRouter(`/joint-investment?token=${pendingJointToken}`, { replace: true });
             }, 100);
         }
       }
@@ -245,8 +250,9 @@ const AppContent: React.FC = () => {
   useEffect(() => {
     if (searchParams.get('login') === 'success') {
       const pendingToken = localStorage.getItem('pending_gift_token');
-      if (pendingToken) {
-          console.log("Google login success with pending gift, redirection will be handled by auth effect");
+      const pendingJointToken = localStorage.getItem('pending_joint_token');
+      if (pendingToken || pendingJointToken) {
+          console.log("Google login success with pending action, redirection will be handled by auth effect");
           // Redirection is handled by the useEffect above that watches user.isLoggedIn
       } else {
           navigateRouter('/dashboard', { replace: true });
@@ -645,6 +651,8 @@ const AppContent: React.FC = () => {
         } />
 
         <Route path="/claim-gift" element={<ClaimGiftPage />} />
+
+        <Route path="/joint-investment" element={<JointAcceptancePage />} />
 
         <Route path="/success" element={
           <ProtectedRoute user={user} isLoading={isLoading} theme={theme} onLogout={handleLogoutRequest} onToggleTheme={toggleTheme}>
