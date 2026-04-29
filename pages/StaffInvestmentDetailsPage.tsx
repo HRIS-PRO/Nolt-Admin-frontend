@@ -634,8 +634,7 @@ const StaffInvestmentDetailsPage: React.FC<StaffInvestmentDetailsPageProps> = ({
                         icon="person" 
                         defaultOpen={true}
                         actionButton={
-                            (user?.role === 'customer_experience' || user?.role === 'super_admin' || user?.role === 'superadmin') &&
-                            (investment.stage === 'customer_experience' || investment.stage === 'submitted') ? (
+                            (user?.role === 'customer_experience' || user?.role === 'super_admin' || user?.role === 'superadmin') ? (
                                 <button
                                     onClick={(e) => { e.stopPropagation(); openBioEditModal(); }}
                                     className="px-4 py-1.5 bg-blue-50 text-blue-600 hover:bg-blue-100 dark:bg-blue-900/20 dark:hover:bg-blue-900/40 dark:text-blue-400 rounded-lg text-sm font-bold transition-colors flex items-center gap-2"
@@ -1406,7 +1405,7 @@ const StaffInvestmentDetailsPage: React.FC<StaffInvestmentDetailsPageProps> = ({
                                                     </div>
                             
                                                     <div className="space-y-4">
-                                                        {['sales_manager', 'admin', 'super_admin', 'superadmin', 'finance'].includes(user?.role?.toLowerCase() || '') ? (
+                                                        {['sales_manager', 'admin', 'super_admin', 'superadmin', 'finance', 'customer_experience'].includes(user?.role?.toLowerCase() || '') ? (
                                                             <>
                                                                 {!investment.casa_account_number && investment.status === 'active' && (
                                                                     <div className="p-3 bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 rounded-xl flex items-start gap-2 mb-2">
