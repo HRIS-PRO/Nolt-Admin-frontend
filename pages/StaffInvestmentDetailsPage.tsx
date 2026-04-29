@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useParams, useNavigate } from 'react-router-dom';
 import StaffLayout from '../components/layouts/StaffLayout';
 import ActivityTimeline from '../components/ActivityTimeline';
@@ -14,16 +15,19 @@ interface StaffInvestmentDetailsPageProps {
     theme?: 'light' | 'dark';
 }
 
-const CollapsibleGroup = ({ title, icon, children, defaultOpen = false }: any) => {
+const CollapsibleGroup = ({ title, icon, children, defaultOpen = false, actionButton }: any) => {
     const [isOpen, setIsOpen] = useState(defaultOpen);
     return (
         <div className="bg-white dark:bg-[#1e293b] rounded-[24px] border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden mb-6">
-            <div onClick={() => setIsOpen(!isOpen)} className="flex items-center justify-between p-6 cursor-pointer bg-slate-50/50 hover:bg-slate-50 transition-colors">
-                <div className="flex items-center gap-4">
+            <div className="flex items-center justify-between p-6 bg-slate-50/50 hover:bg-slate-50 transition-colors">
+                <div className="flex items-center gap-4 cursor-pointer flex-1" onClick={() => setIsOpen(!isOpen)}>
                     <span className="material-symbols-outlined text-2xl text-slate-400">{icon}</span>
                     <h3 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight">{title}</h3>
                 </div>
-                <span className={`material-symbols-outlined transition-transform ${isOpen ? 'rotate-180' : ''}`}>keyboard_arrow_down</span>
+                <div className="flex items-center gap-4">
+                    {actionButton && <div onClick={(e) => e.stopPropagation()}>{actionButton}</div>}
+                    <span onClick={() => setIsOpen(!isOpen)} className={`material-symbols-outlined cursor-pointer transition-transform ${isOpen ? 'rotate-180' : ''}`}>keyboard_arrow_down</span>
+                </div>
             </div>
             {isOpen && <div className="p-8 border-t border-slate-100 dark:border-slate-800 grid grid-cols-1 md:grid-cols-2 gap-8">{children}</div>}
         </div>
@@ -102,6 +106,50 @@ const StaffInvestmentDetailsPage: React.FC<StaffInvestmentDetailsPageProps> = ({
     const [reason, setReason] = useState('');
     const [activePanel, setActivePanel] = useState<'overview' | 'manage' | 'activity'>('overview');
 
+    const [showBioEditModal, setShowBioEditModal] = useState(false);
+    const [bioEditData, setBioEditData] = useState<any>({});
+    const [isSavingBio, setIsSavingBio] = useState(false);
+
+    const openBioEditModal = () => {
+        setBioEditData({
+            title: investment.title || '',
+            rep_full_name: investment.rep_full_name || '',
+            company_name: investment.company_name || '',
+            gender: investment.gender || '',
+            dob: investment.dob ? new Date(investment.dob).toISOString().split('T')[0] : '',
+            customer_email: investment.customer_email || '',
+            rep_phone_number: investment.rep_phone_number || investment.customer_phone || '',
+            mother_maiden_name: investment.mother_maiden_name || '',
+            religion: investment.religion || '',
+            marital_status: investment.marital_status || '',
+            rep_state_of_origin: investment.rep_state_of_origin || '',
+            rep_state_of_residence: investment.rep_state_of_residence || '',
+            rep_house_number: investment.rep_house_number || '',
+            rep_street_address: investment.rep_street_address || '',
+            rep_bvn: investment.rep_bvn || '',
+            rep_nin: investment.rep_nin || '',
+            tin_number: investment.tin_number || '',
+            nok_name: investment.nok_name || '',
+            nok_relationship: investment.nok_relationship || '',
+            nok_address: investment.nok_address || ''
+        });
+        setShowBioEditModal(true);
+    };
+
+    const handleSaveBioData = async () => {
+        setIsSavingBio(true);
+        try {
+            await axios.put(`/api/staff/investments/${id}/bio`, bioEditData, { withCredentials: true });
+            alert("Bio data updated successfully");
+            setShowBioEditModal(false);
+            fetchInvestment();
+        } catch (error: any) {
+            console.error("Error updating bio data:", error);
+            alert(error.response?.data?.message || "Failed to update bio data");
+        } finally {
+            setIsSavingBio(false);
+        }
+    };
 
     const fetchInvestment = async () => {
         try {
@@ -433,8 +481,13 @@ const StaffInvestmentDetailsPage: React.FC<StaffInvestmentDetailsPageProps> = ({
                                 {investment.status || 'pending'}
                             </span>
                         </div>
-                        <h1 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight leading-none">
+                        <h1 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight leading-none flex items-center gap-3">
                             {investment.company_name || investment.rep_full_name || investment.customer_name || 'Individual Application'}
+                            {investment.is_minor_beneficiary && (
+                                <span className="px-2 py-1 rounded-lg border border-teal-500/20 bg-teal-500/10 text-[10px] font-black uppercase tracking-widest leading-none text-teal-600 dark:text-teal-400">
+                                    For Minor
+                                </span>
+                            )}
                         </h1>
                         {investment.promotion_source && (
                             <p className="mt-2 text-xs font-black uppercase tracking-wider text-red-500">
@@ -576,7 +629,23 @@ const StaffInvestmentDetailsPage: React.FC<StaffInvestmentDetailsPageProps> = ({
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
                 <div className="lg:col-span-8 space-y-6">
-                    <CollapsibleGroup title="Personal & Contact Data" icon="person" defaultOpen={true}>
+                    <CollapsibleGroup 
+                        title="Personal & Contact Data" 
+                        icon="person" 
+                        defaultOpen={true}
+                        actionButton={
+                            (user?.role === 'customer_experience' || user?.role === 'super_admin' || user?.role === 'superadmin') &&
+                            (investment.stage === 'customer_experience' || investment.stage === 'submitted') ? (
+                                <button
+                                    onClick={(e) => { e.stopPropagation(); openBioEditModal(); }}
+                                    className="px-4 py-1.5 bg-blue-50 text-blue-600 hover:bg-blue-100 dark:bg-blue-900/20 dark:hover:bg-blue-900/40 dark:text-blue-400 rounded-lg text-sm font-bold transition-colors flex items-center gap-2"
+                                >
+                                    <span className="material-symbols-outlined text-[16px]">edit</span>
+                                    Edit Bio Data
+                                </button>
+                            ) : undefined
+                        }
+                    >
                         <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-8">
                             <div className="space-y-8">
                                 <Field label="Full Name" value={`${investment.title ? investment.title + ' ' : ''}${investment.rep_full_name || investment.customer_name || 'Individual'}`} />
@@ -1352,8 +1421,8 @@ const StaffInvestmentDetailsPage: React.FC<StaffInvestmentDetailsPageProps> = ({
                     )}
                     
 {/* Return Application Modal */}
-                    {showReturnModal && (
-                        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+                    {showReturnModal && createPortal(
+                        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
                             <div className="bg-white dark:bg-slate-900 rounded-2xl w-full max-w-md shadow-2xl border border-slate-100 dark:border-slate-800 p-6 space-y-6">
                                 <div className="flex justify-between items-start">
                                     <div className="space-y-1">
@@ -1428,8 +1497,114 @@ const StaffInvestmentDetailsPage: React.FC<StaffInvestmentDetailsPageProps> = ({
                                     </button>
                                 </div>
                             </div>
-                        </div>
-                    )}
+                        </div>,
+                    document.body)}
+
+                    {showBioEditModal && createPortal(
+                        <div className="fixed  inset-0 bg-slate-900/80 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
+                            <div className="bg-white dark:bg-[#0f172a] rounded-[24px] w-full max-w-3xl max-h-[90vh] overflow-y-auto shadow-2xl p-8 border border-slate-200 dark:border-slate-800">
+                                <div className="flex justify-between items-center mb-6">
+                                    <h2 className="text-2xl font-black text-slate-900 dark:text-white">Edit Bio Data</h2>
+                                    <button onClick={() => setShowBioEditModal(false)} className="p-2 bg-slate-100 dark:bg-slate-800 rounded-full hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
+                                        <span className="material-symbols-outlined text-slate-600 dark:text-slate-400">close</span>
+                                    </button>
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    {investment.entity_type === 'CORPORATE' ? (
+                                        <div className="space-y-1">
+                                            <label className="text-xs font-bold text-slate-500 uppercase">Company Name</label>
+                                            <input type="text" value={bioEditData.company_name} onChange={(e) => setBioEditData({...bioEditData, company_name: e.target.value})} className="w-full bg-slate-50 dark:bg-[#1e293b] border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 text-slate-900 dark:text-white" />
+                                        </div>
+                                    ) : null}
+                                    <div className="space-y-1">
+                                        <label className="text-xs font-bold text-slate-500 uppercase">Title</label>
+                                        <input type="text" value={bioEditData.title} onChange={(e) => setBioEditData({...bioEditData, title: e.target.value})} className="w-full bg-slate-50 dark:bg-[#1e293b] border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 text-slate-900 dark:text-white" />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <label className="text-xs font-bold text-slate-500 uppercase">Full Name</label>
+                                        <input type="text" value={bioEditData.rep_full_name} onChange={(e) => setBioEditData({...bioEditData, rep_full_name: e.target.value})} className="w-full bg-slate-50 dark:bg-[#1e293b] border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 text-slate-900 dark:text-white" />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <label className="text-xs font-bold text-slate-500 uppercase">Gender</label>
+                                        <select value={bioEditData.gender} onChange={(e) => setBioEditData({...bioEditData, gender: e.target.value})} className="w-full bg-slate-50 dark:bg-[#1e293b] border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 text-slate-900 dark:text-white">
+                                            <option value="">Select</option>
+                                            <option value="Male">Male</option>
+                                            <option value="Female">Female</option>
+                                        </select>
+                                    </div>
+                                    <div className="space-y-1">
+                                        <label className="text-xs font-bold text-slate-500 uppercase">Date of Birth</label>
+                                        <input type="date" value={bioEditData.dob} onChange={(e) => setBioEditData({...bioEditData, dob: e.target.value})} className="w-full bg-slate-50 dark:bg-[#1e293b] border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 text-slate-900 dark:text-white" />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <label className="text-xs font-bold text-slate-500 uppercase">Phone Number</label>
+                                        <input type="text" value={bioEditData.rep_phone_number} onChange={(e) => setBioEditData({...bioEditData, rep_phone_number: e.target.value})} className="w-full bg-slate-50 dark:bg-[#1e293b] border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 text-slate-900 dark:text-white" />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <label className="text-xs font-bold text-slate-500 uppercase">Mother's Maiden Name</label>
+                                        <input type="text" value={bioEditData.mother_maiden_name} onChange={(e) => setBioEditData({...bioEditData, mother_maiden_name: e.target.value})} className="w-full bg-slate-50 dark:bg-[#1e293b] border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 text-slate-900 dark:text-white" />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <label className="text-xs font-bold text-slate-500 uppercase">Marital Status</label>
+                                        <select value={bioEditData.marital_status} onChange={(e) => setBioEditData({...bioEditData, marital_status: e.target.value})} className="w-full bg-slate-50 dark:bg-[#1e293b] border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 text-slate-900 dark:text-white">
+                                            <option value="">Select</option>
+                                            <option value="Single">Single</option>
+                                            <option value="Married">Married</option>
+                                            <option value="Divorced">Divorced</option>
+                                            <option value="Widowed">Widowed</option>
+                                        </select>
+                                    </div>
+                                    <div className="space-y-1">
+                                        <label className="text-xs font-bold text-slate-500 uppercase">State of Origin</label>
+                                        <input type="text" value={bioEditData.rep_state_of_origin} onChange={(e) => setBioEditData({...bioEditData, rep_state_of_origin: e.target.value})} className="w-full bg-slate-50 dark:bg-[#1e293b] border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 text-slate-900 dark:text-white" />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <label className="text-xs font-bold text-slate-500 uppercase">State of Residence</label>
+                                        <input type="text" value={bioEditData.rep_state_of_residence} onChange={(e) => setBioEditData({...bioEditData, rep_state_of_residence: e.target.value})} className="w-full bg-slate-50 dark:bg-[#1e293b] border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 text-slate-900 dark:text-white" />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <label className="text-xs font-bold text-slate-500 uppercase">House Number</label>
+                                        <input type="text" value={bioEditData.rep_house_number} onChange={(e) => setBioEditData({...bioEditData, rep_house_number: e.target.value})} className="w-full bg-slate-50 dark:bg-[#1e293b] border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 text-slate-900 dark:text-white" />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <label className="text-xs font-bold text-slate-500 uppercase">Street Address</label>
+                                        <input type="text" value={bioEditData.rep_street_address} onChange={(e) => setBioEditData({...bioEditData, rep_street_address: e.target.value})} className="w-full bg-slate-50 dark:bg-[#1e293b] border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 text-slate-900 dark:text-white" />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <label className="text-xs font-bold text-slate-500 uppercase">BVN</label>
+                                        <input type="text" value={bioEditData.rep_bvn} onChange={(e) => setBioEditData({...bioEditData, rep_bvn: e.target.value})} className="w-full bg-slate-50 dark:bg-[#1e293b] border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 text-slate-900 dark:text-white" />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <label className="text-xs font-bold text-slate-500 uppercase">NIN</label>
+                                        <input type="text" value={bioEditData.rep_nin} onChange={(e) => setBioEditData({...bioEditData, rep_nin: e.target.value})} className="w-full bg-slate-50 dark:bg-[#1e293b] border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 text-slate-900 dark:text-white" />
+                                    </div>
+
+                                    {/* Next of Kin Section */}
+                                    <div className="md:col-span-2 mt-4 pt-4 border-t border-slate-200 dark:border-slate-800">
+                                        <h3 className="text-lg font-bold mb-4 text-slate-900 dark:text-white">Next of Kin Details</h3>
+                                    </div>
+                                    <div className="space-y-1">
+                                        <label className="text-xs font-bold text-slate-500 uppercase">NOK Name</label>
+                                        <input type="text" value={bioEditData.nok_name} onChange={(e) => setBioEditData({...bioEditData, nok_name: e.target.value})} className="w-full bg-slate-50 dark:bg-[#1e293b] border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 text-slate-900 dark:text-white" />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <label className="text-xs font-bold text-slate-500 uppercase">NOK Relationship</label>
+                                        <input type="text" value={bioEditData.nok_relationship} onChange={(e) => setBioEditData({...bioEditData, nok_relationship: e.target.value})} className="w-full bg-slate-50 dark:bg-[#1e293b] border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 text-slate-900 dark:text-white" />
+                                    </div>
+                                    <div className="space-y-1 md:col-span-2">
+                                        <label className="text-xs font-bold text-slate-500 uppercase">NOK Address</label>
+                                        <textarea value={bioEditData.nok_address} onChange={(e) => setBioEditData({...bioEditData, nok_address: e.target.value})} rows={2} className="w-full bg-slate-50 dark:bg-[#1e293b] border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 text-slate-900 dark:text-white" />
+                                    </div>
+                                </div>
+                                <div className="mt-8 flex justify-end gap-4">
+                                    <button onClick={() => setShowBioEditModal(false)} className="px-6 py-3 rounded-xl font-bold text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">Cancel</button>
+                                    <button onClick={handleSaveBioData} disabled={isSavingBio} className="px-6 py-3 rounded-xl bg-blue-600 text-white font-bold hover:bg-blue-700 transition-colors disabled:opacity-50">
+                                        {isSavingBio ? 'Saving...' : 'Save Changes'}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>,
+                    document.body)}
                 </div>
             </div>
         </StaffLayout>

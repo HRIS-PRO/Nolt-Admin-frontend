@@ -152,6 +152,14 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess, initi
     const [accountName, setAccountName] = useState('');
     const [bankList, setBankList] = useState<{ name: string, code: string }[]>([]);
     const [productType, setProductType] = useState('');
+    const [isVerifyingBank, setIsVerifyingBank] = useState(false);
+    const [bankVerificationResult, setBankVerificationResult] = useState<{
+        account_name: string;
+        isMatch: boolean;
+        matchedNames: string[];
+        reason: string;
+    } | null>(null);
+    const [bankVerificationError, setBankVerificationError] = useState<string | null>(null);
 
     // New Fields for TopUp/BuyOver
     const [casa, setCasa] = useState('');
@@ -266,6 +274,48 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess, initi
         };
         fetchBanks();
     }, []);
+
+    // Auto-verify bank account when bank + 10-digit account number are both filled
+    useEffect(() => {
+        const selectedBank = bankList.find(b => b.name === bankName);
+        if (!selectedBank || !/^\d{10}$/.test(accountNumber)) {
+            setBankVerificationResult(null);
+            setBankVerificationError(null);
+            setAccountName('');
+            return;
+        }
+
+        const verifyAccount = async () => {
+            setIsVerifyingBank(true);
+            setBankVerificationResult(null);
+            setBankVerificationError(null);
+            setAccountName('');
+
+            try {
+                const response = await axios.post('/api/misc/resolve-account', {
+                    account_number: accountNumber,
+                    bank_code: selectedBank.code,
+                    first_name: firstName,
+                    surname: surname
+                });
+
+                if (response.data.success) {
+                    setBankVerificationResult(response.data.data);
+                    setAccountName(response.data.data.account_name);
+                } else {
+                    setBankVerificationError(response.data.message || 'Verification failed.');
+                }
+            } catch (err: any) {
+                const msg = err.response?.data?.message || 'Could not verify account. Please check the details.';
+                setBankVerificationError(msg);
+            } finally {
+                setIsVerifyingBank(false);
+            }
+        };
+
+        const timeout = setTimeout(verifyAccount, 500);
+        return () => clearTimeout(timeout);
+    }, [bankName, accountNumber, bankList]);
 
     const updateReference = (index: number, field: string, value: string) => {
         const newRefs = [...references];
@@ -387,6 +437,8 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess, initi
                 newErrors.accountNumber = "Must be 10 digits";
             }
             if (!accountName) newErrors.accountName = "Required";
+            if (bankVerificationResult && !bankVerificationResult.isMatch) newErrors.accountName = "Name mismatch";
+            if (isVerifyingBank) newErrors.accountNumber = "Verifying...";
 
             if (!uploadedDocs.payslip) newErrors.payslip = "Required";
 
@@ -444,6 +496,8 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess, initi
                     newErrors.accountNumber = "Must be 10 digits";
                 }
                 if (!accountName) newErrors.accountName = "Required";
+                if (bankVerificationResult && !bankVerificationResult.isMatch) newErrors.accountName = "Name mismatch";
+                if (isVerifyingBank) newErrors.accountNumber = "Verifying...";
 
                 if (loanType === 'buy_over') {
                     if (!buyOverAmount) newErrors.buyOverAmount = "Required";
@@ -710,19 +764,78 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess, initi
                                             </InputGroup>
 
                                             <InputGroup label="Bank Name" required error={errors.bankName}>
-                                                <select className="input-field" value={bankName} onChange={e => { setBankName(e.target.value); clearError('bankName'); }}>
+                                                <select className="input-field" value={bankName} onChange={e => { setBankName(e.target.value); setAccountName(''); clearError('bankName'); }}>
                                                     <option value="">Select Bank</option>
                                                     {bankList.map((b, i) => <option key={i} value={b.name}>{b.name}</option>)}
                                                 </select>
                                             </InputGroup>
 
                                             <InputGroup label="Account Number" required error={errors.accountNumber}>
-                                                <input className="input-field" value={accountNumber} onChange={handleNumericChange(setAccountNumber, 'accountNumber', 10)} maxLength={10} />
+                                                <div className="relative">
+                                                    <input
+                                                        className={`input-field pr-10 ${
+                                                            bankVerificationResult?.isMatch ? '!border-green-500' : bankVerificationResult && !bankVerificationResult.isMatch ? '!border-red-500' : ''
+                                                        }`}
+                                                        value={accountNumber}
+                                                        onChange={e => { const val = e.target.value.replace(/\D/g, ''); if (val.length <= 10) { setAccountNumber(val); setAccountName(''); clearError('accountNumber'); } }}
+                                                        maxLength={10}
+                                                        placeholder="10 Digits"
+                                                    />
+                                                    {isVerifyingBank && (
+                                                        <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                                                            <div className="size-5 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
+                                                        </div>
+                                                    )}
+                                                    {!isVerifyingBank && bankVerificationResult?.isMatch && (
+                                                        <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                                                            <span className="material-symbols-outlined text-green-500 text-xl filled">check_circle</span>
+                                                        </div>
+                                                    )}
+                                                    {!isVerifyingBank && bankVerificationResult && !bankVerificationResult.isMatch && (
+                                                        <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                                                            <span className="material-symbols-outlined text-red-500 text-xl filled">error</span>
+                                                        </div>
+                                                    )}
+                                                </div>
                                             </InputGroup>
 
-                                            <InputGroup label="Account Name" required error={errors.accountName}>
-                                                <input className="input-field" value={accountName} onChange={e => { setAccountName(e.target.value); clearError('accountName'); }} />
+                                            <InputGroup label="Account Name (Auto-Verified)" required error={errors.accountName}>
+                                                <input
+                                                    className={`input-field cursor-not-allowed ${
+                                                        bankVerificationResult?.isMatch ? '!bg-green-50 dark:!bg-green-900/20 !border-green-500 !text-green-800 dark:!text-green-300'
+                                                        : bankVerificationResult && !bankVerificationResult.isMatch ? '!bg-red-50 dark:!bg-red-900/20 !border-red-500 !text-red-800 dark:!text-red-300'
+                                                        : ''
+                                                    }`}
+                                                    value={accountName}
+                                                    readOnly
+                                                    placeholder={isVerifyingBank ? 'Verifying...' : 'Auto-fills after verification'}
+                                                />
                                             </InputGroup>
+
+                                            {/* Bank Verification Status */}
+                                            {bankVerificationResult && (
+                                                <div className={`md:col-span-2 p-3 rounded-xl border flex items-start gap-2 animate-in fade-in duration-300 ${
+                                                    bankVerificationResult.isMatch
+                                                        ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800'
+                                                        : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'
+                                                }`}>
+                                                    <span className={`material-symbols-outlined text-lg filled ${bankVerificationResult.isMatch ? 'text-green-600' : 'text-red-600'}`}>
+                                                        {bankVerificationResult.isMatch ? 'verified' : 'gpp_bad'}
+                                                    </span>
+                                                    <p className={`text-xs font-medium ${bankVerificationResult.isMatch ? 'text-green-700 dark:text-green-400' : 'text-red-700 dark:text-red-400'}`}>
+                                                        {bankVerificationResult.isMatch
+                                                            ? `Verified: "${bankVerificationResult.account_name}" — matches (${bankVerificationResult.matchedNames.join(', ')}).`
+                                                            : `"${bankVerificationResult.account_name}" does not match "${firstName} ${surname}". At least one name must match.`
+                                                        }
+                                                    </p>
+                                                </div>
+                                            )}
+                                            {bankVerificationError && (
+                                                <div className="md:col-span-2 p-3 rounded-xl border bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800 flex items-start gap-2 animate-in fade-in duration-300">
+                                                    <span className="material-symbols-outlined text-lg text-amber-600 filled">warning</span>
+                                                    <p className="text-xs font-medium text-amber-700 dark:text-amber-400">{bankVerificationError}</p>
+                                                </div>
+                                            )}
                                         </>
                                     )}
 
@@ -939,7 +1052,7 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess, initi
 
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                                             <InputGroup label="Bank Name" required error={errors.bankName}>
-                                                <select className="input-field" value={bankName} onChange={e => { setBankName(e.target.value); clearError('bankName'); }}>
+                                                <select className="input-field" value={bankName} onChange={e => { setBankName(e.target.value); setAccountName(''); clearError('bankName'); }}>
                                                     <option value="">Select Bank</option>
                                                     {bankList.map((bank: any) => (
                                                         <option key={bank.id} value={bank.name}>{bank.name}</option>
@@ -950,23 +1063,81 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess, initi
 
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                                             <InputGroup label="Account Number" required error={errors.accountNumber}>
-                                                <input
-                                                    className="input-field"
-                                                    value={accountNumber}
-                                                    onChange={handleNumericChange(setAccountNumber, 'accountNumber', 10)}
-                                                    maxLength={10}
-                                                    placeholder="10 Digits"
-                                                />
+                                                <div className="relative">
+                                                    <input
+                                                        className={`input-field pr-10 ${
+                                                            bankVerificationResult?.isMatch ? '!border-green-500' : bankVerificationResult && !bankVerificationResult.isMatch ? '!border-red-500' : ''
+                                                        }`}
+                                                        value={accountNumber}
+                                                        onChange={e => { const val = e.target.value.replace(/\D/g, ''); if (val.length <= 10) { setAccountNumber(val); setAccountName(''); clearError('accountNumber'); } }}
+                                                        maxLength={10}
+                                                        placeholder="10 Digits"
+                                                    />
+                                                    {isVerifyingBank && (
+                                                        <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                                                            <div className="size-5 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
+                                                        </div>
+                                                    )}
+                                                    {!isVerifyingBank && bankVerificationResult?.isMatch && (
+                                                        <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                                                            <span className="material-symbols-outlined text-green-500 text-xl filled">check_circle</span>
+                                                        </div>
+                                                    )}
+                                                    {!isVerifyingBank && bankVerificationResult && !bankVerificationResult.isMatch && (
+                                                        <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                                                            <span className="material-symbols-outlined text-red-500 text-xl filled">error</span>
+                                                        </div>
+                                                    )}
+                                                </div>
                                             </InputGroup>
-                                            <InputGroup label="Account Name" required error={errors.accountName}>
+                                            <InputGroup label="Account Name (Auto-Verified)" required error={errors.accountName}>
                                                 <input
-                                                    className="input-field"
+                                                    className={`input-field cursor-not-allowed ${
+                                                        bankVerificationResult?.isMatch ? '!bg-green-50 dark:!bg-green-900/20 !border-green-500 !text-green-800 dark:!text-green-300'
+                                                        : bankVerificationResult && !bankVerificationResult.isMatch ? '!bg-red-50 dark:!bg-red-900/20 !border-red-500 !text-red-800 dark:!text-red-300'
+                                                        : ''
+                                                    }`}
                                                     value={accountName}
-                                                    onChange={e => { setAccountName(e.target.value); clearError('accountName'); }}
-                                                    placeholder="Account Name"
+                                                    readOnly
+                                                    placeholder={isVerifyingBank ? 'Verifying...' : 'Auto-fills after verification'}
                                                 />
                                             </InputGroup>
                                         </div>
+
+                                        {/* Bank Verification Status */}
+                                        {bankVerificationResult && (
+                                            <div className={`p-4 rounded-2xl border-2 flex items-start gap-3 animate-in fade-in slide-in-from-top-2 duration-300 ${
+                                                bankVerificationResult.isMatch
+                                                    ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800'
+                                                    : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'
+                                            }`}>
+                                                <span className={`material-symbols-outlined text-xl mt-0.5 filled ${bankVerificationResult.isMatch ? 'text-green-600' : 'text-red-600'}`}>
+                                                    {bankVerificationResult.isMatch ? 'verified' : 'gpp_bad'}
+                                                </span>
+                                                <div>
+                                                    <p className={`font-bold text-sm ${bankVerificationResult.isMatch ? 'text-green-800 dark:text-green-300' : 'text-red-800 dark:text-red-300'}`}>
+                                                        {bankVerificationResult.isMatch ? 'Account Verified ✓' : 'Name Mismatch Detected'}
+                                                    </p>
+                                                    <p className={`text-xs mt-1 font-medium ${
+                                                        bankVerificationResult.isMatch ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
+                                                    }`}>
+                                                        {bankVerificationResult.isMatch
+                                                            ? `Resolved: "${bankVerificationResult.account_name}" — matches applicant name (${bankVerificationResult.matchedNames.join(', ')}).`
+                                                            : `Resolved: "${bankVerificationResult.account_name}" — does not match "${firstName} ${surname}". At least the first name or surname must appear in the account name.`
+                                                        }
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        )}
+                                        {bankVerificationError && (
+                                            <div className="p-4 rounded-2xl border-2 bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800 flex items-start gap-3 animate-in fade-in slide-in-from-top-2 duration-300">
+                                                <span className="material-symbols-outlined text-xl mt-0.5 text-amber-600 filled">warning</span>
+                                                <div>
+                                                    <p className="font-bold text-sm text-amber-800 dark:text-amber-300">Verification Failed</p>
+                                                    <p className="text-xs mt-1 font-medium text-amber-600 dark:text-amber-400">{bankVerificationError}</p>
+                                                </div>
+                                            </div>
+                                        )}
 
                                         {loanType === 'buy_over' && (
                                             <div className="mt-8 p-6 bg-amber-50 dark:bg-amber-900/10 rounded-2xl border border-amber-100 dark:border-amber-900/20">

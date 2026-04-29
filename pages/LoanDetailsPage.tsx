@@ -535,6 +535,7 @@ const LoanDetailsPage: React.FC<LoanDetailsPageProps> = ({ user, onLogout, toggl
     const [isLoading, setIsLoading] = useState(true);
     const [showEditModal, setShowEditModal] = useState(false);
     const [officers, setOfficers] = useState<any[]>([]);
+    const [activePanel, setActivePanel] = useState<'overview' | 'manage' | 'activity'>('overview');
     
     // Indemnity Management State
     const [isProcessingIndemnity, setIsProcessingIndemnity] = useState(false);
@@ -1122,71 +1123,106 @@ const LoanDetailsPage: React.FC<LoanDetailsPageProps> = ({ user, onLogout, toggl
                 </div>
 
                 <div className="xl:col-span-4 space-y-6 sticky top-8">
-                    <ActionCard
-                        loan={loan}
-                        userRole={user.role}
-                        onActionComplete={() => {
-                            const fetchLoan = async () => {
-                                try {
-                                    const response = await axios.get(`/api/staff/loans/${id}`, { withCredentials: true });
-                                    setLoan(response.data);
-                                } catch (error) { console.error("Refresh failed", error); }
-                            };
-                            fetchLoan();
-                        }}
-                    />
+                    <div className="bg-white dark:bg-[#1e293b] rounded-2xl p-2 border border-slate-200 dark:border-slate-800 shadow-sm flex items-center justify-between gap-1">
+                        <button 
+                            onClick={() => setActivePanel('overview')} 
+                            className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 ${activePanel === 'overview' ? 'bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/50'}`}
+                        >
+                            <span className="material-symbols-outlined text-[16px]">page_info</span>
+                            Status
+                        </button>
+                        {['sales_manager', 'admin', 'super_admin', 'superadmin', 'customer_experience'].includes(user?.role?.toLowerCase() || '') && (
+                            <button 
+                                onClick={() => setActivePanel('manage')} 
+                                className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 ${activePanel === 'manage' ? 'bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/50'}`}
+                            >
+                                <span className="material-symbols-outlined text-[16px]">tune</span>
+                                Manage
+                            </button>
+                        )}
+                        <button 
+                            onClick={() => setActivePanel('activity')} 
+                            className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 ${activePanel === 'activity' ? 'bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/50'}`}
+                        >
+                            <span className="material-symbols-outlined text-[16px]">history</span>
+                            Activity
+                        </button>
+                    </div>
 
-                    {/* Assignment Control Card */}
-                    {['sales_manager', 'admin', 'super_admin', 'superadmin', 'customer_experience'].includes(user.role?.toLowerCase() || '') && (
-                        <div className="bg-white dark:bg-[#1e293b] rounded-[24px] p-8 border border-slate-200 dark:border-slate-800 shadow-xl shadow-slate-200/50 dark:shadow-none mb-6">
-                            <div className="flex items-center gap-2 mb-4">
-                                <span className="material-symbols-outlined text-blue-500">person_add</span>
-                                <p className="text-xs font-black uppercase tracking-widest text-slate-500 dark:text-slate-400">Account Assignment</p>
-                            </div>
-                            <h3 className="text-2xl font-black mb-6 text-slate-900 dark:text-white">Sales Officer</h3>
+                    {activePanel === 'overview' && (
+                        <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                            <ActionCard
+                                loan={loan}
+                                userRole={user.role}
+                                onActionComplete={() => {
+                                    const fetchLoan = async () => {
+                                        try {
+                                            const response = await axios.get(`/api/staff/loans/${id}`, { withCredentials: true });
+                                            setLoan(response.data);
+                                        } catch (error) { console.error("Refresh failed", error); }
+                                    };
+                                    fetchLoan();
+                                }}
+                            />
 
-                            <div className="space-y-4">
-                                <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-800">
-                                    <div className="flex items-center gap-3">
-                                        <div className="size-10 rounded-full bg-blue-500/10 text-blue-500 flex items-center justify-center font-black">
-                                            {loan.officer_name ? loan.officer_name[0] : 'U'}
-                                        </div>
-                                        <div>
-                                            <p className="text-sm font-black text-slate-900 dark:text-white leading-none mb-1">
-                                                {loan.officer_name || 'Unassigned'}
-                                            </p>
-                                            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-tight text-nowrap truncate max-w-[150px]">
-                                                {loan.officer_email || 'Promotion / Marketing'}
-                                            </p>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div className="relative">
-                                    <select
-                                        value={loan.sales_officer_id || ''}
-                                        onChange={(e) => handleAssignOfficer(e.target.value)}
-                                        className="w-full px-6 py-4 rounded-2xl bg-white dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-800 text-sm font-black text-slate-900 dark:text-white appearance-none cursor-pointer focus:border-blue-500 transition-all outline-none"
-                                    >
-                                        <option value="">Select Officer to Reassign</option>
-                                        {officers.map(off => (
-                                            <option key={off.id} value={off.id}>{off.full_name}</option>
-                                        ))}
-                                    </select>
-                                    <span className="material-symbols-outlined absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">expand_more</span>
-                                </div>
+                            <div className="bg-white dark:bg-[#1e293b] rounded-[24px] p-6 border border-slate-200 dark:border-slate-800">
+                                <DocumentsList loanId={id} refreshTrigger={loan ? new Date(loan.updated_at).getTime() : 0} />
                             </div>
                         </div>
                     )}
 
-                    <div className="bg-white dark:bg-[#1e293b] rounded-[24px] p-6 border border-slate-200 dark:border-slate-800">
+                    {activePanel === 'manage' && (
+                        <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                            {/* Assignment Control Card */}
+                            {['sales_manager', 'admin', 'super_admin', 'superadmin', 'customer_experience'].includes(user.role?.toLowerCase() || '') && (
+                                <div className="bg-white dark:bg-[#1e293b] rounded-[24px] p-8 border border-slate-200 dark:border-slate-800 shadow-xl shadow-slate-200/50 dark:shadow-none mb-6">
+                                    <div className="flex items-center gap-2 mb-4">
+                                        <span className="material-symbols-outlined text-blue-500">person_add</span>
+                                        <p className="text-xs font-black uppercase tracking-widest text-slate-500 dark:text-slate-400">Account Assignment</p>
+                                    </div>
+                                    <h3 className="text-2xl font-black mb-6 text-slate-900 dark:text-white">Sales Officer</h3>
 
-                        <DocumentsList loanId={id} refreshTrigger={loan ? new Date(loan.updated_at).getTime() : 0} />
-                    </div>
+                                    <div className="space-y-4">
+                                        <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-800">
+                                            <div className="flex items-center gap-3">
+                                                <div className="size-10 rounded-full bg-blue-500/10 text-blue-500 flex items-center justify-center font-black">
+                                                    {loan.officer_name ? loan.officer_name[0] : 'U'}
+                                                </div>
+                                                <div>
+                                                    <p className="text-sm font-black text-slate-900 dark:text-white leading-none mb-1">
+                                                        {loan.officer_name || 'Unassigned'}
+                                                    </p>
+                                                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-tight text-nowrap truncate max-w-[150px]">
+                                                        {loan.officer_email || 'Promotion / Marketing'}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        </div>
 
-                    <div className="bg-white dark:bg-[#1e293b] rounded-[24px] overflow-hidden border border-slate-200 dark:border-slate-800">
-                        <ActivityTimeline loanId={id} />
-                    </div>
+                                        <div className="relative">
+                                            <select
+                                                value={loan.sales_officer_id || ''}
+                                                onChange={(e) => handleAssignOfficer(e.target.value)}
+                                                className="w-full px-6 py-4 rounded-2xl bg-white dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-800 text-sm font-black text-slate-900 dark:text-white appearance-none cursor-pointer focus:border-blue-500 transition-all outline-none"
+                                            >
+                                                <option value="">Select Officer to Reassign</option>
+                                                {officers.map(off => (
+                                                    <option key={off.id} value={off.id}>{off.full_name}</option>
+                                                ))}
+                                            </select>
+                                            <span className="material-symbols-outlined absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">expand_more</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {activePanel === 'activity' && (
+                        <div className="bg-white dark:bg-[#1e293b] rounded-[24px] overflow-hidden border border-slate-200 dark:border-slate-800 max-h-[75vh] overflow-y-auto animate-in fade-in slide-in-from-bottom-2 duration-300">
+                            <ActivityTimeline loanId={id} />
+                        </div>
+                    )}
                 </div>
             </div>
 

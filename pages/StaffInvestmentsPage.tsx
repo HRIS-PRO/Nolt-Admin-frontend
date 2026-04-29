@@ -1445,6 +1445,11 @@ const StaffInvestmentsPage: React.FC<StaffInvestmentsPageProps> = ({ user, onLog
                                                                             }`}>
                                                                             {inv.entity_type === 'CORPORATE' ? 'CORP' : 'INDV'}
                                                                         </span>
+                                                                        {inv.is_minor_beneficiary && (
+                                                                            <span className="px-1.5 py-0.5 rounded border border-teal-500/20 bg-teal-500/10 text-[8px] font-black uppercase tracking-widest leading-none text-teal-600 dark:text-teal-400">
+                                                                                For Minor
+                                                                            </span>
+                                                                        )}
                                                                         {inv.is_liquidating && (
                                                                             <span className="flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-orange-500 text-white text-[8px] font-black uppercase tracking-tighter leading-none">
                                                                                 <span className="material-symbols-outlined text-[8px]">warning</span>
