@@ -690,6 +690,52 @@ const StaffInvestmentDetailsPage: React.FC<StaffInvestmentDetailsPageProps> = ({
                         </div>
                     </CollapsibleGroup>
 
+                    {investment.entity_type === 'JOINT' && investment.partner_details && (
+                        <CollapsibleGroup title="Co-Investor Data" icon="group" defaultOpen={true}>
+                            <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-8">
+                                <div className="space-y-8">
+                                    <Field label="Full Name" value={`${investment.partner_details.title ? investment.partner_details.title + ' ' : ''}${investment.partner_details.rep_full_name || investment.partner_details.customer_name || 'Individual'}`} />
+                                    <Field label="Gender" value={investment.partner_details.gender} />
+                                    <Field label="Date of Birth" value={investment.partner_details.dob ? formatDate(investment.partner_details.dob) : ''} />
+                                    <Field label="Email Address" value={investment.partner_details.customer_email} />
+                                    <Field label="Phone Number" value={investment.partner_details.rep_phone_number || investment.partner_details.customer_phone} />
+                                    <Field label="Mother's Maiden Name" value={investment.partner_details.mother_maiden_name} />
+                                    <Field label="Religion" value={investment.partner_details.religion} />
+                                    <Field label="Marital Status" value={investment.partner_details.marital_status} />
+
+                                    <Field label="State of Origin" value={investment.partner_details.rep_state_of_origin} />
+                                    <Field label="State of Residence" value={investment.partner_details.rep_state_of_residence} />
+                                    <Field label="Home Address" value={`${investment.partner_details.rep_house_number ? investment.partner_details.rep_house_number + ', ' : ''}${investment.partner_details.rep_street_address || ''}`} />
+
+                                    <MaskedField label="BVN" value={investment.partner_details.rep_bvn || investment.partner_details.bvn} verified={investment.partner_details.is_identity_verified} />
+                                    <MaskedField label="NIN" value={investment.partner_details.rep_nin || investment.partner_details.nin} />
+                                </div>
+
+                                {investment.partner_details.rep_selfie_url && (
+                                    <div className="flex flex-col items-center justify-start pt-4">
+                                        <div className="relative group">
+                                            <div className="absolute -inset-4 bg-gradient-to-tr from-purple-500/20 to-blue-500/20 rounded-[40px] blur-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                                            <div className="relative">
+                                                <img
+                                                    src={investment.partner_details.rep_selfie_url}
+                                                    alt="Captured Face"
+                                                    className="w-64 h-80 object-cover rounded-[32px] border-4 border-white dark:border-slate-800 shadow-2xl relative z-0"
+                                                />
+                                                <div className="absolute top-4 right-4 z-10">
+                                                    <span className="flex items-center gap-1 px-3 py-1 bg-white/90 dark:bg-slate-900/90 backdrop-blur shadow-lg rounded-full text-[10px] font-black uppercase tracking-widest text-slate-900 dark:text-white border border-slate-200 dark:border-slate-700">
+                                                        <span className="material-symbols-outlined text-[14px] text-purple-500">face</span>
+                                                        Live Image
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <p className="mt-6 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Identity Verification Image</p>
+                                    </div>
+                                )}
+                            </div>
+                        </CollapsibleGroup>
+                    )}
+
                     {investment.entity_type === 'CORPORATE' && (
                         <CollapsibleGroup title="Corporate Data" icon="domain" defaultOpen={true}>
                             <Field label="Company Name" value={investment.company_name} />
@@ -1145,6 +1191,17 @@ const StaffInvestmentDetailsPage: React.FC<StaffInvestmentDetailsPageProps> = ({
                                                         );
                             
                                                         if (canApprove) {
+                                                            if (investment.is_pending_partner) {
+                                                                return (
+                                                                    <div className="mt-6 pt-6 border-t border-slate-100 dark:border-slate-800/60 text-center">
+                                                                        <div className="bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 text-amber-600 dark:text-amber-400 p-4 rounded-xl flex flex-col items-center">
+                                                                            <span className="material-symbols-outlined text-2xl mb-2">hourglass_empty</span>
+                                                                            <p className="text-sm font-bold">Waiting for Joint Partner Validation</p>
+                                                                            <p className="text-xs mt-1 opacity-80">This application cannot be processed until the co-investor completes their KYC and accepts the invitation.</p>
+                                                                        </div>
+                                                                    </div>
+                                                                );
+                                                            }
                                                             return (
                                                                 <div className="mt-6 pt-6 border-t border-slate-100 dark:border-slate-800/60">
                                                                     <p className="text-xs text-slate-500 mb-4 text-center">You have the necessary permissions to review this stage.</p>
