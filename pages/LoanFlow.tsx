@@ -109,6 +109,14 @@ const LoanFlow: React.FC<LoanFlowProps> = ({ initialStep, onComplete, navigate, 
     accountName: ''
   });
   const [bankList, setBankList] = useState<{ name: string; code: string }[]>([]);
+  const [isVerifyingBank, setIsVerifyingBank] = useState(false);
+  const [bankVerificationResult, setBankVerificationResult] = useState<{
+    account_name: string;
+    isMatch: boolean;
+    matchedNames: string[];
+    reason: string;
+  } | null>(null);
+  const [bankVerificationError, setBankVerificationError] = useState<string | null>(null);
 
 
   const categories = [
@@ -252,6 +260,51 @@ const LoanFlow: React.FC<LoanFlowProps> = ({ initialStep, onComplete, navigate, 
     };
     fetchBanks();
   }, []);
+
+  // Auto-verify bank account when bank + 10-digit account number are both filled
+  useEffect(() => {
+    const selectedBank = bankList.find(b => b.name === bankDetails.bankName);
+    if (!selectedBank || !isValidAccountNumber(bankDetails.accountNumber)) {
+      // Reset verification when inputs change and become invalid
+      setBankVerificationResult(null);
+      setBankVerificationError(null);
+      setBankDetails(prev => ({ ...prev, accountName: '' }));
+      return;
+    }
+
+    const verifyAccount = async () => {
+      setIsVerifyingBank(true);
+      setBankVerificationResult(null);
+      setBankVerificationError(null);
+      setBankDetails(prev => ({ ...prev, accountName: '' }));
+
+      try {
+        const backendUrl = '';
+        const response = await axios.post(`${backendUrl}/api/misc/resolve-account`, {
+          account_number: bankDetails.accountNumber,
+          bank_code: selectedBank.code,
+          first_name: firstName,
+          surname: surname
+        }, { withCredentials: true });
+
+        if (response.data.success) {
+          setBankVerificationResult(response.data.data);
+          setBankDetails(prev => ({ ...prev, accountName: response.data.data.account_name }));
+        } else {
+          setBankVerificationError(response.data.message || 'Verification failed.');
+        }
+      } catch (err: any) {
+        const msg = err.response?.data?.message || 'Could not verify account. Please check the details.';
+        setBankVerificationError(msg);
+      } finally {
+        setIsVerifyingBank(false);
+      }
+    };
+
+    // Debounce to avoid rapid API calls while typing
+    const timeout = setTimeout(verifyAccount, 500);
+    return () => clearTimeout(timeout);
+  }, [bankDetails.bankName, bankDetails.accountNumber, bankList]);
 
   // Auto-Prefill from Existing Data
   useEffect(() => {
@@ -1050,13 +1103,13 @@ const LoanFlow: React.FC<LoanFlowProps> = ({ initialStep, onComplete, navigate, 
           {subStep === 10 && (
             <div className="space-y-8 animate-in fade-in slide-in-from-right-4 duration-500">
               <h2 className="text-3xl font-black dark:text-white">Disbursement Details</h2>
-              <p className="text-slate-500 font-medium">Where should we send your funds?</p>
+              <p className="text-slate-500 font-medium">Where should we send your funds? We'll verify the account matches your name.</p>
               <div className="grid gap-6">
                 <div className="space-y-2">
                   <label className="text-sm font-black text-slate-500 uppercase">Bank Name</label>
                   <select
                     value={bankDetails.bankName}
-                    onChange={(e) => setBankDetails({ ...bankDetails, bankName: e.target.value })}
+                    onChange={(e) => setBankDetails({ ...bankDetails, bankName: e.target.value, accountName: '' })}
                     className="w-full h-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-6 text-lg font-bold dark:text-white focus:border-primary outline-none"
                   >
                     <option value="">Select Bank</option>
@@ -1070,19 +1123,38 @@ const LoanFlow: React.FC<LoanFlowProps> = ({ initialStep, onComplete, navigate, 
 
                 <div className="space-y-2">
                   <label className="text-sm font-black text-slate-500 uppercase">Account Number</label>
-                  <input
-                    type="text"
-                    value={bankDetails.accountNumber}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      if (/^\d*$/.test(val)) { // Only allow numeric input
-                        setBankDetails({ ...bankDetails, accountNumber: val });
-                      }
-                    }}
-                    className="w-full h-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-6 text-lg font-bold dark:text-white focus:border-primary outline-none"
-                    placeholder="Enter Account Number"
-                    maxLength={10}
-                  />
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={bankDetails.accountNumber}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (/^\d*$/.test(val)) {
+                          setBankDetails({ ...bankDetails, accountNumber: val, accountName: '' });
+                        }
+                      }}
+                      className={`w-full h-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 px-6 pr-14 text-lg font-bold dark:text-white focus:border-primary outline-none transition-all ${
+                        bankVerificationResult?.isMatch ? 'border-green-500' : bankVerificationResult && !bankVerificationResult.isMatch ? 'border-red-500' : bankVerificationError ? 'border-red-500' : 'border-slate-100 dark:border-slate-700'
+                      }`}
+                      placeholder="Enter 10-digit Account Number"
+                      maxLength={10}
+                    />
+                    {isVerifyingBank && (
+                      <div className="absolute right-4 top-1/2 -translate-y-1/2">
+                        <div className="size-6 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
+                      </div>
+                    )}
+                    {!isVerifyingBank && bankVerificationResult?.isMatch && (
+                      <div className="absolute right-4 top-1/2 -translate-y-1/2">
+                        <span className="material-symbols-outlined text-green-500 text-2xl filled">check_circle</span>
+                      </div>
+                    )}
+                    {!isVerifyingBank && bankVerificationResult && !bankVerificationResult.isMatch && (
+                      <div className="absolute right-4 top-1/2 -translate-y-1/2">
+                        <span className="material-symbols-outlined text-red-500 text-2xl filled">error</span>
+                      </div>
+                    )}
+                  </div>
                   {!isValidAccountNumber(bankDetails.accountNumber) && bankDetails.accountNumber.length > 0 && (
                     <p className="text-red-500 text-sm font-bold mt-2 animate-in slide-in-from-top-1">
                       Account number must be 10 digits and numeric.
@@ -1090,18 +1162,69 @@ const LoanFlow: React.FC<LoanFlowProps> = ({ initialStep, onComplete, navigate, 
                   )}
                 </div>
 
+                {/* Resolved Account Name — Read Only */}
                 <div className="space-y-2">
-                  <label className="text-sm font-black text-slate-500 uppercase">Account Name</label>
+                  <label className="text-sm font-black text-slate-500 uppercase">Account Name (Auto-Verified)</label>
                   <input
                     type="text"
                     value={bankDetails.accountName}
-                    onChange={(e) => setBankDetails({ ...bankDetails, accountName: e.target.value })}
-                    className="w-full h-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-6 text-lg font-bold dark:text-white focus:border-primary outline-none"
-                    placeholder="Enter Account Name"
+                    readOnly
+                    className={`w-full h-16 rounded-2xl border-2 px-6 text-lg font-bold outline-none transition-all cursor-not-allowed ${
+                      bankVerificationResult?.isMatch
+                        ? 'bg-green-50 dark:bg-green-900/20 border-green-500 text-green-800 dark:text-green-300'
+                        : bankVerificationResult && !bankVerificationResult.isMatch
+                        ? 'bg-red-50 dark:bg-red-900/20 border-red-500 text-red-800 dark:text-red-300'
+                        : 'bg-slate-100 dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-400 dark:text-slate-500'
+                    }`}
+                    placeholder={isVerifyingBank ? 'Verifying...' : 'Will auto-fill after verification'}
                   />
                 </div>
+
+                {/* Verification Status Messages */}
+                {bankVerificationResult && (
+                  <div className={`p-4 rounded-2xl border-2 flex items-start gap-3 animate-in fade-in slide-in-from-top-2 duration-300 ${
+                    bankVerificationResult.isMatch
+                      ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800'
+                      : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'
+                  }`}>
+                    <span className={`material-symbols-outlined text-xl mt-0.5 filled ${
+                      bankVerificationResult.isMatch ? 'text-green-600' : 'text-red-600'
+                    }`}>
+                      {bankVerificationResult.isMatch ? 'verified' : 'gpp_bad'}
+                    </span>
+                    <div>
+                      <p className={`font-bold text-sm ${bankVerificationResult.isMatch ? 'text-green-800 dark:text-green-300' : 'text-red-800 dark:text-red-300'}`}>
+                        {bankVerificationResult.isMatch ? 'Account Verified ✓' : 'Name Mismatch Detected'}
+                      </p>
+                      <p className={`text-xs mt-1 font-medium ${
+                        bankVerificationResult.isMatch ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
+                      }`}>
+                        {bankVerificationResult.isMatch
+                          ? `Resolved: "${bankVerificationResult.account_name}" — matches applicant name (${bankVerificationResult.matchedNames.join(', ')}).`
+                          : `Resolved: "${bankVerificationResult.account_name}" — does not match "${firstName} ${surname}". At least the first name or surname must appear in the account name.`
+                        }
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {bankVerificationError && (
+                  <div className="p-4 rounded-2xl border-2 bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800 flex items-start gap-3 animate-in fade-in slide-in-from-top-2 duration-300">
+                    <span className="material-symbols-outlined text-xl mt-0.5 text-amber-600 filled">warning</span>
+                    <div>
+                      <p className="font-bold text-sm text-amber-800 dark:text-amber-300">Verification Failed</p>
+                      <p className="text-xs mt-1 font-medium text-amber-600 dark:text-amber-400">{bankVerificationError}</p>
+                    </div>
+                  </div>
+                )}
               </div>
-              <NavActions isNextDisabled={!bankDetails.bankName || !isValidAccountNumber(bankDetails.accountNumber) || !bankDetails.accountName} />
+              <NavActions isNextDisabled={
+                !bankDetails.bankName ||
+                !isValidAccountNumber(bankDetails.accountNumber) ||
+                !bankDetails.accountName ||
+                isVerifyingBank ||
+                (bankVerificationResult !== null && !bankVerificationResult.isMatch)
+              } />
             </div>
           )}
 

@@ -1792,7 +1792,6 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
                   <label className="text-sm font-black text-slate-500 uppercase tracking-widest">Investment Amount</label>
                   <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-xl gap-1">
                     <button disabled={isClaimingGift} onClick={() => setCurrency('NGN')} className={`px-3 py-1 rounded-lg text-[10px] font-black transition-all ${currency === 'NGN' ? 'bg-white dark:bg-slate-700 text-primary shadow-sm' : 'text-slate-400'}`}>NGN</button>
-                    <button disabled={isClaimingGift} onClick={() => setCurrency('USD')} className={`px-3 py-1 rounded-lg text-[10px] font-black transition-all ${currency === 'USD' ? 'bg-white dark:bg-slate-700 text-primary shadow-sm' : 'text-slate-400'}`}>USD</button>
                     {(selectedPlan === 'VAULT') && (
                       <button disabled={isClaimingGift} onClick={() => setCurrency('USD')} className={`px-3 py-1 rounded-lg text-[10px] font-black transition-all ${currency === 'USD' ? 'bg-white dark:bg-slate-700 text-primary shadow-sm' : 'text-slate-400'}`}>USD</button>
                     )}
@@ -1808,18 +1807,22 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
                     placeholder="e.g. 500,000"
                   />
                 </div>
-                {(!dynamicInterestRate && !rateLoading && parseFloat(amount) > 0) && (
+                {currency === 'USD' && selectedPlan !== 'VAULT' ? (
                   <p className="text-xs font-bold text-red-500 mt-2 flex items-center gap-1">
                     <span className="material-symbols-outlined text-sm">warning</span>
-                    No valid interest rate found for this amount and tenure.
+                    USD is only available for NOLT VAULT. Please switch to NGN.
                   </p>
-                )}
-                {(parseFloat(amount) < minAmount && amount) && (
+                ) : (parseFloat(amount) < minAmount && amount) ? (
                   <p className="text-xs font-bold text-red-500 mt-2 flex items-center gap-1">
                     <span className="material-symbols-outlined text-sm">warning</span>
                     Minimum investment for NOLT {selectedPlan} is {formatMoney(minAmount, currency)}
                   </p>
-                )}
+                ) : (!dynamicInterestRate && !rateLoading && parseFloat(amount) > 0) ? (
+                  <p className="text-xs font-bold text-red-500 mt-2 flex items-center gap-1">
+                    <span className="material-symbols-outlined text-sm">warning</span>
+                    No valid interest rate found for this amount and tenure.
+                  </p>
+                ) : null}
               </div>
               {selectedPlan === 'RISE' && (
                 <div className="space-y-4">
@@ -1938,7 +1941,7 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
                   <option value="none">Payout at Maturity</option>
                 </select>
               </div>
-              <NavActions isNextDisabled={parseFloat(amount) < minAmount || rateLoading || !dynamicInterestRate} />
+              <NavActions isNextDisabled={parseFloat(amount) < minAmount || rateLoading || !dynamicInterestRate || (currency === 'USD' && selectedPlan !== 'VAULT')} />
             </div>
             <div className="lg:col-span-5">
               <div className="bg-slate-900 rounded-[2.5rem] p-10 text-white shadow-2xl space-y-8 relative overflow-hidden">

@@ -36,6 +36,7 @@ const StaffLayout: React.FC<StaffLayoutProps> = ({ children, user, onLogout, tog
                 { label: 'Promotions', icon: 'campaign', path: '/staff/promotions' },
                 { label: 'Reports', icon: 'description', path: '/staff/reports' },
                 { label: 'BI Dashboard', icon: 'timeline', path: '/staff/timeline' },
+                { label: 'Calculator', icon: 'calculate', path: '/staff/calculator' },
             ]
         },
         {

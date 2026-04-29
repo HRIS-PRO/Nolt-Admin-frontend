@@ -19,6 +19,20 @@ interface Promotion {
     created_at: string;
 }
 
+interface PromoUser {
+    customer_id: number;
+    full_name: string;
+    email: string;
+    phone_number: string;
+    avatar_url: string | null;
+    registered_at: string;
+    used_code: string;
+    hear_about_us: string;
+    marketing_created_at: string;
+    investments: { investment_id: number; product_type: string; amount: number; status: string; investment_date: string }[];
+    loans: { loan_id: number; amount: number; status: string; loan_date: string }[];
+}
+
 interface StaffPromotionsPageProps {
     user: { name: string; email: string; avatar_url?: string; role?: string };
     onLogout: () => void;
@@ -32,6 +46,10 @@ const StaffPromotionsPage: React.FC<StaffPromotionsPageProps> = ({ user, onLogou
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [editingPromo, setEditingPromo] = useState<Promotion | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [selectedPromo, setSelectedPromo] = useState<Promotion | null>(null);
+    const [promoUsers, setPromoUsers] = useState<PromoUser[]>([]);
+    const [loadingUsers, setLoadingUsers] = useState(false);
+    const [showUsersDrawer, setShowUsersDrawer] = useState(false);
 
     // Form data
     const [formData, setFormData] = useState({
@@ -178,6 +196,49 @@ const StaffPromotionsPage: React.FC<StaffPromotionsPageProps> = ({ user, onLogou
         alert('Copied to clipboard!');
     };
 
+    const fetchPromoUsers = async (promo: Promotion) => {
+        setSelectedPromo(promo);
+        setShowUsersDrawer(true);
+        setLoadingUsers(true);
+        setPromoUsers([]);
+        try {
+            const response = await axios.get(`/api/promotions/${promo.id}/users`, { withCredentials: true });
+            setPromoUsers(response.data.users || []);
+        } catch (error) {
+            console.error('Error fetching promo users:', error);
+        } finally {
+            setLoadingUsers(false);
+        }
+    };
+
+    const closeUsersDrawer = () => {
+        setShowUsersDrawer(false);
+        setTimeout(() => { setSelectedPromo(null); setPromoUsers([]); }, 300);
+    };
+
+    const exportUsersCSV = (promo: Promotion, users: PromoUser[]) => {
+        if (users.length === 0) return;
+        const headers = ['Name', 'Email', 'Phone', 'Code Used', 'Registered', 'Source', 'Investments', 'Loans'];
+        const rows = users.map(u => [
+            u.full_name || '',
+            u.email || '',
+            u.phone_number || '',
+            u.used_code || '',
+            u.registered_at ? new Date(u.registered_at).toLocaleDateString() : '',
+            u.hear_about_us || '',
+            u.investments.length.toString(),
+            u.loans.length.toString()
+        ]);
+        const csvContent = [headers, ...rows].map(r => r.map(v => `"${v}"`).join(',')).join('\n');
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${promo.utm_campaign}_users_${new Date().toISOString().split('T')[0]}.csv`;
+        a.click();
+        URL.revokeObjectURL(url);
+    };
+
     return (
         <StaffLayout user={user} onLogout={onLogout} toggleTheme={toggleTheme} theme={theme}>
             
@@ -321,6 +382,13 @@ const StaffPromotionsPage: React.FC<StaffPromotionsPageProps> = ({ user, onLogou
                                             <td className="px-4 py-5 border-b border-slate-100 dark:border-slate-800 text-right">
                                                 <div className="flex items-center justify-end gap-2">
                                                     <button 
+                                                        onClick={() => fetchPromoUsers(promo)}
+                                                        className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-emerald-600 hover:shadow-md transition-all inline-flex items-center"
+                                                        title="View Users"
+                                                    >
+                                                        <span className="material-symbols-outlined text-[18px]">group</span>
+                                                    </button>
+                                                    <button 
                                                         onClick={() => copyLink(promo)}
                                                         className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-purple-600 hover:shadow-md transition-all inline-flex items-center"
                                                         title="Copy Tracking Link"
@@ -400,6 +468,7 @@ const StaffPromotionsPage: React.FC<StaffPromotionsPageProps> = ({ user, onLogou
                                                 className="w-full h-12 px-4 rounded-xl bg-slate-800/80 border border-slate-700/50 text-white focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-all font-bold text-xs appearance-none"
                                             >
                                                 <option value="ALL_PRODUCTS">All Products</option>
+                                                <option value="IPPIS">IPPIS</option>
                                                 <option value="NOLT_RISE">NOLT Rise</option>
                                                 <option value="NOLT_VAULT">NOLT Vault</option>
                                                 <option value="NOLT_SURGE">NOLT Surge</option>
@@ -587,6 +656,153 @@ const StaffPromotionsPage: React.FC<StaffPromotionsPageProps> = ({ user, onLogou
                                 </button>
                             </div>
                         </form>
+                    </div>
+                </div>
+            )}
+            {/* Users Drawer */}
+            {selectedPromo && (
+                <div className={`fixed inset-0 z-50 flex justify-end transition-all duration-300 ${showUsersDrawer ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+                    <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={closeUsersDrawer} />
+                    <div className={`relative w-full max-w-2xl bg-white dark:bg-slate-900 shadow-2xl flex flex-col transition-transform duration-300 ${showUsersDrawer ? 'translate-x-0' : 'translate-x-full'}`}>
+                        {/* Drawer Header */}
+                        <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex justify-between items-start bg-white dark:bg-slate-900 shrink-0">
+                            <div className="space-y-1 flex-1 min-w-0">
+                                <div className="flex items-center gap-2">
+                                    <span className="material-symbols-outlined text-purple-500 text-xl">campaign</span>
+                                    <p className="text-xs font-black text-purple-500 uppercase tracking-widest">Campaign Users</p>
+                                </div>
+                                <h2 className="text-xl font-black text-slate-900 dark:text-white truncate">{selectedPromo.utm_campaign}</h2>
+                                <p className="text-xs text-slate-400 font-mono font-bold">{selectedPromo.unique_code}</p>
+                            </div>
+                            <div className="flex items-center gap-2 shrink-0">
+                                {promoUsers.length > 0 && (
+                                    <button
+                                        onClick={() => exportUsersCSV(selectedPromo, promoUsers)}
+                                        className="h-9 px-4 rounded-xl bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-bold text-xs hover:bg-emerald-100 dark:hover:bg-emerald-500/20 transition-all flex items-center gap-1.5"
+                                    >
+                                        <span className="material-symbols-outlined text-sm">download</span>
+                                        Export CSV
+                                    </button>
+                                )}
+                                <button onClick={closeUsersDrawer} className="size-9 rounded-full bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center justify-center transition-all">
+                                    <span className="material-symbols-outlined text-slate-400 hover:text-slate-900 dark:hover:text-white">close</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Drawer Stats */}
+                        <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 shrink-0">
+                            <div className="grid grid-cols-3 gap-4">
+                                <div className="text-center">
+                                    <p className="text-2xl font-black text-slate-900 dark:text-white">{promoUsers.length}</p>
+                                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Users</p>
+                                </div>
+                                <div className="text-center">
+                                    <p className="text-2xl font-black text-blue-500">{selectedPromo.clicks}</p>
+                                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Clicks</p>
+                                </div>
+                                <div className="text-center">
+                                    <p className="text-2xl font-black text-emerald-500">{selectedPromo.current_redemptions}</p>
+                                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Redemptions</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Drawer Content */}
+                        <div className="flex-1 overflow-y-auto p-6">
+                            {loadingUsers ? (
+                                <div className="py-16 flex flex-col items-center justify-center gap-3">
+                                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
+                                    <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Loading users...</p>
+                                </div>
+                            ) : promoUsers.length === 0 ? (
+                                <div className="py-16 text-center">
+                                    <div className="size-16 bg-slate-50 dark:bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-4 text-slate-400">
+                                        <span className="material-symbols-outlined text-3xl">person_off</span>
+                                    </div>
+                                    <h3 className="text-base font-black text-slate-900 dark:text-white uppercase">No Users Yet</h3>
+                                    <p className="text-xs text-slate-500 font-medium max-w-xs mx-auto mt-2">
+                                        No one has registered using this promotion link yet. Share the link to start tracking.
+                                    </p>
+                                </div>
+                            ) : (
+                                <div className="space-y-3">
+                                    {promoUsers.map((pu, idx) => (
+                                        <div key={pu.customer_id} className="p-4 bg-white dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700 hover:shadow-md transition-all">
+                                            <div className="flex items-start gap-3">
+                                                {/* Avatar */}
+                                                <div className="size-10 rounded-full bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center text-white font-black text-sm shrink-0 shadow-lg shadow-purple-500/20">
+                                                    {pu.full_name ? pu.full_name.charAt(0).toUpperCase() : '?'}
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="flex items-center justify-between gap-2">
+                                                        <p className="font-bold text-sm text-slate-900 dark:text-white truncate">{pu.full_name || 'Unknown'}</p>
+                                                        <span className="text-[9px] font-black text-slate-400 uppercase tracking-wider shrink-0">
+                                                            #{idx + 1}
+                                                        </span>
+                                                    </div>
+                                                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1">
+                                                        <span className="text-xs text-slate-500 font-medium flex items-center gap-1">
+                                                            <span className="material-symbols-outlined text-xs">mail</span>
+                                                            {pu.email || 'N/A'}
+                                                        </span>
+                                                        <span className="text-xs text-slate-500 font-medium flex items-center gap-1">
+                                                            <span className="material-symbols-outlined text-xs">call</span>
+                                                            {pu.phone_number || 'N/A'}
+                                                        </span>
+                                                    </div>
+                                                    <div className="flex flex-wrap items-center gap-2 mt-2">
+                                                        <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase bg-purple-50 text-purple-600 dark:bg-purple-500/10 dark:text-purple-400">
+                                                            Code: {pu.used_code}
+                                                        </span>
+                                                        <span className="text-[9px] font-bold text-slate-400">
+                                                            Joined {new Date(pu.registered_at).toLocaleDateString('en-NG', { day: 'numeric', month: 'short', year: 'numeric' })}
+                                                        </span>
+                                                    </div>
+                                                    {/* Investments & Loans */}
+                                                    {(pu.investments.length > 0 || pu.loans.length > 0) && (
+                                                        <div className="mt-3 pt-3 border-t border-slate-50 dark:border-slate-700 space-y-1.5">
+                                                            {pu.investments.map(inv => (
+                                                                <div key={inv.investment_id} className="flex items-center justify-between text-[10px]">
+                                                                    <span className="font-bold text-blue-600 dark:text-blue-400 flex items-center gap-1">
+                                                                        <span className="material-symbols-outlined text-xs">trending_up</span>
+                                                                        {inv.product_type?.replace('NOLT_', '').replace('_', ' ')}
+                                                                    </span>
+                                                                    <div className="flex items-center gap-2">
+                                                                        <span className="font-black text-slate-700 dark:text-slate-300">₦{Number(inv.amount).toLocaleString()}</span>
+                                                                        <span className={`px-1.5 py-0.5 rounded font-black uppercase ${
+                                                                            inv.status === 'active' ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10' :
+                                                                            inv.status === 'pending' ? 'bg-amber-50 text-amber-600 dark:bg-amber-500/10' :
+                                                                            'bg-slate-50 text-slate-400 dark:bg-slate-800'
+                                                                        }`}>{inv.status}</span>
+                                                                    </div>
+                                                                </div>
+                                                            ))}
+                                                            {pu.loans.map(loan => (
+                                                                <div key={loan.loan_id} className="flex items-center justify-between text-[10px]">
+                                                                    <span className="font-bold text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                                                                        <span className="material-symbols-outlined text-xs">account_balance</span>
+                                                                        Loan
+                                                                    </span>
+                                                                    <div className="flex items-center gap-2">
+                                                                        <span className="font-black text-slate-700 dark:text-slate-300">₦{Number(loan.amount).toLocaleString()}</span>
+                                                                        <span className={`px-1.5 py-0.5 rounded font-black uppercase ${
+                                                                            loan.status === 'approved' ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10' :
+                                                                            loan.status === 'pending' ? 'bg-amber-50 text-amber-600 dark:bg-amber-500/10' :
+                                                                            'bg-slate-50 text-slate-400 dark:bg-slate-800'
+                                                                        }`}>{loan.status}</span>
+                                                                    </div>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </div>
             )}
