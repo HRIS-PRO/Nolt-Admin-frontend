@@ -71,6 +71,8 @@ const StaffInvestmentsPage: React.FC<StaffInvestmentsPageProps> = ({ user, onLog
         nokName: '',
         nokRelationship: '',
         nokAddress: '',
+        nokPhoneNumber: '',
+        nokCountryCode: '+234',
         isNokSameAddress: false,
 
         // Corporate Profile
@@ -105,6 +107,12 @@ const StaffInvestmentsPage: React.FC<StaffInvestmentsPageProps> = ({ user, onLog
         paymentMethod: 'bank_transfer' as 'bank_transfer' | 'paystack',
         receiptUrl: ''
     });
+
+    useEffect(() => {
+        if (wizardData.plan === 'SURGE') {
+            setWizardData(prev => ({ ...prev, tenure: '365' }));
+        }
+    }, [wizardData.plan]);
 
     const individualDocs = React.useMemo(() => [
         { id: 'gov_id', label: 'Government ID', icon: 'badge', required: true },
@@ -159,7 +167,7 @@ const StaffInvestmentsPage: React.FC<StaffInvestmentsPageProps> = ({ user, onLog
                     plan: wizardData.plan,
                     currency: wizardData.currency,
                     amount: numericAmount,
-                    tenure: parseInt(wizardData.tenure) || 12
+                    tenure: wizardData.plan === 'SURGE' ? 365 : (parseInt(wizardData.tenure) || 30)
                 };
                 if (wizardData.plan === 'VAULT') {
                     payload.payout_frequency = wizardData.payoutFrequency;
@@ -179,9 +187,9 @@ const StaffInvestmentsPage: React.FC<StaffInvestmentsPageProps> = ({ user, onLog
 
     const returns = React.useMemo(() => {
         const principal = parseFloat(wizardData.amount) || 0;
-        const tenure = parseInt(wizardData.tenure) || 12;
+        const tenureToUse = wizardData.plan === 'SURGE' ? 365 : (parseInt(wizardData.tenure) || 30);
         const rateToUse = dynamicInterestRate ?? 0;
-        const interestEarned = (principal * rateToUse * (tenure / 365)) / 100;
+        const interestEarned = (principal * rateToUse * (tenureToUse / 365)) / 100;
         return { principal, interestEarned, total: principal + interestEarned };
     }, [wizardData.amount, wizardData.tenure, dynamicInterestRate]);
 
@@ -438,7 +446,7 @@ const StaffInvestmentsPage: React.FC<StaffInvestmentsPageProps> = ({ user, onLog
 
     const resetWizardData = () => {
         setWizardData({
-            entityType: 'INDIVIDUAL', email: '', phoneNumber: '', bvn: '', nin: '', tin: '', title: 'Mr', firstName: '', lastName: '', middleName: '', isPep: false, gender: '', dob: '', maidenName: '', religion: 'Prefer not to say', maritalStatus: 'Single', stateOfOrigin: 'Abia', stateOfResidence: 'Abia', homeAddress: '', nokName: '', nokRelationship: '', nokAddress: '', isNokSameAddress: false, companyName: '', rcNumber: '', isAuthorizedRep: false, incorpDate: '', businessAddress: '', businessNature: '', directorCount: 1, directors: [{ surname: '', firstName: '', middleName: '', phone: '', gender: '', dob: '', bvn: '', nin: '', isPep: false }], bankName: '', bankCode: '', accountNumber: '', accountName: '',
+            entityType: 'INDIVIDUAL', email: '', phoneNumber: '', bvn: '', nin: '', tin: '', title: 'Mr', firstName: '', lastName: '', middleName: '', isPep: false, gender: '', dob: '', maidenName: '', religion: 'Prefer not to say', maritalStatus: 'Single', stateOfOrigin: 'Abia', stateOfResidence: 'Abia', homeAddress: '', nokName: '', nokRelationship: '', nokAddress: '', nokPhoneNumber: '', nokCountryCode: '+234', isNokSameAddress: false, companyName: '', rcNumber: '', isAuthorizedRep: false, incorpDate: '', businessAddress: '', businessNature: '', directorCount: 1, directors: [{ surname: '', firstName: '', middleName: '', phone: '', gender: '', dob: '', bvn: '', nin: '', isPep: false }], bankName: '', bankCode: '', accountNumber: '', accountName: '',
             uploadedDocs: {}, plan: 'RISE', amount: '', targetAmount: '', payoutFrequency: 'monthly', tenure: '365', currency: 'NGN', rollover: 'principal_interest', paymentMethod: 'bank_transfer', receiptUrl: ''
         });
         setWizardStep(1);
@@ -470,7 +478,7 @@ const StaffInvestmentsPage: React.FC<StaffInvestmentsPageProps> = ({ user, onLog
         if (step === 2) {
             if (wizardData.entityType === 'INDIVIDUAL') {
                 if (!d.homeAddress) { alert("Home address is required"); return false; }
-                if (!d.nokName || !d.nokRelationship || !d.nokAddress) { alert("All Next of Kin details are required"); return false; }
+                if (!d.nokName || !d.nokRelationship || !d.nokAddress || !d.nokPhoneNumber) { alert("All Next of Kin details are required"); return false; }
             }
             if (!d.bankName || !d.accountNumber || d.accountNumber.length < 10) { alert("Valid bank details (10-digit account) are required"); return false; }
             if (!d.accountName) { alert("Account name must be resolved before proceeding"); return false; }
@@ -528,6 +536,7 @@ const StaffInvestmentsPage: React.FC<StaffInvestmentsPageProps> = ({ user, onLog
                 nokName: wizardData.nokName,
                 nokRelationship: wizardData.nokRelationship,
                 nokAddress: wizardData.nokAddress,
+                nok_phone_number: `${wizardData.nokCountryCode}${wizardData.nokPhoneNumber}`,
 
                 // Bank
                 bankName: wizardData.bankName,
@@ -951,6 +960,25 @@ const StaffInvestmentsPage: React.FC<StaffInvestmentsPageProps> = ({ user, onLog
                                                     <option value="Other">Other</option>
                                                 </select>
                                             </div>
+                                            <div className="space-y-2 col-span-2">
+                                                <label className="text-[10px] font-black uppercase text-slate-400 px-1">Phone Number</label>
+                                                <div className="flex gap-2">
+                                                    <input
+                                                        type="text"
+                                                        placeholder="+234"
+                                                        value={wizardData.nokCountryCode}
+                                                        onChange={e => setWizardData({ ...wizardData, nokCountryCode: e.target.value })}
+                                                        className="w-20 h-14 px-3 rounded-2xl bg-slate-50 dark:bg-slate-800 border-none focus:ring-2 focus:ring-purple-500 transition-all font-bold text-sm"
+                                                    />
+                                                    <input
+                                                        type="tel"
+                                                        placeholder="8012345678"
+                                                        value={wizardData.nokPhoneNumber}
+                                                        onChange={e => setWizardData({ ...wizardData, nokPhoneNumber: e.target.value.replace(/\D/g, "") })}
+                                                        className="flex-1 h-14 px-5 rounded-2xl bg-slate-50 dark:bg-slate-800 border-none focus:ring-2 focus:ring-purple-500 transition-all font-bold text-sm"
+                                                    />
+                                                </div>
+                                            </div>
                                         </div>
                                         <div className="space-y-2">
                                             <div className="flex justify-between items-center px-1">
@@ -1097,31 +1125,33 @@ const StaffInvestmentsPage: React.FC<StaffInvestmentsPageProps> = ({ user, onLog
                                                     <input type="number" value={wizardData.amount} onChange={e => setWizardData({ ...wizardData, amount: e.target.value })} className="w-full h-14 pl-10 pr-5 rounded-2xl bg-slate-50 dark:bg-slate-800 border-none focus:ring-2 focus:ring-purple-500 transition-all font-bold text-sm" placeholder="0.00" />
                                                 </div>
                                             </div>
-                                            <div className="space-y-3">
-                                                <div className="flex justify-between items-center px-1">
-                                                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Tenure (Days)</label>
-                                                    <span className="text-xs font-black text-purple-600">{wizardData.tenure} Days</span>
-                                                </div>
-                                                <div className="relative pt-2">
-                                                    <input
-                                                        type="range"
-                                                        min="0"
-                                                        max={TENURE_VALUES.length - 1}
-                                                        step="1"
-                                                        value={TENURE_VALUES.indexOf(parseInt(wizardData.tenure)) !== -1 ? TENURE_VALUES.indexOf(parseInt(wizardData.tenure)) : TENURE_VALUES.length - 1}
-                                                        onChange={(e) => {
-                                                            const newTenure = TENURE_VALUES[parseInt(e.target.value)];
-                                                            setWizardData({ ...wizardData, tenure: newTenure.toString() });
-                                                        }}
-                                                        className="w-full h-2 bg-slate-100 dark:bg-slate-800 rounded-lg appearance-none cursor-pointer accent-purple-600"
-                                                    />
-                                                    <div className="flex justify-between mt-2 px-1">
-                                                        <span className="text-[9px] font-bold text-slate-400">30D</span>
-                                                        <span className="text-[9px] font-bold text-slate-400">180D</span>
-                                                        <span className="text-[9px] font-bold text-slate-400">365D</span>
+                                            {wizardData.plan !== 'SURGE' && (
+                                                <div className="space-y-3">
+                                                    <div className="flex justify-between items-center px-1">
+                                                        <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Tenure (Days)</label>
+                                                        <span className="text-xs font-black text-purple-600">{wizardData.tenure} Days</span>
+                                                    </div>
+                                                    <div className="relative pt-2">
+                                                        <input
+                                                            type="range"
+                                                            min="0"
+                                                            max={TENURE_VALUES.length - 1}
+                                                            step="1"
+                                                            value={TENURE_VALUES.indexOf(parseInt(wizardData.tenure)) !== -1 ? TENURE_VALUES.indexOf(parseInt(wizardData.tenure)) : TENURE_VALUES.length - 1}
+                                                            onChange={(e) => {
+                                                                const newTenure = TENURE_VALUES[parseInt(e.target.value)];
+                                                                setWizardData({ ...wizardData, tenure: newTenure.toString() });
+                                                            }}
+                                                            className="w-full h-2 bg-slate-100 dark:bg-slate-800 rounded-lg appearance-none cursor-pointer accent-purple-600"
+                                                        />
+                                                        <div className="flex justify-between mt-2 px-1">
+                                                            <span className="text-[9px] font-bold text-slate-400">30D</span>
+                                                            <span className="text-[9px] font-bold text-slate-400">180D</span>
+                                                            <span className="text-[9px] font-bold text-slate-400">365D</span>
+                                                        </div>
                                                     </div>
                                                 </div>
-                                            </div>
+                                            )}
                                         </div>
 
                                         <div className="grid grid-cols-2 gap-6">

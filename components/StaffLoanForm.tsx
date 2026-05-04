@@ -179,6 +179,13 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess, initi
         proof_address: null
     });
 
+    // Next of Kin
+    const [nokName, setNokName] = useState('');
+    const [nokRelationship, setNokRelationship] = useState('');
+    const [nokAddress, setNokAddress] = useState('');
+    const [nokPhoneNumber, setNokPhoneNumber] = useState('');
+    const [nokCountryCode, setNokCountryCode] = useState('+234');
+
     // References
     const [references, setReferences] = useState([
         { fullName: '', phoneNumber: '', relationship: '', address: '' }
@@ -248,6 +255,20 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess, initi
                 // Ensure references array matches structure or fallback
                 const refs = Array.isArray(initialData.customer_references) ? initialData.customer_references : [];
                 if (refs.length > 0) setReferences(refs);
+            }
+
+            // Populate NOK
+            setNokName(initialData.nok_name || '');
+            setNokRelationship(initialData.nok_relationship || '');
+            setNokAddress(initialData.nok_address || '');
+            if (initialData.nok_phone_number) {
+                const phone = initialData.nok_phone_number;
+                if (phone.startsWith('+')) {
+                    setNokCountryCode(phone.substring(0, 4));
+                    setNokPhoneNumber(phone.substring(4));
+                } else {
+                    setNokPhoneNumber(phone);
+                }
             }
 
             // Bank Details
@@ -519,6 +540,15 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess, initi
             }
 
             if (step === 5) { // References
+                if (!nokName.trim()) newErrors.nokName = "Required";
+                if (!nokRelationship) newErrors.nokRelationship = "Required";
+                if (!nokPhoneNumber) {
+                    newErrors.nokPhoneNumber = "Required";
+                } else if (nokPhoneNumber.length < 10) {
+                    newErrors.nokPhoneNumber = "Invalid Number";
+                }
+                if (!nokAddress.trim()) newErrors.nokAddress = "Required";
+
                 references.forEach((ref, idx) => {
                     // All fields required for any added reference
                     if (!ref.fullName?.trim()) newErrors[`ref_${idx}_fullName`] = "Required";
@@ -616,6 +646,12 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess, initi
                     proof_of_residence_url: uploadedDocs.proof_address?.url,
                     selfie_verification_url: uploadedDocs.selfie?.url,
                     references,
+
+                    // Next of Kin
+                    nok_name: nokName,
+                    nok_relationship: nokRelationship,
+                    nok_address: nokAddress,
+                    nok_phone_number: `${nokCountryCode}${nokPhoneNumber}`,
 
                     bank_name: bankName,
                     account_number: accountNumber,
@@ -1226,11 +1262,92 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess, initi
 
                             {step === 5 && (
                                 <div className="space-y-6 animate-in fade-in slide-in-from-right-8 duration-500">
-                                    <div className="flex justify-between items-center mb-4">
-                                        <h3 className="text-lg font-black dark:text-white">References</h3>
+                                    {/* Next of Kin Section */}
+                                    <div className="p-6 bg-slate-50 dark:bg-slate-800/50 rounded-3xl border border-slate-100 dark:border-slate-800 space-y-4">
+                                        <div className="flex items-center gap-3 mb-2">
+                                            <div className="size-8 rounded-full bg-primary text-white flex items-center justify-center">
+                                                <span className="material-symbols-outlined text-base">family_history</span>
+                                            </div>
+                                            <h3 className="text-lg font-black dark:text-white uppercase tracking-wider">Next of Kin</h3>
+                                        </div>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            <InputGroup label="Full Name" required error={errors.nokName}>
+                                                <input
+                                                    className="input-field"
+                                                    value={nokName}
+                                                    onChange={e => { setNokName(e.target.value); if(errors.nokName) setErrors(prev => { const n = {...prev}; delete n.nokName; return n; }); }}
+                                                    placeholder="Enter Full Name"
+                                                />
+                                            </InputGroup>
+                                            <InputGroup label="Relationship" required error={errors.nokRelationship}>
+                                                <select
+                                                    className="input-field"
+                                                    value={nokRelationship}
+                                                    onChange={e => { setNokRelationship(e.target.value); if(errors.nokRelationship) setErrors(prev => { const n = {...prev}; delete n.nokRelationship; return n; }); }}
+                                                >
+                                                    <option value="">Select Relationship</option>
+                                                    <option value="Husband">Husband</option>
+                                                    <option value="Wife">Wife</option>
+                                                    <option value="Brother">Brother</option>
+                                                    <option value="Sister">Sister</option>
+                                                    <option value="Mother">Mother</option>
+                                                    <option value="Father">Father</option>
+                                                    <option value="Son">Son</option>
+                                                    <option value="Daughter">Daughter</option>
+                                                    <option value="Other">Other</option>
+                                                </select>
+                                            </InputGroup>
+                                            <InputGroup label="Phone Number" required error={errors.nokPhoneNumber}>
+                                                <div className="flex gap-2">
+                                                    <select
+                                                        className="input-field !w-24 px-2 text-center"
+                                                        value={nokCountryCode}
+                                                        onChange={e => setNokCountryCode(e.target.value)}
+                                                    >
+                                                        <option value="+234">+234</option>
+                                                    </select>
+                                                    <input
+                                                        className="input-field flex-1"
+                                                        value={nokPhoneNumber}
+                                                        onChange={e => {
+                                                            const val = e.target.value.replace(/\D/g, '');
+                                                            if (val.length <= 11) {
+                                                                setNokPhoneNumber(val);
+                                                                if(errors.nokPhoneNumber) setErrors(prev => { const n = {...prev}; delete n.nokPhoneNumber; return n; });
+                                                            }
+                                                        }}
+                                                        placeholder="8012345678"
+                                                    />
+                                                </div>
+                                            </InputGroup>
+                                            <InputGroup label="Contact Address" required error={errors.nokAddress}>
+                                                <div className="relative">
+                                                    <input
+                                                        className="input-field"
+                                                        value={nokAddress}
+                                                        onChange={e => { setNokAddress(e.target.value); if(errors.nokAddress) setErrors(prev => { const n = {...prev}; delete n.nokAddress; return n; }); }}
+                                                        placeholder="Full Home Address"
+                                                    />
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            setNokAddress(address);
+                                                            if(errors.nokAddress) setErrors(prev => { const n = {...prev}; delete n.nokAddress; return n; });
+                                                        }}
+                                                        className="absolute right-4 top-1/2 -translate-y-1/2 text-[10px] font-black text-primary uppercase tracking-widest hover:underline"
+                                                    >
+                                                        Same as mine
+                                                    </button>
+                                                </div>
+                                            </InputGroup>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex justify-between items-center mb-4 mt-8">
+                                        <h3 className="text-lg font-black dark:text-white uppercase tracking-wider">References</h3>
                                         <button onClick={addReference} className="text-sm font-bold text-primary flex items-center gap-1 hover:text-primary/80 transition-colors">
                                             <span className="material-symbols-outlined text-lg">add_circle</span>
-                                            Add Reference / Next of kin
+                                            Add Reference
                                         </button>
                                     </div>
                                     {references.map((ref, idx) => (

@@ -197,17 +197,22 @@ const StaffInvestmentDetailsPage: React.FC<StaffInvestmentDetailsPageProps> = ({
     }, [id, navigate]);
 
     const handleAction = async (action: 'approve' | 'reject' | 'return', targetStage?: string) => {
+        if (action === 'reject' && !reason.trim()) {
+            alert("Please provide a reason for rejection in the comment box.");
+            return;
+        }
+
         if (action !== 'return') {
             if (!confirm(`Are you sure you want to ${action} this investment at the current stage?`)) return;
         }
         setIsActioning(true);
         try {
-            const payload: any = { action };
+            const payload: any = { action, reason };
             if (action === 'return') {
                 payload.target_stage = targetStage;
-                payload.reason = reason;
             }
             await axios.put(`/api/staff/investments/${id}/action`, payload, { withCredentials: true });
+            setReason('');
             await fetchInvestment(); // Re-fetch to see updated stage
         } catch (error: any) {
             console.error(`Failed to ${action} investment`, error);
@@ -262,10 +267,16 @@ const StaffInvestmentDetailsPage: React.FC<StaffInvestmentDetailsPageProps> = ({
     };
 
     const handleLiquidationAction = async (action: 'APPROVE' | 'REJECT') => {
+        if (action === 'REJECT' && !reason.trim()) {
+            alert("Please provide a reason for rejection in the comment box.");
+            return;
+        }
+
         if (!confirm(`Are you sure you want to ${action} this liquidation request?`)) return;
         setIsActioning(true);
         try {
-            await axios.post(`/api/staff/investments/${id}/liquidate-action`, { action }, { withCredentials: true });
+            await axios.post(`/api/staff/investments/${id}/liquidate-action`, { action, note: reason }, { withCredentials: true });
+            setReason('');
             await fetchInvestment();
         } catch (error: any) {
             console.error(`Failed to ${action} liquidation`, error);
@@ -1114,7 +1125,20 @@ const StaffInvestmentDetailsPage: React.FC<StaffInvestmentDetailsPageProps> = ({
                             
                                                             if (canApproveLiq) {
                                                                 return (
-                                                                    <div className="flex gap-3 relative z-10">
+                                                                    <div className="space-y-4 relative z-10">
+                                                                        <div className="bg-slate-50 dark:bg-slate-800/50 rounded-2xl p-4 border border-slate-100 dark:border-slate-800/60">
+                                                                            <div className="flex items-center gap-2 mb-3">
+                                                                                <span className="material-symbols-outlined text-slate-400 text-sm">chat_bubble</span>
+                                                                                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Liquidation Comment / Note</label>
+                                                                            </div>
+                                                                            <textarea
+                                                                                value={reason}
+                                                                                onChange={(e) => setReason(e.target.value)}
+                                                                                placeholder="Add a remark for this liquidation decision (required for rejection)..."
+                                                                                className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 text-sm text-slate-900 dark:text-white placeholder:text-slate-400 focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all outline-none min-h-[80px] resize-none"
+                                                                            />
+                                                                        </div>
+                                                                        <div className="flex gap-3">
                                                                         <button
                                                                             onClick={() => handleLiquidationAction('REJECT')}
                                                                             disabled={isActioning}
@@ -1130,7 +1154,8 @@ const StaffInvestmentDetailsPage: React.FC<StaffInvestmentDetailsPageProps> = ({
                                                                             {isActioning ? 'Processing...' : 'Approve & Pass'}
                                                                         </button>
                                                                     </div>
-                                                                );
+                                                                </div>
+                                                            );
                                                             }
                                                             return (
                                                                 <div className="relative z-10 text-center bg-slate-50 dark:bg-slate-800/50 py-2 px-3 rounded-lg">
@@ -1205,6 +1230,15 @@ const StaffInvestmentDetailsPage: React.FC<StaffInvestmentDetailsPageProps> = ({
                                                                 <div className="mt-6 pt-6 border-t border-slate-100 dark:border-slate-800/60">
                                                                     <p className="text-xs text-slate-500 mb-4 text-center">You have the necessary permissions to review this stage.</p>
                                                                     <div className="flex flex-col gap-3">
+                                                                        <div className="mb-2">
+                                                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block px-1">Review Comment / Reason</label>
+                                                                            <textarea
+                                                                                value={reason}
+                                                                                onChange={(e) => setReason(e.target.value)}
+                                                                                placeholder="Add a comment for this action (required for rejection)..."
+                                                                                className="w-full bg-slate-50 dark:bg-slate-800 border-none rounded-2xl px-4 py-3 text-sm text-slate-900 dark:text-white placeholder:text-slate-500 focus:ring-2 focus:ring-slate-500/20 transition-all outline-none min-h-[100px] resize-none font-medium"
+                                                                            />
+                                                                        </div>
                                                                         <button
                                                                             onClick={() => handleAction('approve')}
                                                                             disabled={isActioning}

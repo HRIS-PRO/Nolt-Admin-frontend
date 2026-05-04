@@ -121,6 +121,8 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
   const [nokName, setNokName] = useState(initialDraft?.data?.nokName ?? '');
   const [nokRelationship, setNokRelationship] = useState(initialDraft?.data?.nokRelationship ?? '');
   const [nokAddress, setNokAddress] = useState(initialDraft?.data?.nokAddress ?? '');
+  const [nokPhoneNumber, setNokPhoneNumber] = useState(initialDraft?.data?.nokPhoneNumber ?? '');
+  const [nokCountryCode, setNokCountryCode] = useState(initialDraft?.data?.nokCountryCode ?? '+234');
   const [isNokSameAddress, setIsNokSameAddress] = useState(false);
 
   // Sync fullName for Individuals
@@ -134,6 +136,13 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
   useEffect(() => {
     if (isNokSameAddress) setNokAddress(homeAddress);
   }, [isNokSameAddress, homeAddress]);
+
+  useEffect(() => {
+    if (selectedPlan === 'SURGE') {
+      setTenure(365);
+      setIsInfinityTenure(false);
+    }
+  }, [selectedPlan]);
 
 
 
@@ -521,7 +530,7 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
           plan: selectedPlan,
           currency,
           amount: numericAmount,
-          tenure
+          tenure: selectedPlan === 'SURGE' ? 365 : tenure
         };
         
         if (selectedPlan === 'VAULT') {
@@ -554,7 +563,8 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
   const returns = useMemo(() => {
     const principal = parseFloat(amount.replace(/[^0-9.]/g, '')) || 0;
     const rateToUse = interestRate;
-    const interestEarned = (principal * rateToUse * (tenure / 365)) / 100;
+    const tenureToUse = selectedPlan === 'SURGE' ? 365 : tenure;
+    const interestEarned = (principal * rateToUse * (tenureToUse / 365)) / 100;
     return { principal, interestEarned, total: principal + interestEarned };
   }, [amount, tenure, interestRate]);
 
@@ -577,7 +587,7 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
         selectedPlan, currency, amount, tenure, rollover, targetAmount, payoutFrequency,
         entityType, title, fullName, surname, firstName, middleName, isOnBehalf, representativeRelation, isPep,
         gender, dob, maidenName, religion, maritalStatus, countryCode, mobileNumber, contactEmail, bvn, nin,
-        stateOfOrigin, stateOfResidence, homeAddress, nokName, nokRelationship, nokAddress,
+        stateOfOrigin, stateOfResidence, homeAddress, nokName, nokRelationship, nokAddress, nokPhoneNumber, nokCountryCode,
         companyName, businessAddress, incorpDate, rcNumber, businessNature, directors,
         isAuthorizedRep, authRepPhone, tin, tinNumber, uploadedDocs, isTopUp, casaNumber, giftToken, isClaimingGift, originalInvestmentId
       }
@@ -839,7 +849,7 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
         title, gender, dob, mother_maiden_name: maidenName, religion, marital_status: maritalStatus,
         is_pep: isPep,
         directors_are_pep: isPep, // Corporate PEP flag
-        nok_name: nokName, nok_relationship: nokRelationship, nok_address: nokAddress,
+        nok_name: nokName, nok_relationship: nokRelationship, nok_address: nokAddress, nok_phone_number: `${nokCountryCode}${nokPhoneNumber}`,
         target_amount: targetAmount, rollover_option: rollover, 
         ...(selectedPlan === 'VAULT' ? { payout_frequency: payoutFrequency } : {}),
         interest_rate: dynamicInterestRate,
@@ -1658,6 +1668,23 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
                   <option value="Other">Other</option>
                 </select>
               </div>
+              <div className="space-y-2">
+                <label className="text-sm font-black text-slate-500 uppercase tracking-widest px-1">Phone Number</label>
+                <div className="flex gap-2">
+                  <input
+                    className="w-24 h-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-4 text-lg font-bold dark:text-white focus:ring-2 focus:ring-primary outline-none transition-all"
+                    value={nokCountryCode}
+                    onChange={e => setNokCountryCode(e.target.value)}
+                    placeholder="+234"
+                  />
+                  <input
+                    className="flex-1 h-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-6 text-lg font-bold dark:text-white focus:ring-2 focus:ring-primary outline-none transition-all"
+                    value={nokPhoneNumber}
+                    onChange={e => setNokPhoneNumber(e.target.value.replace(/\D/g, ''))}
+                    placeholder="e.g. 08012345678"
+                  />
+                </div>
+              </div>
             </div>
             <div className="space-y-4">
               <div className="flex justify-between items-center group">
@@ -1691,7 +1718,7 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
               </div>
             </div>
           </div>
-          <NavActions isNextDisabled={!nokName || !nokRelationship} />
+          <NavActions isNextDisabled={!nokName || !nokRelationship || !nokPhoneNumber || !nokAddress} />
         </div>
       )}
 
@@ -1910,27 +1937,11 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
                 </div>
               )}
 
-              <div className="space-y-6">
-                <div className="flex justify-between items-center">
-                  <label className="text-sm font-black text-slate-500 uppercase tracking-widest">Tenure (Days)</label>
-                  <div className="flex items-center gap-4">
-                    {selectedPlan === 'SURGE' && (
-                      <label className="flex items-center gap-2 cursor-pointer group">
-                        <div className="relative flex items-center">
-                          <input
-                            disabled={isClaimingGift}
-                            type="checkbox"
-                            checked={isInfinityTenure}
-                            onChange={e => setIsInfinityTenure(e.target.checked)}
-                            className="peer size-5 appearance-none rounded border-2 border-slate-300 dark:border-slate-700 checked:bg-primary checked:border-primary transition-all cursor-pointer"
-                          />
-                          <span className="absolute inset-0 flex items-center justify-center text-white opacity-0 peer-checked:opacity-100 transition-opacity pointer-events-none">
-                            <span className="material-symbols-outlined text-sm font-bold">all_inclusive</span>
-                          </span>
-                        </div>
-                        <span className="text-xs font-black uppercase tracking-widest text-slate-400 group-hover:text-primary transition-colors">Infinity</span>
-                      </label>
-                    )}
+              {selectedPlan !== 'SURGE' && (
+                <div className="space-y-6">
+                  <div className="flex justify-between items-center">
+                    <label className="text-sm font-black text-slate-500 uppercase tracking-widest">Tenure (Days)</label>
+                    <div className="flex items-center gap-4">
                     <span className="bg-primary text-white font-black px-6 py-2 rounded-full text-sm">
                       {isInfinityTenure ? '∞' : `${tenure} Days`}
                     </span>
@@ -1961,12 +1972,9 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
                     className="w-full h-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-6 text-lg font-bold dark:text-white opacity-70"
                   />
                 )}
-                <div className="flex justify-between text-[10px] font-black text-slate-400 uppercase tracking-widest px-1 mt-4">
-                  <span>{(selectedPlan === 'VAULT' && currency === 'NGN') || selectedPlan === 'SURGE' ? (selectedPlan === 'SURGE' ? 'Flexible' : '30 Days') : '90 Days'}</span>
-                  <span>{selectedPlan === 'SURGE' ? '5 Years' : '2 Year'}</span>
                 </div>
-              </div>
-              <div className="space-y-4">
+            )}
+            <div className="space-y-4">
                 <div className="flex items-center gap-2">
                   <label className="text-sm font-black text-slate-500 uppercase tracking-widest">Rollover Instruction</label>
                   <button onClick={() => setShowRolloverInfo(!showRolloverInfo)} className="text-slate-400 hover:text-primary transition-colors">
@@ -1994,7 +2002,7 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
                 <h3 className="text-xl font-black uppercase tracking-widest">Returns Estimate</h3>
                 <div className="bg-white/5 p-8 rounded-3xl border border-white/10 ring-2 ring-primary/20">
                   <p className="text-xs font-bold text-slate-400 uppercase tracking-[0.2em] mb-3">Expected Maturity Value</p>
-                  <span className="text-5xl font-black text-primary">{formatMoney(returns.total, currency)}</span>
+                  <span className="text-5xl font-black text-primary">{formatMoney(returns.total, currency)} <span className='text-sm'>Est</span></span>
                 </div>
                 <div className="space-y-4 pt-4 border-t border-white/10">
                   <div className="flex justify-between text-sm font-bold">
