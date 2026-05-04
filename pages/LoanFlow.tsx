@@ -100,6 +100,12 @@ const LoanFlow: React.FC<LoanFlowProps> = ({ initialStep, onComplete, navigate, 
   const [ippisNumber, setIppisNumber] = useState(initialDraft?.data?.ippisNumber ?? '');
   const [staffId, setStaffId] = useState(initialDraft?.data?.staffId ?? '');
   const [referralCode, setReferralCode] = useState(referralCodeUsed || initialDraft?.data?.referralCode || '');
+  const [nokName, setNokName] = useState(initialDraft?.data?.nokName ?? '');
+  const [nokRelationship, setNokRelationship] = useState(initialDraft?.data?.nokRelationship ?? '');
+  const [nokAddress, setNokAddress] = useState(initialDraft?.data?.nokAddress ?? '');
+  const [nokPhoneNumber, setNokPhoneNumber] = useState(initialDraft?.data?.nokPhoneNumber ?? '');
+  const [nokCountryCode, setNokCountryCode] = useState(initialDraft?.data?.nokCountryCode ?? '+234');
+  const [isNokSameAddress, setIsNokSameAddress] = useState(false);
   const [submitting, setSubmitting] = useState(false)
 
   // Bank Details
@@ -221,7 +227,13 @@ const LoanFlow: React.FC<LoanFlowProps> = ({ initialStep, onComplete, navigate, 
         bank_name: bankDetails.bankName,
         account_number: bankDetails.accountNumber,
         account_name: bankDetails.accountName,
-        loan_type: currentLoanLabel
+        loan_type: currentLoanLabel,
+
+        // Next of Kin
+        nok_name: nokName,
+        nok_relationship: nokRelationship,
+        nok_address: nokAddress,
+        nok_phone_number: `${nokCountryCode}${nokPhoneNumber}`
       };
 
       console.log("Submitting Loan Payload:", payload);
@@ -475,6 +487,7 @@ const LoanFlow: React.FC<LoanFlowProps> = ({ initialStep, onComplete, navigate, 
         homeAddress, residentialStatus, dependents, hasActiveLoans, monthlyIncome, uploadedDocs,
         references, desiredAmount, repaymentPeriod, hasSigned, acceptedIndemnity,
         mda, customMda, ippisNumber, staffId, referralCode,
+        nokName, nokRelationship, nokAddress, nokPhoneNumber, nokCountryCode,
         bankDetails // Added bank details to draft
       }
     };
@@ -1231,8 +1244,45 @@ const LoanFlow: React.FC<LoanFlowProps> = ({ initialStep, onComplete, navigate, 
           {/* Step 11: References (Adjusted from 10 to 11) */}
           {subStep === 11 && (
             <div className="space-y-8 animate-in fade-in slide-in-from-right-4 duration-500">
-              <h2 className="text-3xl font-black dark:text-white">References / Next of kin</h2>
-              <p className="text-slate-500 font-medium">Please provide 3 professional or personal contacts.</p>
+              <h2 className="text-3xl font-black dark:text-white">Next of Kin</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <label className="text-sm font-black text-slate-500 uppercase">Full Name</label>
+                  <input className="w-full h-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-6 text-lg font-bold dark:text-white focus:border-primary outline-none transition-all" value={nokName} onChange={e => setNokName(e.target.value)} placeholder="e.g. Jane Doe" />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-black text-slate-500 uppercase">Relationship</label>
+                  <select className="w-full h-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-6 text-lg font-bold dark:text-white focus:border-primary outline-none" value={nokRelationship} onChange={e => setNokRelationship(e.target.value)}>
+                    <option value="">Select Relationship</option>
+                    <option value="Spouse">Spouse</option>
+                    <option value="Parent">Parent</option>
+                    <option value="Sibling">Sibling</option>
+                    <option value="Child">Child</option>
+                    <option value="Relative">Relative</option>
+                    <option value="Friend">Friend</option>
+                    <option value="Other">Other</option>
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-black text-slate-500 uppercase">Phone Number</label>
+                  <div className="flex gap-2">
+                    <input className="w-24 h-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-4 text-lg font-bold dark:text-white focus:border-primary outline-none" value={nokCountryCode} onChange={e => setNokCountryCode(e.target.value)} placeholder="+234" />
+                    <input type="tel" className="flex-1 h-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-6 text-lg font-bold dark:text-white focus:border-primary outline-none" value={nokPhoneNumber} onChange={e => setNokPhoneNumber(e.target.value.replace(/\D/g, ''))} placeholder="08012345678" />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center">
+                    <label className="text-sm font-black text-slate-500 uppercase">Contact Address</label>
+                    <button onClick={() => { setIsNokSameAddress(!isNokSameAddress); if (!isNokSameAddress) setNokAddress(homeAddress); }} className={`text-[10px] font-black uppercase px-3 py-1 rounded-full transition-all ${isNokSameAddress ? 'bg-primary text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-500'}`}>Same as mine</button>
+                  </div>
+                  <input className="w-full h-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-6 text-lg font-bold dark:text-white focus:border-primary outline-none" value={nokAddress} onChange={e => { setNokAddress(e.target.value); setIsNokSameAddress(false); }} placeholder="Full residential address" />
+                </div>
+              </div>
+
+              <div className="pt-8 border-t border-slate-100 dark:border-slate-700">
+                <h2 className="text-3xl font-black dark:text-white">References</h2>
+                <p className="text-slate-500 font-medium">Please provide at least 1 professional or personal contact.</p>
+              </div>
               <div className="space-y-6">
                 <div className="flex justify-between items-center mb-4">
                   <button onClick={addReference} className="text-sm font-bold text-primary flex items-center gap-1 hover:text-primary/80 transition-colors">
@@ -1271,7 +1321,10 @@ const LoanFlow: React.FC<LoanFlowProps> = ({ initialStep, onComplete, navigate, 
                   </div>
                 ))}
               </div>
-              <NavActions isNextDisabled={!references[0]?.name || !references[0]?.phone || !references[0]?.relationship} />
+              <NavActions isNextDisabled={
+                !nokName || !nokRelationship || !nokPhoneNumber || !nokAddress ||
+                !references[0]?.name || !references[0]?.phone || !references[0]?.relationship
+              } />
             </div>
           )}
 

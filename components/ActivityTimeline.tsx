@@ -167,10 +167,12 @@ const ActivityTimeline: React.FC<ActivityTimelineProps> = ({ loanId, investmentI
                                                     {/* Full Content */}
                                                     <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-800/50 text-xs text-slate-700 dark:text-slate-300 leading-relaxed font-mono">
                                                         {isComment ? item.comment : item.description}
-                                                        {item.metadata?.reason && (
+                                                        {(item.metadata?.reason || item.metadata?.note) && (
                                                             <div className="mt-2 pt-2 border-t border-slate-200 dark:border-slate-700">
-                                                                <span className="font-bold text-xs uppercase tracking-wider text-slate-400 block mb-1">Legacy Reason</span>
-                                                                {item.metadata.reason}
+                                                                <span className="font-bold text-[9px] uppercase tracking-widest text-slate-400 block mb-1">Staff Remark</span>
+                                                                <p className="text-xs font-medium text-slate-600 dark:text-slate-400 italic">
+                                                                    "{item.metadata.reason || item.metadata.note}"
+                                                                </p>
                                                             </div>
                                                         )}
                                                     </div>
