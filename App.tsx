@@ -36,6 +36,7 @@ import ClaimGiftPage from './pages/investment/ClaimGiftPage';
 import ProfilePage from './pages/ProfilePage';
 import StaffPromotionsPage from './pages/StaffPromotionsPage';
 import StaffCalculatorPage from './pages/StaffCalculatorPage';
+import ProductsPage from './pages/ProductsPage';
 import LogoutWarningModal from './components/modals/LogoutWarningModal';
 import JointAcceptancePage from './pages/investment/JointAcceptancePage';
 
@@ -496,6 +497,16 @@ const AppContent: React.FC = () => {
         <Route path="/staff/promotions" element={
           isLoading ? null : (user.isLoggedIn && user.role !== 'customer' ? (
             <StaffPromotionsPage
+              user={user}
+              onLogout={handleLogoutRequest}
+              toggleTheme={toggleTheme}
+              theme={theme}
+            />
+          ) : <Navigate to="/login" />)
+        } />
+        <Route path="/staff/products" element={
+          isLoading ? null : (user.isLoggedIn && user.role !== 'customer' ? (
+            <ProductsPage
               user={user}
               onLogout={handleLogoutRequest}
               toggleTheme={toggleTheme}

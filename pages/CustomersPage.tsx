@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import StaffLayout from '../components/layouts/StaffLayout';
 import axios from 'axios';
 import CustomerDetailsDrawer from '../components/drawers/CustomerDetailsDrawer';
+import NewCustomerModal from '../components/modals/NewCustomerModal';
 import { formatDate } from '../utils/dateFormatter';
 
 interface Customer {
@@ -50,6 +51,7 @@ const CustomersPage: React.FC<CustomersPageProps> = ({ user, onLogout, toggleThe
     const [searchTerm, setSearchTerm] = useState('');
     const [isDrawerOpen, setIsDrawerOpen] = useState(false);
     const [drawerCustomerId, setDrawerCustomerId] = useState<number | null>(null);
+    const [isNewCustomerModalOpen, setIsNewCustomerModalOpen] = useState(false);
 
     // Pagination
     const [currentPage, setCurrentPage] = useState(1);
@@ -223,16 +225,16 @@ const CustomersPage: React.FC<CustomersPageProps> = ({ user, onLogout, toggleThe
 
     return (
         <StaffLayout user={user} onLogout={onLogout} toggleTheme={toggleTheme} theme={theme}>
-            <header className="flex flex-col md:flex-row justify-between md:items-end gap-6 mb-8">
+            <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-8">
                 <div>
-                    <h1 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight leading-tight">
-                        Customers
+                    <h1 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight leading-tight uppercase">
+                        Customer Directory
                     </h1>
-                    <p className="text-slate-500 dark:text-slate-400 font-medium">
-                        Manage and view all registered customers.
+                    <p className="text-slate-500 dark:text-slate-400 font-medium text-sm">
+                        Verified customer profiles across all financial products.
                     </p>
                 </div>
-                <div className="flex gap-3">
+                <div className="flex flex-wrap gap-3">
                     {selectedIds.length > 0 && (
                         <button
                             onClick={() => handleExport(false)}
@@ -244,20 +246,59 @@ const CustomersPage: React.FC<CustomersPageProps> = ({ user, onLogout, toggleThe
                     )}
                     <button
                         onClick={handleCSVExport}
-                        className="px-4 py-2 rounded-lg bg-blue-600 text-white text-xs font-bold uppercase tracking-wider flex items-center gap-2 hover:bg-blue-700 transition-all shadow-lg shadow-blue-500/20"
+                        className="px-4 py-2 rounded-lg bg-blue-600/10 text-blue-600 dark:bg-blue-600/20 dark:text-blue-400 text-xs font-bold uppercase tracking-wider flex items-center gap-2 hover:bg-blue-600 hover:text-white transition-all border border-blue-600/20"
                     >
                         <span className="material-symbols-outlined text-sm">spreadsheet</span>
                         Export to CSV
                     </button>
                     <button
                         onClick={() => handleExport(true)}
-                        className="px-4 py-2 rounded-lg bg-green-500 text-white text-xs font-bold uppercase tracking-wider flex items-center gap-2 hover:bg-green-600 transition-all shadow-lg shadow-green-500/20"
+                        className="px-4 py-2 rounded-lg bg-green-500/10 text-green-600 dark:bg-green-500/20 dark:text-green-400 text-xs font-bold uppercase tracking-wider flex items-center gap-2 hover:bg-green-500 hover:text-white transition-all border border-green-500/20"
                     >
                         <span className="material-symbols-outlined text-sm">folder_zip</span>
                         Export Docs (ZIP)
                     </button>
+                    <button
+                        onClick={() => setIsNewCustomerModalOpen(true)}
+                        className="px-6 py-2.5 rounded-xl bg-[#0f172a] text-white text-[10px] font-black uppercase tracking-widest flex items-center gap-2 hover:opacity-90 transition-all shadow-xl shadow-slate-900/20"
+                    >
+                        <span className="material-symbols-outlined text-lg">person_add</span>
+                        New Customer
+                    </button>
                 </div>
             </header>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
+                <div className="bg-white dark:bg-[#1e293b] p-6 rounded-[2rem] border border-slate-200 dark:border-slate-800 shadow-sm flex items-center gap-5 transition-all hover:shadow-md">
+                    <div className="size-14 rounded-2xl bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center">
+                        <span className="material-symbols-outlined text-blue-600 dark:text-blue-400 text-2xl">person_add</span>
+                    </div>
+                    <div>
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Onboarded Customers</p>
+                        <p className="text-2xl font-black text-slate-900 dark:text-white">{totalCustomers}</p>
+                    </div>
+                </div>
+
+                <div className="bg-white dark:bg-[#1e293b] p-6 rounded-[2rem] border border-slate-200 dark:border-slate-800 shadow-sm flex items-center gap-5 transition-all hover:shadow-md">
+                    <div className="size-14 rounded-2xl bg-emerald-50 dark:bg-emerald-900/20 flex items-center justify-center">
+                        <span className="material-symbols-outlined text-emerald-600 dark:text-emerald-400 text-2xl">verified</span>
+                    </div>
+                    <div>
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Verified Customers</p>
+                        <p className="text-2xl font-black text-slate-900 dark:text-white">{totalCustomers}</p>
+                    </div>
+                </div>
+
+                <div className="bg-white dark:bg-[#1e293b] p-6 rounded-[2rem] border border-slate-200 dark:border-slate-800 shadow-sm flex items-center gap-5 transition-all hover:shadow-md">
+                    <div className="size-14 rounded-2xl bg-amber-50 dark:bg-amber-900/20 flex items-center justify-center">
+                        <span className="material-symbols-outlined text-amber-600 dark:text-amber-400 text-2xl">military_tech</span>
+                    </div>
+                    <div>
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Tier 3 Customers</p>
+                        <p className="text-2xl font-black text-slate-900 dark:text-white">{totalCustomers}</p>
+                    </div>
+                </div>
+            </div>
 
             <div className="bg-white dark:bg-[#1e293b] rounded-3xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm">
                 <div className="p-6 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-[#0f172a]/50">
@@ -453,6 +494,11 @@ const CustomersPage: React.FC<CustomersPageProps> = ({ user, onLogout, toggleThe
                     onClose={() => setIsDrawerOpen(false)}
                 />
             )}
+
+            <NewCustomerModal
+                isOpen={isNewCustomerModalOpen}
+                onClose={() => setIsNewCustomerModalOpen(false)}
+            />
         </StaffLayout>
     );
 };
