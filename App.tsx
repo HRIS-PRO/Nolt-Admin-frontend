@@ -39,6 +39,7 @@ import StaffCalculatorPage from './pages/StaffCalculatorPage';
 import ProductsPage from './pages/ProductsPage';
 import LogoutWarningModal from './components/modals/LogoutWarningModal';
 import JointAcceptancePage from './pages/investment/JointAcceptancePage';
+import CustomerDetailsPage from './pages/CustomerDetailsPage';
 
 // Setup Global Axios Interceptor for GPS Tracking
 axios.interceptors.request.use((config) => {
@@ -557,6 +558,16 @@ const AppContent: React.FC = () => {
         <Route path="/staff/customers" element={
           isLoading ? null : (user.isLoggedIn && user.role !== 'customer' ? (
             <CustomersPage
+              user={user}
+              onLogout={handleLogoutRequest}
+              toggleTheme={toggleTheme}
+              theme={theme}
+            />
+          ) : <Navigate to="/login" />)
+        } />
+        <Route path="/staff/customers/:id" element={
+          isLoading ? null : (user.isLoggedIn && user.role !== 'customer' ? (
+            <CustomerDetailsPage
               user={user}
               onLogout={handleLogoutRequest}
               toggleTheme={toggleTheme}

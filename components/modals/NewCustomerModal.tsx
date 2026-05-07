@@ -1,137 +1,202 @@
 
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
+import axios from 'axios';
 
 interface NewCustomerModalProps {
   isOpen: boolean;
   onClose: () => void;
+  onSuccess?: () => void;
 }
 
-type Step = 0 | 1;
+type Step = 0 | 1 | 2;
 
 const STEPS = [
   'BVN Lookup',
-  'Customer Profile'
+  'Personal Details',
+  'Tier 3 Verification'
 ];
 
-const mockExistingCustomer = {
-  firstName: "Adewale",
-  lastName: "Okafor",
-  middleName: "Emeka",
-  bvn: "22387654210",
-  casaAccountNo: "0087654321",
-  balance: 184500.00,
-  accountTier: "Tier 2",
-  accountType: "Individual",
-  dob: "12/04/1988",
-  gender: "Male",
-  maritalStatus: "Married",
-  email: "adewale.okafor@example.com",
-  phone: "08034567890",
-  address: "12, Admiralty Way, Lekki Phase 1, Lagos"
-};
-
-const mockNewCustomer = {
-  firstName: "Blessing",
-  lastName: "Nwosu",
-  middleName: "",
-  bvn: "22198765430",
-  casaAccountNo: "0094321876",
-  balance: 0,
-  accountTier: "Tier 1",
-  accountType: "Individual",
-  dob: "03/09/1995",
-  gender: "Female",
-  maritalStatus: "Single",
-  email: "",
-  phone: "",
-  address: ""
-};
-
-const NewCustomerModal: React.FC<NewCustomerModalProps> = ({ isOpen, onClose }) => {
+const NewCustomerModal: React.FC<NewCustomerModalProps> = ({ isOpen, onClose, onSuccess }) => {
   const [currentStep, setCurrentStep] = useState<Step>(0);
   const [bvn, setBvn] = useState('');
   const [loading, setLoading] = useState(false);
-  const [simulateCASAFound, setSimulateCASAFound] = useState(false);
-  const [showCreateForm, setShowCreateForm] = useState(false);
-  const [creatingCustomer, setCreatingCustomer] = useState(false);
-  const [customerCreated, setCustomerCreated] = useState(false);
-  const [customerData, setCustomerData] = useState<any>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [onboardingProgress, setOnboardingProgress] = useState(false);
+  const [customerOnboarded, setCustomerOnboarded] = useState(false);
+  const [onboardedData, setOnboardedData] = useState<any>(null);
+  const [cbaBalance, setCbaBalance] = useState<number | null>(null);
+  const [fetchingBalance, setFetchingBalance] = useState(false);
 
-  // New customer form state
+  // Form state pre-filled from BVN
   const [formData, setFormData] = useState({
+    title: '',
     firstName: '',
     lastName: '',
     middleName: '',
-    mobile: '',
     email: '',
+    phone: '',
+    nin: '',
     address: '',
     stateOfResidence: '',
+    stateOfOrigin: '',
     dob: '',
     gender: '',
     maritalStatus: '',
-    accountType: 'Individual'
+    utility_bill_url: '',
+    avatar_url: ''
   });
+
+  const [uploading, setUploading] = useState(false);
 
   if (!isOpen) return null;
 
-  const handleSearchCustomer = () => {
+  const handleLookupBVN = async () => {
     if (bvn.length !== 11) return;
     setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
-      if (simulateCASAFound) {
-        setCustomerData(mockExistingCustomer);
+    setError(null);
+    try {
+      const response = await axios.get(`/api/staff/kyc/lookup-bvn?bvn=${bvn}`);
+      if (response.data.success) {
+        if (response.data.already_exists) {
+          const custData = response.data.customer;
+          setOnboardedData(custData);
+          setCustomerOnboarded(true);
+          
+          if (custData.casa) {
+            setFetchingBalance(true);
+            try {
+              const balRes = await axios.get(`/api/staff/kyc/cba-balance/${custData.casa}`);
+              if (balRes.data.success) {
+                setCbaBalance(balRes.data.data.AvailableBalance ?? balRes.data.data.availableBalance);
+              }
+            } catch (e) {}
+            setFetchingBalance(false);
+          }
+          setLoading(false);
+          return;
+        }
+
+        const data = response.data.data;
+        // Convert YYYY-MM-DD or DD-MM-YYYY to YYYY-MM-DD for date input
+        let dob = data.dob || '';
+        if (dob.includes('-')) {
+          const parts = dob.split('-');
+          if (parts[0].length === 2) dob = `${parts[2]}-${parts[1]}-${parts[0]}`;
+        }
+
+        setFormData(prev => ({
+          ...prev,
+          firstName: data.firstName || '',
+          lastName: data.lastName || '',
+          middleName: data.middleName || '',
+          email: data.email || '',
+          phone: data.phone || '',
+          dob: dob,
+          gender: data.gender || '',
+          avatar_url: data.avatar_url || ''
+        }));
         setCurrentStep(1);
       } else {
-        setShowCreateForm(true);
+        setError(response.data.message || 'BVN lookup failed');
       }
-    }, 1500);
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Error connecting to verification service');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleCreateCustomer = (e: React.FormEvent) => {
-    e.preventDefault();
-    setCreatingCustomer(true);
-    setTimeout(() => {
-      setCreatingCustomer(false);
-      setCustomerCreated(true);
-      setCustomerData({
-        ...mockNewCustomer,
-        firstName: formData.firstName || mockNewCustomer.firstName,
-        lastName: formData.lastName || mockNewCustomer.lastName,
-        middleName: formData.middleName,
-        phone: formData.mobile,
-        email: formData.email,
-        address: formData.address,
-        stateOfResidence: formData.stateOfResidence,
-        accountTier: formData.accountType, // Using accountType for tier display in summary for now
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploading(true);
+    const uploadData = new FormData();
+    uploadData.append('file', file);
+    uploadData.append('document_type', 'utility_bill');
+
+    try {
+      const response = await axios.post('/api/upload', uploadData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
       });
-      setTimeout(() => {
-        setCurrentStep(1);
-      }, 1500);
-    }, 1500);
+      setFormData(prev => ({ ...prev, utility_bill_url: response.data.document.file_url }));
+    } catch (err) {
+      alert('Failed to upload utility bill');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleOnboard = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setOnboardingProgress(true);
+    setError(null);
+
+    if (!formData.utility_bill_url) {
+      setError("Please upload a utility bill for Tier 3 verification.");
+      return;
+    }
+
+    const payload = {
+      ...formData,
+      full_name: `${formData.firstName} ${formData.lastName} ${formData.middleName}`.trim(),
+      bvn
+    };
+
+    try {
+      const response = await axios.post('/api/staff/kyc/onboard-customer', payload);
+      if (response.data.success) {
+        setCustomerOnboarded(true);
+        const custData = response.data.customer;
+        setOnboardedData(custData);
+        if (custData.casa) {
+          setFetchingBalance(true);
+          try {
+            const balRes = await axios.get(`/api/staff/kyc/cba-balance/${custData.casa}`);
+            if (balRes.data.success) {
+              setCbaBalance(balRes.data.data.AvailableBalance ?? balRes.data.data.availableBalance);
+            }
+          } catch (e) {}
+          setFetchingBalance(false);
+        }
+        if (onSuccess) onSuccess();
+      } else {
+        setError(response.data.message || 'Onboarding failed');
+      }
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Error during onboarding process');
+    } finally {
+      setOnboardingProgress(false);
+    }
   };
 
   const resetModal = () => {
     setCurrentStep(0);
     setBvn('');
     setLoading(false);
-    setShowCreateForm(false);
-    setCreatingCustomer(false);
-    setCustomerCreated(false);
-    setCustomerData(null);
+    setError(null);
+    setOnboardingProgress(false);
+    setCustomerOnboarded(false);
+    setOnboardedData(null);
+    setCbaBalance(null);
+    setFetchingBalance(false);
     setFormData({
+      title: '',
       firstName: '',
       lastName: '',
       middleName: '',
-      mobile: '',
       email: '',
+      phone: '',
+      nin: '',
       address: '',
       stateOfResidence: '',
+      stateOfOrigin: '',
       dob: '',
       gender: '',
       maritalStatus: '',
-      accountType: 'Individual'
+      utility_bill_url: '',
+      avatar_url: ''
     });
   };
 
@@ -167,7 +232,7 @@ const NewCustomerModal: React.FC<NewCustomerModalProps> = ({ isOpen, onClose }) 
           <div className="flex items-center justify-between mb-10">
             <div>
                <h3 className="text-2xl font-black text-slate-900 dark:text-white uppercase tracking-tight italic">Onboard New Customer</h3>
-               <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mt-1">CASA Generation & BVN verification</p>
+               <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mt-1">Automated KYC Tiering & Provisioning</p>
             </div>
             <button 
               onClick={() => { resetModal(); onClose(); }}
@@ -177,108 +242,240 @@ const NewCustomerModal: React.FC<NewCustomerModalProps> = ({ isOpen, onClose }) 
             </button>
           </div>
 
-          {renderStepIndicator()}
+          {!customerOnboarded && renderStepIndicator()}
 
           <div className="min-h-[400px]">
-            {currentStep === 0 && (
-              <div className="flex flex-col items-center justify-center py-6 min-h-[400px] animate-in fade-in zoom-in duration-500">
-                <div className="w-full max-w-md space-y-10">
-                  <div className="text-center space-y-3">
-                    <div className="w-16 h-16 bg-blue-600/10 rounded-3xl flex items-center justify-center text-blue-600 mx-auto mb-6">
-                       <span className="material-symbols-outlined text-3xl font-black">badge</span>
-                    </div>
-                    <h4 className="text-xl font-black text-slate-900 dark:text-white uppercase tracking-tight">Identity Verification</h4>
-                    <p className="text-[11px] font-bold text-slate-500 dark:text-slate-400 leading-relaxed uppercase tracking-wide">
-                      Enter the customer's 11-digit BVN to check the core banking system for an existing CASA account.
-                    </p>
+            {customerOnboarded ? (
+              <div className="flex flex-col items-center justify-center py-6 animate-in fade-in zoom-in duration-500 w-full">
+                <div className="w-full bg-white dark:bg-[#1e293b] rounded-[32px] border border-slate-100 dark:border-slate-800 shadow-xl overflow-hidden mb-6">
+                  <div className="bg-emerald-50 dark:bg-emerald-900/20 px-6 py-3 flex items-center justify-end">
+                    <span className="text-[10px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-widest">
+                      {onboardedData?.already_exists ? 'CORE BANKING RECORD FOUND' : 'CUSTOMER PROFILE CREATED'}
+                    </span>
                   </div>
-
-                  <div className="space-y-6">
-                    <div className="relative group">
-                      <div className="absolute -top-3 left-6 bg-white dark:bg-[#1e293b] px-2 text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] z-10 transition-colors group-focus-within:text-blue-600">Bank Verification Number</div>
-                      <input 
-                        type="text" 
-                        maxLength={11}
-                        value={bvn}
-                        onChange={(e) => setBvn(e.target.value.replace(/\D/g, ''))}
-                        disabled={loading || showCreateForm}
-                        placeholder="01234567890"
-                        className="w-full px-8 py-5 bg-slate-50 dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 rounded-3xl text-center text-2xl font-black tracking-[0.3em] dark:text-white focus:ring-4 focus:ring-blue-600/10 focus:border-blue-600 outline-none transition-all disabled:opacity-50"
-                      />
-                    </div>
-                    
-                    {loading && (
-                      <div className="flex items-center justify-center gap-4 py-2 animate-pulse">
-                        <span className="w-5 h-5 border-3 border-blue-600/30 border-t-blue-600 rounded-full animate-spin" />
-                        <span className="text-[11px] font-black text-blue-600 uppercase tracking-[0.15em]">Retrieving CBS Account Data…</span>
-                      </div>
-                    )}
-
-                    {!showCreateForm && !loading && (
-                      <button 
-                        onClick={handleSearchCustomer}
-                        disabled={bvn.length !== 11}
-                        className="w-full py-5 bg-slate-900 dark:bg-blue-600 text-white rounded-3xl font-black uppercase text-sm tracking-[0.2em] shadow-2xl hover:bg-blue-600 dark:hover:bg-blue-700 transition-all disabled:opacity-20 disabled:grayscale"
-                      >
-                        Verify Identity
-                      </button>
-                    )}
-
-                    <div className="flex items-center justify-center gap-2 pt-2 opacity-50">
-                       <span className="material-symbols-outlined text-xs dark:text-slate-400">encrypted</span>
-                       <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
-                         SECURE DATA FETCH VIA ACCOUNTDETAILSVIEWVIABVN
-                       </p>
-                    </div>
-                  </div>
-
-                  <AnimatePresence>
-                    {showCreateForm && !customerCreated && (
-                      <motion.div 
-                        initial={{ opacity: 0, scale: 0.95, y: 20 }}
-                        animate={{ opacity: 1, scale: 1, y: 0 }}
-                        className="space-y-8 pt-10 border-t border-slate-100 dark:border-slate-800"
-                      >
-                        <div className="bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800 p-6 rounded-[24px] flex gap-4 items-start">
-                          <div className="w-10 h-10 rounded-full bg-amber-200 dark:bg-amber-800 text-amber-700 dark:text-amber-400 flex items-center justify-center flex-shrink-0 animate-bounce">
-                             <span className="material-symbols-outlined text-xl font-black">warning</span>
-                          </div>
-                          <div>
-                            <span className="text-[12px] font-black text-amber-900 dark:text-amber-200 uppercase tracking-tight block mb-1">Unregistered Identity</span>
-                            <p className="text-[10px] font-bold text-amber-700/80 dark:text-amber-400/80 uppercase leading-relaxed tracking-wide">
-                              This BVN is not linked to any existing CASA on CBS. Please complete the registration to onboard this customer.
-                            </p>
-                          </div>
+                  
+                  <div className="p-8">
+                    <div className="flex items-center gap-6 mb-8">
+                      {onboardedData?.avatar_url ? (
+                        <div className="w-20 h-20 rounded-full shadow-lg shadow-slate-900/10 overflow-hidden border-2 border-white dark:border-slate-800">
+                          <img src={onboardedData.avatar_url} alt="Profile" className="w-full h-full object-cover" />
                         </div>
+                      ) : (
+                        <div className="w-20 h-20 bg-slate-900 dark:bg-emerald-600 rounded-full flex items-center justify-center text-white text-2xl font-black shadow-lg shadow-emerald-600/30">
+                          {onboardedData?.full_name?.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase()}
+                        </div>
+                      )}
+                      <div>
+                        <h4 className="text-2xl font-black text-slate-900 dark:text-white uppercase tracking-tight italic">
+                          {onboardedData?.full_name}
+                        </h4>
+                        <div className="flex items-center gap-2 mt-1">
+                          <span className="text-sm font-bold text-slate-500 tracking-[0.2em]">
+                            {onboardedData?.casa || 'PENDING CASA'}
+                          </span>
+                          <span className="w-1.5 h-1.5 rounded-full bg-slate-300 dark:bg-slate-600"></span>
+                          <span className="text-[10px] font-black text-blue-500 uppercase tracking-widest italic">Active Profile</span>
+                        </div>
+                      </div>
+                    </div>
 
-                        <form onSubmit={handleCreateCustomer} className="grid grid-cols-2 gap-x-6 gap-y-5">
+                    <div className="grid grid-cols-3 gap-y-8 gap-x-4 mb-8">
+                      <div className="space-y-1">
+                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">DOB / GENDER</p>
+                        <p className="text-xs font-black text-slate-900 dark:text-white uppercase">
+                          {onboardedData?.date_of_birth ? new Date(onboardedData.date_of_birth).toLocaleDateString() : 'N/A'} • {onboardedData?.gender || 'N/A'}
+                        </p>
+                      </div>
+                      <div className="space-y-1">
+                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">VERIFICATION (BVN)</p>
+                        <p className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-[0.2em]">
+                          •••• •••• {onboardedData?.bvn?.slice(-3) || 'XXX'}
+                        </p>
+                      </div>
+                      <div className="space-y-1">
+                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">CURRENT WALLET BALANCE</p>
+                        {fetchingBalance ? (
+                           <div className="h-4 w-16 bg-slate-200 dark:bg-slate-700 rounded animate-pulse"></div>
+                        ) : (
+                           <p className="text-sm font-black text-emerald-600 dark:text-emerald-400 tracking-tight">
+                             {cbaBalance !== null ? `₦${cbaBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })}` : 'N/A'}
+                           </p>
+                        )}
+                      </div>
+                      <div className="space-y-1">
+                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">KYC TIER</p>
+                        <p className="text-xs font-black text-slate-900 dark:text-white uppercase italic">
+                          TIER {onboardedData?.kyc_tier || 1}
+                        </p>
+                      </div>
+                      <div className="space-y-1">
+                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">ACCOUNT TYPE</p>
+                        <p className="text-xs font-black text-blue-600 uppercase italic">INDIVIDUAL</p>
+                      </div>
+                      <div className="space-y-1">
+                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">CONTACT INFO</p>
+                        <p className="text-[10px] font-bold text-slate-900 dark:text-white uppercase">
+                          {onboardedData?.phone_number}<br/>
+                          {onboardedData?.email}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* <div className="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl flex items-center justify-between border border-slate-100 dark:border-slate-700">
+                       <div className="flex items-center gap-3">
+                         <div className="w-8 h-8 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center text-emerald-600">
+                           <span className="material-symbols-outlined text-sm font-black">verified_user</span>
+                         </div>
+                         <div>
+                           <p className="text-[10px] font-black text-slate-900 dark:text-white uppercase tracking-widest">ONBOARDING COMPLETE</p>
+                           <p className="text-[8px] font-bold text-slate-500 uppercase tracking-widest">PROFILE SYNCED ACROSS NOLT ECOSYSTEM</p>
+                         </div>
+                       </div>
+                       <button className="px-4 py-2 bg-slate-900 dark:bg-slate-700 text-white rounded-xl text-[9px] font-black uppercase tracking-widest shadow-lg hover:bg-blue-600 transition-all">
+                         VIEW DEEP PROFILE
+                       </button>
+                    </div> */}
+                  </div>
+                </div>
+
+                <div className="flex gap-4 w-full">
+                  <button 
+                    onClick={resetModal}
+                    className="flex-1 py-4 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-slate-200 transition-all flex items-center justify-center gap-2"
+                  >
+                    <span className="material-symbols-outlined text-sm">person_add</span>
+                    NEW ONBOARDING
+                  </button>
+                  <button 
+                    onClick={() => { resetModal(); onClose(); }}
+                    className="flex-[2] py-4 bg-blue-600 text-white rounded-2xl font-black uppercase text-[10px] tracking-[0.2em] shadow-xl hover:bg-blue-700 transition-all flex items-center justify-center gap-2"
+                  >
+                    CLOSE & FINISH
+                    <span className="material-symbols-outlined text-sm">check_circle</span>
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <>
+                {currentStep === 0 && (
+                  <div className="flex flex-col items-center justify-center py-6 min-h-[400px]">
+                    <div className="w-full max-w-md space-y-10">
+                      <div className="text-center space-y-3">
+                        <div className="w-16 h-16 bg-blue-600/10 rounded-3xl flex items-center justify-center text-blue-600 mx-auto mb-6">
+                           <span className="material-symbols-outlined text-3xl font-black">badge</span>
+                        </div>
+                        <h4 className="text-xl font-black text-slate-900 dark:text-white uppercase tracking-tight">Identity Verification</h4>
+                        <p className="text-[11px] font-bold text-slate-500 dark:text-slate-400 leading-relaxed uppercase tracking-wide">
+                          Enter the customer's 11-digit BVN to fetch verified identity data from Dojah.
+                        </p>
+                      </div>
+
+                      <div className="space-y-6">
+                        <div className="relative group">
+                          <div className="absolute -top-3 left-6 bg-white dark:bg-[#1e293b] px-2 text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] z-10">Bank Verification Number</div>
+                          <input 
+                            type="text" 
+                            maxLength={11}
+                            value={bvn}
+                            onChange={(e) => setBvn(e.target.value.replace(/\D/g, ''))}
+                            disabled={loading}
+                            placeholder="01234567890"
+                            className="w-full px-8 py-5 bg-slate-50 dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 rounded-3xl text-center text-2xl font-black tracking-[0.3em] dark:text-white focus:border-blue-600 outline-none transition-all disabled:opacity-50"
+                          />
+                        </div>
+                        
+                        {error && (
+                          <div className="p-4 bg-rose-50 dark:bg-rose-900/10 border border-rose-100 dark:border-rose-800 rounded-2xl text-center">
+                            <p className="text-[10px] font-black text-rose-600 uppercase tracking-widest">{error}</p>
+                          </div>
+                        )}
+
+                        <button 
+                          onClick={handleLookupBVN}
+                          disabled={bvn.length !== 11 || loading}
+                          className="w-full py-5 bg-slate-900 dark:bg-blue-600 text-white rounded-3xl font-black uppercase text-sm tracking-[0.2em] shadow-2xl hover:bg-blue-700 transition-all disabled:opacity-20 flex items-center justify-center gap-4"
+                        >
+                          {loading && <span className="w-5 h-5 border-3 border-white/30 border-t-white rounded-full animate-spin" />}
+                          Verify & Continue
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {(currentStep === 1 || currentStep === 2) && (
+                  <form onSubmit={handleOnboard} className="space-y-8 animate-in fade-in slide-in-from-bottom-6 duration-500">
+                    {currentStep === 1 ? (
+                      <div className="grid grid-cols-2 gap-x-6 gap-y-5">
+                        <div className="space-y-2">
+                          <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Title</p>
+                          <select required value={formData.title} onChange={(e) => setFormData({...formData, title: e.target.value})} className="input-field-onboarding">
+                            <option value="">Select...</option>
+                            <option value="Mr.">Mr.</option>
+                            <option value="Mrs">Mrs</option>
+                            <option value="Master">Master</option>
+                            <option value="Miss">Miss</option>
+                            <option value="Ms">Ms</option>
+                          </select>
+                        </div>
+                        <div className="space-y-2">
+                          <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">First Name</p>
+                          <input required type="text" value={formData.firstName} onChange={(e) => setFormData({...formData, firstName: e.target.value})} className="input-field-onboarding" />
+                        </div>
+                        <div className="space-y-2">
+                          <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Last Name</p>
+                          <input required type="text" value={formData.lastName} onChange={(e) => setFormData({...formData, lastName: e.target.value})} className="input-field-onboarding" />
+                        </div>
+                        <div className="space-y-2">
+                          <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1 text-slate-400">Middle Name (Optional)</p>
+                          <input type="text" value={formData.middleName} onChange={(e) => setFormData({...formData, middleName: e.target.value})} className="input-field-onboarding" />
+                        </div>
+                        <div className="space-y-2">
+                          <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">NIN (Optional)</p>
+                          <input type="text" maxLength={11} value={formData.nin} onChange={(e) => setFormData({...formData, nin: e.target.value.replace(/\D/g, '')})} className="input-field-onboarding" placeholder="11-digit NIN" />
+                        </div>
+                        <div className="space-y-2">
+                          <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Mobile Number</p>
+                          <input required type="tel" value={formData.phone} onChange={(e) => setFormData({...formData, phone: e.target.value})} className="input-field-onboarding" />
+                        </div>
+                        <div className="space-y-2">
+                          <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Email Address</p>
+                          <input required type="email" value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})} className="input-field-onboarding" />
+                        </div>
+                        <div className="space-y-2">
+                          <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Gender</p>
+                          <select required value={formData.gender} onChange={(e) => setFormData({...formData, gender: e.target.value})} className="input-field-onboarding">
+                            <option value="">Select...</option>
+                            <option value="Male">Male</option>
+                            <option value="Female">Female</option>
+                          </select>
+                        </div>
+                        <div className="space-y-2">
+                          <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Date of Birth</p>
+                          <input required type="date" value={formData.dob} onChange={(e) => setFormData({...formData, dob: e.target.value})} className="input-field-onboarding" />
+                        </div>
+                        <div className="space-y-2">
+                          <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Marital Status</p>
+                          <select required value={formData.maritalStatus} onChange={(e) => setFormData({...formData, maritalStatus: e.target.value})} className="input-field-onboarding">
+                            <option value="">Select...</option>
+                            <option value="Single">Single</option>
+                            <option value="Married">Married</option>
+                            <option value="Divorced">Divorced</option>
+                            <option value="Widowed">Widowed</option>
+                          </select>
+                        </div>
+                        
+                        <div className="col-span-full pt-6 flex gap-4">
+                          <button type="button" onClick={() => setCurrentStep(0)} className="flex-1 py-4 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 rounded-2xl text-[10px] font-black uppercase tracking-widest">Back</button>
+                          <button type="button" onClick={() => setCurrentStep(2)} className="flex-[2] py-4 bg-slate-900 dark:bg-blue-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] shadow-xl">Continue to Tier 3</button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="space-y-6">
+                        <div className="grid grid-cols-2 gap-4">
                           <div className="space-y-2">
-                            <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">First Name</p>
-                            <input required type="text" value={formData.firstName} onChange={(e) => setFormData({...formData, firstName: e.target.value})} className="w-full px-5 py-3.5 bg-slate-50 dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 rounded-2xl text-xs font-black uppercase dark:text-white focus:border-blue-600 outline-none transition-all" />
-                          </div>
-                          <div className="space-y-2">
-                            <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Last Name</p>
-                            <input required type="text" value={formData.lastName} onChange={(e) => setFormData({...formData, lastName: e.target.value})} className="w-full px-5 py-3.5 bg-slate-50 dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 rounded-2xl text-xs font-black uppercase dark:text-white focus:border-blue-600 outline-none transition-all" />
-                          </div>
-                          <div className="space-y-2">
-                            <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1 text-slate-300 dark:text-slate-600">Middle Name (Optional)</p>
-                            <input type="text" value={formData.middleName} onChange={(e) => setFormData({...formData, middleName: e.target.value})} className="w-full px-5 py-3.5 bg-slate-50 dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 rounded-2xl text-xs font-black uppercase dark:text-white focus:border-blue-600 outline-none transition-all" />
-                          </div>
-                          <div className="space-y-2">
-                            <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Mobile Number</p>
-                            <input required type="tel" value={formData.mobile} onChange={(e) => setFormData({...formData, mobile: e.target.value})} placeholder="08012345678" className="w-full px-5 py-3.5 bg-slate-50 dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 rounded-2xl text-xs font-black dark:text-white focus:border-blue-600 outline-none transition-all" />
-                          </div>
-                          <div className="space-y-2">
-                            <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Email Address</p>
-                            <input type="email" value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})} className="w-full px-5 py-3.5 bg-slate-50 dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 rounded-2xl text-xs font-black dark:text-white focus:border-blue-600 outline-none transition-all" />
-                          </div>
-                          <div className="space-y-2 col-span-full">
-                            <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Residential Address</p>
-                            <textarea required value={formData.address} onChange={(e) => setFormData({...formData, address: e.target.value})} className="w-full px-5 py-3.5 bg-slate-50 dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 rounded-2xl text-xs font-black dark:text-white focus:border-blue-600 outline-none transition-all min-h-[100px]" />
-                          </div>
-                          <div className="space-y-2 col-span-full">
                             <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">State of Residence</p>
-                            <select required value={formData.stateOfResidence} onChange={(e) => setFormData({...formData, stateOfResidence: e.target.value})} className="w-full px-5 py-3.5 bg-slate-50 dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 rounded-2xl text-xs font-black uppercase dark:text-white focus:border-blue-600 outline-none transition-all">
+                            <select required value={formData.stateOfResidence} onChange={(e) => setFormData({...formData, stateOfResidence: e.target.value})} className="input-field-onboarding">
                               <option value="">Select State...</option>
                               {["Lagos", "Abuja", "Rivers", "Oyo", "Kano", "Cross River", "Edo", "Enugu"].map(state => (
                                 <option key={state} value={state}>{state}</option>
@@ -286,183 +483,87 @@ const NewCustomerModal: React.FC<NewCustomerModalProps> = ({ isOpen, onClose }) 
                             </select>
                           </div>
                           <div className="space-y-2">
-                            <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Date of Birth</p>
-                            <input required type="date" value={formData.dob} onChange={(e) => setFormData({...formData, dob: e.target.value})} className="w-full px-5 py-3.5 bg-slate-50 dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 rounded-2xl text-xs font-black dark:text-white focus:border-blue-600 outline-none transition-all" />
-                          </div>
-                          <div className="space-y-2">
-                            <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Gender</p>
-                            <select required value={formData.gender} onChange={(e) => setFormData({...formData, gender: e.target.value})} className="w-full px-5 py-3.5 bg-slate-50 dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 rounded-2xl text-xs font-black uppercase dark:text-white focus:border-blue-600 outline-none transition-all">
-                              <option value="">Select...</option>
-                              <option value="Male">Male</option>
-                              <option value="Female">Female</option>
+                            <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">State of Origin</p>
+                            <select required value={formData.stateOfOrigin} onChange={(e) => setFormData({...formData, stateOfOrigin: e.target.value})} className="input-field-onboarding">
+                              <option value="">Select State...</option>
+                              {["Abia", "Adamawa", "Akwa Ibom", "Anambra", "Bauchi", "Bayelsa", "Benue", "Borno", "Cross River", "Delta", "Ebonyi", "Edo", "Ekiti", "Enugu", "Gombe", "Imo", "Jigawa", "Kaduna", "Kano", "Katsina", "Kebbi", "Kogi", "Kwara", "Lagos", "Nasarawa", "Niger", "Ogun", "Ondo", "Osun", "Oyo", "Plateau", "Rivers", "Sokoto", "Taraba", "Yobe", "Zamfara", "FCT"].map(state => (
+                                <option key={state} value={state}>{state}</option>
+                              ))}
                             </select>
                           </div>
-                          <div className="space-y-2">
-                            <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Marital Status</p>
-                            <select required value={formData.maritalStatus} onChange={(e) => setFormData({...formData, maritalStatus: e.target.value})} className="w-full px-5 py-3.5 bg-slate-50 dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 rounded-2xl text-xs font-black uppercase dark:text-white focus:border-blue-600 outline-none transition-all">
-                              <option value="">Select...</option>
-                              <option value="Single">Single</option>
-                              <option value="Married">Married</option>
-                              <option value="Divorced">Divorced</option>
-                              <option value="Widowed">Widowed</option>
-                            </select>
+                          <div className="col-span-full space-y-2">
+                            <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Residential Address</p>
+                            <textarea required value={formData.address} onChange={(e) => setFormData({...formData, address: e.target.value})} className="input-field-onboarding min-h-[60px] pt-3" placeholder="Enter full residential address" />
                           </div>
-                          <div className="space-y-2 col-span-full">
-                            <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Account Type</p>
-                            <select required value={formData.accountType} onChange={(e) => setFormData({...formData, accountType: e.target.value})} className="w-full px-5 py-3.5 bg-slate-50 dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 rounded-2xl text-xs font-black uppercase dark:text-white focus:border-blue-600 outline-none transition-all">
-                              <option value="Individual">Individual</option>
-                              <option value="Joint">Joint</option>
-                              <option value="Corporate">Corporate</option>
-                            </select>
+                        </div>
+                        
+                        <div className="space-y-3">
+                          <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Utility Bill (Required for Tier 3)</p>
+                          <div className="relative group h-32 rounded-[24px] border-2 border-dashed border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 flex flex-col items-center justify-center transition-all hover:border-blue-500 overflow-hidden">
+                             {formData.utility_bill_url ? (
+                               <div className="flex flex-col items-center gap-2">
+                                 <span className="material-symbols-outlined text-emerald-500 text-3xl font-black">check_circle</span>
+                                 <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">Document Uploaded</span>
+                                 <button type="button" onClick={() => setFormData({...formData, utility_bill_url: ''})} className="text-[9px] font-black text-rose-500 uppercase underline mt-1">Remove</button>
+                               </div>
+                             ) : (
+                               <>
+                                 <span className="material-symbols-outlined text-slate-400 group-hover:text-blue-500 text-3xl mb-2">cloud_upload</span>
+                                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Click to upload bill</p>
+                                 <input type="file" onChange={handleFileUpload} className="absolute inset-0 opacity-0 cursor-pointer" accept="image/*,application/pdf" />
+                               </>
+                             )}
+                             {uploading && <div className="absolute inset-0 bg-white/80 dark:bg-slate-900/80 flex items-center justify-center"><span className="w-6 h-6 border-3 border-blue-600/30 border-t-blue-600 rounded-full animate-spin" /></div>}
                           </div>
-                          <button 
-                            type="submit"
-                            disabled={creatingCustomer}
-                            className="col-span-full py-5 bg-blue-600 text-white rounded-2xl text-[12px] font-black uppercase tracking-[0.2em] shadow-2xl hover:bg-blue-700 transition-all flex items-center justify-center gap-4 disabled:opacity-50"
-                          >
-                            {creatingCustomer && <span className="w-5 h-5 border-3 border-white/30 border-t-white rounded-full animate-spin" />}
-                            {creatingCustomer ? 'Initializing CASA on CBS...' : 'Provision Account & Onboard'}
+                        </div>
+
+                        <div className="pt-6 flex gap-4">
+                          <button type="button" onClick={() => setCurrentStep(1)} className="flex-1 py-4 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 rounded-2xl text-[10px] font-black uppercase tracking-widest">Back</button>
+                          <button type="submit" disabled={onboardingProgress} className="flex-[2] py-4 bg-slate-900 dark:bg-blue-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] shadow-xl flex items-center justify-center gap-4 disabled:opacity-50">
+                             {onboardingProgress && <span className="w-5 h-5 border-3 border-white/30 border-t-white rounded-full animate-spin" />}
+                             Submit Tier 3 Application
                           </button>
-                        </form>
-                      </motion.div>
+                        </div>
+                      </div>
                     )}
-                  </AnimatePresence>
-
-                  {customerCreated && (
-                    <motion.div 
-                      initial={{ opacity: 0, scale: 0.95 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      className="bg-emerald-50 dark:bg-emerald-900/10 border-2 border-emerald-100 dark:border-emerald-800 p-10 rounded-[40px] flex flex-col items-center text-center space-y-6"
-                    >
-                      <div className="w-20 h-20 rounded-full bg-emerald-500 text-white flex items-center justify-center shadow-2xl shadow-emerald-500/30">
-                        <span className="material-symbols-outlined text-4xl font-black">check</span>
+                    
+                    {error && (
+                      <div className="p-4 bg-rose-50 dark:bg-rose-900/10 border border-rose-100 dark:border-rose-800 rounded-2xl text-center mt-4">
+                        <p className="text-[10px] font-black text-rose-600 uppercase tracking-widest">{error}</p>
                       </div>
-                      <div>
-                        <p className="text-[14px] font-black text-emerald-700 dark:text-emerald-400 uppercase tracking-[0.2em] mb-2">CASA Generated Successfully</p>
-                        <p className="text-4xl font-black text-emerald-900 dark:text-emerald-200 tracking-[0.1em] italic">0123456789</p>
-                        <p className="text-[10px] font-black text-emerald-600/60 uppercase tracking-widest mt-4 italic">Customer has been added to the master directory</p>
-                      </div>
-                    </motion.div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {currentStep === 1 && customerData && (
-              <div className="space-y-10 animate-in fade-in slide-in-from-bottom-6 duration-700 min-h-[400px]">
-                {/* Customer Profiler Card */}
-                <div className="bg-white dark:bg-[#1e293b] border-2 border-slate-100 dark:border-slate-800 rounded-[48px] overflow-hidden shadow-sm relative">
-                  <div className={`absolute top-0 right-0 px-8 py-3 rounded-bl-[32px] text-[10px] font-black uppercase tracking-widest border-l-2 border-b-2 ${simulateCASAFound ? 'text-emerald-700 bg-emerald-50 border-emerald-100 dark:text-emerald-400 dark:bg-emerald-900/20 dark:border-emerald-800' : 'text-amber-700 bg-amber-50 border-amber-100 dark:text-amber-400 dark:bg-amber-900/20 dark:border-amber-800'}`}>
-                    {simulateCASAFound ? 'CORE BANKING RECORD FOUND' : 'FRESHLY PROVISIONED ACCOUNT'}
-                  </div>
-
-                  <div className="p-12">
-                    <div className="flex items-center gap-8 mb-12">
-                       <div className={`w-28 h-28 rounded-[40px] flex items-center justify-center text-4xl font-black text-white shadow-2xl ${simulateCASAFound ? 'bg-[#0F6E56]' : 'bg-[#B45309]'}`}>
-                         {customerData.firstName[0]}{customerData.lastName[0]}
-                       </div>
-                       <div className="space-y-2">
-                          <h4 className="text-4xl font-black text-slate-900 dark:text-white uppercase italic tracking-tighter leading-none">{customerData.firstName} {customerData.lastName}</h4>
-                          <div className="flex items-center gap-3">
-                            <span className="text-lg font-mono font-black text-slate-400 tracking-[0.15em]">{customerData.casaAccountNo}</span>
-                            <span className="w-1 h-1 rounded-full bg-slate-300"></span>
-                            <span className="text-[10px] font-black text-blue-600 uppercase tracking-widest bg-blue-600/5 px-3 py-1 rounded-lg italic">Active Profile</span>
-                          </div>
-                       </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 lg:grid-cols-3 gap-12 pb-12 border-b border-dashed border-slate-200 dark:border-slate-700">
-                      <div>
-                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">DOB / Gender</p>
-                        <p className="text-base font-black text-slate-900 dark:text-white uppercase">{customerData.dob} • {customerData.gender}</p>
-                      </div>
-                      <div>
-                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Verification (BVN)</p>
-                        <p className="text-base font-black text-slate-900 dark:text-white uppercase tracking-widest">••••••••{customerData.bvn.slice(-3)}</p>
-                      </div>
-                      <div>
-                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Current Liquidity</p>
-                        <p className="text-base font-black text-[#0F6E56] uppercase tracking-tight">₦{customerData.balance.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
-                      </div>
-                      <div>
-                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Registry Tier</p>
-                        <p className="text-base font-black text-slate-900 dark:text-white uppercase italic">{customerData.accountTier}</p>
-                      </div>
-                      <div>
-                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Account Type</p>
-                        <p className="text-base font-black text-blue-600 uppercase italic">{customerData.accountType}</p>
-                      </div>
-                      <div>
-                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Contact Info</p>
-                        <p className="text-xs font-black text-slate-900 dark:text-white uppercase leading-relaxed">{customerData.phone}<br/>{customerData.email}</p>
-                      </div>
-                    </div>
-
-                    <div className="pt-12 flex items-center justify-between">
-                       <div className="flex items-center gap-4">
-                          <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center">
-                             <span className="material-symbols-outlined font-black">verified_user</span>
-                          </div>
-                          <div>
-                             <p className="text-[11px] font-black text-slate-900 dark:text-white uppercase italic">Onboarding Complete</p>
-                             <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Profile synced across Nolt Ecosystem</p>
-                          </div>
-                       </div>
-                       <button className="px-8 py-3 bg-slate-900 dark:bg-blue-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-800 dark:hover:bg-blue-700 transition-all shadow-xl">
-                          View Deep Profile
-                       </button>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-6">
-                  <button 
-                    onClick={() => { resetModal(); setCurrentStep(0); }}
-                    className="flex-1 py-5 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 rounded-[24px] font-black uppercase text-xs tracking-widest hover:bg-slate-200 dark:hover:bg-slate-700 transition-all flex items-center justify-center gap-4 border-2 border-transparent hover:border-slate-300 dark:hover:border-slate-600"
-                  >
-                    <span className="material-symbols-outlined text-[24px] font-black">person_search</span>
-                    New Onboarding
-                  </button>
-                  <button 
-                    onClick={() => { resetModal(); onClose(); }}
-                    className="flex-1 py-5 bg-blue-600 text-white rounded-[24px] font-black uppercase text-xs tracking-widest shadow-2xl hover:bg-blue-700 transition-all flex items-center justify-center gap-4 group"
-                  >
-                    Close & Finish
-                    <span className="material-symbols-outlined text-[24px] font-black group-hover:translate-x-1 transition-transform">task_alt</span>
-                  </button>
-                </div>
-              </div>
+                    )}
+                  </form>
+                )}
+              </>
             )}
           </div>
         </div>
 
-        {/* Developer Simulation Control */}
-        <div className="bg-slate-900 px-10 py-4 flex items-center justify-between">
-           <div className="flex items-center gap-3">
-              <span className="material-symbols-outlined text-slate-500 text-lg">science</span>
-              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Core Banking Simulation (CBS)</span>
-           </div>
-           <div className="flex items-center gap-6">
-              <label className="flex items-center gap-3 cursor-pointer group">
-                 <input 
-                  type="radio" 
-                  checked={simulateCASAFound} 
-                  onChange={() => setSimulateCASAFound(true)} 
-                  className="w-4 h-4 text-blue-600 focus:ring-blue-600 border-slate-700 bg-slate-800"
-                />
-                 <span className="text-[10px] font-black text-slate-500 uppercase group-hover:text-white transition-colors">Existing Identity Found</span>
-              </label>
-              <label className="flex items-center gap-3 cursor-pointer group">
-                 <input 
-                  type="radio" 
-                  checked={!simulateCASAFound} 
-                  onChange={() => setSimulateCASAFound(false)} 
-                  className="w-4 h-4 text-blue-600 focus:ring-blue-600 border-slate-700 bg-slate-800"
-                />
-                 <span className="text-[10px] font-black text-slate-500 uppercase group-hover:text-white transition-colors">Simulate Registration Flow</span>
-              </label>
-           </div>
-        </div>
+        {/* CSS for custom onboarding inputs to match design */}
+        <style dangerouslySetInnerHTML={{ __html: `
+          .input-field-onboarding {
+            width: 100%;
+            padding: 0.875rem 1.25rem;
+            background: rgb(248 250 252);
+            border-width: 2px;
+            border-style: solid;
+            border-color: rgb(241 245 249);
+            border-radius: 1rem;
+            font-size: 0.75rem;
+            font-weight: 900;
+            text-transform: uppercase;
+            outline: none;
+            transition: all 0.2s;
+          }
+          .dark .input-field-onboarding {
+            background: rgb(30 41 59);
+            border-color: rgb(51 65 85);
+            color: white;
+          }
+          .input-field-onboarding:focus {
+            border-color: rgb(37 99 235);
+          }
+        ` }} />
       </motion.div>
     </div>
   );

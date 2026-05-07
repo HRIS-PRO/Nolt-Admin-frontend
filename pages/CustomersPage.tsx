@@ -4,6 +4,7 @@ import axios from 'axios';
 import CustomerDetailsDrawer from '../components/drawers/CustomerDetailsDrawer';
 import NewCustomerModal from '../components/modals/NewCustomerModal';
 import { formatDate } from '../utils/dateFormatter';
+import { useNavigate } from 'react-router-dom';
 
 interface Customer {
     id: number;
@@ -35,6 +36,8 @@ interface Customer {
     mda_tertiary?: string;
     personal_email?: string;
     mobile_number?: string;
+    kyc_tier?: number;
+    tier_3_status?: string;
 }
 
 interface CustomersPageProps {
@@ -49,6 +52,7 @@ const CustomersPage: React.FC<CustomersPageProps> = ({ user, onLogout, toggleThe
     const [isLoading, setIsLoading] = useState(true);
     const [selectedIds, setSelectedIds] = useState<number[]>([]);
     const [searchTerm, setSearchTerm] = useState('');
+    const [activeFilter, setActiveFilter] = useState<'all' | 'pending' | 'verified'>('all');
     const [isDrawerOpen, setIsDrawerOpen] = useState(false);
     const [drawerCustomerId, setDrawerCustomerId] = useState<number | null>(null);
     const [isNewCustomerModalOpen, setIsNewCustomerModalOpen] = useState(false);
@@ -62,13 +66,21 @@ const CustomersPage: React.FC<CustomersPageProps> = ({ user, onLogout, toggleThe
         setIsLoading(true);
         try {
             // Fetch only users with role='customer'
-            const res = await axios.get(`${import.meta.env.VITE_BACKEND_URL || ''}/api/staff/users`, {
-                params: {
-                    role: 'customer',
-                    page: currentPage,
-                    limit: limit,
-                    search: searchTerm
-                },
+            const params: any = {
+                role: 'customer',
+                page: currentPage,
+                limit: limit,
+                search: searchTerm
+            };
+
+            if (activeFilter === 'pending') {
+                params.tier_3_status = 'pending';
+            } else if (activeFilter === 'verified') {
+                params.kyc_tier = 3;
+            }
+
+            const res = await axios.get(`/api/staff/users`, {
+                params,
                 withCredentials: true
             });
 
@@ -89,7 +101,7 @@ const CustomersPage: React.FC<CustomersPageProps> = ({ user, onLogout, toggleThe
 
     useEffect(() => {
         fetchCustomers();
-    }, [currentPage, limit, searchTerm]);
+    }, [currentPage, limit, searchTerm, activeFilter]);
 
     const toggleSelectAll = () => {
         if (selectedIds.length === customers.length) {
@@ -107,9 +119,10 @@ const CustomersPage: React.FC<CustomersPageProps> = ({ user, onLogout, toggleThe
         }
     };
 
+    const navigate = useNavigate();
+
     const handleRowClick = (id: number) => {
-        setDrawerCustomerId(id);
-        setIsDrawerOpen(true);
+        navigate(`/staff/customers/${id}`);
     };
 
     const handleCSVExport = async () => {
@@ -301,9 +314,32 @@ const CustomersPage: React.FC<CustomersPageProps> = ({ user, onLogout, toggleThe
             </div>
 
             <div className="bg-white dark:bg-[#1e293b] rounded-3xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm">
-                <div className="p-6 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-[#0f172a]/50">
-                    <div className="flex items-center gap-4">
-                        <div className="relative">
+                <div className="p-6 border-b border-slate-200 dark:border-slate-800 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-slate-50 dark:bg-[#0f172a]/50">
+                    <div className="flex items-center gap-2 bg-white dark:bg-slate-800 p-1 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
+                        {[
+                            { id: 'all', label: 'All Customers', icon: 'groups' },
+                            { id: 'pending', label: 'Pending Tier 3', icon: 'assignment_late' },
+                            { id: 'verified', label: 'Tier 3 Verified', icon: 'verified' }
+                        ].map(tab => (
+                            <button
+                                key={tab.id}
+                                onClick={() => {
+                                    setActiveFilter(tab.id as any);
+                                    setCurrentPage(1);
+                                }}
+                                className={`px-4 py-2 rounded-lg text-xs font-black uppercase tracking-wider flex items-center gap-2 transition-all ${
+                                    activeFilter === tab.id
+                                        ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/20'
+                                        : 'text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-700'
+                                }`}
+                            >
+                                <span className="material-symbols-outlined text-sm">{tab.icon}</span>
+                                {tab.label}
+                            </button>
+                        ))}
+                    </div>
+                    <div className="flex items-center gap-4 w-full md:w-auto">
+                        <div className="relative flex-1 md:flex-none">
                             <span className="absolute left-3 top-1/2 -translate-y-1/2 material-symbols-outlined text-slate-400 text-sm">search</span>
                             <input
                                 type="text"
@@ -313,12 +349,9 @@ const CustomersPage: React.FC<CustomersPageProps> = ({ user, onLogout, toggleThe
                                     setSearchTerm(e.target.value);
                                     setCurrentPage(1);
                                 }}
-                                className="pl-9 pr-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm font-medium focus:ring-2 focus:ring-blue-500 outline-none w-72 transition-all"
+                                className="pl-9 pr-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm font-medium focus:ring-2 focus:ring-blue-500 outline-none w-full md:w-72 transition-all"
                             />
                         </div>
-                    </div>
-                    <div className="text-xs font-bold text-slate-500">
-                        Total Customers: {totalCustomers}
                     </div>
                 </div>
 
@@ -336,7 +369,7 @@ const CustomersPage: React.FC<CustomersPageProps> = ({ user, onLogout, toggleThe
                                 </th>
                                 <th className="p-4">Customer</th>
                                 <th className="p-4">Contact</th>
-                                <th className="p-4">State</th>
+                                <th className="p-4">KYC Tier</th>
                                 <th className="p-4">Employment</th>
                                 <th className="p-4">Status</th>
                                 <th className="p-4">Joined</th>
@@ -393,8 +426,23 @@ const CustomersPage: React.FC<CustomersPageProps> = ({ user, onLogout, toggleThe
                                                 <span className="text-[10px] text-slate-500">{customer.phone_number || 'No phone'}</span>
                                             </div>
                                         </td>
-                                        <td className="p-4 text-slate-600 dark:text-slate-400 font-medium text-xs">
-                                            {customer.state_of_residence || 'N/A'}
+                                        <td className="p-4">
+                                            <div className="flex flex-col gap-1">
+                                                <span className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider w-fit ${
+                                                    customer.kyc_tier === 3 ? 'bg-blue-500 text-white shadow-sm' :
+                                                    customer.kyc_tier === 2 ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400' :
+                                                    customer.kyc_tier === 1 ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' :
+                                                    'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'
+                                                }`}>
+                                                    Tier {customer.kyc_tier || 0}
+                                                </span>
+                                                {customer.tier_3_status === 'pending' && (
+                                                    <span className="flex items-center gap-1 text-[8px] font-black uppercase text-amber-600 animate-pulse">
+                                                        <span className="material-symbols-outlined text-[10px]">info</span>
+                                                        Review Pending
+                                                    </span>
+                                                )}
+                                            </div>
                                         </td>
                                         <td className="p-4 text-slate-600 dark:text-slate-400 font-medium text-xs">
                                             {customer.employer || 'N/A'}
@@ -413,9 +461,13 @@ const CustomersPage: React.FC<CustomersPageProps> = ({ user, onLogout, toggleThe
                                         <td className="p-4">
                                             <button
                                                 onClick={(e) => { e.stopPropagation(); handleRowClick(customer.id); }}
-                                                className="text-blue-500 hover:text-blue-600 text-xs font-bold uppercase"
+                                                className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase transition-all ${
+                                                    customer.tier_3_status === 'pending'
+                                                        ? 'bg-blue-600 text-white hover:bg-blue-700 shadow-md shadow-blue-500/20'
+                                                        : 'text-blue-500 hover:text-blue-600'
+                                                }`}
                                             >
-                                                View
+                                                {customer.tier_3_status === 'pending' ? 'Review' : 'View'}
                                             </button>
                                         </td>
                                     </tr>

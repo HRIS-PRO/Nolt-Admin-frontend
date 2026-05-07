@@ -42,6 +42,8 @@ interface CustomerProfile {
     is_corporate_account?: boolean;
     is_identity_verified?: boolean;
     selfie_verification_url?: string;
+    kyc_tier?: number;
+    tier_3_status?: string;
 }
 
 interface Investment {
@@ -73,6 +75,7 @@ const CustomerDetailsDrawer: React.FC<CustomerDetailsDrawerProps> = ({ customerI
     const [investments, setInvestments] = useState<Investment[]>([]);
     const [documents, setDocuments] = useState<Document[]>([]);
     const [isLoading, setIsLoading] = useState(false);
+    const [isApproving, setIsApproving] = useState(false);
 
     useEffect(() => {
         if (customerId) {
@@ -111,6 +114,25 @@ const CustomerDetailsDrawer: React.FC<CustomerDetailsDrawerProps> = ({ customerI
         }
     };
 
+    const handleApproveTier3 = async () => {
+        if (!customerId || !profile) return;
+        if (!window.confirm("Are you sure you want to approve this customer for Tier 3? This will increase their investment limits.")) return;
+
+        setIsApproving(true);
+        try {
+            const res = await axios.patch(`/api/staff/kyc/approve-tier-3`, { customerId }, { withCredentials: true });
+            if (res.data.success) {
+                alert("Customer upgraded to Tier 3 successfully!");
+                setProfile({ ...profile, kyc_tier: 3, tier_3_status: 'verified' });
+            }
+        } catch (error: any) {
+            console.error("Failed to approve Tier 3", error);
+            alert(error.response?.data?.message || "Approval failed");
+        } finally {
+            setIsApproving(false);
+        }
+    };
+
     if (!customerId) return null;
 
     return (
@@ -141,19 +163,28 @@ const CustomerDetailsDrawer: React.FC<CustomerDetailsDrawerProps> = ({ customerI
                                 </div>
                             </div>
 
-                            <div className="flex items-center gap-4">
-                                <div className="size-16 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden border-2 border-white dark:border-slate-600 shadow-sm">
-                                    {profile.avatar_url ? (
-                                        <img src={profile.avatar_url} alt={profile.full_name} className="w-full h-full object-cover" />
-                                    ) : (
-                                        <div className="w-full h-full flex items-center justify-center text-xl font-bold text-slate-500">
-                                            {profile.full_name[0]}
+                                <div className="flex items-center gap-4">
+                                    <div className="size-16 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden border-2 border-white dark:border-slate-600 shadow-sm">
+                                        {profile.avatar_url ? (
+                                            <img src={profile.avatar_url} alt={profile.full_name} className="w-full h-full object-cover" />
+                                        ) : (
+                                            <div className="w-full h-full flex items-center justify-center text-xl font-bold text-slate-500">
+                                                {profile.full_name ? profile.full_name[0] : '?'}
+                                            </div>
+                                        )}
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <div className="flex items-center gap-2 flex-wrap">
+                                            <h2 className="text-xl font-black text-slate-900 dark:text-white truncate">{profile.full_name}</h2>
+                                            <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider ${
+                                                profile.kyc_tier === 3 ? 'bg-blue-600 text-white shadow-sm' :
+                                                profile.kyc_tier === 2 ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400' :
+                                                'bg-slate-100 text-slate-600 dark:bg-slate-700'
+                                            }`}>
+                                                Tier {profile.kyc_tier || 0}
+                                            </span>
                                         </div>
-                                    )}
-                                </div>
-                                <div>
-                                    <h2 className="text-xl font-black text-slate-900 dark:text-white">{profile.full_name}</h2>
-                                    <p className="text-sm text-slate-500 dark:text-slate-400">{profile.personal_email || profile.email}</p>
+                                        <p className="text-sm text-slate-500 dark:text-slate-400 truncate">{profile.personal_email || profile.email}</p>
                                     <div className="flex items-center gap-2 mt-1">
                                         {profile.employer && (
                                             <div className="flex items-center gap-1 text-xs font-bold text-blue-600 dark:text-blue-400">
@@ -190,9 +221,32 @@ const CustomerDetailsDrawer: React.FC<CustomerDetailsDrawerProps> = ({ customerI
 
                         {/* Content */}
                         <div className="flex-1 overflow-y-auto p-6">
-                            {activeTab === 'overview' && (
-                                <div className="space-y-8">
-                                    <div className="bg-blue-50 dark:bg-blue-900/20 rounded-xl p-5 border border-blue-100 dark:border-blue-800">
+                                {activeTab === 'overview' && (
+                                    <div className="space-y-8">
+                                        {profile.tier_3_status === 'pending' && (
+                                            <div className="bg-amber-50 dark:bg-amber-900/20 rounded-2xl p-5 border border-amber-200 dark:border-amber-800/50 shadow-sm animate-pulse-subtle mb-6">
+                                                <div className="flex items-start gap-4">
+                                                    <div className="p-3 bg-white dark:bg-amber-900 rounded-xl text-amber-600 dark:text-amber-400 shadow-sm">
+                                                        <span className="material-symbols-outlined">assignment_late</span>
+                                                    </div>
+                                                    <div className="flex-1">
+                                                        <h3 className="text-xs font-black uppercase text-amber-700 dark:text-amber-400 tracking-wider mb-1">Tier 3 Review Required</h3>
+                                                        <p className="text-amber-800 dark:text-amber-200/70 text-xs font-medium leading-relaxed mb-4">
+                                                            Customer has requested a Tier 3 upgrade. Please review their address and uploaded documents before approving.
+                                                        </p>
+                                                        <button 
+                                                            onClick={handleApproveTier3}
+                                                            disabled={isApproving}
+                                                            className="w-full py-2.5 rounded-xl bg-amber-600 text-white text-[10px] font-black uppercase tracking-widest hover:bg-amber-700 transition-all shadow-lg shadow-amber-600/20 disabled:opacity-50"
+                                                        >
+                                                            {isApproving ? 'Approving...' : 'Approve Tier 3 Upgrade'}
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        <div className="bg-blue-50 dark:bg-blue-900/20 rounded-xl p-5 border border-blue-100 dark:border-blue-800">
                                         <div className="flex items-start gap-4">
                                             <div className="p-3 bg-white dark:bg-blue-900 rounded-lg text-blue-600 dark:text-blue-400 shadow-sm">
                                                 <span className="material-symbols-outlined">location_on</span>
