@@ -6,7 +6,7 @@ import axios from 'axios';
 interface NewCustomerModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSuccess?: () => void;
+  onSuccess?: (bvn?: string) => void;
 }
 
 type Step = 0 | 1 | 2;
@@ -160,7 +160,7 @@ const NewCustomerModal: React.FC<NewCustomerModalProps> = ({ isOpen, onClose, on
           } catch (e) {}
           setFetchingBalance(false);
         }
-        if (onSuccess) onSuccess();
+        if (onSuccess) onSuccess(bvn);
       } else {
         setError(response.data.message || 'Onboarding failed');
       }

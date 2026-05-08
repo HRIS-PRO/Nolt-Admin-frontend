@@ -19,6 +19,7 @@ const CustomerDetailsPage: React.FC<CustomerDetailsPageProps> = ({ user, onLogou
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'IDENTITY & KYC' | 'LOAN' | 'INVESTMENT' | 'BILL PAYMENTS' | 'AUDIT LOG'>('IDENTITY & KYC');
   const [balance, setBalance] = useState<number | null>(null);
+  const [isTogglingFreeze, setIsTogglingFreeze] = useState(false);
 
   useEffect(() => {
     fetchCustomerData();
@@ -399,17 +400,38 @@ const CustomerDetailsPage: React.FC<CustomerDetailsPageProps> = ({ user, onLogou
             <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 border border-slate-100 dark:border-slate-800/50 shadow-sm">
               <h3 className="text-[10px] font-bold text-slate-900 dark:text-white uppercase tracking-wider mb-6">QUICK ACTIONS</h3>
               <div className="space-y-3">
-                <button className="w-full flex items-center justify-between px-4 py-3 bg-blue-500 text-white rounded-xl hover:bg-blue-600 transition-colors shadow-sm shadow-blue-500/20">
-                  <span className="text-xs font-bold uppercase tracking-wider">FREEZE ACCOUNT</span>
-                  <svg className="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4m13.657-5.657l-11.314 11.314m0-11.314l11.314 11.314"/></svg>
+                <button 
+                  onClick={async () => {
+                    if (!window.confirm(`Are you sure you want to ${profile.is_active !== false ? 'freeze' : 'unfreeze'} this account?`)) return;
+                    setIsTogglingFreeze(true);
+                    try {
+                      const endpoint = profile.is_active !== false ? '/api/staff/revoke-access' : '/api/staff/unrevoke-access';
+                      await axios.post(`${import.meta.env.VITE_BACKEND_URL || ''}${endpoint}`, { userId: id }, { withCredentials: true });
+                      await fetchCustomerData(); // refresh the data
+                    } catch (err) {
+                      console.error("Failed to toggle account status", err);
+                      alert("Failed to toggle account status.");
+                    } finally {
+                      setIsTogglingFreeze(false);
+                    }
+                  }}
+                  disabled={isTogglingFreeze}
+                  className={`w-full flex items-center justify-between px-4 py-3 text-white rounded-xl transition-colors shadow-sm disabled:opacity-70 disabled:cursor-not-allowed ${profile.is_active !== false ? 'bg-blue-500 hover:bg-blue-600 shadow-blue-500/20' : 'bg-red-500 hover:bg-red-600 shadow-red-500/20'}`}
+                >
+                  <span className="text-xs font-bold uppercase tracking-wider">
+                    {isTogglingFreeze 
+                      ? (profile.is_active !== false ? 'FREEZING...' : 'UNFREEZING...') 
+                      : (profile.is_active !== false ? 'FREEZE ACCOUNT' : 'UNFREEZE ACCOUNT')}
+                  </span>
+                  {isTogglingFreeze ? (
+                    <div className="size-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  ) : (
+                    <svg className="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4m13.657-5.657l-11.314 11.314m0-11.314l11.314 11.314"/></svg>
+                  )}
                 </button>
                 <button className="w-full flex items-center justify-between px-4 py-3 border border-slate-200 dark:border-slate-700 bg-transparent text-slate-700 dark:text-slate-200 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
                   <span className="text-xs font-bold uppercase tracking-wider">SEND MESSAGE</span>
                   <svg className="size-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
-                </button>
-                <button className="w-full flex items-center justify-between px-4 py-3 border border-red-200 dark:border-red-900/30 bg-red-50 dark:bg-red-900/10 text-red-600 dark:text-red-400 rounded-xl hover:bg-red-100 dark:hover:bg-red-900/20 transition-colors">
-                  <span className="text-xs font-bold uppercase tracking-wider">FLAG PROFILE</span>
-                  <svg className="size-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6h-8.5l-1-1H5a2 2 0 00-2 2zm9-13.5V9" /></svg>
                 </button>
               </div>
             </div>

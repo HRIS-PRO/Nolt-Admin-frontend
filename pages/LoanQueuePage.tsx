@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import StaffLayout from '../components/layouts/StaffLayout';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
-import StaffLoanForm from '../components/StaffLoanForm';
+import NewLoanApplicationFlow from '../components/NewLoanApplicationFlow';
 import { getStatusStyles } from '../utils/statusStyles';
 import { formatDate } from '../utils/dateFormatter';
 
@@ -482,12 +482,14 @@ const LoanQueuePage: React.FC<LoanQueuePageProps> = ({ user, onLogout, toggleThe
             </div>
 
             {isCreateModalOpen && (
-                <StaffLoanForm
+                <NewLoanApplicationFlow
+                    isOpen={isCreateModalOpen}
                     onClose={() => setIsCreateModalOpen(false)}
                     onSuccess={() => {
                         fetchLoans();
                         setIsCreateModalOpen(false);
                     }}
+                    user={user}
                 />
             )}
         </StaffLayout>

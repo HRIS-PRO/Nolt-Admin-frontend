@@ -5,6 +5,10 @@ import MdaTertiarySelect, { TERTIARY_LIST } from './MdaTertiarySelect';
 interface StaffLoanFormProps {
     onClose: () => void;
     onSuccess: () => void;
+    initialData?: any;
+    loanId?: string;
+    user?: any;
+    isCustomerVerified?: boolean;
 }
 
 const NIGERIAN_STATES = [
@@ -107,7 +111,7 @@ const FileUpload = ({
 
 // --- Main Component ---
 
-const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess, initialData, loanId, user }) => {
+const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess, initialData, loanId, user, isCustomerVerified }) => {
     const [step, setStep] = useState(0);
     const [loading, setLoading] = useState(false);
     const [uploadProgress, setUploadProgress] = useState<Record<string, number>>({});
@@ -213,7 +217,7 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess, initi
             setReligion(initialData.religion || '');
             setMaritalStatus(initialData.marital_status || '');
             setMothersMaidenName(initialData.mothers_maiden_name || '');
-            setMobileNumber(initialData.mobile_number || '');
+            setMobileNumber(initialData.phone_number || initialData.mobile_number || '');
             setEmail(initialData.personal_email || '');
             setBvn(initialData.bvn || '');
             setNin(initialData.nin || '');
@@ -221,7 +225,7 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess, initi
             setStateOfOrigin(initialData.state_of_origin || '');
             setStateOfResidence(initialData.state_of_residence || '');
             setResidentialStatus(initialData.residential_status || '');
-            setAddress(initialData.primary_home_address || '');
+            setAddress(initialData.address || initialData.primary_home_address || '');
 
             setMda(initialData.mda_tertiary || '');
             setIppisNumber(initialData.ippis_number || '');
@@ -233,7 +237,7 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess, initi
             setLoanType(initialData.loan_type || 'new');
 
             // Populate New Fields
-            setCasa(String(initialData.casa).split('.')[0] || '');
+            setCasa(initialData.casa ? String(initialData.casa).split('.')[0] : '');
             setTopUpAmount(initialData.topup_amount || '');
             setBuyOverAmount(initialData.buy_over_amount || '');
             setBuyOverCompanyName(initialData.buy_over_company_name || '');
@@ -941,24 +945,24 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess, initi
                                         </div>
                                         <div className="md:col-span-2">
                                             <InputGroup label="Title">
-                                                <select className="input-field" value={title} onChange={e => setTitle(e.target.value)}>
+                                                <select className="input-field" value={title} onChange={e => setTitle(e.target.value)} disabled={isCustomerVerified}>
                                                     <option>Mr</option><option>Mrs</option><option>Ms</option><option>Dr</option>
                                                 </select>
                                             </InputGroup>
                                         </div>
                                         <div className="md:col-span-4">
                                             <InputGroup label="Surname" required error={errors.surname}>
-                                                <input className="input-field" value={surname} onChange={e => { setSurname(e.target.value); clearError('surname'); }} placeholder="e.g. Doe" />
+                                                <input className="input-field" value={surname} onChange={e => { setSurname(e.target.value); clearError('surname'); }} placeholder="e.g. Doe" disabled={isCustomerVerified} />
                                             </InputGroup>
                                         </div>
                                         <div className="md:col-span-3">
                                             <InputGroup label="First Name" required error={errors.firstName}>
-                                                <input className="input-field" value={firstName} onChange={e => { setFirstName(e.target.value); clearError('firstName'); }} placeholder="e.g. John" />
+                                                <input className="input-field" value={firstName} onChange={e => { setFirstName(e.target.value); clearError('firstName'); }} placeholder="e.g. John" disabled={isCustomerVerified} />
                                             </InputGroup>
                                         </div>
                                         <div className="md:col-span-3">
                                             <InputGroup label="Middle Name">
-                                                <input className="input-field" value={middleName} onChange={e => setMiddleName(e.target.value)} placeholder="Optional" />
+                                                <input className="input-field" value={middleName} onChange={e => setMiddleName(e.target.value)} placeholder="Optional" disabled={isCustomerVerified} />
                                             </InputGroup>
                                         </div>
                                     </div>
@@ -967,12 +971,12 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess, initi
 
                                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                                         <InputGroup label="Gender" required error={errors.gender}>
-                                            <select className="input-field" value={gender} onChange={e => { setGender(e.target.value); clearError('gender'); }}>
+                                            <select className="input-field" value={gender} onChange={e => { setGender(e.target.value); clearError('gender'); }} disabled={isCustomerVerified}>
                                                 <option value="">Select</option><option>Male</option><option>Female</option>
                                             </select>
                                         </InputGroup>
                                         <InputGroup label="Date of Birth" required error={errors.dob}>
-                                            <input type="date" className="input-field" value={dob} onChange={e => { setDob(e.target.value); clearError('dob'); }} />
+                                            <input type="date" className="input-field" value={dob} onChange={e => { setDob(e.target.value); clearError('dob'); }} disabled={isCustomerVerified} />
                                         </InputGroup>
                                         <InputGroup label="Marital Status" required error={errors.maritalStatus}>
                                             <select className="input-field" value={maritalStatus} onChange={e => { setMaritalStatus(e.target.value); clearError('maritalStatus'); }}>
@@ -991,7 +995,7 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess, initi
                                             </select>
                                         </InputGroup>
                                         <InputGroup label="Mobile Number" required error={errors.mobileNumber}>
-                                            <input className="input-field" value={mobileNumber} onChange={handleNumericChange(setMobileNumber, 'mobileNumber', 11)} placeholder="080..." maxLength={11} />
+                                            <input className="input-field" value={mobileNumber} onChange={handleNumericChange(setMobileNumber, 'mobileNumber', 11)} placeholder="080..." maxLength={11} disabled={isCustomerVerified} />
                                         </InputGroup>
                                         <InputGroup label="Email Address">
                                             <input className="input-field" value={email} onChange={e => setEmail(e.target.value)} placeholder="Optional" />
@@ -1000,10 +1004,10 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess, initi
 
                                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                                         <InputGroup label="BVN" required error={errors.bvn}>
-                                            <input className="input-field" value={bvn} onChange={handleNumericChange(setBvn, 'bvn', 11)} maxLength={11} placeholder="11 Digits" />
+                                            <input className="input-field" value={bvn} onChange={handleNumericChange(setBvn, 'bvn', 11)} maxLength={11} placeholder="11 Digits" disabled={isCustomerVerified} />
                                         </InputGroup>
                                         <InputGroup label="NIN" required error={errors.nin}>
-                                            <input className="input-field" value={nin} onChange={handleNumericChange(setNin, 'nin', 11)} maxLength={11} placeholder="11 Digits" />
+                                            <input className="input-field" value={nin} onChange={handleNumericChange(setNin, 'nin', 11)} maxLength={11} placeholder="11 Digits" disabled={isCustomerVerified} />
                                         </InputGroup>
                                         <InputGroup label="Mother's Maiden Name">
                                             <input className="input-field" value={mothersMaidenName} onChange={e => setMothersMaidenName(e.target.value)} />
