@@ -11,7 +11,7 @@ interface NewLoanApplicationFlowProps {
     user?: any;
 }
 
-type FlowState = 'LOOKUP' | 'NEW_CUSTOMER' | 'CUSTOMER_CARD' | 'LOAN_FORM';
+type FlowState = 'LOOKUP' | 'NEW_CUSTOMER' | 'CUSTOMER_CARD' | 'LOAN_FORM' | 'NOT_FOUND';
 
 const NewLoanApplicationFlow: React.FC<NewLoanApplicationFlowProps> = ({ isOpen, onClose, onSuccess, user }) => {
     const [currentState, setCurrentState] = useState<FlowState>('LOOKUP');
@@ -52,7 +52,7 @@ const NewLoanApplicationFlow: React.FC<NewLoanApplicationFlowProps> = ({ isOpen,
             }
         } catch (err: any) {
             if (err.response?.status === 404) {
-                setCurrentState('NEW_CUSTOMER');
+                setCurrentState('NOT_FOUND');
             } else {
                 setError(err.response?.data?.message || 'Error looking up customer');
             }
@@ -88,6 +88,7 @@ const NewLoanApplicationFlow: React.FC<NewLoanApplicationFlowProps> = ({ isOpen,
                 isOpen={true} 
                 onClose={resetFlow} 
                 onSuccess={handleCustomerCreated} 
+                initialBvn={lookupType === 'bvn' ? searchValue : ''}
             />
         );
     }
@@ -159,11 +160,49 @@ const NewLoanApplicationFlow: React.FC<NewLoanApplicationFlowProps> = ({ isOpen,
                                         <button 
                                             onClick={() => handleSearch()}
                                             disabled={loading || searchValue.length < 10}
-                                            className="w-full py-4 bg-primary text-white rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-primary-600 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                                            className="w-full py-4 bg-primary text-white rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-primary-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 relative overflow-hidden group"
                                         >
-                                            {loading ? <span className="material-symbols-outlined animate-spin">refresh</span> : 'Search Customer'}
+                                            {loading && (
+                                                <div className="absolute inset-0 flex items-center justify-center bg-primary-700">
+                                                    <span className="material-symbols-outlined animate-spin">progress_activity</span>
+                                                </div>
+                                            )}
+                                            <span className={loading ? 'opacity-0' : 'opacity-100'}>Search Customer</span>
                                         </button>
                                     </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {currentState === 'NOT_FOUND' && (
+                            <div className="p-8 flex-1 flex flex-col items-center justify-center text-center space-y-6">
+                                <div className="absolute top-6 right-6">
+                                    <button onClick={resetFlow} className="w-10 h-10 rounded-full bg-slate-50 dark:bg-slate-800 flex items-center justify-center text-slate-400 hover:text-rose-500 transition-colors">
+                                        <span className="material-symbols-outlined">close</span>
+                                    </button>
+                                </div>
+                                <div className="size-20 rounded-full bg-slate-50 dark:bg-slate-800/50 flex items-center justify-center">
+                                    <span className="material-symbols-outlined text-4xl text-slate-400">person_off</span>
+                                </div>
+                                <div>
+                                    <h4 className="text-xl font-black text-slate-900 dark:text-white uppercase mb-2 tracking-tight">Customer Not Found</h4>
+                                    <p className="text-sm font-bold text-slate-500 uppercase tracking-widest leading-relaxed">
+                                        No customer found with {lookupType.toUpperCase()} {searchValue}.<br/>Would you like to onboard them?
+                                    </p>
+                                </div>
+                                <div className="flex gap-4 w-full max-w-sm mt-4">
+                                    <button 
+                                        onClick={() => setCurrentState('LOOKUP')}
+                                        className="flex-1 py-4 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all"
+                                    >
+                                        Try Again
+                                    </button>
+                                    <button 
+                                        onClick={() => setCurrentState('NEW_CUSTOMER')}
+                                        className="flex-1 py-4 bg-primary text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-primary-600 transition-all shadow-lg shadow-primary/20"
+                                    >
+                                        Create Customer
+                                    </button>
                                 </div>
                             </div>
                         )}

@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import axios from 'axios';
 
@@ -7,6 +7,7 @@ interface NewCustomerModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess?: (bvn?: string) => void;
+  initialBvn?: string;
 }
 
 type Step = 0 | 1 | 2;
@@ -17,9 +18,9 @@ const STEPS = [
   'Tier 3 Verification'
 ];
 
-const NewCustomerModal: React.FC<NewCustomerModalProps> = ({ isOpen, onClose, onSuccess }) => {
+const NewCustomerModal: React.FC<NewCustomerModalProps> = ({ isOpen, onClose, onSuccess, initialBvn }) => {
   const [currentStep, setCurrentStep] = useState<Step>(0);
-  const [bvn, setBvn] = useState('');
+  const [bvn, setBvn] = useState(initialBvn || '');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [onboardingProgress, setOnboardingProgress] = useState(false);
@@ -49,14 +50,21 @@ const NewCustomerModal: React.FC<NewCustomerModalProps> = ({ isOpen, onClose, on
 
   const [uploading, setUploading] = useState(false);
 
+  useEffect(() => {
+    if (initialBvn && isOpen && initialBvn.length === 11) {
+      handleLookupBVN(initialBvn);
+    }
+  }, [initialBvn, isOpen]);
+
   if (!isOpen) return null;
 
-  const handleLookupBVN = async () => {
-    if (bvn.length !== 11) return;
+  const handleLookupBVN = async (bvnToLookup?: string) => {
+    const lookupVal = typeof bvnToLookup === 'string' ? bvnToLookup : bvn;
+    if (lookupVal.length !== 11) return;
     setLoading(true);
     setError(null);
     try {
-      const response = await axios.get(`/api/staff/kyc/lookup-bvn?bvn=${bvn}`);
+      const response = await axios.get(`/api/staff/kyc/lookup-bvn?bvn=${lookupVal}`);
       if (response.data.success) {
         if (response.data.already_exists) {
           const custData = response.data.customer;
@@ -121,11 +129,25 @@ const NewCustomerModal: React.FC<NewCustomerModalProps> = ({ isOpen, onClose, on
         headers: { 'Content-Type': 'multipart/form-data' }
       });
       setFormData(prev => ({ ...prev, utility_bill_url: response.data.document.file_url }));
+      setError(null);
     } catch (err) {
       alert('Failed to upload utility bill');
     } finally {
       setUploading(false);
     }
+  };
+
+  const handleContinueToStep2 = () => {
+    if (!formData.title || !formData.firstName || !formData.lastName || !formData.middleName || !formData.nin || !formData.phone || !formData.email || !formData.gender || !formData.dob || !formData.maritalStatus) {
+      setError("Please fill in all personal details, including Middle Name and NIN, before proceeding.");
+      return;
+    }
+    if (formData.nin.length !== 11) {
+      setError("NIN must be exactly 11 digits.");
+      return;
+    }
+    setError(null);
+    setCurrentStep(2);
   };
 
   const handleOnboard = async (e: React.FormEvent) => {
@@ -135,6 +157,7 @@ const NewCustomerModal: React.FC<NewCustomerModalProps> = ({ isOpen, onClose, on
 
     if (!formData.utility_bill_url) {
       setError("Please upload a utility bill for Tier 3 verification.");
+      setOnboardingProgress(false);
       return;
     }
 
@@ -427,12 +450,12 @@ const NewCustomerModal: React.FC<NewCustomerModalProps> = ({ isOpen, onClose, on
                           <input required type="text" value={formData.lastName} onChange={(e) => setFormData({...formData, lastName: e.target.value})} className="input-field-onboarding" />
                         </div>
                         <div className="space-y-2">
-                          <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1 text-slate-400">Middle Name (Optional)</p>
-                          <input type="text" value={formData.middleName} onChange={(e) => setFormData({...formData, middleName: e.target.value})} className="input-field-onboarding" />
+                          <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Middle Name</p>
+                          <input required type="text" value={formData.middleName} onChange={(e) => setFormData({...formData, middleName: e.target.value})} className="input-field-onboarding" />
                         </div>
                         <div className="space-y-2">
-                          <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">NIN (Optional)</p>
-                          <input type="text" maxLength={11} value={formData.nin} onChange={(e) => setFormData({...formData, nin: e.target.value.replace(/\D/g, '')})} className="input-field-onboarding" placeholder="11-digit NIN" />
+                          <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">NIN</p>
+                          <input required type="text" maxLength={11} value={formData.nin} onChange={(e) => setFormData({...formData, nin: e.target.value.replace(/\D/g, '')})} className="input-field-onboarding" placeholder="11-digit NIN" />
                         </div>
                         <div className="space-y-2">
                           <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Mobile Number</p>
@@ -467,7 +490,7 @@ const NewCustomerModal: React.FC<NewCustomerModalProps> = ({ isOpen, onClose, on
                         
                         <div className="col-span-full pt-6 flex gap-4">
                           <button type="button" onClick={() => setCurrentStep(0)} className="flex-1 py-4 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 rounded-2xl text-[10px] font-black uppercase tracking-widest">Back</button>
-                          <button type="button" onClick={() => setCurrentStep(2)} className="flex-[2] py-4 bg-slate-900 dark:bg-blue-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] shadow-xl">Continue to Tier 3</button>
+                          <button type="button" onClick={handleContinueToStep2} className="flex-[2] py-4 bg-slate-900 dark:bg-blue-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] shadow-xl">Continue to Tier 3</button>
                         </div>
                       </div>
                     ) : (
@@ -477,7 +500,7 @@ const NewCustomerModal: React.FC<NewCustomerModalProps> = ({ isOpen, onClose, on
                             <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">State of Residence</p>
                             <select required value={formData.stateOfResidence} onChange={(e) => setFormData({...formData, stateOfResidence: e.target.value})} className="input-field-onboarding">
                               <option value="">Select State...</option>
-                              {["Lagos", "Abuja", "Rivers", "Oyo", "Kano", "Cross River", "Edo", "Enugu"].map(state => (
+                              {["Abia", "Adamawa", "Akwa Ibom", "Anambra", "Bauchi", "Bayelsa", "Benue", "Borno", "Cross River", "Delta", "Ebonyi", "Edo", "Ekiti", "Enugu", "Gombe", "Imo", "Jigawa", "Kaduna", "Kano", "Katsina", "Kebbi", "Kogi", "Kwara", "Lagos", "Nasarawa", "Niger", "Ogun", "Ondo", "Osun", "Oyo", "Plateau", "Rivers", "Sokoto", "Taraba", "Yobe", "Zamfara", "FCT"].map(state => (
                                 <option key={state} value={state}>{state}</option>
                               ))}
                             </select>

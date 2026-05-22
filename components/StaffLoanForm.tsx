@@ -156,6 +156,7 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess, initi
     const [accountName, setAccountName] = useState('');
     const [bankList, setBankList] = useState<{ name: string, code: string }[]>([]);
     const [productType, setProductType] = useState('');
+    const [activeProducts, setActiveProducts] = useState<{ id: number, custom_name: string }[]>([]);
     const [isVerifyingBank, setIsVerifyingBank] = useState(false);
     const [bankVerificationResult, setBankVerificationResult] = useState<{
         account_name: string;
@@ -297,7 +298,22 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess, initi
                 console.error("Error fetching banks:", error);
             }
         };
+
+        const fetchActiveProducts = async () => {
+            try {
+                const response = await axios.get('/api/staff/products/loans/active');
+                setActiveProducts(response.data);
+                // Pre-select first product if none is selected
+                if (response.data.length > 0 && !productType && !initialData?.product_type) {
+                    setProductType(response.data[0].custom_name);
+                }
+            } catch (error) {
+                console.error("Error fetching active products:", error);
+            }
+        };
+
         fetchBanks();
+        fetchActiveProducts();
     }, []);
 
     // Auto-verify bank account when bank + 10-digit account number are both filled
@@ -939,7 +955,10 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess, initi
                                         <div className="md:col-span-2">
                                             <InputGroup label="Product Type">
                                                 <select className="input-field" value={productType} onChange={e => setProductType(e.target.value)}>
-                                                    <option>Public Sector Loan</option>
+                                                    <option value="">Select Product Type</option>
+                                                    {activeProducts.map(p => (
+                                                        <option key={p.id} value={p.custom_name}>{p.custom_name}</option>
+                                                    ))}
                                                 </select>
                                             </InputGroup>
                                         </div>
@@ -1413,12 +1432,15 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess, initi
                             Next Step <span className="material-symbols-outlined transition-transform group-hover:translate-x-1">arrow_forward</span>
                         </button>
                     ) : (
-                        <button onClick={handleSubmit} disabled={loading} className="group px-10 py-4 rounded-2xl font-black text-white bg-green-500 hover:bg-green-600 shadow-xl shadow-green-500/20 hover:shadow-green-500/30 hover:-translate-y-1 transition-all disabled:opacity-50 disabled:translate-y-0 disabled:shadow-none flex items-center gap-2">
-                            {loading ? (
-                                <>Processing...</>
-                            ) : (
-                                <>Submit Application <span className="material-symbols-outlined">check_circle</span></>
+                        <button onClick={handleSubmit} disabled={loading} className="group px-10 py-4 rounded-2xl font-black text-white bg-green-500 hover:bg-green-600 shadow-xl shadow-green-500/20 hover:shadow-green-500/30 hover:-translate-y-1 transition-all disabled:opacity-50 disabled:translate-y-0 disabled:shadow-none disabled:cursor-not-allowed flex items-center gap-2 relative overflow-hidden">
+                            {loading && (
+                                <div className="absolute inset-0 flex items-center justify-center bg-green-600">
+                                    <span className="material-symbols-outlined animate-spin">progress_activity</span>
+                                </div>
                             )}
+                            <span className={loading ? 'opacity-0 flex items-center gap-2' : 'flex items-center gap-2'}>
+                                Submit Application <span className="material-symbols-outlined">check_circle</span>
+                            </span>
                         </button>
                     )}
                 </div>
