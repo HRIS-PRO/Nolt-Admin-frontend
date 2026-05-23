@@ -96,15 +96,13 @@ const NewLoanApplicationFlow: React.FC<NewLoanApplicationFlowProps> = ({ isOpen,
     if (currentState === 'LOAN_FORM') {
         const enrichedInitialData = { ...customerData, loan_type: selectedLoanType };
         return (
-            <div className="fixed inset-0 z-50 overflow-y-auto">
-                <StaffLoanForm 
-                    onClose={resetFlow} 
-                    onSuccess={() => { onSuccess(); resetFlow(); }} 
-                    initialData={enrichedInitialData}
-                    user={user}
-                    isCustomerVerified={true}
-                />
-            </div>
+            <StaffLoanForm 
+                onClose={resetFlow} 
+                onSuccess={() => { onSuccess(); resetFlow(); }} 
+                initialData={enrichedInitialData}
+                user={user}
+                isCustomerVerified={true}
+            />
         );
     }
 
