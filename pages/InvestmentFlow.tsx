@@ -1161,10 +1161,10 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
               <div className="size-20 rounded-3xl bg-primary/10 text-primary flex items-center justify-center shrink-0 group-hover:bg-primary group-hover:text-white transition-all"><span className="material-symbols-outlined text-4xl filled">business</span></div>
               <div className="flex-1"><h3 className="text-2xl font-black uppercase tracking-tight dark:text-white">Corporate</h3><p className="text-slate-500 font-bold text-sm">Business reserves or treasury.</p></div>
             </button>
-            <button onClick={() => { setEntityType('JOINT'); handleNext(); }} className={`group p-10 rounded-[3rem] border-2 transition-all text-left flex items-center gap-8 ${entityType === 'JOINT' ? 'border-primary bg-white dark:bg-slate-800 shadow-xl' : 'border-slate-100 dark:border-slate-800 bg-white/50 hover:border-primary/50'}`}>
+            {/* <button onClick={() => { setEntityType('JOINT'); handleNext(); }} className={`group p-10 rounded-[3rem] border-2 transition-all text-left flex items-center gap-8 ${entityType === 'JOINT' ? 'border-primary bg-white dark:bg-slate-800 shadow-xl' : 'border-slate-100 dark:border-slate-800 bg-white/50 hover:border-primary/50'}`}>
               <div className="size-20 rounded-3xl bg-primary/10 text-primary flex items-center justify-center shrink-0 group-hover:bg-primary group-hover:text-white transition-all"><span className="material-symbols-outlined text-4xl filled">group</span></div>
               <div className="flex-1"><h3 className="text-2xl font-black uppercase tracking-tight dark:text-white">Joint</h3><p className="text-slate-500 font-bold text-sm">Invest together with a partner.</p></div>
-            </button>
+            </button> */}
           </div>
           <button onClick={handleBack} className="flex items-center gap-2 text-slate-400 font-black uppercase tracking-widest text-sm hover:text-primary transition-colors"><span className="material-symbols-outlined">arrow_back</span> Back</button>
         </div>
