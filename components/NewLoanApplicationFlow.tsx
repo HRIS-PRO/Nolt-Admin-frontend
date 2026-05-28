@@ -21,6 +21,7 @@ const NewLoanApplicationFlow: React.FC<NewLoanApplicationFlowProps> = ({ isOpen,
     const [error, setError] = useState<string | null>(null);
     const [customerData, setCustomerData] = useState<any>(null);
     const [loanHistory, setLoanHistory] = useState<any[]>([]);
+    const [cbaLoans, setCbaLoans] = useState<any[]>([]);
     const [selectedLoanType, setSelectedLoanType] = useState<string>('new');
 
     if (!isOpen) return null;
@@ -48,6 +49,7 @@ const NewLoanApplicationFlow: React.FC<NewLoanApplicationFlowProps> = ({ isOpen,
             if (response.data.success) {
                 setCustomerData(response.data.customer);
                 setLoanHistory(response.data.loans || []);
+                setCbaLoans(response.data.cbaLoans || []);
                 setCurrentState('CUSTOMER_CARD');
             }
         } catch (err: any) {
@@ -77,6 +79,7 @@ const NewLoanApplicationFlow: React.FC<NewLoanApplicationFlowProps> = ({ isOpen,
         setSearchValue('');
         setCustomerData(null);
         setLoanHistory([]);
+        setCbaLoans([]);
         setError(null);
         onClose();
     };
@@ -259,18 +262,17 @@ const NewLoanApplicationFlow: React.FC<NewLoanApplicationFlowProps> = ({ isOpen,
                                     </div>
                                 </div>
 
-                                {/* Loan History */}
+                                {/* Loan History (CBA Live) */}
                                 <div className="mb-8">
                                     <div className="flex items-center gap-3 mb-6">
                                         <div className="w-1 h-4 bg-primary rounded-full"></div>
                                         <h4 className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-widest">Existing Loans on CBS</h4>
                                     </div>
                                     
-                                    {loanHistory.length > 0 ? (
+                                    {cbaLoans.length > 0 ? (
                                         <div className="space-y-4">
-                                            {loanHistory.map((loan, idx) => {
-                                                const isActive = ['pending', 'approved', 'disbursed', 'active'].includes((loan.status || '').toLowerCase()) || 
-                                                                 ['disbursed', 'ongoing'].includes((loan.stage || '').toLowerCase());
+                                            {cbaLoans.map((loan, idx) => {
+                                                const isActive = loan.currentBalance < 0 && loan.nextTotalPayment !== 0;
                                                 return (
                                                     <div key={idx} className="flex items-center justify-between p-5 bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm">
                                                         <div className="flex items-center gap-4">
@@ -279,10 +281,10 @@ const NewLoanApplicationFlow: React.FC<NewLoanApplicationFlowProps> = ({ isOpen,
                                                             </div>
                                                             <div>
                                                                 <p className="font-black text-sm text-slate-900 dark:text-white tracking-tight">
-                                                                    LN-{new Date(loan.created_at).getFullYear()}-{loan.id.toString().padStart(5, '0')} • {(loan.product_type || loan.loan_type).toUpperCase()}
+                                                                    {loan.loanAccountNo} • {(loan.product || '').toUpperCase()}
                                                                 </p>
                                                                 <p className="text-[10px] font-black tracking-widest text-slate-400 uppercase mt-1">
-                                                                    Outstanding: <span className="text-rose-500">{isActive ? `₦${parseFloat(loan.requested_loan_amount).toLocaleString()}` : 'NO'}</span>
+                                                                    Outstanding: <span className="text-rose-500">{isActive ? `₦${Math.abs(loan.currentBalance).toLocaleString()}` : 'NO'}</span>
                                                                 </p>
                                                             </div>
                                                         </div>
@@ -295,42 +297,58 @@ const NewLoanApplicationFlow: React.FC<NewLoanApplicationFlowProps> = ({ isOpen,
                                         </div>
                                     ) : (
                                         <div className="p-5 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-700 text-center">
-                                            <p className="text-xs font-bold text-slate-500 italic">No existing loans found for this customer.</p>
+                                            <p className="text-xs font-bold text-slate-500 italic">No existing loans found on core banking.</p>
                                         </div>
                                     )}
                                 </div>
 
                                 {/* Active Loan Options Block */}
-                                {loanHistory.some(loan => ['pending', 'approved', 'disbursed', 'active'].includes((loan.status || '').toLowerCase()) || ['disbursed', 'ongoing'].includes((loan.stage || '').toLowerCase())) && (
-                                    <div className="p-6 bg-purple-50/50 dark:bg-purple-900/10 rounded-3xl border border-purple-200 dark:border-purple-800 border-dashed mb-8">
-                                        <h4 className="text-sm font-black text-purple-700 dark:text-purple-400 uppercase italic tracking-tight mb-1">Active Loan Detected</h4>
-                                        <p className="text-[10px] font-black text-purple-500/70 dark:text-purple-400/70 uppercase tracking-widest mb-6">An active loan exists for this customer. How would you like to proceed?</p>
-                                        
-                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                            <button 
-                                                onClick={() => setSelectedLoanType('topup')}
-                                                className={`p-4 rounded-lg border transition-all text-left ${selectedLoanType === 'topup' ? 'bg-white border-purple-400 shadow-md ring-2 ring-purple-100' : 'bg-white/60 border-purple-100 hover:bg-white'}`}
-                                            >
-                                                <p className="font-black text-slate-900 text-sm mb-1">TOP-UP</p>
-                                                <p className="text-[9px] font-bold text-slate-400 uppercase leading-relaxed">Add funds to the existing loan</p>
-                                            </button>
-                                            <button 
-                                                onClick={() => setSelectedLoanType('add_on')}
-                                                className={`p-4 rounded-lg border transition-all text-left ${selectedLoanType === 'add_on' ? 'bg-white border-purple-400 shadow-md ring-2 ring-purple-100' : 'bg-white/60 border-purple-100 hover:bg-white'}`}
-                                            >
-                                                <p className="font-black text-slate-900 text-sm mb-1">RE-ADD</p>
-                                                <p className="text-[9px] font-bold text-slate-400 uppercase leading-relaxed">Re-open or restructure the existing loan</p>
-                                            </button>
-                                            <button 
-                                                onClick={() => setSelectedLoanType('buy_over')}
-                                                className={`p-4 rounded-lg border transition-all text-left ${selectedLoanType === 'buy_over' ? 'bg-white border-purple-400 shadow-md ring-2 ring-purple-100' : 'bg-white/60 border-purple-100 hover:bg-white'}`}
-                                            >
-                                                <p className="font-black text-slate-900 text-sm mb-1">BUYOVER</p>
-                                                <p className="text-[9px] font-bold text-slate-400 uppercase leading-relaxed">Transfer the loan from another lender</p>
-                                            </button>
-                                        </div>
-                                    </div>
-                                )}
+                                {(() => {
+                                    const activeLoans = cbaLoans.filter(loan => loan.currentBalance < 0 && loan.nextTotalPayment !== 0);
+                                    const hasActiveLoan = activeLoans.length > 0;
+                                    const hasActiveIppisLoan = activeLoans.some(loan => loan.product === 'NOLT IPPIS');
+
+                                    if (hasActiveLoan && hasActiveIppisLoan) {
+                                        return (
+                                            <div className="p-6 bg-purple-50/50 dark:bg-purple-900/10 rounded-3xl border border-purple-200 dark:border-purple-800 border-dashed mb-8">
+                                                <h4 className="text-sm font-black text-purple-700 dark:text-purple-400 uppercase italic tracking-tight mb-1">Active IPPIS Loan Detected</h4>
+                                                <p className="text-[10px] font-black text-purple-500/70 dark:text-purple-400/70 uppercase tracking-widest mb-6">This customer has an active IPPIS loan. Please select an action to proceed.</p>
+                                                
+                                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                                    <button 
+                                                        onClick={() => setSelectedLoanType('topup')}
+                                                        className={`p-4 rounded-lg border transition-all text-left ${selectedLoanType === 'topup' ? 'bg-white border-purple-400 shadow-md ring-2 ring-purple-100' : 'bg-white/60 border-purple-100 hover:bg-white'}`}
+                                                    >
+                                                        <p className="font-black text-slate-900 text-sm mb-1">TOP-UP</p>
+                                                        <p className="text-[9px] font-bold text-slate-400 uppercase leading-relaxed">Add funds to the existing loan</p>
+                                                    </button>
+                                                    <button 
+                                                        onClick={() => setSelectedLoanType('re-app')}
+                                                        className={`p-4 rounded-lg border transition-all text-left ${selectedLoanType === 're-app' ? 'bg-white border-purple-400 shadow-md ring-2 ring-purple-100' : 'bg-white/60 border-purple-100 hover:bg-white'}`}
+                                                    >
+                                                        <p className="font-black text-slate-900 text-sm mb-1">RE-APP</p>
+                                                        <p className="text-[9px] font-bold text-slate-400 uppercase leading-relaxed">Re-apply for a new loan term</p>
+                                                    </button>
+                                                    <button 
+                                                        onClick={() => setSelectedLoanType('add_on')}
+                                                        className={`p-4 rounded-lg border transition-all text-left ${selectedLoanType === 'add_on' ? 'bg-white border-purple-400 shadow-md ring-2 ring-purple-100' : 'bg-white/60 border-purple-100 hover:bg-white'}`}
+                                                    >
+                                                        <p className="font-black text-slate-900 text-sm mb-1">ADD-ON</p>
+                                                        <p className="text-[9px] font-bold text-slate-400 uppercase leading-relaxed">Add additional product/funds</p>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        );
+                                    } else if (hasActiveLoan && !hasActiveIppisLoan) {
+                                        return (
+                                            <div className="p-6 bg-rose-50/50 dark:bg-rose-900/10 rounded-3xl border border-rose-200 dark:border-rose-800 border-dashed mb-8">
+                                                <h4 className="text-sm font-black text-rose-700 dark:text-rose-400 uppercase italic tracking-tight mb-1">Active Loan Restriction</h4>
+                                                <p className="text-[10px] font-black text-rose-500/70 dark:text-rose-400/70 uppercase tracking-widest mb-2">This customer currently has an active non-IPPIS loan. A new loan cannot be created until the existing loan is fully settled.</p>
+                                            </div>
+                                        );
+                                    }
+                                    return null;
+                                })()}
 
                                 {/* Footer Actions */}
                                 <div className="mt-auto pt-6 flex items-center justify-between gap-4">
@@ -343,7 +361,18 @@ const NewLoanApplicationFlow: React.FC<NewLoanApplicationFlowProps> = ({ isOpen,
                                     </button>
                                     <button 
                                         onClick={() => setCurrentState('LOAN_FORM')}
-                                        disabled={!customerData.is_active}
+                                        disabled={(() => {
+                                            if (!customerData.is_active) return true;
+                                            const activeLoans = cbaLoans.filter(loan => loan.currentBalance < 0 && loan.nextTotalPayment !== 0);
+                                            const hasActiveLoan = activeLoans.length > 0;
+                                            const hasActiveIppisLoan = activeLoans.some(loan => loan.product === 'NOLT IPPIS');
+                                            
+                                            if (hasActiveLoan) {
+                                                if (!hasActiveIppisLoan) return true; // Disabled if active but not IPPIS
+                                                if (!['topup', 're-app', 'add_on'].includes(selectedLoanType)) return true; // Disabled until they select an IPPIS option
+                                            }
+                                            return false;
+                                        })()}
                                         className="flex-1 py-4 bg-[#0084FF] hover:bg-blue-600 text-white rounded-2xl text-xs font-black uppercase tracking-widest transition-all disabled:opacity-50 flex items-center justify-center gap-2 shadow-lg shadow-blue-500/20"
                                     >
                                         Confirm & Continue

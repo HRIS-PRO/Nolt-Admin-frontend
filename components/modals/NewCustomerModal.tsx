@@ -70,7 +70,7 @@ const NewCustomerModal: React.FC<NewCustomerModalProps> = ({ isOpen, onClose, on
           const custData = response.data.customer;
           setOnboardedData(custData);
           setCustomerOnboarded(true);
-          
+
           if (custData.casa) {
             setFetchingBalance(true);
             try {
@@ -78,7 +78,7 @@ const NewCustomerModal: React.FC<NewCustomerModalProps> = ({ isOpen, onClose, on
               if (balRes.data.success) {
                 setCbaBalance(balRes.data.data.AvailableBalance ?? balRes.data.data.availableBalance);
               }
-            } catch (e) {}
+            } catch (e) { }
             setFetchingBalance(false);
           }
           setLoading(false);
@@ -138,8 +138,8 @@ const NewCustomerModal: React.FC<NewCustomerModalProps> = ({ isOpen, onClose, on
   };
 
   const handleContinueToStep2 = () => {
-    if (!formData.title || !formData.firstName || !formData.lastName || !formData.middleName || !formData.nin || !formData.phone || !formData.email || !formData.gender || !formData.dob || !formData.maritalStatus) {
-      setError("Please fill in all personal details, including Middle Name and NIN, before proceeding.");
+    if (!formData.title || !formData.firstName || !formData.lastName || !formData.nin || !formData.phone || !formData.email || !formData.gender || !formData.dob || !formData.maritalStatus) {
+      setError("Please fill in all required personal details (including NIN) before proceeding.");
       return;
     }
     if (formData.nin.length !== 11) {
@@ -180,7 +180,7 @@ const NewCustomerModal: React.FC<NewCustomerModalProps> = ({ isOpen, onClose, on
             if (balRes.data.success) {
               setCbaBalance(balRes.data.data.AvailableBalance ?? balRes.data.data.availableBalance);
             }
-          } catch (e) {}
+          } catch (e) { }
           setFetchingBalance(false);
         }
         if (onSuccess) onSuccess(bvn);
@@ -227,18 +227,16 @@ const NewCustomerModal: React.FC<NewCustomerModalProps> = ({ isOpen, onClose, on
     <div className="flex items-center justify-center gap-12 mb-8">
       {STEPS.map((step, idx) => (
         <div key={idx} className="flex flex-col items-center gap-2 relative">
-          <div className={`w-10 h-10 rounded-full flex items-center justify-center text-[12px] font-black transition-all ${
-            currentStep === idx 
-              ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20 scale-110' 
-              : currentStep > idx 
-                ? 'bg-emerald-500 text-white' 
+          <div className={`w-10 h-10 rounded-full flex items-center justify-center text-[12px] font-black transition-all ${currentStep === idx
+              ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20 scale-110'
+              : currentStep > idx
+                ? 'bg-emerald-500 text-white'
                 : 'bg-slate-100 dark:bg-slate-800 text-slate-400'
-          }`}>
+            }`}>
             {currentStep > idx ? <span className="material-symbols-outlined text-sm font-black">check</span> : idx + 1}
           </div>
-          <span className={`text-[10px] font-black uppercase tracking-widest ${
-            currentStep === idx ? 'text-blue-600' : 'text-slate-400'
-          }`}>{step}</span>
+          <span className={`text-[10px] font-black uppercase tracking-widest ${currentStep === idx ? 'text-blue-600' : 'text-slate-400'
+            }`}>{step}</span>
         </div>
       ))}
     </div>
@@ -246,7 +244,7 @@ const NewCustomerModal: React.FC<NewCustomerModalProps> = ({ isOpen, onClose, on
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 backdrop-blur-md p-4 overflow-y-auto">
-      <motion.div 
+      <motion.div
         initial={{ opacity: 0, scale: 0.95, y: 20 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         className="bg-white dark:bg-[#1e293b] rounded-[40px] shadow-2xl w-full max-w-2xl overflow-hidden relative my-auto border border-slate-100 dark:border-slate-800"
@@ -254,10 +252,10 @@ const NewCustomerModal: React.FC<NewCustomerModalProps> = ({ isOpen, onClose, on
         <div className="p-10">
           <div className="flex items-center justify-between mb-10">
             <div>
-               <h3 className="text-2xl font-black text-slate-900 dark:text-white uppercase tracking-tight italic">Onboard New Customer</h3>
-               <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mt-1">Automated KYC Tiering & Provisioning</p>
+              <h3 className="text-2xl font-black text-slate-900 dark:text-white uppercase tracking-tight italic">Onboard New Customer</h3>
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mt-1">Automated KYC Tiering & Provisioning</p>
             </div>
-            <button 
+            <button
               onClick={() => { resetModal(); onClose(); }}
               className="w-12 h-12 rounded-full bg-slate-50 dark:bg-slate-800 flex items-center justify-center text-slate-400 hover:text-rose-500 transition-all hover:bg-rose-50 dark:hover:bg-rose-900/20"
             >
@@ -276,7 +274,7 @@ const NewCustomerModal: React.FC<NewCustomerModalProps> = ({ isOpen, onClose, on
                       {onboardedData?.already_exists ? 'CORE BANKING RECORD FOUND' : 'CUSTOMER PROFILE CREATED'}
                     </span>
                   </div>
-                  
+
                   <div className="p-8">
                     <div className="flex items-center gap-6 mb-8">
                       {onboardedData?.avatar_url ? (
@@ -318,11 +316,11 @@ const NewCustomerModal: React.FC<NewCustomerModalProps> = ({ isOpen, onClose, on
                       <div className="space-y-1">
                         <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">CURRENT WALLET BALANCE</p>
                         {fetchingBalance ? (
-                           <div className="h-4 w-16 bg-slate-200 dark:bg-slate-700 rounded animate-pulse"></div>
+                          <div className="h-4 w-16 bg-slate-200 dark:bg-slate-700 rounded animate-pulse"></div>
                         ) : (
-                           <p className="text-sm font-black text-emerald-600 dark:text-emerald-400 tracking-tight">
-                             {cbaBalance !== null ? `₦${cbaBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })}` : 'N/A'}
-                           </p>
+                          <p className="text-sm font-black text-emerald-600 dark:text-emerald-400 tracking-tight">
+                            {cbaBalance !== null ? `₦${cbaBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })}` : 'N/A'}
+                          </p>
                         )}
                       </div>
                       <div className="space-y-1">
@@ -338,7 +336,7 @@ const NewCustomerModal: React.FC<NewCustomerModalProps> = ({ isOpen, onClose, on
                       <div className="space-y-1">
                         <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">CONTACT INFO</p>
                         <p className="text-[10px] font-bold text-slate-900 dark:text-white uppercase">
-                          {onboardedData?.phone_number}<br/>
+                          {onboardedData?.phone_number}<br />
                           {onboardedData?.email}
                         </p>
                       </div>
@@ -362,14 +360,14 @@ const NewCustomerModal: React.FC<NewCustomerModalProps> = ({ isOpen, onClose, on
                 </div>
 
                 <div className="flex gap-4 w-full">
-                  <button 
+                  <button
                     onClick={resetModal}
                     className="flex-1 py-4 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-slate-200 transition-all flex items-center justify-center gap-2"
                   >
                     <span className="material-symbols-outlined text-sm">person_add</span>
                     NEW ONBOARDING
                   </button>
-                  <button 
+                  <button
                     onClick={() => { resetModal(); onClose(); }}
                     className="flex-[2] py-4 bg-blue-600 text-white rounded-2xl font-black uppercase text-[10px] tracking-[0.2em] shadow-xl hover:bg-blue-700 transition-all flex items-center justify-center gap-2"
                   >
@@ -385,7 +383,7 @@ const NewCustomerModal: React.FC<NewCustomerModalProps> = ({ isOpen, onClose, on
                     <div className="w-full max-w-md space-y-10">
                       <div className="text-center space-y-3">
                         <div className="w-16 h-16 bg-blue-600/10 rounded-3xl flex items-center justify-center text-blue-600 mx-auto mb-6">
-                           <span className="material-symbols-outlined text-3xl font-black">badge</span>
+                          <span className="material-symbols-outlined text-3xl font-black">badge</span>
                         </div>
                         <h4 className="text-xl font-black text-slate-900 dark:text-white uppercase tracking-tight">Identity Verification</h4>
                         <p className="text-[11px] font-bold text-slate-500 dark:text-slate-400 leading-relaxed uppercase tracking-wide">
@@ -396,8 +394,8 @@ const NewCustomerModal: React.FC<NewCustomerModalProps> = ({ isOpen, onClose, on
                       <div className="space-y-6">
                         <div className="relative group">
                           <div className="absolute -top-3 left-6 bg-white dark:bg-[#1e293b] px-2 text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] z-10">Bank Verification Number</div>
-                          <input 
-                            type="text" 
+                          <input
+                            type="text"
                             maxLength={11}
                             value={bvn}
                             onChange={(e) => setBvn(e.target.value.replace(/\D/g, ''))}
@@ -406,14 +404,14 @@ const NewCustomerModal: React.FC<NewCustomerModalProps> = ({ isOpen, onClose, on
                             className="w-full px-8 py-5 bg-slate-50 dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 rounded-3xl text-center text-2xl font-black tracking-[0.3em] dark:text-white focus:border-blue-600 outline-none transition-all disabled:opacity-50"
                           />
                         </div>
-                        
+
                         {error && (
                           <div className="p-4 bg-rose-50 dark:bg-rose-900/10 border border-rose-100 dark:border-rose-800 rounded-2xl text-center">
                             <p className="text-[10px] font-black text-rose-600 uppercase tracking-widest">{error}</p>
                           </div>
                         )}
 
-                        <button 
+                        <button
                           onClick={handleLookupBVN}
                           disabled={bvn.length !== 11 || loading}
                           className="w-full py-5 bg-slate-900 dark:bg-blue-600 text-white rounded-3xl font-black uppercase text-sm tracking-[0.2em] shadow-2xl hover:bg-blue-700 transition-all disabled:opacity-20 flex items-center justify-center gap-4"
@@ -432,7 +430,7 @@ const NewCustomerModal: React.FC<NewCustomerModalProps> = ({ isOpen, onClose, on
                       <div className="grid grid-cols-2 gap-x-6 gap-y-5">
                         <div className="space-y-2">
                           <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Title</p>
-                          <select required value={formData.title} onChange={(e) => setFormData({...formData, title: e.target.value})} className="input-field-onboarding">
+                          <select required value={formData.title} onChange={(e) => setFormData({ ...formData, title: e.target.value })} className="input-field-onboarding">
                             <option value="">Select...</option>
                             <option value="Mr.">Mr.</option>
                             <option value="Mrs">Mrs</option>
@@ -443,31 +441,31 @@ const NewCustomerModal: React.FC<NewCustomerModalProps> = ({ isOpen, onClose, on
                         </div>
                         <div className="space-y-2">
                           <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">First Name</p>
-                          <input required type="text" value={formData.firstName} onChange={(e) => setFormData({...formData, firstName: e.target.value})} className="input-field-onboarding" />
+                          <input required type="text" value={formData.firstName} onChange={(e) => setFormData({ ...formData, firstName: e.target.value })} className="input-field-onboarding" />
                         </div>
                         <div className="space-y-2">
                           <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Last Name</p>
-                          <input required type="text" value={formData.lastName} onChange={(e) => setFormData({...formData, lastName: e.target.value})} className="input-field-onboarding" />
+                          <input required type="text" value={formData.lastName} onChange={(e) => setFormData({ ...formData, lastName: e.target.value })} className="input-field-onboarding" />
                         </div>
                         <div className="space-y-2">
-                          <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Middle Name</p>
-                          <input required type="text" value={formData.middleName} onChange={(e) => setFormData({...formData, middleName: e.target.value})} className="input-field-onboarding" />
+                          <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Middle Name <span className="text-[8px] text-slate-400">(Optional)</span></p>
+                          <input type="text" value={formData.middleName} onChange={(e) => setFormData({ ...formData, middleName: e.target.value })} className="input-field-onboarding" />
                         </div>
                         <div className="space-y-2">
                           <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">NIN</p>
-                          <input required type="text" maxLength={11} value={formData.nin} onChange={(e) => setFormData({...formData, nin: e.target.value.replace(/\D/g, '')})} className="input-field-onboarding" placeholder="11-digit NIN" />
+                          <input required type="text" maxLength={11} value={formData.nin} onChange={(e) => setFormData({ ...formData, nin: e.target.value.replace(/\D/g, '') })} className="input-field-onboarding" placeholder="11-digit NIN" />
                         </div>
                         <div className="space-y-2">
                           <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Mobile Number</p>
-                          <input required type="tel" value={formData.phone} onChange={(e) => setFormData({...formData, phone: e.target.value})} className="input-field-onboarding" />
+                          <input required type="tel" value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} className="input-field-onboarding" />
                         </div>
                         <div className="space-y-2">
                           <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Email Address</p>
-                          <input required type="email" value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})} className="input-field-onboarding" />
+                          <input required type="email" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} className="input-field-onboarding" />
                         </div>
                         <div className="space-y-2">
                           <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Gender</p>
-                          <select required value={formData.gender} onChange={(e) => setFormData({...formData, gender: e.target.value})} className="input-field-onboarding">
+                          <select required value={formData.gender} onChange={(e) => setFormData({ ...formData, gender: e.target.value })} className="input-field-onboarding">
                             <option value="">Select...</option>
                             <option value="Male">Male</option>
                             <option value="Female">Female</option>
@@ -475,11 +473,11 @@ const NewCustomerModal: React.FC<NewCustomerModalProps> = ({ isOpen, onClose, on
                         </div>
                         <div className="space-y-2">
                           <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Date of Birth</p>
-                          <input required type="date" value={formData.dob} onChange={(e) => setFormData({...formData, dob: e.target.value})} className="input-field-onboarding" />
+                          <input required type="date" value={formData.dob} onChange={(e) => setFormData({ ...formData, dob: e.target.value })} className="input-field-onboarding" />
                         </div>
                         <div className="space-y-2">
                           <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Marital Status</p>
-                          <select required value={formData.maritalStatus} onChange={(e) => setFormData({...formData, maritalStatus: e.target.value})} className="input-field-onboarding">
+                          <select required value={formData.maritalStatus} onChange={(e) => setFormData({ ...formData, maritalStatus: e.target.value })} className="input-field-onboarding">
                             <option value="">Select...</option>
                             <option value="Single">Single</option>
                             <option value="Married">Married</option>
@@ -487,7 +485,7 @@ const NewCustomerModal: React.FC<NewCustomerModalProps> = ({ isOpen, onClose, on
                             <option value="Widowed">Widowed</option>
                           </select>
                         </div>
-                        
+
                         <div className="col-span-full pt-6 flex gap-4">
                           <button type="button" onClick={() => setCurrentStep(0)} className="flex-1 py-4 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 rounded-2xl text-[10px] font-black uppercase tracking-widest">Back</button>
                           <button type="button" onClick={handleContinueToStep2} className="flex-[2] py-4 bg-slate-900 dark:bg-blue-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] shadow-xl">Continue to Tier 3</button>
@@ -498,7 +496,7 @@ const NewCustomerModal: React.FC<NewCustomerModalProps> = ({ isOpen, onClose, on
                         <div className="grid grid-cols-2 gap-4">
                           <div className="space-y-2">
                             <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">State of Residence</p>
-                            <select required value={formData.stateOfResidence} onChange={(e) => setFormData({...formData, stateOfResidence: e.target.value})} className="input-field-onboarding">
+                            <select required value={formData.stateOfResidence} onChange={(e) => setFormData({ ...formData, stateOfResidence: e.target.value })} className="input-field-onboarding">
                               <option value="">Select State...</option>
                               {["Abia", "Adamawa", "Akwa Ibom", "Anambra", "Bauchi", "Bayelsa", "Benue", "Borno", "Cross River", "Delta", "Ebonyi", "Edo", "Ekiti", "Enugu", "Gombe", "Imo", "Jigawa", "Kaduna", "Kano", "Katsina", "Kebbi", "Kogi", "Kwara", "Lagos", "Nasarawa", "Niger", "Ogun", "Ondo", "Osun", "Oyo", "Plateau", "Rivers", "Sokoto", "Taraba", "Yobe", "Zamfara", "FCT"].map(state => (
                                 <option key={state} value={state}>{state}</option>
@@ -507,7 +505,7 @@ const NewCustomerModal: React.FC<NewCustomerModalProps> = ({ isOpen, onClose, on
                           </div>
                           <div className="space-y-2">
                             <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">State of Origin</p>
-                            <select required value={formData.stateOfOrigin} onChange={(e) => setFormData({...formData, stateOfOrigin: e.target.value})} className="input-field-onboarding">
+                            <select required value={formData.stateOfOrigin} onChange={(e) => setFormData({ ...formData, stateOfOrigin: e.target.value })} className="input-field-onboarding">
                               <option value="">Select State...</option>
                               {["Abia", "Adamawa", "Akwa Ibom", "Anambra", "Bauchi", "Bayelsa", "Benue", "Borno", "Cross River", "Delta", "Ebonyi", "Edo", "Ekiti", "Enugu", "Gombe", "Imo", "Jigawa", "Kaduna", "Kano", "Katsina", "Kebbi", "Kogi", "Kwara", "Lagos", "Nasarawa", "Niger", "Ogun", "Ondo", "Osun", "Oyo", "Plateau", "Rivers", "Sokoto", "Taraba", "Yobe", "Zamfara", "FCT"].map(state => (
                                 <option key={state} value={state}>{state}</option>
@@ -516,40 +514,40 @@ const NewCustomerModal: React.FC<NewCustomerModalProps> = ({ isOpen, onClose, on
                           </div>
                           <div className="col-span-full space-y-2">
                             <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Residential Address</p>
-                            <textarea required value={formData.address} onChange={(e) => setFormData({...formData, address: e.target.value})} className="input-field-onboarding min-h-[60px] pt-3" placeholder="Enter full residential address" />
+                            <textarea required value={formData.address} onChange={(e) => setFormData({ ...formData, address: e.target.value })} className="input-field-onboarding min-h-[60px] pt-3" placeholder="Enter full residential address" />
                           </div>
                         </div>
-                        
+
                         <div className="space-y-3">
                           <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Utility Bill (Required for Tier 3)</p>
                           <div className="relative group h-32 rounded-[24px] border-2 border-dashed border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 flex flex-col items-center justify-center transition-all hover:border-blue-500 overflow-hidden">
-                             {formData.utility_bill_url ? (
-                               <div className="flex flex-col items-center gap-2">
-                                 <span className="material-symbols-outlined text-emerald-500 text-3xl font-black">check_circle</span>
-                                 <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">Document Uploaded</span>
-                                 <button type="button" onClick={() => setFormData({...formData, utility_bill_url: ''})} className="text-[9px] font-black text-rose-500 uppercase underline mt-1">Remove</button>
-                               </div>
-                             ) : (
-                               <>
-                                 <span className="material-symbols-outlined text-slate-400 group-hover:text-blue-500 text-3xl mb-2">cloud_upload</span>
-                                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Click to upload bill</p>
-                                 <input type="file" onChange={handleFileUpload} className="absolute inset-0 opacity-0 cursor-pointer" accept="image/*,application/pdf" />
-                               </>
-                             )}
-                             {uploading && <div className="absolute inset-0 bg-white/80 dark:bg-slate-900/80 flex items-center justify-center"><span className="w-6 h-6 border-3 border-blue-600/30 border-t-blue-600 rounded-full animate-spin" /></div>}
+                            {formData.utility_bill_url ? (
+                              <div className="flex flex-col items-center gap-2">
+                                <span className="material-symbols-outlined text-emerald-500 text-3xl font-black">check_circle</span>
+                                <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">Document Uploaded</span>
+                                <button type="button" onClick={() => setFormData({ ...formData, utility_bill_url: '' })} className="text-[9px] font-black text-rose-500 uppercase underline mt-1">Remove</button>
+                              </div>
+                            ) : (
+                              <>
+                                <span className="material-symbols-outlined text-slate-400 group-hover:text-blue-500 text-3xl mb-2">cloud_upload</span>
+                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Click to upload bill</p>
+                                <input type="file" onChange={handleFileUpload} className="absolute inset-0 opacity-0 cursor-pointer" accept="image/*,application/pdf" />
+                              </>
+                            )}
+                            {uploading && <div className="absolute inset-0 bg-white/80 dark:bg-slate-900/80 flex items-center justify-center"><span className="w-6 h-6 border-3 border-blue-600/30 border-t-blue-600 rounded-full animate-spin" /></div>}
                           </div>
                         </div>
 
                         <div className="pt-6 flex gap-4">
                           <button type="button" onClick={() => setCurrentStep(1)} className="flex-1 py-4 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 rounded-2xl text-[10px] font-black uppercase tracking-widest">Back</button>
                           <button type="submit" disabled={onboardingProgress} className="flex-[2] py-4 bg-slate-900 dark:bg-blue-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] shadow-xl flex items-center justify-center gap-4 disabled:opacity-50">
-                             {onboardingProgress && <span className="w-5 h-5 border-3 border-white/30 border-t-white rounded-full animate-spin" />}
-                             Submit Tier 3 Application
+                            {onboardingProgress && <span className="w-5 h-5 border-3 border-white/30 border-t-white rounded-full animate-spin" />}
+                            Submit Tier 3 Application
                           </button>
                         </div>
                       </div>
                     )}
-                    
+
                     {error && (
                       <div className="p-4 bg-rose-50 dark:bg-rose-900/10 border border-rose-100 dark:border-rose-800 rounded-2xl text-center mt-4">
                         <p className="text-[10px] font-black text-rose-600 uppercase tracking-widest">{error}</p>
@@ -563,7 +561,8 @@ const NewCustomerModal: React.FC<NewCustomerModalProps> = ({ isOpen, onClose, on
         </div>
 
         {/* CSS for custom onboarding inputs to match design */}
-        <style dangerouslySetInnerHTML={{ __html: `
+        <style dangerouslySetInnerHTML={{
+          __html: `
           .input-field-onboarding {
             width: 100%;
             padding: 0.875rem 1.25rem;

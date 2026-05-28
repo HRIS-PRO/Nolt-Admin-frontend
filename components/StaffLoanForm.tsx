@@ -81,9 +81,8 @@ const FileUpload = ({
                 ) : null}
 
                 <div className="flex justify-between items-start w-full">
-                    <div className={`size-12 rounded-2xl flex items-center justify-center transform group-hover:scale-105 transition-transform duration-300 ${
-                        doc ? 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-500' : 'bg-slate-50 dark:bg-slate-800 text-slate-400 group-hover:text-[#0084FF] dark:group-hover:text-[#0084FF]'
-                    }`}>
+                    <div className={`size-12 rounded-2xl flex items-center justify-center transform group-hover:scale-105 transition-transform duration-300 ${doc ? 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-500' : 'bg-slate-50 dark:bg-slate-800 text-slate-400 group-hover:text-[#0084FF] dark:group-hover:text-[#0084FF]'
+                        }`}>
                         <span className="material-symbols-outlined text-2xl">{doc ? 'check_circle' : 'description'}</span>
                     </div>
                     {doc ? (
@@ -295,14 +294,14 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess, initi
     useEffect(() => {
         if (activeProducts.length > 0) {
             const currentType = productType || initialData?.product_type;
-            const match = currentType 
-                ? activeProducts.find(p => 
-                    p.custom_name.toLowerCase() === currentType.toLowerCase() || 
+            const match = currentType
+                ? activeProducts.find(p =>
+                    p.custom_name.toLowerCase() === currentType.toLowerCase() ||
                     currentType.toLowerCase().includes(p.custom_name.toLowerCase()) ||
                     p.custom_name.toLowerCase().includes(currentType.toLowerCase())
-                  )
+                )
                 : activeProducts[0];
-            
+
             if (match) {
                 setSelectedProductOption(match);
                 if (!productType) {
@@ -577,6 +576,7 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess, initi
                 if (!uploadedDocs.govt_id) newErrors.govt_id = "Required";
                 if (!uploadedDocs.work_id) newErrors.work_id = "Required";
                 if (!uploadedDocs.payslip) newErrors.payslip = "Required";
+                if (!uploadedDocs.selfie) newErrors.selfie = "Required";
 
                 // Bank Statement required for > 500k
                 if ((parseFloat(amount) || 0) > 500000 && !uploadedDocs.bank_statement) {
@@ -809,7 +809,7 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess, initi
             <div className="px-6 md:px-8 pt-8 pb-4 flex justify-between items-center relative max-w-4xl mx-auto w-full">
                 {/* Horizontal progress background line */}
                 <div className="absolute top-[2.5rem] left-[10%] right-[10%] h-[2px] bg-slate-100 dark:bg-slate-800 -z-10" />
-                
+
                 {visualSteps.map((s, idx) => {
                     const isChecked = s.type === "checked";
                     const isActive = s.isActive;
@@ -834,9 +834,8 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess, initi
                                     {s.number}
                                 </div>
                             )}
-                            <span className={`text-[9px] font-black uppercase tracking-widest mt-3 text-center leading-none ${
-                                isActive ? 'text-blue-500' : isChecked || isCompleted ? 'text-slate-500' : 'text-slate-400'
-                            }`}>
+                            <span className={`text-[9px] font-black uppercase tracking-widest mt-3 text-center leading-none ${isActive ? 'text-blue-500' : isChecked || isCompleted ? 'text-slate-500' : 'text-slate-400'
+                                }`}>
                                 {s.label}
                             </span>
                         </div>
@@ -956,9 +955,8 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess, initi
                                             <InputGroup label="Account Number" required error={errors.accountNumber}>
                                                 <div className="relative">
                                                     <input
-                                                        className={`input-field pr-10 ${
-                                                            bankVerificationResult?.isMatch ? '!border-green-500' : bankVerificationResult && !bankVerificationResult.isMatch ? '!border-red-500' : ''
-                                                        }`}
+                                                        className={`input-field pr-10 ${bankVerificationResult?.isMatch ? '!border-green-500' : bankVerificationResult && !bankVerificationResult.isMatch ? '!border-red-500' : ''
+                                                            }`}
                                                         value={accountNumber}
                                                         onChange={e => { const val = e.target.value.replace(/\D/g, ''); if (val.length <= 10) { setAccountNumber(val); setAccountName(''); clearError('accountNumber'); } }}
                                                         maxLength={10}
@@ -984,11 +982,10 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess, initi
 
                                             <InputGroup label="Account Name (Auto-Verified)" required error={errors.accountName}>
                                                 <input
-                                                    className={`input-field cursor-not-allowed ${
-                                                        bankVerificationResult?.isMatch ? '!bg-green-50 dark:!bg-green-900/20 !border-green-500 !text-green-800 dark:!text-green-300'
-                                                        : bankVerificationResult && !bankVerificationResult.isMatch ? '!bg-red-50 dark:!bg-red-900/20 !border-red-500 !text-red-800 dark:!text-red-300'
-                                                        : ''
-                                                    }`}
+                                                    className={`input-field cursor-not-allowed ${bankVerificationResult?.isMatch ? '!bg-green-50 dark:!bg-green-900/20 !border-green-500 !text-green-800 dark:!text-green-300'
+                                                            : bankVerificationResult && !bankVerificationResult.isMatch ? '!bg-red-50 dark:!bg-red-900/20 !border-red-500 !text-red-800 dark:!text-red-300'
+                                                                : ''
+                                                        }`}
                                                     value={accountName}
                                                     readOnly
                                                     placeholder={isVerifyingBank ? 'Verifying...' : 'Auto-fills after verification'}
@@ -997,11 +994,10 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess, initi
 
                                             {/* Bank Verification Status */}
                                             {bankVerificationResult && (
-                                                <div className={`md:col-span-2 p-3 rounded-xl border flex items-start gap-2 animate-in fade-in duration-300 ${
-                                                    bankVerificationResult.isMatch
+                                                <div className={`md:col-span-2 p-3 rounded-xl border flex items-start gap-2 animate-in fade-in duration-300 ${bankVerificationResult.isMatch
                                                         ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800'
                                                         : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'
-                                                }`}>
+                                                    }`}>
                                                     <span className={`material-symbols-outlined text-lg filled ${bankVerificationResult.isMatch ? 'text-green-600' : 'text-red-600'}`}>
                                                         {bankVerificationResult.isMatch ? 'verified' : 'gpp_bad'}
                                                     </span>
@@ -1083,16 +1079,15 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess, initi
                                                     key={p.id || idx}
                                                     onClick={() => handleProductSelect(p)}
                                                     className={`w-full rounded-[2rem] border-2 p-6 flex items-center justify-between transition-all duration-300 cursor-pointer overflow-hidden
-                                                        ${isSelected 
-                                                            ? 'border-[#0084FF] bg-[#0084FF] text-white shadow-xl shadow-blue-500/20' 
+                                                        ${isSelected
+                                                            ? 'border-[#0084FF] bg-[#0084FF] text-white shadow-xl shadow-blue-500/20'
                                                             : 'border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-[#0084FF]/40'
                                                         }
                                                     `}
                                                 >
                                                     <div className="flex items-center gap-6">
-                                                        <div className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-all ${
-                                                            isSelected ? 'bg-white/20 text-white' : 'bg-slate-50 dark:bg-slate-800 text-slate-400'
-                                                        }`}>
+                                                        <div className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-all ${isSelected ? 'bg-white/20 text-white' : 'bg-slate-50 dark:bg-slate-800 text-slate-400'
+                                                            }`}>
                                                             <span className="material-symbols-outlined text-2xl">{icon}</span>
                                                         </div>
                                                         <div className="text-left">
@@ -1100,9 +1095,8 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess, initi
                                                             <p className={`text-[10px] font-black uppercase tracking-wider mt-1 ${isSelected ? 'text-white/70' : 'text-slate-400 dark:text-slate-500'}`}>CODE: {code}</p>
                                                         </div>
                                                     </div>
-                                                    <span className={`px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-wider ${
-                                                        isSelected ? 'bg-white/20 text-white' : 'bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
-                                                    }`}>
+                                                    <span className={`px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-wider ${isSelected ? 'bg-white/20 text-white' : 'bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
+                                                        }`}>
                                                         {rate}
                                                     </span>
                                                 </div>
@@ -1114,10 +1108,10 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess, initi
 
                             {step === 0 && !showProductSelect && (
                                 <div className="space-y-6 animate-in fade-in slide-in-from-right-8 duration-500 max-w-4xl mx-auto py-2">
-                                    
+
                                     {/* Accordion 1: APPLICANT IDENTITY (Optional, collapsed details) */}
                                     <div className="rounded-[2.5rem] border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm overflow-hidden transition-all duration-300">
-                                        <div 
+                                        <div
                                             onClick={() => setExpandedSection(expandedSection === 'identity' ? 'loan' : 'identity')}
                                             className="p-6 flex justify-between items-center cursor-pointer select-none"
                                         >
@@ -1204,7 +1198,7 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess, initi
                                                 </div>
                                                 <div className="md:col-span-4">
                                                     <InputGroup label="NIN" required error={errors.nin}>
-                                                        <input className="input-field" value={nin} onChange={handleNumericChange(setNac => {}, 'nin', 11)} maxLength={11} placeholder="NIN" disabled={isCustomerVerified} />
+                                                        <input className="input-field" value={nin} onChange={handleNumericChange(setNac => { }, 'nin', 11)} maxLength={11} placeholder="NIN" disabled={isCustomerVerified} />
                                                     </InputGroup>
                                                 </div>
                                                 <div className="md:col-span-4">
@@ -1218,7 +1212,7 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess, initi
 
                                     {/* Accordion 2: RESIDENTIAL ADDRESS */}
                                     <div className="rounded-[2.5rem] border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm overflow-hidden transition-all duration-300">
-                                        <div 
+                                        <div
                                             onClick={() => setExpandedSection(expandedSection === 'address' ? 'loan' : 'address')}
                                             className="p-6 flex justify-between items-center cursor-pointer select-none"
                                         >
@@ -1263,7 +1257,7 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess, initi
 
                                     {/* Accordion 3: EMPLOYMENT DETAILS */}
                                     <div className="rounded-[2.5rem] border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm overflow-hidden transition-all duration-300">
-                                        <div 
+                                        <div
                                             onClick={() => setExpandedSection(expandedSection === 'employment' ? 'loan' : 'employment')}
                                             className="p-6 flex justify-between items-center cursor-pointer select-none"
                                         >
@@ -1307,7 +1301,7 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess, initi
 
                                     {/* Accordion 4: LOAN CONFIGURATION */}
                                     <div className="rounded-[2.5rem] border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm overflow-hidden transition-all duration-300">
-                                        <div 
+                                        <div
                                             onClick={() => setExpandedSection(expandedSection === 'loan' ? 'address' : 'loan')}
                                             className="p-6 flex justify-between items-center cursor-pointer select-none"
                                         >
@@ -1328,9 +1322,9 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess, initi
                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-8 pt-0 border-t border-slate-50 dark:border-slate-800/50 mt-6 animate-in fade-in duration-300">
                                                 <div className="md:col-span-2">
                                                     <InputGroup label="Loan Type">
-                                                        <select 
-                                                            className="input-field animate-none" 
-                                                            value={loanType} 
+                                                        <select
+                                                            className="input-field animate-none"
+                                                            value={loanType}
                                                             onChange={e => {
                                                                 setLoanType(e.target.value);
                                                                 clearError('loanType');
@@ -1386,7 +1380,7 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess, initi
                                                 )}
 
                                                 <div className="md:col-span-2 h-px bg-slate-50 dark:bg-slate-800/50 w-full my-2" />
-                                                
+
                                                 <div className="md:col-span-2">
                                                     <h4 className="text-xs font-black uppercase tracking-widest text-slate-400 mb-2 flex items-center gap-2">
                                                         <span className="material-symbols-outlined text-lg">credit_card</span>
@@ -1406,9 +1400,8 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess, initi
                                                 <InputGroup label="Account Number" required error={errors.accountNumber}>
                                                     <div className="relative">
                                                         <input
-                                                            className={`input-field pr-10 ${
-                                                                bankVerificationResult?.isMatch ? '!border-green-500' : bankVerificationResult && !bankVerificationResult.isMatch ? '!border-red-500' : ''
-                                                            }`}
+                                                            className={`input-field pr-10 ${bankVerificationResult?.isMatch ? '!border-green-500' : bankVerificationResult && !bankVerificationResult.isMatch ? '!border-red-500' : ''
+                                                                }`}
                                                             value={accountNumber}
                                                             onChange={e => { const val = e.target.value.replace(/\D/g, ''); if (val.length <= 10) { setAccountNumber(val); setAccountName(''); clearError('accountNumber'); } }}
                                                             maxLength={10}
@@ -1435,11 +1428,10 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess, initi
                                                 <div className="md:col-span-2">
                                                     <InputGroup label="Account Name (Auto-Verified)" required error={errors.accountName}>
                                                         <input
-                                                            className={`input-field cursor-not-allowed ${
-                                                                bankVerificationResult?.isMatch ? '!bg-green-50/50 dark:!bg-green-950/20 !border-green-500/30 !text-green-700 dark:!text-green-300'
-                                                                : bankVerificationResult && !bankVerificationResult.isMatch ? '!bg-red-50/50 dark:!bg-red-950/20 !border-red-500/30 !text-red-700 dark:!text-red-300'
-                                                                : ''
-                                                            }`}
+                                                            className={`input-field cursor-not-allowed ${bankVerificationResult?.isMatch ? '!bg-green-50/50 dark:!bg-green-950/20 !border-green-500/30 !text-green-700 dark:!text-green-300'
+                                                                    : bankVerificationResult && !bankVerificationResult.isMatch ? '!bg-red-50/50 dark:!bg-red-950/20 !border-red-500/30 !text-red-700 dark:!text-red-300'
+                                                                        : ''
+                                                                }`}
                                                             value={accountName}
                                                             readOnly
                                                             placeholder={isVerifyingBank ? 'Verifying...' : 'Auto-fills after verification'}
@@ -1449,11 +1441,10 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess, initi
 
                                                 {/* Bank Verification Status */}
                                                 {bankVerificationResult && (
-                                                    <div className={`md:col-span-2 p-4 rounded-2xl border flex items-start gap-3 animate-in fade-in slide-in-from-top-2 duration-300 ${
-                                                        bankVerificationResult.isMatch
+                                                    <div className={`md:col-span-2 p-4 rounded-2xl border flex items-start gap-3 animate-in fade-in slide-in-from-top-2 duration-300 ${bankVerificationResult.isMatch
                                                             ? 'bg-green-50/40 dark:bg-green-950/10 border-green-200 dark:border-green-800/30 text-green-800 dark:text-green-300'
                                                             : 'bg-red-50/40 dark:bg-red-950/10 border-red-200 dark:border-red-800/30 text-red-800 dark:text-red-300'
-                                                    }`}>
+                                                        }`}>
                                                         <span className={`material-symbols-outlined text-xl mt-0.5 filled`}>
                                                             {bankVerificationResult.isMatch ? 'verified' : 'gpp_bad'}
                                                         </span>
@@ -1533,8 +1524,10 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess, initi
                                             id="selfie"
                                             label="Selfie"
                                             subtitle="REAL-TIME FACIAL CAPTURE"
+                                            required
                                             doc={uploadedDocs.selfie}
                                             progress={uploadProgress.selfie}
+                                            error={errors.selfie}
                                             onSelect={handleFileSelect}
                                             onRemove={removeDoc}
                                         />
@@ -1584,7 +1577,7 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess, initi
                                                 <input
                                                     className="input-field"
                                                     value={nokName}
-                                                    onChange={e => { setNokName(e.target.value); if(errors.nokName) setErrors(prev => { const n = {...prev}; delete n.nokName; return n; }); }}
+                                                    onChange={e => { setNokName(e.target.value); if (errors.nokName) setErrors(prev => { const n = { ...prev }; delete n.nokName; return n; }); }}
                                                     placeholder="Full Name"
                                                 />
                                             </InputGroup>
@@ -1592,7 +1585,7 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess, initi
                                                 <select
                                                     className="input-field animate-none"
                                                     value={nokRelationship}
-                                                    onChange={e => { setNokRelationship(e.target.value); if(errors.nokRelationship) setErrors(prev => { const n = {...prev}; delete n.nokRelationship; return n; }); }}
+                                                    onChange={e => { setNokRelationship(e.target.value); if (errors.nokRelationship) setErrors(prev => { const n = { ...prev }; delete n.nokRelationship; return n; }); }}
                                                 >
                                                     <option value="">Select Relationship</option>
                                                     <option value="Husband">Husband</option>
@@ -1622,7 +1615,7 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess, initi
                                                             const val = e.target.value.replace(/\D/g, '');
                                                             if (val.length <= 11) {
                                                                 setNokPhoneNumber(val);
-                                                                if(errors.nokPhoneNumber) setErrors(prev => { const n = {...prev}; delete n.nokPhoneNumber; return n; });
+                                                                if (errors.nokPhoneNumber) setErrors(prev => { const n = { ...prev }; delete n.nokPhoneNumber; return n; });
                                                             }
                                                         }}
                                                         placeholder="8012345678"
@@ -1634,14 +1627,14 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess, initi
                                                     <input
                                                         className="input-field pr-24"
                                                         value={nokAddress}
-                                                        onChange={e => { setNokAddress(e.target.value); if(errors.nokAddress) setErrors(prev => { const n = {...prev}; delete n.nokAddress; return n; }); }}
+                                                        onChange={e => { setNokAddress(e.target.value); if (errors.nokAddress) setErrors(prev => { const n = { ...prev }; delete n.nokAddress; return n; }); }}
                                                         placeholder="Full Home Address"
                                                     />
                                                     <button
                                                         type="button"
                                                         onClick={() => {
                                                             setNokAddress(address);
-                                                            if(errors.nokAddress) setErrors(prev => { const n = {...prev}; delete n.nokAddress; return n; });
+                                                            if (errors.nokAddress) setErrors(prev => { const n = { ...prev }; delete n.nokAddress; return n; });
                                                         }}
                                                         className="absolute right-4 top-1/2 -translate-y-1/2 text-[9px] font-black text-primary uppercase tracking-widest hover:underline"
                                                     >
@@ -1700,8 +1693,8 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess, initi
                                         ))}
 
                                         {references.length < 2 && (
-                                            <button 
-                                                onClick={addReference} 
+                                            <button
+                                                onClick={addReference}
                                                 className="w-full py-4 border-2 border-dashed border-slate-200 dark:border-slate-800 hover:border-primary/50 text-slate-400 hover:text-primary transition-all rounded-[2rem] flex items-center justify-center gap-2 group"
                                             >
                                                 <span className="material-symbols-outlined text-lg group-hover:scale-110 transition-transform">add_circle</span>
@@ -1714,7 +1707,7 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess, initi
 
                             {step === 6 && (
                                 <div className="space-y-8 animate-in fade-in zoom-in-95 duration-500 max-w-4xl mx-auto py-4 flex flex-col items-center">
-                                    
+
                                     <div className="size-24 rounded-3xl bg-[#0084FF]/10 text-[#0084FF] flex items-center justify-center shadow-xl shadow-blue-500/5 mb-4">
                                         <span className="material-symbols-outlined text-5xl">task</span>
                                     </div>
@@ -1807,8 +1800,8 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess, initi
                             </span>
                         </button>
                     ) : (
-                        <button 
-                            onClick={handleNext} 
+                        <button
+                            onClick={handleNext}
                             disabled={step === 0 && showProductSelect && !productType}
                             className={`group px-10 py-4 rounded-2xl font-black text-white bg-[#0084FF] hover:bg-blue-600 shadow-xl shadow-blue-500/20 hover:shadow-blue-500/30 hover:-translate-y-1 transition-all flex items-center gap-2
                                 ${step === 0 && showProductSelect && !productType ? 'opacity-40 cursor-not-allowed pointer-events-none hover:translate-y-0 shadow-none' : ''}

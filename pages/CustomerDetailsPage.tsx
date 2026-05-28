@@ -20,16 +20,40 @@ const CustomerDetailsPage: React.FC<CustomerDetailsPageProps> = ({ user, onLogou
   const [activeTab, setActiveTab] = useState<'IDENTITY & KYC' | 'LOAN' | 'INVESTMENT' | 'BILL PAYMENTS' | 'AUDIT LOG'>('IDENTITY & KYC');
   const [balance, setBalance] = useState<number | null>(null);
   const [isTogglingFreeze, setIsTogglingFreeze] = useState(false);
+  const [loans, setLoans] = useState<any[]>([]);
+  const [cbaLoans, setCbaLoans] = useState<any[]>([]);
+  const [isCbaLoading, setIsCbaLoading] = useState(false);
 
   useEffect(() => {
     fetchCustomerData();
   }, [id]);
+
+  useEffect(() => {
+      if (activeTab === 'LOAN' && id && cbaLoans.length === 0) {
+          fetchCbaLoans(id);
+      }
+  }, [activeTab, id]);
+
+  const fetchCbaLoans = async (customerId: string) => {
+      setIsCbaLoading(true);
+      try {
+          const res = await axios.get(`${import.meta.env.VITE_BACKEND_URL || ''}/api/staff/customers/${customerId}/cba-loans`, { withCredentials: true });
+          if (res.data.success) {
+              setCbaLoans(res.data.response || []);
+          }
+      } catch (error) {
+          console.error("Failed to fetch CBA loans", error);
+      } finally {
+          setIsCbaLoading(false);
+      }
+  };
 
   const fetchCustomerData = async () => {
     setIsLoading(true);
     try {
       const res = await axios.get(`${import.meta.env.VITE_BACKEND_URL || ''}/api/staff/customers/${id}`, { withCredentials: true });
       setProfile(res.data.profile);
+      setLoans(res.data.loans || []);
       
       // Fetch balance if casa exists
       if (res.data.profile?.casa) {
@@ -386,7 +410,225 @@ const CustomerDetailsPage: React.FC<CustomerDetailsPageProps> = ({ user, onLogou
               </>
             )}
 
-            {activeTab !== 'IDENTITY & KYC' && (
+            {activeTab === 'LOAN' && (
+              <div className="space-y-12">
+                  {isCbaLoading ? (
+                      <div className="flex justify-center py-12">
+                          <span className="w-8 h-8 border-4 border-blue-600/30 border-t-blue-600 rounded-full animate-spin"></span>
+                      </div>
+                  ) : (
+                      <>
+                          {/* Active CBA Loans */}
+                          {cbaLoans.filter(l => l.currentBalance < 0 && l.nextTotalPayment !== 0).map(loan => (
+                              <div key={loan.loanAccountNo} className="space-y-6">
+                                  <h3 className="text-sm font-black text-slate-800 dark:text-white uppercase tracking-widest flex items-center gap-2">
+                                      <span className="material-symbols-outlined text-blue-600 text-lg">play_arrow</span>
+                                      Active Loan Details
+                                  </h3>
+                                  
+                                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                                      <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-sm flex flex-col justify-between min-h-[160px]">
+                                          <div className="flex justify-between items-start mb-2">
+                                              <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Loan Category</span>
+                                              <div className="w-8 h-8 rounded-full bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center">
+                                                  <span className="material-symbols-outlined text-blue-600 text-[14px]">account_tree</span>
+                                              </div>
+                                          </div>
+                                          <div>
+                                              <h4 className="text-[16px] leading-tight font-black text-slate-900 dark:text-white uppercase tracking-tight line-clamp-2">{loan.product}</h4>
+                                              <p className="text-[9px] font-bold text-slate-400 uppercase mt-1.5 tracking-widest">Ref: #{loan.loanAccountNo}</p>
+                                          </div>
+                                      </div>
+
+                                      <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-sm flex flex-col justify-between min-h-[160px]">
+                                          <div className="flex justify-between items-start mb-2">
+                                              <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Principal</span>
+                                              <div className="w-8 h-8 rounded-full bg-indigo-50 dark:bg-indigo-900/30 flex items-center justify-center">
+                                                  <span className="material-symbols-outlined text-indigo-600 text-[14px]">payments</span>
+                                              </div>
+                                          </div>
+                                          <div>
+                                              <h4 className="text-[18px] font-black text-slate-900 dark:text-white uppercase tracking-tight">
+                                                  {new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN' }).format(loan.loanAmount || 0)}
+                                              </h4>
+                                              <p className="text-[9px] font-bold text-slate-400 uppercase mt-1.5 tracking-widest">@ {loan.interestrate}% Interest Rate</p>
+                                          </div>
+                                      </div>
+
+                                      <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-sm flex flex-col justify-between min-h-[160px]">
+                                          <div className="flex justify-between items-start mb-2">
+                                              <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Outstanding Debt</span>
+                                              <div className="w-8 h-8 rounded-full bg-rose-50 dark:bg-rose-900/30 flex items-center justify-center">
+                                                  <span className="material-symbols-outlined text-rose-600 text-[14px]">account_balance</span>
+                                              </div>
+                                          </div>
+                                          <div>
+                                              <h4 className="text-[18px] font-black text-slate-900 dark:text-white uppercase tracking-tight">
+                                                  {new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN' }).format(Math.abs(loan.currentBalance || 0))}
+                                              </h4>
+                                              <p className="text-[9px] font-bold text-amber-500 uppercase mt-1.5 tracking-widest flex items-center gap-1">
+                                                  <span className="material-symbols-outlined text-[10px]">warning</span> Due Soon
+                                              </p>
+                                          </div>
+                                      </div>
+
+                                      <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-sm flex flex-col justify-between min-h-[160px]">
+                                          <div className="flex justify-between items-start mb-2">
+                                              <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Next Repayment</span>
+                                              <div className="w-8 h-8 rounded-full bg-emerald-50 dark:bg-emerald-900/30 flex items-center justify-center">
+                                                  <span className="material-symbols-outlined text-emerald-600 text-[14px]">calendar_month</span>
+                                              </div>
+                                          </div>
+                                          <div>
+                                              <h4 className="text-[16px] font-black text-slate-900 dark:text-white uppercase tracking-tight">
+                                                  {loan.nextPaymentDate || 'N/A'}
+                                              </h4>
+                                              <p className="text-[9px] font-bold text-slate-400 uppercase mt-1.5 tracking-widest">
+                                                  Amount: {new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN' }).format(loan.nextTotalPayment || (loan.nextPrincipalPayment || 0))}
+                                              </p>
+                                          </div>
+                                      </div>
+                                  </div>
+
+                                  <div className="mt-8 bg-white dark:bg-slate-900 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-sm overflow-hidden">
+                                      <div className="px-6 py-5 border-b border-slate-100 dark:border-slate-800 flex items-center gap-3">
+                                          <svg className="size-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                                          <h3 className="text-xs font-black text-slate-800 dark:text-white uppercase tracking-widest">Repayment Schedule</h3>
+                                      </div>
+                                      <div className="overflow-x-auto">
+                                          <table className="w-full text-left border-collapse">
+                                              <thead>
+                                                  <tr className="bg-slate-50 dark:bg-slate-800/50">
+                                                      <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest whitespace-nowrap">Due Date</th>
+                                                      <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest whitespace-nowrap">Installment</th>
+                                                      <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest whitespace-nowrap">Principal</th>
+                                                      <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest whitespace-nowrap">Interest</th>
+                                                      <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest whitespace-nowrap">Status</th>
+                                                  </tr>
+                                              </thead>
+                                              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                                                  <tr className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                                                      <td className="px-6 py-4 text-sm font-black text-slate-900 dark:text-white whitespace-nowrap">
+                                                          {loan.nextPaymentDate ? new Date(loan.nextPaymentDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }).toUpperCase() : 'N/A'}
+                                                      </td>
+                                                      <td className="px-6 py-4 text-sm font-black text-slate-900 dark:text-white whitespace-nowrap">
+                                                          {new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN' }).format(loan.nextTotalPayment || 0)}
+                                                      </td>
+                                                      <td className="px-6 py-4 text-sm font-bold text-slate-500 whitespace-nowrap">
+                                                          {new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN' }).format(loan.nextPrincipalPayment || 0)}
+                                                      </td>
+                                                      <td className="px-6 py-4 text-sm font-bold text-slate-500 whitespace-nowrap">
+                                                          {new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN' }).format(Math.max(0, (loan.nextTotalPayment || 0) - (loan.nextPrincipalPayment || 0)))}
+                                                      </td>
+                                                      <td className="px-6 py-4 whitespace-nowrap">
+                                                          <span className="px-3 py-1 bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 rounded-full text-[9px] font-black uppercase tracking-widest">PENDING</span>
+                                                      </td>
+                                                  </tr>
+                                              </tbody>
+                                          </table>
+                                      </div>
+                                  </div>
+                              </div>
+                          ))}
+
+                          {/* Inactive CBA Loans */}
+                          {cbaLoans.filter(l => l.currentBalance >= 0 || l.nextTotalPayment === 0).length > 0 && (
+                              <div className="space-y-4">
+                                  <h3 className="text-sm font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                                      <span className="material-symbols-outlined text-slate-400 text-lg">history</span>
+                                      Closed / Inactive Loans
+                                  </h3>
+                                  <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-sm overflow-hidden">
+                                      <div className="overflow-x-auto">
+                                          <table className="w-full text-left border-collapse">
+                                              <thead>
+                                                  <tr className="bg-slate-50 dark:bg-slate-800/50">
+                                                      <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest whitespace-nowrap">Loan Ref</th>
+                                                      <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest whitespace-nowrap">Product</th>
+                                                      <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest whitespace-nowrap">Principal</th>
+                                                      <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest whitespace-nowrap">Status</th>
+                                                  </tr>
+                                              </thead>
+                                              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                                                  {cbaLoans.filter(l => l.currentBalance >= 0 || l.nextTotalPayment === 0).map(loan => (
+                                                      <tr key={loan.loanAccountNo} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                                                          <td className="px-6 py-4 text-sm font-bold text-slate-500 whitespace-nowrap">#{loan.loanAccountNo}</td>
+                                                          <td className="px-6 py-4 text-sm font-black text-slate-900 dark:text-white whitespace-nowrap">{loan.product}</td>
+                                                          <td className="px-6 py-4 text-sm font-black text-slate-900 dark:text-white whitespace-nowrap">
+                                                              {new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN' }).format(loan.loanAmount || 0)}
+                                                          </td>
+                                                          <td className="px-6 py-4 whitespace-nowrap">
+                                                              <span className="px-3 py-1 bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 rounded-full text-[9px] font-black uppercase tracking-widest">SETTLED</span>
+                                                          </td>
+                                                      </tr>
+                                                  ))}
+                                              </tbody>
+                                          </table>
+                                      </div>
+                                  </div>
+                              </div>
+                          )}
+
+                          {/* Local Pending Loans */}
+                          {loans.filter(l => l.status !== 'disbursed').length > 0 && (
+                              <div className="space-y-4">
+                                  <h3 className="text-sm font-black text-slate-800 dark:text-white uppercase tracking-widest flex items-center gap-2">
+                                      <span className="material-symbols-outlined text-yellow-500 text-lg">pending_actions</span>
+                                      Pending Applications
+                                  </h3>
+                                  <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-sm overflow-hidden">
+                                      <div className="overflow-x-auto">
+                                          <table className="w-full text-left border-collapse">
+                                              <thead>
+                                                  <tr className="bg-slate-50 dark:bg-slate-800/50">
+                                                      <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest whitespace-nowrap">Applied On</th>
+                                                      <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest whitespace-nowrap">Product</th>
+                                                      <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest whitespace-nowrap">Amount Requested</th>
+                                                      <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest whitespace-nowrap">Status</th>
+                                                  </tr>
+                                              </thead>
+                                              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                                                  {loans.filter(l => l.status !== 'disbursed').map(loan => (
+                                                      <tr key={loan.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                                                          <td className="px-6 py-4 text-sm font-bold text-slate-500 whitespace-nowrap">
+                                                              {new Date(loan.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }).toUpperCase()}
+                                                          </td>
+                                                          <td className="px-6 py-4 text-sm font-black text-slate-900 dark:text-white whitespace-nowrap">{loan.loan_type}</td>
+                                                          <td className="px-6 py-4 text-sm font-black text-slate-900 dark:text-white whitespace-nowrap">
+                                                              {new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN' }).format(Number(loan.requested_loan_amount))}
+                                                          </td>
+                                                          <td className="px-6 py-4 whitespace-nowrap">
+                                                              <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest ${
+                                                                  loan.status === 'active' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' :
+                                                                  loan.status === 'pending' ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400' :
+                                                                  'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-400'
+                                                              }`}>
+                                                                  {loan.status}
+                                                              </span>
+                                                          </td>
+                                                      </tr>
+                                                  ))}
+                                              </tbody>
+                                          </table>
+                                      </div>
+                                  </div>
+                              </div>
+                          )}
+
+                          {cbaLoans.length === 0 && loans.length === 0 && (
+                              <div className="text-center py-20 bg-white dark:bg-slate-900 rounded-3xl border border-slate-100 dark:border-slate-800/50 shadow-sm">
+                                  <div className="size-16 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-4 text-slate-400">
+                                      <span className="material-symbols-outlined text-2xl">credit_card_off</span>
+                                  </div>
+                                  <p className="text-[11px] uppercase tracking-widest text-slate-500 font-black">No loan history available</p>
+                              </div>
+                          )}
+                      </>
+                  )}
+              </div>
+            )}
+
+            {activeTab !== 'IDENTITY & KYC' && activeTab !== 'LOAN' && (
               <div className="bg-white dark:bg-slate-900 rounded-3xl p-8 border border-slate-100 dark:border-slate-800/50 relative shadow-sm text-center py-20">
                 <p className="text-slate-500 uppercase tracking-wider text-sm font-bold">Content for {activeTab} is currently being implemented.</p>
               </div>

@@ -76,6 +76,28 @@ const CustomerDetailsDrawer: React.FC<CustomerDetailsDrawerProps> = ({ customerI
     const [documents, setDocuments] = useState<Document[]>([]);
     const [isLoading, setIsLoading] = useState(false);
     const [isApproving, setIsApproving] = useState(false);
+    const [cbaLoans, setCbaLoans] = useState<any[]>([]);
+    const [isCbaLoading, setIsCbaLoading] = useState(false);
+
+    useEffect(() => {
+        if (activeTab === 'loans' && customerId && cbaLoans.length === 0) {
+            fetchCbaLoans(customerId);
+        }
+    }, [activeTab, customerId]);
+
+    const fetchCbaLoans = async (id: number) => {
+        setIsCbaLoading(true);
+        try {
+            const res = await axios.get(`/api/staff/customers/${id}/cba-loans`, { withCredentials: true });
+            if (res.data.success) {
+                setCbaLoans(res.data.response || []);
+            }
+        } catch (error) {
+            console.error("Failed to fetch CBA loans", error);
+        } finally {
+            setIsCbaLoading(false);
+        }
+    };
 
     useEffect(() => {
         if (customerId) {
@@ -378,39 +400,149 @@ const CustomerDetailsDrawer: React.FC<CustomerDetailsDrawerProps> = ({ customerI
                             )}
 
                             {activeTab === 'loans' && (
-                                <div className="space-y-4">
-                                    {loans.length === 0 ? (
-                                        <div className="text-center py-12">
-                                            <div className="size-16 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-4 text-slate-400">
-                                                <span className="material-symbols-outlined text-2xl">credit_card_off</span>
-                                            </div>
-                                            <p className="text-slate-500 font-medium">No loan history available.</p>
+                                <div className="space-y-12">
+                                    {isCbaLoading ? (
+                                        <div className="flex justify-center py-12">
+                                            <span className="w-8 h-8 border-4 border-blue-600/30 border-t-blue-600 rounded-full animate-spin"></span>
                                         </div>
                                     ) : (
-                                        loans.map(loan => (
-                                            <div key={loan.id} className="p-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-sm hover:shadow-md transition-shadow">
-                                                <div className="flex justify-between items-start mb-2">
-                                                    <div>
-                                                        <div className="text-lg font-black text-slate-900 dark:text-white tracking-tight">
-                                                            {new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN' }).format(Number(loan.requested_loan_amount))}
+                                        <>
+                                            {/* Active CBA Loans */}
+                                            {cbaLoans.filter(l => l.currentBalance < 0 && l.nextTotalPayment !== 0).map(loan => (
+                                                <div key={loan.loanAccountNo} className="space-y-6">
+                                                    <h3 className="text-sm font-black text-slate-800 dark:text-white uppercase tracking-widest flex items-center gap-2">
+                                                        <span className="material-symbols-outlined text-blue-600 text-lg">play_arrow</span>
+                                                        Active Loan Details
+                                                    </h3>
+                                                    
+                                                    <div className="grid grid-cols-4 gap-4">
+                                                        <div className="bg-white dark:bg-slate-800 p-6 rounded-3xl border border-slate-100 dark:border-slate-700 shadow-sm flex flex-col justify-between h-40">
+                                                            <div className="flex justify-between items-start mb-2">
+                                                                <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Loan Category</span>
+                                                                <div className="w-8 h-8 rounded-full bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center">
+                                                                    <span className="material-symbols-outlined text-blue-600 text-[14px]">account_tree</span>
+                                                                </div>
+                                                            </div>
+                                                            <div>
+                                                                <h4 className="text-[16px] leading-tight font-black text-slate-900 dark:text-white uppercase tracking-tight line-clamp-2">{loan.product}</h4>
+                                                                <p className="text-[9px] font-bold text-slate-400 uppercase mt-1.5 tracking-widest">Ref: #{loan.loanAccountNo}</p>
+                                                            </div>
                                                         </div>
-                                                        <div className="text-xs text-slate-500 font-medium font-mono">
-                                                            Applied: {formatDateTime(loan.created_at)}
+
+                                                        <div className="bg-white dark:bg-slate-800 p-6 rounded-3xl border border-slate-100 dark:border-slate-700 shadow-sm flex flex-col justify-between h-40">
+                                                            <div className="flex justify-between items-start mb-2">
+                                                                <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Principal</span>
+                                                                <div className="w-8 h-8 rounded-full bg-indigo-50 dark:bg-indigo-900/30 flex items-center justify-center">
+                                                                    <span className="material-symbols-outlined text-indigo-600 text-[14px]">payments</span>
+                                                                </div>
+                                                            </div>
+                                                            <div>
+                                                                <h4 className="text-[18px] font-black text-slate-900 dark:text-white uppercase tracking-tight">
+                                                                    {new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN' }).format(loan.loanAmount || 0)}
+                                                                </h4>
+                                                                <p className="text-[9px] font-bold text-slate-400 uppercase mt-1.5 tracking-widest">@ {loan.interestrate}% Interest Rate</p>
+                                                            </div>
+                                                        </div>
+
+                                                        <div className="bg-white dark:bg-slate-800 p-6 rounded-3xl border border-slate-100 dark:border-slate-700 shadow-sm flex flex-col justify-between h-40">
+                                                            <div className="flex justify-between items-start mb-2">
+                                                                <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Outstanding Debt</span>
+                                                                <div className="w-8 h-8 rounded-full bg-rose-50 dark:bg-rose-900/30 flex items-center justify-center">
+                                                                    <span className="material-symbols-outlined text-rose-600 text-[14px]">account_balance</span>
+                                                                </div>
+                                                            </div>
+                                                            <div>
+                                                                <h4 className="text-[18px] font-black text-slate-900 dark:text-white uppercase tracking-tight">
+                                                                    {new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN' }).format(Math.abs(loan.currentBalance || 0))}
+                                                                </h4>
+                                                                <p className="text-[9px] font-bold text-amber-500 uppercase mt-1.5 tracking-widest flex items-center gap-1">
+                                                                    <span className="material-symbols-outlined text-[10px]">warning</span> Due Soon
+                                                                </p>
+                                                            </div>
+                                                        </div>
+
+                                                        <div className="bg-white dark:bg-slate-800 p-6 rounded-3xl border border-slate-100 dark:border-slate-700 shadow-sm flex flex-col justify-between h-40">
+                                                            <div className="flex justify-between items-start mb-2">
+                                                                <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Next Repayment</span>
+                                                                <div className="w-8 h-8 rounded-full bg-emerald-50 dark:bg-emerald-900/30 flex items-center justify-center">
+                                                                    <span className="material-symbols-outlined text-emerald-600 text-[14px]">calendar_month</span>
+                                                                </div>
+                                                            </div>
+                                                            <div>
+                                                                <h4 className="text-[16px] font-black text-slate-900 dark:text-white uppercase tracking-tight">
+                                                                    {loan.nextPaymentDate || 'N/A'}
+                                                                </h4>
+                                                                <p className="text-[9px] font-bold text-slate-400 uppercase mt-1.5 tracking-widest">
+                                                                    Amount: {new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN' }).format(loan.nextTotalPayment || (loan.nextPrincipalPayment || 0))}
+                                                                </p>
+                                                            </div>
                                                         </div>
                                                     </div>
-                                                    <span className={`px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider ${loan.status === 'active' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' :
-                                                        loan.status === 'pending' ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400' :
-                                                            'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-400'
-                                                        }`}>
-                                                        {loan.status}
-                                                    </span>
                                                 </div>
-                                                <div className="mt-2 pt-2 border-t border-slate-100 dark:border-slate-700 flex justify-between items-center">
-                                                    <span className="text-xs text-slate-400 font-bold">{loan.loan_type?.toUpperCase() || 'LOAN'}</span>
-                                                    <span className="text-xs text-blue-500 font-bold cursor-pointer hover:underline">View Details</span>
+                                            ))}
+
+                                            {/* Inactive CBA Loans */}
+                                            {cbaLoans.filter(l => l.currentBalance >= 0 || l.nextTotalPayment === 0).length > 0 && (
+                                                <div className="space-y-4">
+                                                    <h3 className="text-sm font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                                                        <span className="material-symbols-outlined text-slate-400 text-lg">history</span>
+                                                        Closed / Inactive Loans
+                                                    </h3>
+                                                    {cbaLoans.filter(l => l.currentBalance >= 0 || l.nextTotalPayment === 0).map(loan => (
+                                                        <div key={loan.loanAccountNo} className="p-5 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 flex justify-between items-center">
+                                                            <div>
+                                                                <div className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-tight">{loan.product}</div>
+                                                                <div className="text-[10px] text-slate-500 font-bold tracking-widest mt-1">REF: #{loan.loanAccountNo}</div>
+                                                            </div>
+                                                            <div className="text-right">
+                                                                <div className="text-sm font-black text-slate-900 dark:text-white">
+                                                                    {new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN' }).format(loan.loanAmount || 0)}
+                                                                </div>
+                                                                <div className="px-2 py-1 mt-1 inline-block rounded-md bg-slate-200 dark:bg-slate-800 text-[9px] font-black text-slate-500 uppercase tracking-widest">SETTLED</div>
+                                                            </div>
+                                                        </div>
+                                                    ))}
                                                 </div>
-                                            </div>
-                                        ))
+                                            )}
+
+                                            {/* Local Pending Loans (if any) */}
+                                            {loans.filter(l => l.status !== 'disbursed').length > 0 && (
+                                                <div className="space-y-4">
+                                                    <h3 className="text-sm font-black text-slate-800 dark:text-white uppercase tracking-widest flex items-center gap-2">
+                                                        <span className="material-symbols-outlined text-yellow-500 text-lg">pending_actions</span>
+                                                        Pending Applications
+                                                    </h3>
+                                                    {loans.filter(l => l.status !== 'disbursed').map(loan => (
+                                                        <div key={loan.id} className="p-5 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-sm flex justify-between items-center">
+                                                            <div>
+                                                                <div className="text-lg font-black text-slate-900 dark:text-white tracking-tight">
+                                                                    {new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN' }).format(Number(loan.requested_loan_amount))}
+                                                                </div>
+                                                                <div className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-1">
+                                                                    {loan.loan_type} • Applied: {formatDateTime(loan.created_at)}
+                                                                </div>
+                                                            </div>
+                                                            <span className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider ${
+                                                                loan.status === 'active' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' :
+                                                                loan.status === 'pending' ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400' :
+                                                                'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-400'
+                                                            }`}>
+                                                                {loan.status}
+                                                            </span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+
+                                            {cbaLoans.length === 0 && loans.length === 0 && (
+                                                <div className="text-center py-12">
+                                                    <div className="size-16 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-4 text-slate-400">
+                                                        <span className="material-symbols-outlined text-2xl">credit_card_off</span>
+                                                    </div>
+                                                    <p className="text-[11px] uppercase tracking-widest text-slate-500 font-black">No loan history available</p>
+                                                </div>
+                                            )}
+                                        </>
                                     )}
                                 </div>
                             )}
