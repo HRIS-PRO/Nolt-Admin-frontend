@@ -532,7 +532,7 @@ const CustomerDetailsPage: React.FC<CustomerDetailsPageProps> = ({ user, onLogou
 
             {/* ══════════════ LOAN TAB ══════════════ */}
             {activeTab === 'LOAN' && (
-              <div className="space-y-12">
+              <div className="space-y-8">
                 {isCbaLoading ? (
                   <div className="flex flex-col items-center justify-center py-16 gap-4">
                     <span className="w-10 h-10 border-4 border-blue-600/20 border-t-blue-600 rounded-full animate-spin" />
@@ -556,52 +556,138 @@ const CustomerDetailsPage: React.FC<CustomerDetailsPageProps> = ({ user, onLogou
                   </div>
                 ) : (
                   <>
-                    {cbaLoans.filter(l => l.currentBalance < 0 && l.nextTotalPayment !== 0).map(loan => (
-                      <div key={loan.loanAccountNo} className="space-y-6">
-                        <h3 className="text-sm font-black text-slate-800 dark:text-white uppercase tracking-widest flex items-center gap-2">
-                          <span className="material-symbols-outlined text-blue-600 text-lg">play_arrow</span> Active Loan Details
-                        </h3>
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                          {[
-                            { label: 'Loan Category', val: loan.product, sub: `Ref: #${loan.loanAccountNo}`, icon: 'account_tree', c: 'blue' },
-                            { label: 'Principal', val: new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN' }).format(loan.loanAmount || 0), sub: `@ ${loan.interestrate}% Interest`, icon: 'payments', c: 'indigo' },
-                            { label: 'Outstanding Debt', val: new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN' }).format(Math.abs(loan.currentBalance || 0)), sub: 'Due Soon', icon: 'account_balance', c: 'rose' },
-                            { label: 'Next Repayment', val: loan.nextPaymentDate || 'N/A', sub: `Amt: ${new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN' }).format(loan.nextTotalPayment || loan.nextPrincipalPayment || 0)}`, icon: 'calendar_month', c: 'emerald' },
-                          ].map(card => (
-                            <div key={card.label} className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-sm flex flex-col justify-between min-h-[160px]">
-                              <div className="flex justify-between items-start mb-2">
-                                <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{card.label}</span>
-                                <div className="w-8 h-8 rounded-full bg-slate-50 dark:bg-slate-800 flex items-center justify-center">
-                                  <span className="material-symbols-outlined text-blue-600 text-[14px]">{card.icon}</span>
-                                </div>
-                              </div>
-                              <div>
-                                <h4 className="text-[16px] leading-tight font-black text-slate-900 dark:text-white uppercase tracking-tight line-clamp-2">{card.val}</h4>
-                                <p className="text-[9px] font-bold text-slate-400 uppercase mt-1.5 tracking-widest">{card.sub}</p>
-                              </div>
+                    {/* ── ACTIVE CBA LOANS ── */}
+                    {cbaLoans.filter(l => l.currentBalance < 0 && l.nextTotalPayment !== 0).length > 0 && (() => {
+                      const activeLoans = cbaLoans.filter(l => l.currentBalance < 0 && l.nextTotalPayment !== 0);
+                      const fmt = (n: number) => new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN' }).format(n);
+                      return (
+                        <div className="space-y-4">
+                          {/* Section header */}
+                          <div className="flex items-center gap-3">
+                            <div className="flex items-center gap-2">
+                              <div className="size-2.5 rounded-full bg-emerald-500 animate-pulse" />
+                              <h3 className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-widest">Active CBA Loans</h3>
                             </div>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
+                            <span className="px-2 py-0.5 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 text-[10px] font-black uppercase tracking-wider rounded-full border border-emerald-100 dark:border-emerald-800">
+                              {activeLoans.length} Active
+                            </span>
+                          </div>
 
+                          {/* Summary stat cards — aggregate across all active loans */}
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                            {[
+                              {
+                                label: 'Total Principal', icon: 'payments', color: 'blue',
+                                value: fmt(activeLoans.reduce((s, l) => s + (l.loanAmount || 0), 0)),
+                                sub: `${activeLoans.length} loan${activeLoans.length > 1 ? 's' : ''}`,
+                              },
+                              {
+                                label: 'Outstanding Balance', icon: 'account_balance', color: 'rose',
+                                value: fmt(activeLoans.reduce((s, l) => s + Math.abs(l.currentBalance || 0), 0)),
+                                sub: 'Total owed',
+                              },
+                              {
+                                label: 'Next Repayment', icon: 'calendar_month', color: 'amber',
+                                value: fmt(activeLoans.reduce((s, l) => s + (l.nextTotalPayment || 0), 0)),
+                                sub: activeLoans[0]?.nextPaymentDate || 'N/A',
+                              },
+                              {
+                                label: 'Interest Rate', icon: 'percent', color: 'indigo',
+                                value: `${activeLoans[0]?.interestrate || 0}%`,
+                                sub: 'Per annum',
+                              },
+                            ].map(card => (
+                              <div key={card.label} className="bg-white dark:bg-slate-900 rounded-2xl p-5 border border-slate-100 dark:border-slate-800 shadow-sm">
+                                <div className="flex items-center justify-between mb-3">
+                                  <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-tight">{card.label}</span>
+                                  <div className="size-7 rounded-full bg-slate-50 dark:bg-slate-800 flex items-center justify-center">
+                                    <span className="material-symbols-outlined text-blue-500 text-[13px]">{card.icon}</span>
+                                  </div>
+                                </div>
+                                <div className="text-[15px] font-black text-slate-900 dark:text-white tracking-tight leading-tight">{card.value}</div>
+                                <div className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1">{card.sub}</div>
+                              </div>
+                            ))}
+                          </div>
+
+                          {/* Loans table */}
+                          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm overflow-hidden">
+                            <table className="w-full text-left border-collapse">
+                              <thead>
+                                <tr className="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-100 dark:border-slate-800">
+                                  {['Loan Ref', 'Product', 'Principal', 'Outstanding', 'Rate', 'Next Payment', 'Due Date', 'Maturity'].map(h => (
+                                    <th key={h} className="px-5 py-3.5 text-[9px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">{h}</th>
+                                  ))}
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                                {activeLoans.map(loan => (
+                                  <tr key={loan.loanAccountNo} className="hover:bg-blue-50/30 dark:hover:bg-slate-800/40 transition-colors">
+                                    <td className="px-5 py-4 whitespace-nowrap">
+                                      <div className="flex items-center gap-2">
+                                        <div className="size-1.5 rounded-full bg-emerald-500 shrink-0" />
+                                        <span className="text-[11px] font-bold text-slate-500 font-mono">#{loan.loanAccountNo}</span>
+                                      </div>
+                                    </td>
+                                    <td className="px-5 py-4 whitespace-nowrap">
+                                      <span className="text-sm font-black text-slate-900 dark:text-white">{loan.product}</span>
+                                      {loan.loanDuration && <div className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mt-0.5">{loan.loanDuration}</div>}
+                                    </td>
+                                    <td className="px-5 py-4 whitespace-nowrap text-sm font-bold text-slate-900 dark:text-white">{fmt(loan.loanAmount || 0)}</td>
+                                    <td className="px-5 py-4 whitespace-nowrap">
+                                      <span className="text-sm font-black text-rose-600 dark:text-rose-400">{fmt(Math.abs(loan.currentBalance || 0))}</span>
+                                    </td>
+                                    <td className="px-5 py-4 whitespace-nowrap">
+                                      <span className="px-2 py-1 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 text-[10px] font-black rounded-lg">{loan.interestrate}%</span>
+                                    </td>
+                                    <td className="px-5 py-4 whitespace-nowrap text-sm font-bold text-slate-900 dark:text-white">{fmt(loan.nextTotalPayment || 0)}</td>
+                                    <td className="px-5 py-4 whitespace-nowrap">
+                                      <span className="px-2 py-1 bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 text-[10px] font-black rounded-lg">{loan.nextPaymentDate || '—'}</span>
+                                    </td>
+                                    <td className="px-5 py-4 whitespace-nowrap text-[11px] font-bold text-slate-500">{loan.maturityDate || '—'}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      );
+                    })()}
+
+                    {/* ── SETTLED / INACTIVE CBA LOANS ── */}
                     {cbaLoans.filter(l => l.currentBalance >= 0 || l.nextTotalPayment === 0).length > 0 && (
                       <div className="space-y-4">
-                        <h3 className="text-sm font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                          <span className="material-symbols-outlined text-slate-400 text-lg">history</span> Closed / Inactive Loans
-                        </h3>
-                        <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-sm overflow-hidden">
+                        <div className="flex items-center gap-3">
+                          <div className="flex items-center gap-2">
+                            <div className="size-2.5 rounded-full bg-slate-400" />
+                            <h3 className="text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">Settled CBA Loans</h3>
+                          </div>
+                          <span className="px-2 py-0.5 bg-slate-100 dark:bg-slate-800 text-slate-500 text-[10px] font-black uppercase tracking-wider rounded-full">
+                            {cbaLoans.filter(l => l.currentBalance >= 0 || l.nextTotalPayment === 0).length} Closed
+                          </span>
+                        </div>
+                        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm overflow-hidden">
                           <table className="w-full text-left border-collapse">
-                            <thead><tr className="bg-slate-50 dark:bg-slate-800/50">
-                              {['Loan Ref', 'Product', 'Principal', 'Status'].map(h => <th key={h} className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest whitespace-nowrap">{h}</th>)}
-                            </tr></thead>
+                            <thead>
+                              <tr className="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-100 dark:border-slate-800">
+                                {['Loan Ref', 'Product', 'Principal', 'Start Date', 'Maturity Date', 'Status'].map(h => (
+                                  <th key={h} className="px-5 py-3.5 text-[9px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">{h}</th>
+                                ))}
+                              </tr>
+                            </thead>
                             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                               {cbaLoans.filter(l => l.currentBalance >= 0 || l.nextTotalPayment === 0).map(loan => (
-                                <tr key={loan.loanAccountNo} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                                  <td className="px-6 py-4 text-sm font-bold text-slate-500">#{loan.loanAccountNo}</td>
-                                  <td className="px-6 py-4 text-sm font-black text-slate-900 dark:text-white">{loan.product}</td>
-                                  <td className="px-6 py-4 text-sm font-black text-slate-900 dark:text-white">{new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN' }).format(loan.loanAmount || 0)}</td>
-                                  <td className="px-6 py-4"><span className="px-3 py-1 bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 rounded-full text-[9px] font-black uppercase tracking-widest">SETTLED</span></td>
+                                <tr key={loan.loanAccountNo} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
+                                  <td className="px-5 py-4 text-[11px] font-bold text-slate-400 font-mono whitespace-nowrap">#{loan.loanAccountNo}</td>
+                                  <td className="px-5 py-4 text-sm font-black text-slate-900 dark:text-white whitespace-nowrap">{loan.product}</td>
+                                  <td className="px-5 py-4 text-sm font-bold text-slate-700 dark:text-slate-300 whitespace-nowrap">
+                                    {new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN' }).format(loan.loanAmount || 0)}
+                                  </td>
+                                  <td className="px-5 py-4 text-[11px] font-bold text-slate-500 whitespace-nowrap">{loan.startDate || '—'}</td>
+                                  <td className="px-5 py-4 text-[11px] font-bold text-slate-500 whitespace-nowrap">{loan.maturityDate || '—'}</td>
+                                  <td className="px-5 py-4 whitespace-nowrap">
+                                    <span className="px-2.5 py-1 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 rounded-full text-[9px] font-black uppercase tracking-widest">SETTLED</span>
+                                  </td>
                                 </tr>
                               ))}
                             </tbody>
@@ -610,26 +696,94 @@ const CustomerDetailsPage: React.FC<CustomerDetailsPageProps> = ({ user, onLogou
                       </div>
                     )}
 
-                    {loans.filter(l => l.status !== 'disbursed').length > 0 && (
+                    {/* ── INTERNAL NOLT LOANS (top-up, re-app, add-on) ── */}
+                    {loans.filter(l => ['topup', 're-app', 'add_on', 'top_up', 're_app', 'add-on'].includes((l.loan_type || '').toLowerCase())).length > 0 && (
                       <div className="space-y-4">
-                        <h3 className="text-sm font-black text-slate-800 dark:text-white uppercase tracking-widest flex items-center gap-2">
-                          <span className="material-symbols-outlined text-yellow-500 text-lg">pending_actions</span> Pending Applications
-                        </h3>
-                        <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-sm overflow-hidden">
+                        <div className="flex items-center gap-3">
+                          <div className="flex items-center gap-2">
+                            <div className="size-2.5 rounded-full bg-purple-500" />
+                            <h3 className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-widest">Internal Nolt Loans</h3>
+                          </div>
+                          <div className="flex gap-1.5 flex-wrap">
+                            {['TOP-UP', 'RE-APP', 'ADD-ON'].map(tag => (
+                              <span key={tag} className="px-2 py-0.5 bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400 text-[9px] font-black uppercase tracking-wider rounded-full border border-purple-100 dark:border-purple-800">{tag}</span>
+                            ))}
+                          </div>
+                        </div>
+                        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm overflow-hidden">
                           <table className="w-full text-left border-collapse">
-                            <thead><tr className="bg-slate-50 dark:bg-slate-800/50">
-                              {['Applied On', 'Product', 'Amount Requested', 'Status'].map(h => <th key={h} className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest whitespace-nowrap">{h}</th>)}
-                            </tr></thead>
+                            <thead>
+                              <tr className="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-100 dark:border-slate-800">
+                                {['Date', 'Type', 'Amount Requested', 'Tenor', 'Status'].map(h => (
+                                  <th key={h} className="px-5 py-3.5 text-[9px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">{h}</th>
+                                ))}
+                              </tr>
+                            </thead>
                             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                              {loans.filter(l => l.status !== 'disbursed').map(loan => (
-                                <tr key={loan.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                                  <td className="px-6 py-4 text-sm font-bold text-slate-500">{new Date(loan.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }).toUpperCase()}</td>
-                                  <td className="px-6 py-4 text-sm font-black text-slate-900 dark:text-white">{loan.loan_type}</td>
-                                  <td className="px-6 py-4 text-sm font-black text-slate-900 dark:text-white">{new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN' }).format(Number(loan.requested_loan_amount))}</td>
-                                  <td className="px-6 py-4">
-                                    <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest ${loan.status === 'active' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : loan.status === 'pending' ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400' : 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-400'}`}>
-                                      {loan.status}
+                              {loans.filter(l => ['topup', 're-app', 'add_on', 'top_up', 're_app', 'add-on'].includes((l.loan_type || '').toLowerCase())).map(loan => (
+                                <tr key={loan.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
+                                  <td className="px-5 py-4 text-[11px] font-bold text-slate-500 whitespace-nowrap">
+                                    {new Date(loan.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }).toUpperCase()}
+                                  </td>
+                                  <td className="px-5 py-4 whitespace-nowrap">
+                                    <span className="px-2.5 py-1 bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300 text-[9px] font-black uppercase tracking-widest rounded-full">
+                                      {(loan.loan_type || '').replace(/_/g, '-').toUpperCase()}
                                     </span>
+                                  </td>
+                                  <td className="px-5 py-4 text-sm font-black text-slate-900 dark:text-white whitespace-nowrap">
+                                    {new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN' }).format(Number(loan.requested_loan_amount))}
+                                  </td>
+                                  <td className="px-5 py-4 text-[11px] font-bold text-slate-500 whitespace-nowrap">
+                                    {loan.loan_tenure ? `${loan.loan_tenure} months` : '—'}
+                                  </td>
+                                  <td className="px-5 py-4 whitespace-nowrap">
+                                    <span className={`px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-widest ${
+                                      loan.status === 'disbursed' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' :
+                                      loan.status === 'active'   ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' :
+                                      loan.status === 'pending'  ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' :
+                                      'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-400'
+                                    }`}>{loan.status}</span>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* ── ALL OTHER PENDING / ACTIVE LOANS ── */}
+                    {loans.filter(l => !['topup', 're-app', 'add_on', 'top_up', 're_app', 'add-on'].includes((l.loan_type || '').toLowerCase()) && l.status !== 'disbursed').length > 0 && (
+                      <div className="space-y-4">
+                        <div className="flex items-center gap-2">
+                          <div className="size-2.5 rounded-full bg-amber-400" />
+                          <h3 className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-widest">Pending Applications</h3>
+                        </div>
+                        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm overflow-hidden">
+                          <table className="w-full text-left border-collapse">
+                            <thead>
+                              <tr className="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-100 dark:border-slate-800">
+                                {['Applied On', 'Type', 'Amount Requested', 'Status'].map(h => (
+                                  <th key={h} className="px-5 py-3.5 text-[9px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">{h}</th>
+                                ))}
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                              {loans.filter(l => !['topup', 're-app', 'add_on', 'top_up', 're_app', 'add-on'].includes((l.loan_type || '').toLowerCase()) && l.status !== 'disbursed').map(loan => (
+                                <tr key={loan.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
+                                  <td className="px-5 py-4 text-[11px] font-bold text-slate-500 whitespace-nowrap">
+                                    {new Date(loan.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }).toUpperCase()}
+                                  </td>
+                                  <td className="px-5 py-4 text-sm font-black text-slate-900 dark:text-white whitespace-nowrap">{loan.loan_type}</td>
+                                  <td className="px-5 py-4 text-sm font-black text-slate-900 dark:text-white whitespace-nowrap">
+                                    {new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN' }).format(Number(loan.requested_loan_amount))}
+                                  </td>
+                                  <td className="px-5 py-4 whitespace-nowrap">
+                                    <span className={`px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-widest ${
+                                      loan.status === 'active'  ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' :
+                                      loan.status === 'pending' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' :
+                                      'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-400'
+                                    }`}>{loan.status}</span>
                                   </td>
                                 </tr>
                               ))}
