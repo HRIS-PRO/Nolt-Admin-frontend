@@ -32,11 +32,36 @@ const CustomerDetailsPage: React.FC<CustomerDetailsPageProps> = ({ user, onLogou
   const [editForm, setEditForm] = useState<any>({});
   const [isSaving, setIsSaving] = useState(false);
   const [saveMsg, setSaveMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [uploadingUtilityBill, setUploadingUtilityBill] = useState(false);
+  const [isSendingPassword, setIsSendingPassword] = useState(false);
 
   useEffect(() => { fetchCustomerData(); }, [id]);
   useEffect(() => {
     if (activeTab === 'LOAN' && id && !hasFetchedCba) fetchCbaLoans(id);
   }, [activeTab, id]);
+
+  const handleUtilityBillUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || e.target.files.length === 0) return;
+    const file = e.target.files[0];
+    
+    setUploadingUtilityBill(true);
+    const uploadData = new FormData();
+    uploadData.append('file', file);
+    uploadData.append('document_type', 'utility_bill');
+
+    try {
+      const response = await axios.post('/api/upload', uploadData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+        withCredentials: true
+      });
+      setEditForm((prev: any) => ({ ...prev, utility_bill_url: response.data.document.file_url }));
+    } catch (error) {
+      console.error('Upload error:', error);
+      alert('Failed to upload utility bill');
+    } finally {
+      setUploadingUtilityBill(false);
+    }
+  };
 
   const fetchCbaLoans = async (customerId: string) => {
     setIsCbaLoading(true);
@@ -55,6 +80,21 @@ const CustomerDetailsPage: React.FC<CustomerDetailsPageProps> = ({ user, onLogou
     } finally {
       setIsCbaLoading(false);
       setHasFetchedCba(true);
+    }
+  };
+
+  const handleSendPassword = async () => {
+    if (!window.confirm(`Are you sure you want to generate and send a new password to ${profile.email}?`)) return;
+    
+    setIsSendingPassword(true);
+    try {
+      const res = await axios.post(API(`/api/staff/customers/${id}/send-password`), {}, { withCredentials: true });
+      alert(res.data.message);
+      await fetchCustomerData();
+    } catch (e: any) {
+      alert(e.response?.data?.message || 'Failed to send password.');
+    } finally {
+      setIsSendingPassword(false);
     }
   };
 
@@ -122,6 +162,7 @@ const CustomerDetailsPage: React.FC<CustomerDetailsPageProps> = ({ user, onLogou
       const payload: any = {};
       Object.entries(editForm).forEach(([k, v]) => {
         if (typeof v === 'boolean') { payload[k] = v; return; }
+        if (k === 'utility_bill_url' && v === '') { payload[k] = ''; return; }
         if (v !== '' && v !== null && v !== undefined) payload[k] = v;
       });
       await axios.put(API(`/api/staff/customers/${id}/profile`), payload, { withCredentials: true });
@@ -390,7 +431,29 @@ const CustomerDetailsPage: React.FC<CustomerDetailsPageProps> = ({ user, onLogou
                       <div>
                         <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-4 border-b border-slate-100 dark:border-slate-800/50 pb-2">CONTACT DETAILS</h4>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                          <DV label="EMAIL ADDRESS" value={profile.email || profile.personal_email} verified />
+                          <div>
+                            <DV label="EMAIL ADDRESS" value={profile.email || profile.personal_email} verified />
+                            {!profile.has_password && (
+                              <button 
+                                onClick={handleSendPassword} 
+                                disabled={isSendingPassword}
+                                className="mt-2 text-[10px] font-black uppercase text-blue-500 hover:text-blue-600 tracking-wider flex items-center gap-1 transition-colors"
+                              >
+                                <svg className="size-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+                                {isSendingPassword ? 'Sending...' : 'Send Password Setup Email'}
+                              </button>
+                            )}
+                            {profile.has_password && (
+                              <button 
+                                onClick={handleSendPassword} 
+                                disabled={isSendingPassword}
+                                className="mt-2 text-[10px] font-black uppercase text-slate-400 hover:text-rose-500 tracking-wider flex items-center gap-1 transition-colors"
+                              >
+                                <svg className="size-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                                {isSendingPassword ? 'Sending...' : 'Reset & Resend Password'}
+                              </button>
+                            )}
+                          </div>
                           <DV label="PHONE NUMBER" value={profile.phone_number || profile.mobile_number} verified />
                           <div className="md:col-span-2">
                             <DV label="REGISTERED ADDRESS" value={`${profile.address || profile.primary_home_address || '-'}${profile.state_of_residence ? `, ${profile.state_of_residence}` : ''}`} />
@@ -460,23 +523,30 @@ const CustomerDetailsPage: React.FC<CustomerDetailsPageProps> = ({ user, onLogou
                           </div>
                         </div>
 
-                        {/* Utility bill URL */}
+                        {/* Utility bill Upload */}
                         <div>
-                          <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Utility Bill Document URL</label>
-                          <p className="text-[11px] text-slate-400 mb-2">Paste a direct link to the customer's utility bill (PDF or image).</p>
-                          <input
-                            type="url"
-                            value={editForm.utility_bill_url ?? ''}
-                            onChange={e => setEditForm((f: any) => ({ ...f, utility_bill_url: e.target.value }))}
-                            placeholder="https://..."
-                            className="w-full px-3 py-2 text-sm font-bold bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none dark:text-white"
-                          />
-                          {editForm.utility_bill_url && (
-                            <a href={editForm.utility_bill_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 mt-2 text-xs font-bold text-blue-500 hover:underline">
-                              Preview URL
-                              <svg className="size-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
-                            </a>
-                          )}
+                          <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Utility Bill Document</label>
+                          <p className="text-[11px] text-slate-400 mb-2">Upload the customer's utility bill (PDF or image).</p>
+                          
+                          <div className="relative h-24 border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-2xl flex flex-col items-center justify-center bg-slate-50 dark:bg-slate-800/50 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors group overflow-hidden">
+                            {uploadingUtilityBill ? (
+                                <div className="absolute inset-0 bg-white/80 dark:bg-slate-900/80 flex items-center justify-center">
+                                    <span className="w-6 h-6 border-3 border-blue-600/30 border-t-blue-600 rounded-full animate-spin" />
+                                </div>
+                            ) : editForm.utility_bill_url ? (
+                                <div className="flex flex-col items-center">
+                                    <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">Document Uploaded</span>
+                                    <a href={editForm.utility_bill_url} target="_blank" rel="noreferrer" className="text-xs font-bold text-blue-500 hover:underline mt-1">Preview File</a>
+                                    <button type="button" onClick={() => setEditForm((prev: any) => ({ ...prev, utility_bill_url: '' }))} className="text-[9px] font-black text-rose-500 uppercase underline mt-1">Remove</button>
+                                </div>
+                            ) : (
+                                <>
+                                    <span className="material-symbols-outlined text-slate-400 group-hover:text-blue-500 text-3xl mb-2">cloud_upload</span>
+                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Click to upload bill</p>
+                                    <input type="file" onChange={handleUtilityBillUpload} className="absolute inset-0 opacity-0 cursor-pointer" accept="image/*,application/pdf" />
+                                </>
+                            )}
+                          </div>
                         </div>
                       </div>
                       <EditBar />
