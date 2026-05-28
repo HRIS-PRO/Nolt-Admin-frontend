@@ -302,6 +302,66 @@ const NewLoanApplicationFlow: React.FC<NewLoanApplicationFlowProps> = ({ isOpen,
                                     )}
                                 </div>
 
+                                {/* Internal Nolt Loan History — only topup, re-app, add_on */}
+                                {loanHistory.filter((l: any) => ['topup', 're-app', 'add_on'].includes(l.loan_type)).length > 0 && (
+                                    <div className="mb-8">
+                                        <div className="flex items-center gap-3 mb-6">
+                                            <div className="w-1 h-4 bg-violet-500 rounded-full"></div>
+                                            <h4 className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-widest">Previous Applications (Nolt)</h4>
+                                        </div>
+                                        <div className="space-y-3">
+                                            {loanHistory.filter((l: any) => ['topup', 're-app', 'add_on'].includes(l.loan_type)).map((loan: any, idx: number) => {
+                                                const typeLabel: Record<string, string> = {
+                                                    'new': 'New Loan',
+                                                    'buy_over': 'Buy Over',
+                                                    'topup': 'Top-Up',
+                                                    're-app': 'Re-App',
+                                                    'add_on': 'Add-On',
+                                                };
+                                                const typeColor: Record<string, string> = {
+                                                    'topup': 'bg-blue-50 text-blue-600 border-blue-100',
+                                                    're-app': 'bg-violet-50 text-violet-600 border-violet-100',
+                                                    'add_on': 'bg-amber-50 text-amber-600 border-amber-100',
+                                                    'buy_over': 'bg-orange-50 text-orange-600 border-orange-100',
+                                                    'new': 'bg-emerald-50 text-emerald-600 border-emerald-100',
+                                                };
+                                                const statusColor: Record<string, string> = {
+                                                    'disbursed': 'bg-emerald-50 text-emerald-600',
+                                                    'pending': 'bg-amber-50 text-amber-600',
+                                                    'rejected': 'bg-rose-50 text-rose-600',
+                                                    'approved': 'bg-blue-50 text-blue-600',
+                                                };
+                                                const amount = loan.disbursement_amount || loan.topup_amount || loan.buy_over_amount || loan.requested_loan_amount || 0;
+                                                const label = typeLabel[loan.loan_type] || loan.loan_type?.toUpperCase() || 'LOAN';
+                                                const color = typeColor[loan.loan_type] || 'bg-slate-50 text-slate-600 border-slate-100';
+                                                const sColor = statusColor[loan.status] || 'bg-slate-50 text-slate-500';
+
+                                                return (
+                                                    <div key={idx} className="flex items-center justify-between p-4 bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-700">
+                                                        <div className="flex items-center gap-3">
+                                                            <div className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border ${color}`}>
+                                                                {label}
+                                                            </div>
+                                                            <div>
+                                                                <p className="font-black text-sm text-slate-900 dark:text-white">
+                                                                    ₦{Number(amount).toLocaleString()}
+                                                                </p>
+                                                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-0.5">
+                                                                    {new Date(loan.created_at).toLocaleDateString('en-GB')} • Stage: {(loan.stage || '').replace(/_/g, ' ').toUpperCase()}
+                                                                </p>
+                                                            </div>
+                                                        </div>
+                                                        <div className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${sColor}`}>
+                                                            {loan.status}
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                )}
+
+
                                 {/* Active Loan Options Block */}
                                 {(() => {
                                     const activeLoans = cbaLoans.filter(loan => loan.currentBalance < 0 && loan.nextTotalPayment !== 0);
