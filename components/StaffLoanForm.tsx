@@ -2,9 +2,20 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import MdaTertiarySelect, { TERTIARY_LIST } from './MdaTertiarySelect';
 
+const STATIC_PRODUCTS = [
+    { name: "NOLT IPPIS", code: "314", rate: "4% PER MONTH", icon: "inventory_2" },
+    { name: "WORKING CAPITAL LOAN", code: "301", rate: "5% PER MONTH", icon: "inventory_2" },
+    { name: "NOLT SALARY ADVANCE", code: "302", rate: "4% PER MONTH", icon: "inventory_2" },
+    { name: "ANNUITANT LOAN", code: "303", rate: "CONFIRM FROM CBS", icon: "inventory_2" }
+];
+
 interface StaffLoanFormProps {
     onClose: () => void;
     onSuccess: () => void;
+    initialData?: any;
+    loanId?: string;
+    user?: any;
+    isCustomerVerified?: boolean;
 }
 
 const NIGERIAN_STATES = [
@@ -31,6 +42,7 @@ const InputGroup = ({ label, required = false, children, className = "", error }
 const FileUpload = ({
     id,
     label,
+    subtitle = "PDF, JPG, PNG UP TO 5MB",
     required = false,
     doc,
     progress,
@@ -40,6 +52,7 @@ const FileUpload = ({
 }: {
     id: string,
     label: string,
+    subtitle?: string,
     required?: boolean,
     doc: any,
     progress: number | undefined,
@@ -48,57 +61,51 @@ const FileUpload = ({
     onRemove: (id: string, e: React.MouseEvent) => void
 }) => {
     return (
-        <div className="space-y-3">
-            <div className="flex justify-between items-end">
-                <label className={`text-xs font-black uppercase tracking-widest leading-none ${error ? 'text-red-500' : 'text-slate-400'}`}>
-                    {label} {required && <span className="text-primary">*</span>}
-                </label>
-                {error && <span className="text-[10px] font-bold text-red-500 animate-in slide-in-from-left-2">{error}</span>}
-            </div>
+        <div className="relative">
+            {error && <span className="absolute -top-6 right-2 text-[10px] font-bold text-red-500 animate-in slide-in-from-left-2 z-10">{error}</span>}
             <div
                 onClick={() => !doc && onSelect(id)}
-                className={`relative w-full h-40 rounded-3xl border-2 border-dashed transition-all duration-300 group cursor-pointer overflow-hidden
-                    ${error ? 'border-red-300 bg-red-50' :
+                className={`relative w-full rounded-[2rem] border-2 p-6 flex flex-col justify-between min-h-[160px] transition-all duration-300 group cursor-pointer overflow-hidden
+                    ${error ? 'border-red-300 bg-red-50/50' :
                         doc
-                            ? 'border-primary bg-primary/5'
-                            : 'border-slate-200 dark:border-slate-700 hover:border-primary/50 hover:bg-slate-50 dark:hover:bg-slate-800'
+                            ? 'border-emerald-500/20 bg-emerald-50/10'
+                            : 'border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-[#0084FF]/40 hover:shadow-xl hover:shadow-blue-500/5 dark:hover:border-[#0084FF]/40'
                     }
                 `}
             >
                 {progress && !doc ? (
-                    <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm z-10">
-                        <div className="size-10 rounded-full border-4 border-slate-200 border-t-primary animate-spin" />
-                        <span className="text-xs font-black text-primary uppercase tracking-wider">{progress}% Uploading</span>
+                    <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-white/95 dark:bg-slate-900/95 backdrop-blur-sm z-10">
+                        <div className="size-8 rounded-full border-4 border-slate-200 border-t-[#0084FF] animate-spin" />
+                        <span className="text-[10px] font-black text-[#0084FF] uppercase tracking-wider">{progress}% UPLOADING</span>
                     </div>
                 ) : null}
 
-                {doc ? (
-                    <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 p-4 animate-in zoom-in-95 duration-300">
-                        <div className="size-14 rounded-2xl bg-white dark:bg-slate-800 shadow-xl shadow-slate-200/50 dark:shadow-black/50 flex items-center justify-center text-primary transform group-hover:scale-110 transition-transform duration-500">
-                            <span className="material-symbols-outlined text-3xl">check_circle</span>
-                        </div>
-                        <div className="text-center w-full">
-                            <p className="font-bold text-slate-900 dark:text-white truncate text-sm px-4">{doc.name}</p>
-                            <p className="text-[10px] uppercase font-black text-slate-400 tracking-wider mt-1">{doc.size}</p>
-                        </div>
+                <div className="flex justify-between items-start w-full">
+                    <div className={`size-12 rounded-2xl flex items-center justify-center transform group-hover:scale-105 transition-transform duration-300 ${doc ? 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-500' : 'bg-slate-50 dark:bg-slate-800 text-slate-400 group-hover:text-[#0084FF] dark:group-hover:text-[#0084FF]'
+                        }`}>
+                        <span className="material-symbols-outlined text-2xl">{doc ? 'check_circle' : 'description'}</span>
+                    </div>
+                    {doc ? (
                         <button
+                            type="button"
                             onClick={(e) => onRemove(id, e)}
-                            className="absolute top-3 right-3 size-8 rounded-full bg-red-50 text-red-500 hover:bg-red-500 hover:text-white flex items-center justify-center transition-all duration-300 shadow-sm"
+                            className="size-8 rounded-full bg-red-50 text-red-500 hover:bg-red-500 hover:text-white flex items-center justify-center transition-all duration-300 shadow-sm"
                         >
-                            <span className="material-symbols-outlined text-lg">close</span>
+                            <span className="material-symbols-outlined text-base">close</span>
                         </button>
-                    </div>
-                ) : (
-                    <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 text-slate-400 group-hover:text-primary transition-colors duration-300">
-                        <div className={`size-16 rounded-2xl bg-slate-50 dark:bg-slate-800 border-2 flex items-center justify-center group-hover:scale-110 transition-all duration-500 ${error ? 'border-red-200 bg-red-50' : 'border-slate-100 dark:border-slate-700 group-hover:border-primary/20 group-hover:bg-white dark:group-hover:bg-slate-700'}`}>
-                            <span className="material-symbols-outlined text-3xl">cloud_upload</span>
-                        </div>
-                        <div className="text-center">
-                            <span className="text-xs font-black uppercase tracking-widest block">Click to Upload</span>
-                            <span className="text-[10px] font-medium opacity-60">PDF, JPG, PNG up to 5MB</span>
-                        </div>
-                    </div>
-                )}
+                    ) : (
+                        <span className="text-[10px] font-black text-[#0084FF] group-hover:underline uppercase tracking-wider mt-2">CLICK TO UPLOAD</span>
+                    )}
+                </div>
+
+                <div className="mt-6">
+                    <h5 className="font-black text-slate-800 dark:text-white tracking-tight uppercase text-sm leading-tight">
+                        {label} {required && <span className="text-red-500">*</span>}
+                    </h5>
+                    <p className="text-[9px] font-black text-slate-400 dark:text-slate-500 tracking-wider mt-1 uppercase truncate w-full">
+                        {doc ? doc.name : subtitle}
+                    </p>
+                </div>
             </div>
         </div>
     );
@@ -107,12 +114,16 @@ const FileUpload = ({
 
 // --- Main Component ---
 
-const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess, initialData, loanId, user }) => {
+const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess, initialData, loanId, user, isCustomerVerified }) => {
     const [step, setStep] = useState(0);
     const [loading, setLoading] = useState(false);
     const [uploadProgress, setUploadProgress] = useState<Record<string, number>>({});
     const [draftId] = useState(() => `L-DRAFT-${Date.now()}`); // Generate Draft ID for uploads
     const [errors, setErrors] = useState<Record<string, string>>({});
+
+    const [showProductSelect, setShowProductSelect] = useState(!loanId);
+    const [selectedProductOption, setSelectedProductOption] = useState<any>(null);
+    const [expandedSection, setExpandedSection] = useState<'identity' | 'address' | 'employment' | 'loan'>('loan');
 
     // Identity
     const [title, setTitle] = useState('Mr');
@@ -152,6 +163,7 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess, initi
     const [accountName, setAccountName] = useState('');
     const [bankList, setBankList] = useState<{ name: string, code: string }[]>([]);
     const [productType, setProductType] = useState('');
+    const [activeProducts, setActiveProducts] = useState<any[]>([]);
     const [isVerifyingBank, setIsVerifyingBank] = useState(false);
     const [bankVerificationResult, setBankVerificationResult] = useState<{
         account_name: string;
@@ -213,7 +225,7 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess, initi
             setReligion(initialData.religion || '');
             setMaritalStatus(initialData.marital_status || '');
             setMothersMaidenName(initialData.mothers_maiden_name || '');
-            setMobileNumber(initialData.mobile_number || '');
+            setMobileNumber(initialData.phone_number || initialData.mobile_number || '');
             setEmail(initialData.personal_email || '');
             setBvn(initialData.bvn || '');
             setNin(initialData.nin || '');
@@ -221,7 +233,7 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess, initi
             setStateOfOrigin(initialData.state_of_origin || '');
             setStateOfResidence(initialData.state_of_residence || '');
             setResidentialStatus(initialData.residential_status || '');
-            setAddress(initialData.primary_home_address || '');
+            setAddress(initialData.address || initialData.primary_home_address || '');
 
             setMda(initialData.mda_tertiary || '');
             setIppisNumber(initialData.ippis_number || '');
@@ -233,7 +245,7 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess, initi
             setLoanType(initialData.loan_type || 'new');
 
             // Populate New Fields
-            setCasa(String(initialData.casa).split('.')[0] || '');
+            setCasa(initialData.casa ? String(initialData.casa).split('.')[0] : '');
             setTopUpAmount(initialData.topup_amount || '');
             setBuyOverAmount(initialData.buy_over_amount || '');
             setBuyOverCompanyName(initialData.buy_over_company_name || '');
@@ -278,6 +290,27 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess, initi
         }
     }, [initialData]);
 
+    // Handle initial product selection and dynamic product matching
+    useEffect(() => {
+        if (activeProducts.length > 0) {
+            const currentType = productType || initialData?.product_type;
+            const match = currentType
+                ? activeProducts.find(p =>
+                    p.custom_name.toLowerCase() === currentType.toLowerCase() ||
+                    currentType.toLowerCase().includes(p.custom_name.toLowerCase()) ||
+                    p.custom_name.toLowerCase().includes(currentType.toLowerCase())
+                )
+                : activeProducts[0];
+
+            if (match) {
+                setSelectedProductOption(match);
+                if (!productType) {
+                    setProductType(match.custom_name);
+                }
+            }
+        }
+    }, [activeProducts, initialData]);
+
     useEffect(() => {
         // Fetch banks
         const fetchBanks = async () => {
@@ -293,7 +326,18 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess, initi
                 console.error("Error fetching banks:", error);
             }
         };
+
+        const fetchActiveProducts = async () => {
+            try {
+                const response = await axios.get('/api/staff/products/loans/active');
+                setActiveProducts(response.data);
+            } catch (error) {
+                console.error("Error fetching active products:", error);
+            }
+        };
+
         fetchBanks();
+        fetchActiveProducts();
     }, []);
 
     // Auto-verify bank account when bank + 10-digit account number are both filled
@@ -379,7 +423,7 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess, initi
         const formData = new FormData();
         formData.append('file', file);
         formData.append('document_type', id);
-        formData.append('loan_id', draftId); // Pass draft ID
+        formData.append('loan_id', loanId || draftId); // Pass real loan ID in edit mode, or draft ID
 
         try {
             setUploadProgress(prev => ({ ...prev, [id]: 30 }));
@@ -426,7 +470,7 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess, initi
         setUploadProgress(prev => { const next = { ...prev }; delete next[id]; return next; });
     };
 
-    const validateStep = () => {
+    const validateStep = (stepToCheck = step) => {
         const newErrors: Record<string, string> = {};
         let isValid = true;
 
@@ -465,7 +509,7 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess, initi
 
         } else {
             // Standard Wizard Validation
-            if (step === 0) { // Identity
+            if (stepToCheck === 0) { // Identity
                 if (!surname.trim()) newErrors.surname = "Required";
                 if (!firstName.trim()) newErrors.firstName = "Required";
                 if (!gender) newErrors.gender = "Required";
@@ -489,14 +533,14 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess, initi
                 }
             }
 
-            if (step === 1) { // Address
+            if (stepToCheck === 1) { // Address
                 if (!stateOfOrigin) newErrors.stateOfOrigin = "Required";
                 if (!stateOfResidence) newErrors.stateOfResidence = "Required";
                 if (!residentialStatus) newErrors.residentialStatus = "Required";
                 if (!address.trim()) newErrors.address = "Required";
             }
 
-            if (step === 2) { // Employment
+            if (stepToCheck === 2) { // Employment
                 if (!mda) newErrors.mda = "Required";
 
                 const isTertiary = TERTIARY_LIST.includes(mda);
@@ -506,7 +550,7 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess, initi
                 if (!monthlyIncome) newErrors.monthlyIncome = "Required";
             }
 
-            if (step === 3) { // Loan
+            if (stepToCheck === 3) { // Loan
                 if (!amount) newErrors.amount = "Required";
                 else if (parseFloat(amount) < 100000) newErrors.amount = "Minimum ₦100,000";
 
@@ -528,10 +572,11 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess, initi
                 }
             }
 
-            if (step === 4) { // Documents
+            if (stepToCheck === 4) { // Documents
                 if (!uploadedDocs.govt_id) newErrors.govt_id = "Required";
                 if (!uploadedDocs.work_id) newErrors.work_id = "Required";
                 if (!uploadedDocs.payslip) newErrors.payslip = "Required";
+                if (!uploadedDocs.selfie) newErrors.selfie = "Required";
 
                 // Bank Statement required for > 500k
                 if ((parseFloat(amount) || 0) > 500000 && !uploadedDocs.bank_statement) {
@@ -539,7 +584,7 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess, initi
                 }
             }
 
-            if (step === 5) { // References
+            if (stepToCheck === 5) { // References
                 if (!nokName.trim()) newErrors.nokName = "Required";
                 if (!nokRelationship) newErrors.nokRelationship = "Required";
                 if (!nokPhoneNumber) {
@@ -573,18 +618,81 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess, initi
         return isValid;
     };
 
+    const handleProductSelect = (p: any) => {
+        setSelectedProductOption(p);
+        setProductType(p.custom_name);
+        clearError('productType');
+    };
+
     const handleNext = () => {
-        if (validateStep()) {
-            setStep(prev => Math.min(prev + 1, steps.length - 1));
-            setErrors({}); // Clear errors strictly on successful next
-        } else {
-            // alert("Please correct the errors before proceeding."); // Optional: remove alert if using inline errors
+        if (step === 0 && showProductSelect) {
+            if (!productType) {
+                alert("Please select a product first.");
+                return;
+            }
+            setShowProductSelect(false);
+            setErrors({});
+            return;
+        }
+
+        if (step === 0 && !showProductSelect) {
+            // Validate Address (Step 1)
+            const isAddressValid = validateStep(1);
+            if (!isAddressValid) {
+                setExpandedSection('address');
+                return;
+            }
+            // Validate Employment (Step 2)
+            const isEmploymentValid = validateStep(2);
+            if (!isEmploymentValid) {
+                setExpandedSection('employment');
+                return;
+            }
+            // Validate Loan (Step 3)
+            const isLoanValid = validateStep(3);
+            if (!isLoanValid) {
+                setExpandedSection('loan');
+                return;
+            }
+            // All valid, clear and go to documents step (4)
+            setStep(4);
+            setErrors({});
+            return;
+        }
+
+        // Standard Validation for other steps
+        if (validateStep(step)) {
+            setStep(prev => Math.min(prev + 1, 6)); // Support up to Summary Step (6)
+            setErrors({});
         }
     };
 
     const handleBack = () => {
-        setStep(prev => Math.max(prev - 1, 0));
-        setErrors({});
+        if (step === 6) {
+            setStep(5);
+            setErrors({});
+            return;
+        }
+        if (step === 5) {
+            setStep(4);
+            setErrors({});
+            return;
+        }
+        if (step === 4) {
+            setStep(0);
+            setShowProductSelect(false);
+            setErrors({});
+            return;
+        }
+        if (step === 0) {
+            if (!showProductSelect && !loanId) {
+                setShowProductSelect(true);
+                setErrors({});
+                return;
+            }
+        }
+        // Otherwise trigger close
+        onClose();
     };
 
     const handleSubmit = async () => {
@@ -685,6 +793,58 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess, initi
         }
     };
 
+    const renderStepIndicator = () => {
+        if (['topup', 're-app', 'add_on'].includes(loanType)) return null;
+
+        const visualSteps = [
+            { label: "BVN LOOKUP", type: "checked" },
+            { label: "CUSTOMER CARD", type: "checked" },
+            { label: "LOAN DETAILS", number: 2, isActive: step < 4 },
+            { label: "DOCUMENTS", number: 3, isActive: step === 4 },
+            { label: "REFERENCES", number: 4, isActive: step === 5 },
+            { label: "SUMMARY", number: 5, isActive: step === 6 }
+        ];
+
+        return (
+            <div className="px-6 md:px-8 pt-8 pb-4 flex justify-between items-center relative max-w-4xl mx-auto w-full">
+                {/* Horizontal progress background line */}
+                <div className="absolute top-[2.5rem] left-[10%] right-[10%] h-[2px] bg-slate-100 dark:bg-slate-800 -z-10" />
+
+                {visualSteps.map((s, idx) => {
+                    const isChecked = s.type === "checked";
+                    const isActive = s.isActive;
+                    const isCompleted = !isChecked && !isActive && (
+                        (s.label === "LOAN DETAILS" && step > 3) ||
+                        (s.label === "DOCUMENTS" && step > 4) ||
+                        (s.label === "REFERENCES" && step > 5)
+                    );
+
+                    return (
+                        <div key={idx} className="flex flex-col items-center flex-1 relative z-10 select-none">
+                            {isChecked || isCompleted ? (
+                                <div className="w-10 h-10 rounded-full bg-emerald-500 text-white flex items-center justify-center shadow-lg shadow-emerald-500/20">
+                                    <span className="material-symbols-outlined text-xl font-black">check</span>
+                                </div>
+                            ) : isActive ? (
+                                <div className="w-10 h-10 rounded-full bg-[#0084FF] text-white flex items-center justify-center font-black text-sm shadow-lg shadow-blue-500/20 ring-4 ring-blue-500/10">
+                                    {s.number}
+                                </div>
+                            ) : (
+                                <div className="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 flex items-center justify-center font-black text-sm">
+                                    {s.number}
+                                </div>
+                            )}
+                            <span className={`text-[9px] font-black uppercase tracking-widest mt-3 text-center leading-none ${isActive ? 'text-blue-500' : isChecked || isCompleted ? 'text-slate-500' : 'text-slate-400'
+                                }`}>
+                                {s.label}
+                            </span>
+                        </div>
+                    );
+                })}
+            </div>
+        );
+    };
+
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-md p-4 overflow-y-auto">
             <div className="bg-white dark:bg-slate-900 w-full max-w-5xl rounded-[2.5rem] shadow-2xl shadow-black/50 flex flex-col max-h-[92vh] overflow-hidden border border-slate-100 dark:border-slate-800">
@@ -703,21 +863,7 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess, initi
                 </div>
 
                 {/* Progress Indicator */}
-                {/* Progress Indicator - Only for Wizard Mode */}
-                {!['topup', 're-app', 'add_on'].includes(loanType) && (
-                    <div className="px-6 md:px-8 pt-6 pb-2">
-                        <div className="flex justify-between items-center mb-4">
-                            <span className="text-sm font-bold text-slate-900 dark:text-white">{steps[step]}</span>
-                            <span className="text-xs font-black text-slate-400 uppercase tracking-widest">Step {step + 1} / {steps.length}</span>
-                        </div>
-                        <div className="h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden w-full">
-                            <div
-                                className="h-full bg-primary rounded-full transition-all duration-700 ease-out shadow-[0_0_10px_rgba(2,143,245,0.5)]"
-                                style={{ width: `${((step + 1) / steps.length) * 100}%` }}
-                            />
-                        </div>
-                    </div>
-                )}
+                {renderStepIndicator()}
 
                 {/* Content */}
                 <div className="flex-1 overflow-y-auto p-6 md:p-8 scrollbar-thin scrollbar-thumb-slate-200 dark:scrollbar-thumb-slate-800">
@@ -809,9 +955,8 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess, initi
                                             <InputGroup label="Account Number" required error={errors.accountNumber}>
                                                 <div className="relative">
                                                     <input
-                                                        className={`input-field pr-10 ${
-                                                            bankVerificationResult?.isMatch ? '!border-green-500' : bankVerificationResult && !bankVerificationResult.isMatch ? '!border-red-500' : ''
-                                                        }`}
+                                                        className={`input-field pr-10 ${bankVerificationResult?.isMatch ? '!border-green-500' : bankVerificationResult && !bankVerificationResult.isMatch ? '!border-red-500' : ''
+                                                            }`}
                                                         value={accountNumber}
                                                         onChange={e => { const val = e.target.value.replace(/\D/g, ''); if (val.length <= 10) { setAccountNumber(val); setAccountName(''); clearError('accountNumber'); } }}
                                                         maxLength={10}
@@ -837,11 +982,10 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess, initi
 
                                             <InputGroup label="Account Name (Auto-Verified)" required error={errors.accountName}>
                                                 <input
-                                                    className={`input-field cursor-not-allowed ${
-                                                        bankVerificationResult?.isMatch ? '!bg-green-50 dark:!bg-green-900/20 !border-green-500 !text-green-800 dark:!text-green-300'
-                                                        : bankVerificationResult && !bankVerificationResult.isMatch ? '!bg-red-50 dark:!bg-red-900/20 !border-red-500 !text-red-800 dark:!text-red-300'
-                                                        : ''
-                                                    }`}
+                                                    className={`input-field cursor-not-allowed ${bankVerificationResult?.isMatch ? '!bg-green-50 dark:!bg-green-900/20 !border-green-500 !text-green-800 dark:!text-green-300'
+                                                            : bankVerificationResult && !bankVerificationResult.isMatch ? '!bg-red-50 dark:!bg-red-900/20 !border-red-500 !text-red-800 dark:!text-red-300'
+                                                                : ''
+                                                        }`}
                                                     value={accountName}
                                                     readOnly
                                                     placeholder={isVerifyingBank ? 'Verifying...' : 'Auto-fills after verification'}
@@ -850,11 +994,10 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess, initi
 
                                             {/* Bank Verification Status */}
                                             {bankVerificationResult && (
-                                                <div className={`md:col-span-2 p-3 rounded-xl border flex items-start gap-2 animate-in fade-in duration-300 ${
-                                                    bankVerificationResult.isMatch
+                                                <div className={`md:col-span-2 p-3 rounded-xl border flex items-start gap-2 animate-in fade-in duration-300 ${bankVerificationResult.isMatch
                                                         ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800'
                                                         : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'
-                                                }`}>
+                                                    }`}>
                                                     <span className={`material-symbols-outlined text-lg filled ${bankVerificationResult.isMatch ? 'text-green-600' : 'text-red-600'}`}>
                                                         {bankVerificationResult.isMatch ? 'verified' : 'gpp_bad'}
                                                     </span>
@@ -913,297 +1056,441 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess, initi
                     ) : (
                         // --- STANDARD WIZARD VIEW ---
                         <>
-                            {step === 0 && (
-                                <div className="space-y-8 animate-in fade-in slide-in-from-right-8 duration-500">
-                                    {/* Loan Type Section - Moved to Top */}
-                                    <div className="p-6 bg-slate-50 dark:bg-slate-800/50 rounded-3xl border border-slate-100 dark:border-slate-800 mb-8">
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-6">
-                                            <InputGroup label="Loan Type">
-                                                <select className="input-field" value={loanType} onChange={e => setLoanType(e.target.value)}>
-                                                    <option value="new">New Loan</option>
-                                                    <option value="topup">Top-up</option>
-                                                    <option value="buy_over">Buy-over</option>
-                                                    <option value="re-app">Re-app</option>
-                                                    <option value="add_on">Add-on</option>
-                                                </select>
-                                            </InputGroup>
-                                        </div>
-                                        {/* Conditional fields REMOVED from Wizard Step 0 as they are now in Special View */}
+                            {step === 0 && showProductSelect && (
+                                <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 max-w-2xl mx-auto py-4">
+                                    <div className="text-center space-y-3">
+                                        <h3 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight uppercase">Select Loan Product</h3>
+                                        <p className="text-xs font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest leading-relaxed">
+                                            The product selection drives what fields appear next.
+                                        </p>
                                     </div>
 
-                                    <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
-                                        <div className="md:col-span-2">
-                                            <InputGroup label="Product Type">
-                                                <select className="input-field" value={productType} onChange={e => setProductType(e.target.value)}>
-                                                    <option>Public Sector Loan</option>
-                                                </select>
-                                            </InputGroup>
-                                        </div>
-                                        <div className="md:col-span-2">
-                                            <InputGroup label="Title">
-                                                <select className="input-field" value={title} onChange={e => setTitle(e.target.value)}>
-                                                    <option>Mr</option><option>Mrs</option><option>Ms</option><option>Dr</option>
-                                                </select>
-                                            </InputGroup>
-                                        </div>
-                                        <div className="md:col-span-4">
-                                            <InputGroup label="Surname" required error={errors.surname}>
-                                                <input className="input-field" value={surname} onChange={e => { setSurname(e.target.value); clearError('surname'); }} placeholder="e.g. Doe" />
-                                            </InputGroup>
-                                        </div>
-                                        <div className="md:col-span-3">
-                                            <InputGroup label="First Name" required error={errors.firstName}>
-                                                <input className="input-field" value={firstName} onChange={e => { setFirstName(e.target.value); clearError('firstName'); }} placeholder="e.g. John" />
-                                            </InputGroup>
-                                        </div>
-                                        <div className="md:col-span-3">
-                                            <InputGroup label="Middle Name">
-                                                <input className="input-field" value={middleName} onChange={e => setMiddleName(e.target.value)} placeholder="Optional" />
-                                            </InputGroup>
-                                        </div>
-                                    </div>
-
-                                    <div className="h-px bg-slate-100 dark:bg-slate-800 w-full" />
-
-                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                                        <InputGroup label="Gender" required error={errors.gender}>
-                                            <select className="input-field" value={gender} onChange={e => { setGender(e.target.value); clearError('gender'); }}>
-                                                <option value="">Select</option><option>Male</option><option>Female</option>
-                                            </select>
-                                        </InputGroup>
-                                        <InputGroup label="Date of Birth" required error={errors.dob}>
-                                            <input type="date" className="input-field" value={dob} onChange={e => { setDob(e.target.value); clearError('dob'); }} />
-                                        </InputGroup>
-                                        <InputGroup label="Marital Status" required error={errors.maritalStatus}>
-                                            <select className="input-field" value={maritalStatus} onChange={e => { setMaritalStatus(e.target.value); clearError('maritalStatus'); }}>
-                                                <option value="">Select</option><option>Single</option><option>Married</option><option>Divorced</option>
-                                            </select>
-                                        </InputGroup>
-                                    </div>
-
-                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                                        <InputGroup label="Religion" required error={errors.religion}>
-                                            <select className="input-field" value={religion} onChange={e => { setReligion(e.target.value); clearError('religion'); }}>
-                                                <option value="">Select</option>
-                                                <option>Christianity</option>
-                                                <option>Islam</option>
-                                                <option>Others</option>
-                                            </select>
-                                        </InputGroup>
-                                        <InputGroup label="Mobile Number" required error={errors.mobileNumber}>
-                                            <input className="input-field" value={mobileNumber} onChange={handleNumericChange(setMobileNumber, 'mobileNumber', 11)} placeholder="080..." maxLength={11} />
-                                        </InputGroup>
-                                        <InputGroup label="Email Address">
-                                            <input className="input-field" value={email} onChange={e => setEmail(e.target.value)} placeholder="Optional" />
-                                        </InputGroup>
-                                    </div>
-
-                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                                        <InputGroup label="BVN" required error={errors.bvn}>
-                                            <input className="input-field" value={bvn} onChange={handleNumericChange(setBvn, 'bvn', 11)} maxLength={11} placeholder="11 Digits" />
-                                        </InputGroup>
-                                        <InputGroup label="NIN" required error={errors.nin}>
-                                            <input className="input-field" value={nin} onChange={handleNumericChange(setNin, 'nin', 11)} maxLength={11} placeholder="11 Digits" />
-                                        </InputGroup>
-                                        <InputGroup label="Mother's Maiden Name">
-                                            <input className="input-field" value={mothersMaidenName} onChange={e => setMothersMaidenName(e.target.value)} />
-                                        </InputGroup>
-                                    </div>
-                                </div>
-                            )}
-
-                            {step === 1 && (
-                                <div className="space-y-8 animate-in fade-in slide-in-from-right-8 duration-500">
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                        <InputGroup label="State of Origin" required error={errors.stateOfOrigin}>
-                                            <select className="input-field" value={stateOfOrigin} onChange={e => { setStateOfOrigin(e.target.value); clearError('stateOfOrigin'); }}>
-                                                <option value="">Select State</option>
-                                                {NIGERIAN_STATES.map(s => <option key={s} value={s}>{s}</option>)}
-                                            </select>
-                                        </InputGroup>
-                                        <InputGroup label="State of Residence" required error={errors.stateOfResidence}>
-                                            <select className="input-field" value={stateOfResidence} onChange={e => { setStateOfResidence(e.target.value); clearError('stateOfResidence'); }}>
-                                                <option value="">Select State</option>
-                                                {NIGERIAN_STATES.map(s => <option key={s} value={s}>{s}</option>)}
-                                            </select>
-                                        </InputGroup>
-                                    </div>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                        <InputGroup label="Residential Status" required error={errors.residentialStatus}>
-                                            <select className="input-field" value={residentialStatus} onChange={e => { setResidentialStatus(e.target.value); clearError('residentialStatus'); }}>
-                                                <option value="">Select</option><option>Rent</option><option>Owned</option>
-                                            </select>
-                                        </InputGroup>
-                                        <InputGroup label="Home Address" required error={errors.address}>
-                                            <input className="input-field" value={address} onChange={e => { setAddress(e.target.value); clearError('address'); }} />
-                                        </InputGroup>
-                                    </div>
-                                </div>
-                            )}
-
-                            {step === 2 && (
-                                <div className="space-y-8 animate-in fade-in slide-in-from-right-8 duration-500">
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                        <div className="md:col-span-2">
-                                            <MdaTertiarySelect
-                                                label="MDA / Tertiary Institution *"
-                                                value={mda}
-                                                onChange={(val: string) => { setMda(val); clearError('mda'); }}
-                                                error={errors.mda}
-                                            />
-                                        </div>
-                                        <InputGroup label={`IPPIS Number ${TERTIARY_LIST.includes(mda) ? '(Optional)' : '*'}`} required={!TERTIARY_LIST.includes(mda)} error={errors.ippisNumber}>
-                                            <input className="input-field" value={ippisNumber} onChange={e => { setIppisNumber(e.target.value); clearError('ippisNumber'); }} />
-                                        </InputGroup>
-                                        <InputGroup label={`Staff ID ${TERTIARY_LIST.includes(mda) ? '*' : '(Optional)'}`} required={TERTIARY_LIST.includes(mda)} error={errors.staffId}>
-                                            <input className="input-field" value={staffId} onChange={e => { setStaffId(e.target.value); clearError('staffId'); }} />
-                                        </InputGroup>
-                                        <InputGroup label="Monthly Income" required error={errors.monthlyIncome}>
-                                            <input type="number" className="input-field" value={monthlyIncome} onChange={e => { setMonthlyIncome(e.target.value); clearError('monthlyIncome'); }} />
-                                        </InputGroup>
-                                    </div>
-                                </div>
-                            )}
-
-                            {step === 3 && (
-                                <div className="space-y-8 animate-in fade-in slide-in-from-right-8 duration-500">
-                                    <div className="p-6 bg-slate-50 dark:bg-slate-800/50 rounded-3xl border border-slate-100 dark:border-slate-800">
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                            <InputGroup label="Loan Amount" required error={errors.amount}>
-                                                <div className="relative">
-                                                    <span className="absolute left-4 top-1/2 -translate-y-1/2 font-black text-slate-400">₦</span>
-                                                    <input type="number" className="input-field pl-8" value={amount} onChange={e => { setAmount(e.target.value); clearError('amount'); }} />
-                                                </div>
-                                            </InputGroup>
-                                            <InputGroup label="Tenure (Months)">
-                                                <select className="input-field" value={tenure} onChange={e => setTenure(parseInt(e.target.value))}>
-                                                    {Array.from({ length: 22 }, (_, i) => i + 3).map(m => (
-                                                        <option key={m} value={m}>{m} Months</option>
-                                                    ))}
-                                                </select>
-                                            </InputGroup>
-                                        </div>
-
-                                        <div className="h-px bg-slate-100 dark:bg-slate-800 w-full" />
-
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                            <InputGroup label="Bank Name" required error={errors.bankName}>
-                                                <select className="input-field" value={bankName} onChange={e => { setBankName(e.target.value); setAccountName(''); clearError('bankName'); }}>
-                                                    <option value="">Select Bank</option>
-                                                    {bankList.map((bank: any) => (
-                                                        <option key={bank.id} value={bank.name}>{bank.name}</option>
-                                                    ))}
-                                                </select>
-                                            </InputGroup>
-                                        </div>
-
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                            <InputGroup label="Account Number" required error={errors.accountNumber}>
-                                                <div className="relative">
-                                                    <input
-                                                        className={`input-field pr-10 ${
-                                                            bankVerificationResult?.isMatch ? '!border-green-500' : bankVerificationResult && !bankVerificationResult.isMatch ? '!border-red-500' : ''
-                                                        }`}
-                                                        value={accountNumber}
-                                                        onChange={e => { const val = e.target.value.replace(/\D/g, ''); if (val.length <= 10) { setAccountNumber(val); setAccountName(''); clearError('accountNumber'); } }}
-                                                        maxLength={10}
-                                                        placeholder="10 Digits"
-                                                    />
-                                                    {isVerifyingBank && (
-                                                        <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                                                            <div className="size-5 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
-                                                        </div>
-                                                    )}
-                                                    {!isVerifyingBank && bankVerificationResult?.isMatch && (
-                                                        <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                                                            <span className="material-symbols-outlined text-green-500 text-xl filled">check_circle</span>
-                                                        </div>
-                                                    )}
-                                                    {!isVerifyingBank && bankVerificationResult && !bankVerificationResult.isMatch && (
-                                                        <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                                                            <span className="material-symbols-outlined text-red-500 text-xl filled">error</span>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </InputGroup>
-                                            <InputGroup label="Account Name (Auto-Verified)" required error={errors.accountName}>
-                                                <input
-                                                    className={`input-field cursor-not-allowed ${
-                                                        bankVerificationResult?.isMatch ? '!bg-green-50 dark:!bg-green-900/20 !border-green-500 !text-green-800 dark:!text-green-300'
-                                                        : bankVerificationResult && !bankVerificationResult.isMatch ? '!bg-red-50 dark:!bg-red-900/20 !border-red-500 !text-red-800 dark:!text-red-300'
-                                                        : ''
-                                                    }`}
-                                                    value={accountName}
-                                                    readOnly
-                                                    placeholder={isVerifyingBank ? 'Verifying...' : 'Auto-fills after verification'}
-                                                />
-                                            </InputGroup>
-                                        </div>
-
-                                        {/* Bank Verification Status */}
-                                        {bankVerificationResult && (
-                                            <div className={`p-4 rounded-2xl border-2 flex items-start gap-3 animate-in fade-in slide-in-from-top-2 duration-300 ${
-                                                bankVerificationResult.isMatch
-                                                    ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800'
-                                                    : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'
-                                            }`}>
-                                                <span className={`material-symbols-outlined text-xl mt-0.5 filled ${bankVerificationResult.isMatch ? 'text-green-600' : 'text-red-600'}`}>
-                                                    {bankVerificationResult.isMatch ? 'verified' : 'gpp_bad'}
-                                                </span>
-                                                <div>
-                                                    <p className={`font-bold text-sm ${bankVerificationResult.isMatch ? 'text-green-800 dark:text-green-300' : 'text-red-800 dark:text-red-300'}`}>
-                                                        {bankVerificationResult.isMatch ? 'Account Verified ✓' : 'Name Mismatch Detected'}
-                                                    </p>
-                                                    <p className={`text-xs mt-1 font-medium ${
-                                                        bankVerificationResult.isMatch ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
-                                                    }`}>
-                                                        {bankVerificationResult.isMatch
-                                                            ? `Resolved: "${bankVerificationResult.account_name}" — matches applicant name (${bankVerificationResult.matchedNames.join(', ')}).`
-                                                            : `Resolved: "${bankVerificationResult.account_name}" — does not match "${firstName} ${surname}". At least the first name or surname must appear in the account name.`
+                                    <div className="space-y-4 mt-8">
+                                        {(activeProducts.length > 0 ? activeProducts : STATIC_PRODUCTS).map((p: any, idx: number) => {
+                                            const isSelected = selectedProductOption ? (
+                                                selectedProductOption.id ? selectedProductOption.id === p.id : selectedProductOption.name === p.name
+                                            ) : false;
+                                            const name = p.custom_name || p.name;
+                                            const code = p.cba_product_code || p.code;
+                                            const rate = p.interest_rate ? `${parseFloat(p.interest_rate)}% PER MONTH` : (p.rate || "CONFIRM FROM CBS");
+                                            const icon = p.icon || "inventory_2";
+                                            return (
+                                                <div
+                                                    key={p.id || idx}
+                                                    onClick={() => handleProductSelect(p)}
+                                                    className={`w-full rounded-[2rem] border-2 p-6 flex items-center justify-between transition-all duration-300 cursor-pointer overflow-hidden
+                                                        ${isSelected
+                                                            ? 'border-[#0084FF] bg-[#0084FF] text-white shadow-xl shadow-blue-500/20'
+                                                            : 'border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-[#0084FF]/40'
                                                         }
-                                                    </p>
+                                                    `}
+                                                >
+                                                    <div className="flex items-center gap-6">
+                                                        <div className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-all ${isSelected ? 'bg-white/20 text-white' : 'bg-slate-50 dark:bg-slate-800 text-slate-400'
+                                                            }`}>
+                                                            <span className="material-symbols-outlined text-2xl">{icon}</span>
+                                                        </div>
+                                                        <div className="text-left">
+                                                            <p className={`font-black tracking-tight text-base ${isSelected ? 'text-white' : 'text-slate-900 dark:text-white'}`}>{name}</p>
+                                                            <p className={`text-[10px] font-black uppercase tracking-wider mt-1 ${isSelected ? 'text-white/70' : 'text-slate-400 dark:text-slate-500'}`}>CODE: {code}</p>
+                                                        </div>
+                                                    </div>
+                                                    <span className={`px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-wider ${isSelected ? 'bg-white/20 text-white' : 'bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
+                                                        }`}>
+                                                        {rate}
+                                                    </span>
                                                 </div>
-                                            </div>
-                                        )}
-                                        {bankVerificationError && (
-                                            <div className="p-4 rounded-2xl border-2 bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800 flex items-start gap-3 animate-in fade-in slide-in-from-top-2 duration-300">
-                                                <span className="material-symbols-outlined text-xl mt-0.5 text-amber-600 filled">warning</span>
-                                                <div>
-                                                    <p className="font-bold text-sm text-amber-800 dark:text-amber-300">Verification Failed</p>
-                                                    <p className="text-xs mt-1 font-medium text-amber-600 dark:text-amber-400">{bankVerificationError}</p>
-                                                </div>
-                                            </div>
-                                        )}
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            )}
 
-                                        {loanType === 'buy_over' && (
-                                            <div className="mt-8 p-6 bg-amber-50 dark:bg-amber-900/10 rounded-2xl border border-amber-100 dark:border-amber-900/20">
-                                                <h4 className="text-sm font-black text-amber-800 dark:text-amber-400 uppercase tracking-widest mb-6">Buy Over Details</h4>
-                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                                    <InputGroup label="Buy Over Amount (₦)" required error={errors.buyOverAmount}>
-                                                        <input type="number" className="input-field" value={buyOverAmount} onChange={e => { setBuyOverAmount(e.target.value); clearError('buyOverAmount'); }} />
+                            {step === 0 && !showProductSelect && (
+                                <div className="space-y-6 animate-in fade-in slide-in-from-right-8 duration-500 max-w-4xl mx-auto py-2">
+
+                                    {/* Accordion 1: APPLICANT IDENTITY (Optional, collapsed details) */}
+                                    <div className="rounded-[2.5rem] border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm overflow-hidden transition-all duration-300">
+                                        <div
+                                            onClick={() => setExpandedSection(expandedSection === 'identity' ? 'loan' : 'identity')}
+                                            className="p-6 flex justify-between items-center cursor-pointer select-none"
+                                        >
+                                            <div className="flex items-center gap-4">
+                                                <div className="size-12 rounded-2xl bg-indigo-50 dark:bg-indigo-950/50 text-indigo-500 flex items-center justify-center shadow-sm">
+                                                    <span className="material-symbols-outlined text-2xl">person</span>
+                                                </div>
+                                                <div className="text-left">
+                                                    <h4 className="font-black text-slate-800 dark:text-white uppercase tracking-wider text-base leading-none">Applicant Identity</h4>
+                                                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 mt-1">Verified Personal Details</p>
+                                                </div>
+                                            </div>
+                                            <span className={`material-symbols-outlined text-slate-400 transition-transform duration-300 ${expandedSection === 'identity' ? 'rotate-180' : ''}`}>
+                                                keyboard_arrow_down
+                                            </span>
+                                        </div>
+                                        {expandedSection === 'identity' && (
+                                            <div className="grid grid-cols-1 md:grid-cols-12 gap-6 p-8 pt-0 border-t border-slate-50 dark:border-slate-800/50 mt-6 animate-in fade-in duration-300">
+                                                <div className="md:col-span-2">
+                                                    <InputGroup label="Title">
+                                                        <select className="input-field animate-none animate-none" value={title} onChange={e => setTitle(e.target.value)} disabled={isCustomerVerified}>
+                                                            <option>Mr</option><option>Mrs</option><option>Ms</option><option>Dr</option>
+                                                        </select>
                                                     </InputGroup>
-                                                    <InputGroup label="Buy Over Company Name" required error={errors.buyOverCompanyName}>
-                                                        <input className="input-field" value={buyOverCompanyName} onChange={e => { setBuyOverCompanyName(e.target.value); clearError('buyOverCompanyName'); }} />
+                                                </div>
+                                                <div className="md:col-span-4">
+                                                    <InputGroup label="Surname" required error={errors.surname}>
+                                                        <input className="input-field" value={surname} onChange={e => { setSurname(e.target.value); clearError('surname'); }} placeholder="Surname" disabled={isCustomerVerified} />
                                                     </InputGroup>
-                                                    <InputGroup label="Company Account Name" required error={errors.buyOverAccountName}>
-                                                        <input className="input-field" value={buyOverAccountName} onChange={e => { setBuyOverAccountName(e.target.value); clearError('buyOverAccountName'); }} />
+                                                </div>
+                                                <div className="md:col-span-4">
+                                                    <InputGroup label="First Name" required error={errors.firstName}>
+                                                        <input className="input-field" value={firstName} onChange={e => { setFirstName(e.target.value); clearError('firstName'); }} placeholder="First Name" disabled={isCustomerVerified} />
                                                     </InputGroup>
-                                                    <InputGroup label="Company Account Number" required error={errors.buyOverAccountNumber}>
-                                                        <input className="input-field" value={buyOverAccountNumber} onChange={handleNumericChange(setBuyOverAccountNumber, 'buyOverAccountNumber')} />
+                                                </div>
+                                                <div className="md:col-span-2">
+                                                    <InputGroup label="Middle Name">
+                                                        <input className="input-field" value={middleName} onChange={e => setMiddleName(e.target.value)} placeholder="Optional" disabled={isCustomerVerified} />
+                                                    </InputGroup>
+                                                </div>
+                                                <div className="md:col-span-4">
+                                                    <InputGroup label="Gender" required error={errors.gender}>
+                                                        <select className="input-field animate-none" value={gender} onChange={e => { setGender(e.target.value); clearError('gender'); }} disabled={isCustomerVerified}>
+                                                            <option value="">Select</option><option>Male</option><option>Female</option>
+                                                        </select>
+                                                    </InputGroup>
+                                                </div>
+                                                <div className="md:col-span-4">
+                                                    <InputGroup label="Date of Birth" required error={errors.dob}>
+                                                        <input type="date" className="input-field animate-none" value={dob} onChange={e => { setDob(e.target.value); clearError('dob'); }} disabled={isCustomerVerified} />
+                                                    </InputGroup>
+                                                </div>
+                                                <div className="md:col-span-4">
+                                                    <InputGroup label="Marital Status" required error={errors.maritalStatus}>
+                                                        <select className="input-field animate-none" value={maritalStatus} onChange={e => { setMaritalStatus(e.target.value); clearError('maritalStatus'); }}>
+                                                            <option value="">Select</option><option>Single</option><option>Married</option><option>Divorced</option>
+                                                        </select>
+                                                    </InputGroup>
+                                                </div>
+                                                <div className="md:col-span-4">
+                                                    <InputGroup label="Religion" required error={errors.religion}>
+                                                        <select className="input-field animate-none" value={religion} onChange={e => { setReligion(e.target.value); clearError('religion'); }}>
+                                                            <option value="">Select</option>
+                                                            <option>Christianity</option>
+                                                            <option>Islam</option>
+                                                            <option>Others</option>
+                                                        </select>
+                                                    </InputGroup>
+                                                </div>
+                                                <div className="md:col-span-4">
+                                                    <InputGroup label="Mobile Number" required error={errors.mobileNumber}>
+                                                        <input className="input-field" value={mobileNumber} onChange={handleNumericChange(setMobileNumber, 'mobileNumber', 11)} placeholder="Mobile Number" maxLength={11} disabled={isCustomerVerified} />
+                                                    </InputGroup>
+                                                </div>
+                                                <div className="md:col-span-4">
+                                                    <InputGroup label="Email Address">
+                                                        <input className="input-field" value={email} onChange={e => setEmail(e.target.value)} placeholder="Email Address" />
+                                                    </InputGroup>
+                                                </div>
+                                                <div className="md:col-span-4">
+                                                    <InputGroup label="BVN" required error={errors.bvn}>
+                                                        <input className="input-field" value={bvn} onChange={handleNumericChange(setBvn, 'bvn', 11)} maxLength={11} placeholder="BVN" disabled={isCustomerVerified} />
+                                                    </InputGroup>
+                                                </div>
+                                                <div className="md:col-span-4">
+                                                    <InputGroup label="NIN" required error={errors.nin}>
+                                                        <input className="input-field" value={nin} onChange={handleNumericChange(setNac => { }, 'nin', 11)} maxLength={11} placeholder="NIN" disabled={isCustomerVerified} />
+                                                    </InputGroup>
+                                                </div>
+                                                <div className="md:col-span-4">
+                                                    <InputGroup label="Mother's Maiden Name">
+                                                        <input className="input-field" value={mothersMaidenName} onChange={e => setMothersMaidenName(e.target.value)} placeholder="Mother's Maiden Name" />
                                                     </InputGroup>
                                                 </div>
                                             </div>
                                         )}
                                     </div>
+
+                                    {/* Accordion 2: RESIDENTIAL ADDRESS */}
+                                    <div className="rounded-[2.5rem] border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm overflow-hidden transition-all duration-300">
+                                        <div
+                                            onClick={() => setExpandedSection(expandedSection === 'address' ? 'loan' : 'address')}
+                                            className="p-6 flex justify-between items-center cursor-pointer select-none"
+                                        >
+                                            <div className="flex items-center gap-4">
+                                                <div className="size-12 rounded-2xl bg-blue-50 dark:bg-blue-950/50 text-[#028FF5] flex items-center justify-center shadow-sm">
+                                                    <span className="material-symbols-outlined text-2xl">location_on</span>
+                                                </div>
+                                                <div className="text-left">
+                                                    <h4 className="font-black text-slate-800 dark:text-white uppercase tracking-wider text-base leading-none">Residential Address</h4>
+                                                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 mt-1">Verification & Location Details</p>
+                                                </div>
+                                            </div>
+                                            <span className={`material-symbols-outlined text-slate-400 transition-transform duration-300 ${expandedSection === 'address' ? 'rotate-180' : ''}`}>
+                                                keyboard_arrow_down
+                                            </span>
+                                        </div>
+                                        {expandedSection === 'address' && (
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-8 pt-0 border-t border-slate-50 dark:border-slate-800/50 mt-6 animate-in fade-in duration-300">
+                                                <InputGroup label="State of Origin" required error={errors.stateOfOrigin}>
+                                                    <select className="input-field animate-none" value={stateOfOrigin} onChange={e => { setStateOfOrigin(e.target.value); clearError('stateOfOrigin'); }}>
+                                                        <option value="">Select State</option>
+                                                        {NIGERIAN_STATES.map(s => <option key={s} value={s}>{s}</option>)}
+                                                    </select>
+                                                </InputGroup>
+                                                <InputGroup label="State of Residence" required error={errors.stateOfResidence}>
+                                                    <select className="input-field animate-none" value={stateOfResidence} onChange={e => { setStateOfResidence(e.target.value); clearError('stateOfResidence'); }}>
+                                                        <option value="">Select State</option>
+                                                        {NIGERIAN_STATES.map(s => <option key={s} value={s}>{s}</option>)}
+                                                    </select>
+                                                </InputGroup>
+                                                <InputGroup label="Residential Status" required error={errors.residentialStatus}>
+                                                    <select className="input-field animate-none" value={residentialStatus} onChange={e => { setResidentialStatus(e.target.value); clearError('residentialStatus'); }}>
+                                                        <option value="">Select</option><option>Rent</option><option>Owned</option>
+                                                    </select>
+                                                </InputGroup>
+                                                <InputGroup label="Home Address" required error={errors.address}>
+                                                    <input className="input-field" value={address} onChange={e => { setAddress(e.target.value); clearError('address'); }} placeholder="Residential Address" />
+                                                </InputGroup>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* Accordion 3: EMPLOYMENT DETAILS */}
+                                    <div className="rounded-[2.5rem] border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm overflow-hidden transition-all duration-300">
+                                        <div
+                                            onClick={() => setExpandedSection(expandedSection === 'employment' ? 'loan' : 'employment')}
+                                            className="p-6 flex justify-between items-center cursor-pointer select-none"
+                                        >
+                                            <div className="flex items-center gap-4">
+                                                <div className="size-12 rounded-2xl bg-orange-50 dark:bg-orange-950/50 text-[#F27A1A] flex items-center justify-center shadow-sm">
+                                                    <span className="material-symbols-outlined text-2xl">business</span>
+                                                </div>
+                                                <div className="text-left">
+                                                    <h4 className="font-black text-slate-800 dark:text-white uppercase tracking-wider text-base leading-none">Employment Details</h4>
+                                                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 mt-1">Career & Income Information</p>
+                                                </div>
+                                            </div>
+                                            <span className={`material-symbols-outlined text-slate-400 transition-transform duration-300 ${expandedSection === 'employment' ? 'rotate-180' : ''}`}>
+                                                keyboard_arrow_down
+                                            </span>
+                                        </div>
+                                        {expandedSection === 'employment' && (
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-8 pt-0 border-t border-slate-50 dark:border-slate-800/50 mt-6 animate-in fade-in duration-300">
+                                                <div className="md:col-span-2">
+                                                    <MdaTertiarySelect
+                                                        label="MDA / Tertiary Institution *"
+                                                        value={mda}
+                                                        onChange={(val: string) => { setMda(val); clearError('mda'); }}
+                                                        error={errors.mda}
+                                                    />
+                                                </div>
+                                                <InputGroup label={`IPPIS Number ${TERTIARY_LIST.includes(mda) ? '(Optional)' : '*'}`} required={!TERTIARY_LIST.includes(mda)} error={errors.ippisNumber}>
+                                                    <input className="input-field" value={ippisNumber} onChange={e => { setIppisNumber(e.target.value); clearError('ippisNumber'); }} placeholder="IPPIS Number" />
+                                                </InputGroup>
+                                                <InputGroup label={`Staff ID ${TERTIARY_LIST.includes(mda) ? '*' : '(Optional)'}`} required={TERTIARY_LIST.includes(mda)} error={errors.staffId}>
+                                                    <input className="input-field" value={staffId} onChange={e => { setStaffId(e.target.value); clearError('staffId'); }} placeholder="Staff ID" />
+                                                </InputGroup>
+                                                <div className="md:col-span-2">
+                                                    <InputGroup label="Monthly Income" required error={errors.monthlyIncome}>
+                                                        <input type="number" className="input-field animate-none" value={monthlyIncome} onChange={e => { setMonthlyIncome(e.target.value); clearError('monthlyIncome'); }} placeholder="Monthly Income (₦)" />
+                                                    </InputGroup>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* Accordion 4: LOAN CONFIGURATION */}
+                                    <div className="rounded-[2.5rem] border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm overflow-hidden transition-all duration-300">
+                                        <div
+                                            onClick={() => setExpandedSection(expandedSection === 'loan' ? 'address' : 'loan')}
+                                            className="p-6 flex justify-between items-center cursor-pointer select-none"
+                                        >
+                                            <div className="flex items-center gap-4">
+                                                <div className="size-12 rounded-2xl bg-emerald-50 dark:bg-emerald-950/50 text-[#0F9F59] flex items-center justify-center shadow-sm">
+                                                    <span className="material-symbols-outlined text-2xl">wallet</span>
+                                                </div>
+                                                <div className="text-left">
+                                                    <h4 className="font-black text-slate-800 dark:text-white uppercase tracking-wider text-base leading-none">Loan Configuration</h4>
+                                                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 mt-1">Amount, Tenure & Disbursement</p>
+                                                </div>
+                                            </div>
+                                            <span className={`material-symbols-outlined text-slate-400 transition-transform duration-300 ${expandedSection === 'loan' ? 'rotate-180' : ''}`}>
+                                                keyboard_arrow_down
+                                            </span>
+                                        </div>
+                                        {expandedSection === 'loan' && (
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-8 pt-0 border-t border-slate-50 dark:border-slate-800/50 mt-6 animate-in fade-in duration-300">
+                                                <div className="md:col-span-2">
+                                                    <InputGroup label="Loan Type">
+                                                        <select
+                                                            className="input-field animate-none"
+                                                            value={loanType}
+                                                            onChange={e => {
+                                                                setLoanType(e.target.value);
+                                                                clearError('loanType');
+                                                                if (['topup', 're-app', 'add_on'].includes(e.target.value)) {
+                                                                    setStep(0);
+                                                                }
+                                                            }}
+                                                        >
+                                                            <option value="new">New Loan</option>
+                                                            <option value="topup">Top-up</option>
+                                                            <option value="buy_over">Buy-over</option>
+                                                            <option value="re-app">Re-app</option>
+                                                            <option value="add_on">Add-on</option>
+                                                        </select>
+                                                    </InputGroup>
+                                                </div>
+
+                                                <InputGroup label="Loan Amount (₦)" required error={errors.amount}>
+                                                    <div className="relative">
+                                                        <span className="absolute left-4 top-1/2 -translate-y-1/2 font-black text-slate-400">₦</span>
+                                                        <input type="number" className="input-field pl-8 animate-none" value={amount} onChange={e => { setAmount(e.target.value); clearError('amount'); }} placeholder="0.00" />
+                                                    </div>
+                                                </InputGroup>
+                                                <InputGroup label="Tenure (Months)">
+                                                    <select className="input-field animate-none" value={tenure} onChange={e => setTenure(parseInt(e.target.value))}>
+                                                        {Array.from({ length: 22 }, (_, i) => i + 3).map(m => (
+                                                            <option key={m} value={m}>{m} Months</option>
+                                                        ))}
+                                                    </select>
+                                                </InputGroup>
+
+                                                {loanType === 'buy_over' && (
+                                                    <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-6 p-6 bg-slate-50 dark:bg-slate-800/40 rounded-3xl border border-slate-100 dark:border-slate-800/50 mt-2">
+                                                        <div className="md:col-span-2">
+                                                            <h4 className="text-xs font-black uppercase tracking-widest text-slate-400 mb-2 flex items-center gap-2">
+                                                                <span className="material-symbols-outlined text-lg">swap_horiz</span>
+                                                                Buy Over Details
+                                                            </h4>
+                                                        </div>
+                                                        <InputGroup label="Buy Over Amount (₦)" required error={errors.buyOverAmount}>
+                                                            <input type="number" className="input-field" value={buyOverAmount} onChange={e => { setBuyOverAmount(e.target.value); clearError('buyOverAmount'); }} />
+                                                        </InputGroup>
+                                                        <InputGroup label="Buy Over Company Name" required error={errors.buyOverCompanyName}>
+                                                            <input className="input-field" value={buyOverCompanyName} onChange={e => { setBuyOverCompanyName(e.target.value); clearError('buyOverCompanyName'); }} />
+                                                        </InputGroup>
+                                                        <InputGroup label="Company Account Name" required error={errors.buyOverAccountName}>
+                                                            <input className="input-field" value={buyOverAccountName} onChange={e => { setBuyOverAccountName(e.target.value); clearError('buyOverAccountName'); }} />
+                                                        </InputGroup>
+                                                        <InputGroup label="Company Account Number" required error={errors.buyOverAccountNumber}>
+                                                            <input className="input-field" value={buyOverAccountNumber} onChange={handleNumericChange(setBuyOverAccountNumber, 'buyOverAccountNumber')} />
+                                                        </InputGroup>
+                                                    </div>
+                                                )}
+
+                                                <div className="md:col-span-2 h-px bg-slate-50 dark:bg-slate-800/50 w-full my-2" />
+
+                                                <div className="md:col-span-2">
+                                                    <h4 className="text-xs font-black uppercase tracking-widest text-slate-400 mb-2 flex items-center gap-2">
+                                                        <span className="material-symbols-outlined text-lg">credit_card</span>
+                                                        Disbursement Channel
+                                                    </h4>
+                                                </div>
+
+                                                <InputGroup label="Bank Name" required error={errors.bankName}>
+                                                    <select className="input-field animate-none" value={bankName} onChange={e => { setBankName(e.target.value); setAccountName(''); clearError('bankName'); }}>
+                                                        <option value="">Select Bank</option>
+                                                        {bankList.map((bank: any) => (
+                                                            <option key={bank.id} value={bank.name}>{bank.name}</option>
+                                                        ))}
+                                                    </select>
+                                                </InputGroup>
+
+                                                <InputGroup label="Account Number" required error={errors.accountNumber}>
+                                                    <div className="relative">
+                                                        <input
+                                                            className={`input-field pr-10 ${bankVerificationResult?.isMatch ? '!border-green-500' : bankVerificationResult && !bankVerificationResult.isMatch ? '!border-red-500' : ''
+                                                                }`}
+                                                            value={accountNumber}
+                                                            onChange={e => { const val = e.target.value.replace(/\D/g, ''); if (val.length <= 10) { setAccountNumber(val); setAccountName(''); clearError('accountNumber'); } }}
+                                                            maxLength={10}
+                                                            placeholder="10 Digits"
+                                                        />
+                                                        {isVerifyingBank && (
+                                                            <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                                                                <div className="size-5 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
+                                                            </div>
+                                                        )}
+                                                        {!isVerifyingBank && bankVerificationResult?.isMatch && (
+                                                            <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                                                                <span className="material-symbols-outlined text-green-500 text-xl filled animate-in zoom-in-50 duration-300">check_circle</span>
+                                                            </div>
+                                                        )}
+                                                        {!isVerifyingBank && bankVerificationResult && !bankVerificationResult.isMatch && (
+                                                            <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                                                                <span className="material-symbols-outlined text-red-500 text-xl filled animate-in zoom-in-50 duration-300">error</span>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </InputGroup>
+
+                                                <div className="md:col-span-2">
+                                                    <InputGroup label="Account Name (Auto-Verified)" required error={errors.accountName}>
+                                                        <input
+                                                            className={`input-field cursor-not-allowed ${bankVerificationResult?.isMatch ? '!bg-green-50/50 dark:!bg-green-950/20 !border-green-500/30 !text-green-700 dark:!text-green-300'
+                                                                    : bankVerificationResult && !bankVerificationResult.isMatch ? '!bg-red-50/50 dark:!bg-red-950/20 !border-red-500/30 !text-red-700 dark:!text-red-300'
+                                                                        : ''
+                                                                }`}
+                                                            value={accountName}
+                                                            readOnly
+                                                            placeholder={isVerifyingBank ? 'Verifying...' : 'Auto-fills after verification'}
+                                                        />
+                                                    </InputGroup>
+                                                </div>
+
+                                                {/* Bank Verification Status */}
+                                                {bankVerificationResult && (
+                                                    <div className={`md:col-span-2 p-4 rounded-2xl border flex items-start gap-3 animate-in fade-in slide-in-from-top-2 duration-300 ${bankVerificationResult.isMatch
+                                                            ? 'bg-green-50/40 dark:bg-green-950/10 border-green-200 dark:border-green-800/30 text-green-800 dark:text-green-300'
+                                                            : 'bg-red-50/40 dark:bg-red-950/10 border-red-200 dark:border-red-800/30 text-red-800 dark:text-red-300'
+                                                        }`}>
+                                                        <span className={`material-symbols-outlined text-xl mt-0.5 filled`}>
+                                                            {bankVerificationResult.isMatch ? 'verified' : 'gpp_bad'}
+                                                        </span>
+                                                        <div>
+                                                            <p className="font-bold text-sm">
+                                                                {bankVerificationResult.isMatch ? 'Account Verified ✓' : 'Name Mismatch Detected'}
+                                                            </p>
+                                                            <p className="text-xs mt-1 font-medium opacity-80">
+                                                                {bankVerificationResult.isMatch
+                                                                    ? `Resolved: "${bankVerificationResult.account_name}" — matches applicant name (${bankVerificationResult.matchedNames.join(', ')}).`
+                                                                    : `Resolved: "${bankVerificationResult.account_name}" — does not match "${firstName} ${surname}". At least the first name or surname must appear in the account name.`
+                                                                }
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                                {bankVerificationError && (
+                                                    <div className="md:col-span-2 p-4 rounded-2xl border bg-amber-50/40 dark:bg-amber-950/10 border-amber-200 dark:border-amber-800/30 flex items-start gap-3 animate-in fade-in slide-in-from-top-2 duration-300 text-amber-800 dark:text-amber-300">
+                                                        <span className="material-symbols-outlined text-xl mt-0.5 filled">warning</span>
+                                                        <div>
+                                                            <p className="font-bold text-sm">Verification Failed</p>
+                                                            <p className="text-xs mt-1 font-medium opacity-80">{bankVerificationError}</p>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+
                                 </div>
                             )}
 
                             {step === 4 && (
-                                <div className="space-y-8 animate-in fade-in slide-in-from-right-8 duration-500">
-                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                <div className="space-y-8 animate-in fade-in slide-in-from-right-8 duration-500 max-w-4xl mx-auto py-2">
+                                    <div className="text-center space-y-3 mb-6">
+                                        <h3 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight uppercase">Document Verification</h3>
+                                        <p className="text-xs font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest leading-relaxed">
+                                            Upload clear, scanned copies of supporting documents
+                                        </p>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                         <FileUpload
                                             id="govt_id"
                                             label="Government ID"
+                                            subtitle="PASSPORT, DRIVER LICENSE, ETC."
                                             required
                                             doc={uploadedDocs.govt_id}
                                             progress={uploadProgress.govt_id}
@@ -1214,6 +1501,7 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess, initi
                                         <FileUpload
                                             id="work_id"
                                             label="Work ID"
+                                            subtitle="VALID COMPANY/ORG ID"
                                             required
                                             doc={uploadedDocs.work_id}
                                             progress={uploadProgress.work_id}
@@ -1224,6 +1512,7 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess, initi
                                         <FileUpload
                                             id="payslip"
                                             label="Recent Payslip"
+                                            subtitle="MUST BE FROM LAST 3 MONTHS"
                                             required
                                             doc={uploadedDocs.payslip}
                                             progress={uploadProgress.payslip}
@@ -1234,23 +1523,29 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess, initi
                                         <FileUpload
                                             id="selfie"
                                             label="Selfie"
+                                            subtitle="REAL-TIME FACIAL CAPTURE"
+                                            required
                                             doc={uploadedDocs.selfie}
                                             progress={uploadProgress.selfie}
+                                            error={errors.selfie}
                                             onSelect={handleFileSelect}
                                             onRemove={removeDoc}
                                         />
                                         <FileUpload
                                             id="bank_statement"
                                             label="Bank Statement"
+                                            subtitle="6 MONTHS STAMPED STATEMENT"
                                             required={(parseFloat(amount) || 0) > 500000}
                                             doc={uploadedDocs.bank_statement}
                                             progress={uploadProgress.bank_statement}
+                                            error={errors.bank_statement}
                                             onSelect={handleFileSelect}
                                             onRemove={removeDoc}
                                         />
                                         <FileUpload
                                             id="proof_address"
                                             label="Proof of Residence"
+                                            subtitle="UTILITY BILL OR RENT RECEIPT"
                                             doc={uploadedDocs.proof_address}
                                             progress={uploadProgress.proof_address}
                                             onSelect={handleFileSelect}
@@ -1261,29 +1556,36 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess, initi
                             )}
 
                             {step === 5 && (
-                                <div className="space-y-6 animate-in fade-in slide-in-from-right-8 duration-500">
+                                <div className="space-y-8 animate-in fade-in slide-in-from-right-8 duration-500 max-w-4xl mx-auto py-2">
+                                    <div className="text-center space-y-3 mb-6">
+                                        <h3 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight uppercase">Guarantors & References</h3>
+                                        <p className="text-xs font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest leading-relaxed">
+                                            Provide at least one verified personal reference
+                                        </p>
+                                    </div>
+
                                     {/* Next of Kin Section */}
-                                    <div className="p-6 bg-slate-50 dark:bg-slate-800/50 rounded-3xl border border-slate-100 dark:border-slate-800 space-y-4">
-                                        <div className="flex items-center gap-3 mb-2">
-                                            <div className="size-8 rounded-full bg-primary text-white flex items-center justify-center">
-                                                <span className="material-symbols-outlined text-base">family_history</span>
+                                    <div className="rounded-[2.5rem] border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-8 space-y-6 shadow-sm">
+                                        <div className="flex items-center gap-3">
+                                            <div className="size-10 rounded-2xl bg-indigo-50 dark:bg-slate-800 text-indigo-500 flex items-center justify-center">
+                                                <span className="material-symbols-outlined text-xl">family_history</span>
                                             </div>
                                             <h3 className="text-lg font-black dark:text-white uppercase tracking-wider">Next of Kin</h3>
                                         </div>
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                             <InputGroup label="Full Name" required error={errors.nokName}>
                                                 <input
                                                     className="input-field"
                                                     value={nokName}
-                                                    onChange={e => { setNokName(e.target.value); if(errors.nokName) setErrors(prev => { const n = {...prev}; delete n.nokName; return n; }); }}
-                                                    placeholder="Enter Full Name"
+                                                    onChange={e => { setNokName(e.target.value); if (errors.nokName) setErrors(prev => { const n = { ...prev }; delete n.nokName; return n; }); }}
+                                                    placeholder="Full Name"
                                                 />
                                             </InputGroup>
                                             <InputGroup label="Relationship" required error={errors.nokRelationship}>
                                                 <select
-                                                    className="input-field"
+                                                    className="input-field animate-none"
                                                     value={nokRelationship}
-                                                    onChange={e => { setNokRelationship(e.target.value); if(errors.nokRelationship) setErrors(prev => { const n = {...prev}; delete n.nokRelationship; return n; }); }}
+                                                    onChange={e => { setNokRelationship(e.target.value); if (errors.nokRelationship) setErrors(prev => { const n = { ...prev }; delete n.nokRelationship; return n; }); }}
                                                 >
                                                     <option value="">Select Relationship</option>
                                                     <option value="Husband">Husband</option>
@@ -1300,7 +1602,7 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess, initi
                                             <InputGroup label="Phone Number" required error={errors.nokPhoneNumber}>
                                                 <div className="flex gap-2">
                                                     <select
-                                                        className="input-field !w-24 px-2 text-center"
+                                                        className="input-field !w-24 px-2 text-center animate-none"
                                                         value={nokCountryCode}
                                                         onChange={e => setNokCountryCode(e.target.value)}
                                                     >
@@ -1313,7 +1615,7 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess, initi
                                                             const val = e.target.value.replace(/\D/g, '');
                                                             if (val.length <= 11) {
                                                                 setNokPhoneNumber(val);
-                                                                if(errors.nokPhoneNumber) setErrors(prev => { const n = {...prev}; delete n.nokPhoneNumber; return n; });
+                                                                if (errors.nokPhoneNumber) setErrors(prev => { const n = { ...prev }; delete n.nokPhoneNumber; return n; });
                                                             }
                                                         }}
                                                         placeholder="8012345678"
@@ -1323,18 +1625,18 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess, initi
                                             <InputGroup label="Contact Address" required error={errors.nokAddress}>
                                                 <div className="relative">
                                                     <input
-                                                        className="input-field"
+                                                        className="input-field pr-24"
                                                         value={nokAddress}
-                                                        onChange={e => { setNokAddress(e.target.value); if(errors.nokAddress) setErrors(prev => { const n = {...prev}; delete n.nokAddress; return n; }); }}
+                                                        onChange={e => { setNokAddress(e.target.value); if (errors.nokAddress) setErrors(prev => { const n = { ...prev }; delete n.nokAddress; return n; }); }}
                                                         placeholder="Full Home Address"
                                                     />
                                                     <button
                                                         type="button"
                                                         onClick={() => {
                                                             setNokAddress(address);
-                                                            if(errors.nokAddress) setErrors(prev => { const n = {...prev}; delete n.nokAddress; return n; });
+                                                            if (errors.nokAddress) setErrors(prev => { const n = { ...prev }; delete n.nokAddress; return n; });
                                                         }}
-                                                        className="absolute right-4 top-1/2 -translate-y-1/2 text-[10px] font-black text-primary uppercase tracking-widest hover:underline"
+                                                        className="absolute right-4 top-1/2 -translate-y-1/2 text-[9px] font-black text-primary uppercase tracking-widest hover:underline"
                                                     >
                                                         Same as mine
                                                     </button>
@@ -1343,49 +1645,120 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess, initi
                                         </div>
                                     </div>
 
-                                    <div className="flex justify-between items-center mb-4 mt-8">
-                                        <h3 className="text-lg font-black dark:text-white uppercase tracking-wider">References</h3>
-                                        <button onClick={addReference} className="text-sm font-bold text-primary flex items-center gap-1 hover:text-primary/80 transition-colors">
-                                            <span className="material-symbols-outlined text-lg">add_circle</span>
-                                            Add Reference
-                                        </button>
-                                    </div>
-                                    {references.map((ref, idx) => (
-                                        <div key={idx} className="relative p-6 bg-slate-50 dark:bg-slate-800/50 rounded-3xl border border-slate-100 dark:border-slate-800 space-y-4">
-                                            {references.length > 1 && (
-                                                <button onClick={() => removeReference(idx)} className="absolute top-4 right-4 text-slate-400 hover:text-red-500 transition-colors">
-                                                    <span className="material-symbols-outlined">delete</span>
-                                                </button>
-                                            )}
-                                            <div className="flex items-center gap-3 mb-2">
-                                                <div className="size-8 rounded-full bg-primary/10 text-primary flex items-center justify-center font-black text-sm">{idx + 1}</div>
-                                                <h4 className="font-bold text-base text-slate-900 dark:text-white uppercase tracking-wider">Reference {idx === 0 && '(Required)'}</h4>
-                                            </div>
-                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                                <InputGroup label="Full Name" error={errors[`ref_${idx}_fullName`]}>
-                                                    <input className="input-field" value={ref.fullName} onChange={e => updateReference(idx, 'fullName', e.target.value)} />
-                                                </InputGroup>
-                                                <InputGroup label="Phone Number" error={errors[`ref_${idx}_phoneNumber`]}>
-                                                    <input className="input-field" value={ref.phoneNumber} onChange={e => updateReference(idx, 'phoneNumber', e.target.value)} />
-                                                </InputGroup>
-                                                <InputGroup label="Relationship" error={errors[`ref_${idx}_relationship`]}>
-                                                    <select className="input-field" value={ref.relationship} onChange={e => updateReference(idx, 'relationship', e.target.value)}>
-                                                        <option value="">Select Relationship</option>
-                                                        <option value="Colleague">Husband</option>
-                                                        <option value="Friend">Wife</option>
-                                                        <option value="Family">Brother</option>
-                                                        <option value="Spouse">Sister</option>
-                                                        <option value="Spouse">Widow</option>
-                                                        <option value="Spouse">Proxy</option>
-                                                        <option value="Other">Others</option>
-                                                    </select>
-                                                </InputGroup>
-                                                <InputGroup label="Address" error={errors[`ref_${idx}_address`]}>
-                                                    <input className="input-field" value={ref.address} onChange={e => updateReference(idx, 'address', e.target.value)} />
-                                                </InputGroup>
+                                    {/* References Section */}
+                                    <div className="space-y-6">
+                                        <div className="flex justify-between items-center px-2">
+                                            <div className="flex items-center gap-3">
+                                                <div className="size-10 rounded-2xl bg-indigo-50 dark:bg-slate-800 text-indigo-500 flex items-center justify-center">
+                                                    <span className="material-symbols-outlined text-xl">contacts</span>
+                                                </div>
+                                                <h3 className="text-lg font-black dark:text-white uppercase tracking-wider">References</h3>
                                             </div>
                                         </div>
-                                    ))}
+
+                                        {references.map((ref, idx) => (
+                                            <div key={idx} className="relative rounded-[2.5rem] border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-8 space-y-6 shadow-sm">
+                                                {references.length > 1 && (
+                                                    <button onClick={() => removeReference(idx)} className="absolute top-6 right-6 w-8 h-8 rounded-full bg-red-50 text-red-500 flex items-center justify-center hover:bg-red-500 hover:text-white transition-all shadow-sm">
+                                                        <span className="material-symbols-outlined text-base">close</span>
+                                                    </button>
+                                                )}
+                                                <div className="flex items-center gap-3">
+                                                    <div className="size-8 rounded-xl bg-primary/10 text-primary flex items-center justify-center font-black text-sm">{idx + 1}</div>
+                                                    <h4 className="font-black text-sm text-slate-800 dark:text-white uppercase tracking-wider">Reference {idx === 0 && '(Required)'}</h4>
+                                                </div>
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                                    <InputGroup label="Reference Full Name" error={errors[`ref_${idx}_fullName`]}>
+                                                        <input className="input-field" value={ref.fullName} onChange={e => updateReference(idx, 'fullName', e.target.value)} placeholder="Full Name" />
+                                                    </InputGroup>
+                                                    <InputGroup label="Phone Number" error={errors[`ref_${idx}_phoneNumber`]}>
+                                                        <input className="input-field" value={ref.phoneNumber} onChange={e => updateReference(idx, 'phoneNumber', e.target.value)} placeholder="Phone Number" />
+                                                    </InputGroup>
+                                                    <InputGroup label="Relationship" error={errors[`ref_${idx}_relationship`]}>
+                                                        <select className="input-field animate-none animate-none" value={ref.relationship} onChange={e => updateReference(idx, 'relationship', e.target.value)}>
+                                                            <option value="">Select Relationship</option>
+                                                            <option value="Colleague">Colleague</option>
+                                                            <option value="Friend">Friend</option>
+                                                            <option value="Family">Family</option>
+                                                            <option value="Spouse">Spouse</option>
+                                                            <option value="Sibling">Sibling</option>
+                                                            <option value="Other">Other</option>
+                                                        </select>
+                                                    </InputGroup>
+                                                    <InputGroup label="Residential Address" error={errors[`ref_${idx}_address`]}>
+                                                        <input className="input-field" value={ref.address} onChange={e => updateReference(idx, 'address', e.target.value)} placeholder="Residential Address" />
+                                                    </InputGroup>
+                                                </div>
+                                            </div>
+                                        ))}
+
+                                        {references.length < 2 && (
+                                            <button
+                                                onClick={addReference}
+                                                className="w-full py-4 border-2 border-dashed border-slate-200 dark:border-slate-800 hover:border-primary/50 text-slate-400 hover:text-primary transition-all rounded-[2rem] flex items-center justify-center gap-2 group"
+                                            >
+                                                <span className="material-symbols-outlined text-lg group-hover:scale-110 transition-transform">add_circle</span>
+                                                <span className="text-xs font-black uppercase tracking-widest">Add Second Reference</span>
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+
+                            {step === 6 && (
+                                <div className="space-y-8 animate-in fade-in zoom-in-95 duration-500 max-w-4xl mx-auto py-4 flex flex-col items-center">
+
+                                    <div className="size-24 rounded-3xl bg-[#0084FF]/10 text-[#0084FF] flex items-center justify-center shadow-xl shadow-blue-500/5 mb-4">
+                                        <span className="material-symbols-outlined text-5xl">task</span>
+                                    </div>
+
+                                    <div className="text-center space-y-3 mb-6">
+                                        <h3 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight uppercase">Review Application</h3>
+                                        <p className="text-xs font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest leading-relaxed">
+                                            Verify all details before final submission to CBS
+                                        </p>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8 w-full">
+                                        {/* Left Card: CUSTOMER & LOAN */}
+                                        <div className="rounded-[2.5rem] border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-8 flex flex-col justify-between shadow-sm min-h-[220px]">
+                                            <div>
+                                                <span className="text-[10px] font-black tracking-widest uppercase text-slate-400 dark:text-slate-500">CUSTOMER & LOAN</span>
+                                                <h4 className="text-2xl font-black text-slate-900 dark:text-white uppercase mt-4 italic leading-tight">{firstName} {surname}</h4>
+                                                <p className="text-xs font-bold text-slate-500 mt-1 uppercase tracking-wide">{productType} ({selectedProductOption?.code || 'CBS'})</p>
+                                            </div>
+                                            <div className="mt-8">
+                                                <p className="text-3xl font-black text-emerald-500 tracking-tight leading-none">
+                                                    ₦ {parseFloat(amount || '0').toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                </p>
+                                            </div>
+                                        </div>
+
+                                        {/* Right Card: STATUS & VERIFICATION */}
+                                        <div className="rounded-[2.5rem] border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-8 flex flex-col justify-between shadow-sm min-h-[220px]">
+                                            <div>
+                                                <span className="text-[10px] font-black tracking-widest uppercase text-slate-400 dark:text-slate-500">STATUS & VERIFICATION</span>
+                                            </div>
+                                            <div className="space-y-4 mt-6">
+                                                <div className="flex justify-between items-center">
+                                                    <span className="text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">DOCUMENTS</span>
+                                                    <span className="text-xs font-black text-emerald-500 uppercase tracking-widest">UPLOADED</span>
+                                                </div>
+                                                <div className="h-px bg-slate-50 dark:bg-slate-800/50 w-full" />
+                                                <div className="flex justify-between items-center">
+                                                    <span className="text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">REFERENCES</span>
+                                                    <span className="text-xs font-black text-emerald-500 uppercase tracking-widest">VERIFIED</span>
+                                                </div>
+                                                <div className="h-px bg-slate-50 dark:bg-slate-800/50 w-full" />
+                                                <div className="flex justify-between items-center">
+                                                    <span className="text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">CASA LINK</span>
+                                                    <span className={`text-xs font-black uppercase tracking-widest ${casa ? 'text-emerald-500' : 'text-slate-400'}`}>
+                                                        {casa ? 'ACTIVE' : 'NOT ACTIVE'}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                             )}
                         </>
@@ -1394,27 +1767,51 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess, initi
 
                 {/* Footer Controls */}
                 <div className="p-6 border-t border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 z-10 flex justify-between items-center">
-                    {!['topup', 're-app', 'add_on'].includes(loanType) && step > 0 ? (
-                        <button onClick={handleBack} className="px-8 py-4 rounded-2xl font-bold text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white transition-all">
+                    {!['topup', 're-app', 'add_on'].includes(loanType) && (step > 0 || (step === 0 && !showProductSelect && !loanId)) ? (
+                        <button type="button" onClick={handleBack} className="px-8 py-4 rounded-2xl font-bold text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white transition-all">
                             Back
                         </button>
                     ) : (
-                        <button onClick={onClose} className="px-8 py-4 rounded-2xl font-bold text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white transition-all">
+                        <button type="button" onClick={onClose} className="px-8 py-4 rounded-2xl font-bold text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white transition-all">
                             Cancel
                         </button>
                     )}
 
-                    {!['topup', 're-app', 'add_on'].includes(loanType) && step < steps.length - 1 ? (
-                        <button onClick={handleNext} className="group px-10 py-4 rounded-2xl font-black text-white bg-primary hover:bg-primary/90 shadow-xl shadow-primary/20 hover:shadow-primary/30 hover:-translate-y-1 transition-all flex items-center gap-2">
-                            Next Step <span className="material-symbols-outlined transition-transform group-hover:translate-x-1">arrow_forward</span>
+                    {['topup', 're-app', 'add_on'].includes(loanType) ? (
+                        <button onClick={handleSubmit} disabled={loading} className="group px-10 py-4 rounded-2xl font-black text-white bg-green-500 hover:bg-green-600 shadow-xl shadow-green-500/20 hover:shadow-green-500/30 hover:-translate-y-1 transition-all disabled:opacity-50 disabled:translate-y-0 disabled:shadow-none disabled:cursor-not-allowed flex items-center gap-2 relative overflow-hidden">
+                            {loading && (
+                                <div className="absolute inset-0 flex items-center justify-center bg-green-600">
+                                    <span className="material-symbols-outlined animate-spin">progress_activity</span>
+                                </div>
+                            )}
+                            <span className={loading ? 'opacity-0 flex items-center gap-2' : 'flex items-center gap-2'}>
+                                Submit Application <span className="material-symbols-outlined">check_circle</span>
+                            </span>
+                        </button>
+                    ) : step === 6 ? (
+                        <button onClick={handleSubmit} disabled={loading} className="group px-10 py-4 rounded-2xl font-black text-white bg-emerald-500 hover:bg-emerald-600 shadow-xl shadow-emerald-500/20 hover:shadow-emerald-500/30 hover:-translate-y-1 transition-all disabled:opacity-50 disabled:translate-y-0 disabled:shadow-none disabled:cursor-not-allowed flex items-center gap-2 relative overflow-hidden">
+                            {loading && (
+                                <div className="absolute inset-0 flex items-center justify-center bg-emerald-600">
+                                    <span className="material-symbols-outlined animate-spin">progress_activity</span>
+                                </div>
+                            )}
+                            <span className={loading ? 'opacity-0 flex items-center gap-2' : 'flex items-center gap-2'}>
+                                Final Submission <span className="material-symbols-outlined text-base">send</span>
+                            </span>
                         </button>
                     ) : (
-                        <button onClick={handleSubmit} disabled={loading} className="group px-10 py-4 rounded-2xl font-black text-white bg-green-500 hover:bg-green-600 shadow-xl shadow-green-500/20 hover:shadow-green-500/30 hover:-translate-y-1 transition-all disabled:opacity-50 disabled:translate-y-0 disabled:shadow-none flex items-center gap-2">
-                            {loading ? (
-                                <>Processing...</>
-                            ) : (
-                                <>Submit Application <span className="material-symbols-outlined">check_circle</span></>
-                            )}
+                        <button
+                            onClick={handleNext}
+                            disabled={step === 0 && showProductSelect && !productType}
+                            className={`group px-10 py-4 rounded-2xl font-black text-white bg-[#0084FF] hover:bg-blue-600 shadow-xl shadow-blue-500/20 hover:shadow-blue-500/30 hover:-translate-y-1 transition-all flex items-center gap-2
+                                ${step === 0 && showProductSelect && !productType ? 'opacity-40 cursor-not-allowed pointer-events-none hover:translate-y-0 shadow-none' : ''}
+                            `}
+                        >
+                            {step === 0 && showProductSelect && "Next Step"}
+                            {step === 0 && !showProductSelect && "Next Step: Documents"}
+                            {step === 4 && "Continue to References"}
+                            {step === 5 && "Review Application"}
+                            <span className="material-symbols-outlined transition-transform group-hover:translate-x-1">arrow_forward</span>
                         </button>
                     )}
                 </div>
@@ -1422,14 +1819,14 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess, initi
             <style>{`
                 .input-field {
                     width: 100%;
-                    height: 4rem;
-                    padding: 0 1.5rem;
-                    border-radius: 1rem;
+                    height: 3.25rem;
+                    padding: 0 1.25rem;
+                    border-radius: 0.875rem;
                     border: 2px solid #f1f5f9;
                     background-color: #f8fafc;
                     color: #0f172a;
                     font-weight: 700;
-                    font-size: 1.125rem;
+                    font-size: 0.95rem;
                     outline: none;
                     transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
                 }

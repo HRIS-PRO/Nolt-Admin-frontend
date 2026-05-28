@@ -1228,36 +1228,23 @@ const LoanDetailsPage: React.FC<LoanDetailsPageProps> = ({ user, onLogout, toggl
 
             {/* Edit Modal */}
             {showEditModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-                    <div className="bg-white dark:bg-slate-900 rounded-[2rem] w-full max-w-4xl max-h-[90vh] overflow-y-auto shadow-2xl relative">
-                        <button
-                            onClick={() => setShowEditModal(false)}
-                            className="absolute top-4 right-4 p-2 rounded-full bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors z-10"
-                        >
-                            <span className="material-symbols-outlined">close</span>
-                        </button>
-                        <div className="p-8">
-                            <h2 className="text-2xl font-black mb-6 text-slate-900 dark:text-white">Edit Application</h2>
-                            <StaffLoanForm
-                                user={user}
-                                initialData={loan}
-                                loanId={loan.id}
-                                onClose={() => setShowEditModal(false)} // Pass existing onClose
-                                onSuccess={() => {
-                                    setShowEditModal(false);
-                                    // Refresh logic
-                                    const fetchLoan = async () => {
-                                        try {
-                                            const response = await axios.get(`/api/staff/loans/${id}`, { withCredentials: true });
-                                            setLoan(response.data);
-                                        } catch (error) { console.error("Refresh failed", error); }
-                                    };
-                                    fetchLoan();
-                                }}
-                            />
-                        </div>
-                    </div>
-                </div>
+                <StaffLoanForm
+                    user={user}
+                    initialData={loan}
+                    loanId={loan.id}
+                    onClose={() => setShowEditModal(false)}
+                    onSuccess={() => {
+                        setShowEditModal(false);
+                        // Refresh logic
+                        const fetchLoan = async () => {
+                            try {
+                                const response = await axios.get(`/api/staff/loans/${id}`, { withCredentials: true });
+                                setLoan(response.data);
+                            } catch (error) { console.error("Refresh failed", error); }
+                        };
+                        fetchLoan();
+                    }}
+                />
             )}
 
         </StaffLayout>
