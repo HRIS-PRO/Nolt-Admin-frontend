@@ -131,7 +131,8 @@ const StaffInvestmentDetailsPage: React.FC<StaffInvestmentDetailsPageProps> = ({
             tin_number: investment.tin_number || '',
             nok_name: investment.nok_name || '',
             nok_relationship: investment.nok_relationship || '',
-            nok_address: investment.nok_address || ''
+            nok_address: investment.nok_address || '',
+            nok_phone_number: investment.nok_phone_number || ''
         });
         setShowBioEditModal(true);
     };
@@ -806,6 +807,7 @@ const StaffInvestmentDetailsPage: React.FC<StaffInvestmentDetailsPageProps> = ({
                         <CollapsibleGroup title="Next of Kin Data" icon="family_history">
                             <Field label="Name" value={investment.nok_name} />
                             <Field label="Relationship" value={investment.nok_relationship} />
+                            <Field label="Phone Number" value={investment.nok_phone_number} />
                             <Field label="Address" value={investment.nok_address} />
                         </CollapsibleGroup>
                     )}
@@ -1680,6 +1682,10 @@ const StaffInvestmentDetailsPage: React.FC<StaffInvestmentDetailsPageProps> = ({
                                     <div className="space-y-1">
                                         <label className="text-xs font-bold text-slate-500 uppercase">NOK Relationship</label>
                                         <input type="text" value={bioEditData.nok_relationship} onChange={(e) => setBioEditData({...bioEditData, nok_relationship: e.target.value})} className="w-full bg-slate-50 dark:bg-[#1e293b] border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 text-slate-900 dark:text-white" />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <label className="text-xs font-bold text-slate-500 uppercase">NOK Phone Number</label>
+                                        <input type="text" value={bioEditData.nok_phone_number} onChange={(e) => setBioEditData({...bioEditData, nok_phone_number: e.target.value})} className="w-full bg-slate-50 dark:bg-[#1e293b] border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 text-slate-900 dark:text-white" placeholder="e.g. +2348012345678" />
                                     </div>
                                     <div className="space-y-1 md:col-span-2">
                                         <label className="text-xs font-bold text-slate-500 uppercase">NOK Address</label>

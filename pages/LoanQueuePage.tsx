@@ -401,10 +401,16 @@ const LoanQueuePage: React.FC<LoanQueuePageProps> = ({ user, onLogout, toggleThe
                                                         </div>
                                                         <div>
                                                             <p className="font-black text-slate-900 dark:text-white text-sm leading-tight">{loan.applicant_full_name}</p>
-                                                            <div className="flex items-center gap-2 mt-1">
+                                                            <div className="flex items-center gap-2 mt-1 flex-wrap">
                                                                 <span className="text-[10px] font-mono text-slate-400">#LOAN-{loan.id}</span>
                                                                 <span className="size-1 rounded-full bg-slate-300"></span>
                                                                 <span className="text-[10px] text-slate-500 font-bold uppercase tracking-tighter">{formatDate(loan.created_at)}</span>
+                                                                {loan.casa && (
+                                                                    <>
+                                                                        <span className="size-1 rounded-full bg-slate-300"></span>
+                                                                        <span className="text-[10px] font-mono text-blue-500">CASA: {loan.casa}</span>
+                                                                    </>
+                                                                )}
                                                             </div>
                                                         </div>
                                                     </div>

@@ -35,6 +35,9 @@ const NewCustomerModal: React.FC<NewCustomerModalProps> = ({ isOpen, onClose, on
     firstName: '',
     lastName: '',
     middleName: '',
+    preferred_first_name: '',
+    preferred_surname: '',
+    preferred_middle_name: '',
     email: '',
     phone: '',
     nin: '',
@@ -93,17 +96,30 @@ const NewCustomerModal: React.FC<NewCustomerModalProps> = ({ isOpen, onClose, on
           if (parts[0].length === 2) dob = `${parts[2]}-${parts[1]}-${parts[0]}`;
         }
 
-        setFormData(prev => ({
-          ...prev,
-          firstName: data.firstName || '',
-          lastName: data.lastName || '',
-          middleName: data.middleName || '',
-          email: data.email || '',
-          phone: data.phone || '',
-          dob: dob,
-          gender: data.gender || '',
-          avatar_url: data.avatar_url || ''
-        }));
+        setFormData(prev => {
+          const fName = data.firstName || '';
+          const lName = data.lastName || '';
+          const mName = data.middleName || '';
+          
+          // Helper to convert string to Proper Case
+          const toProperCase = (str: string) =>
+            str.trim().toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
+
+          return {
+            ...prev,
+            firstName: fName,
+            lastName: lName,
+            middleName: mName,
+            preferred_first_name: toProperCase(fName),
+            preferred_surname: toProperCase(lName),
+            preferred_middle_name: toProperCase(mName),
+            email: data.email || '',
+            phone: data.phone || '',
+            dob: dob,
+            gender: data.gender || '',
+            avatar_url: data.avatar_url || ''
+          };
+        });
         setCurrentStep(1);
       } else {
         setError(response.data.message || 'BVN lookup failed');
@@ -163,7 +179,7 @@ const NewCustomerModal: React.FC<NewCustomerModalProps> = ({ isOpen, onClose, on
 
     const payload = {
       ...formData,
-      full_name: `${formData.firstName} ${formData.lastName} ${formData.middleName}`.trim(),
+      full_name: `${formData.preferred_first_name || formData.firstName} ${formData.preferred_surname || formData.lastName}`.trim(),
       bvn
     };
 
@@ -209,6 +225,9 @@ const NewCustomerModal: React.FC<NewCustomerModalProps> = ({ isOpen, onClose, on
       firstName: '',
       lastName: '',
       middleName: '',
+      preferred_first_name: '',
+      preferred_surname: '',
+      preferred_middle_name: '',
       email: '',
       phone: '',
       nin: '',
@@ -439,17 +458,75 @@ const NewCustomerModal: React.FC<NewCustomerModalProps> = ({ isOpen, onClose, on
                             <option value="Ms">Ms</option>
                           </select>
                         </div>
-                        <div className="space-y-2">
-                          <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">First Name</p>
-                          <input required type="text" value={formData.firstName} onChange={(e) => setFormData({ ...formData, firstName: e.target.value })} className="input-field-onboarding" />
+                        {/* 🔒 BVN Verified Name (Read-Only) */}
+                        <div className="col-span-full p-4 bg-slate-50 dark:bg-slate-800/40 rounded-2xl border border-slate-100 dark:border-slate-800 space-y-3">
+                          <div className="flex items-center gap-2 text-slate-500">
+                            <span className="material-symbols-outlined text-sm font-black">lock</span>
+                            <span className="text-[10px] font-black uppercase tracking-widest">BVN Verified Name (Read-Only)</span>
+                          </div>
+                          <div className="grid grid-cols-3 gap-4">
+                            <div className="space-y-1">
+                              <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">First Name</p>
+                              <p className="text-xs font-black text-slate-700 dark:text-slate-300 uppercase">{formData.firstName || '—'}</p>
+                            </div>
+                            <div className="space-y-1">
+                              <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Last Name</p>
+                              <p className="text-xs font-black text-slate-700 dark:text-slate-300 uppercase">{formData.lastName || '—'}</p>
+                            </div>
+                            <div className="space-y-1">
+                              <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Middle Name</p>
+                              <p className="text-xs font-black text-slate-700 dark:text-slate-300 uppercase">{formData.middleName || '—'}</p>
+                            </div>
+                          </div>
                         </div>
-                        <div className="space-y-2">
-                          <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Last Name</p>
-                          <input required type="text" value={formData.lastName} onChange={(e) => setFormData({ ...formData, lastName: e.target.value })} className="input-field-onboarding" />
-                        </div>
-                        <div className="space-y-2">
-                          <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Middle Name <span className="text-[8px] text-slate-400">(Optional)</span></p>
-                          <input type="text" value={formData.middleName} onChange={(e) => setFormData({ ...formData, middleName: e.target.value })} className="input-field-onboarding" />
+
+                        {/* ✏️ Preferred Name (Editable) */}
+                        <div className="col-span-full border-t border-slate-100 dark:border-slate-800 pt-4 mt-2 grid grid-cols-3 gap-4">
+                          <div className="col-span-full flex items-center gap-2 mb-1 text-blue-600 dark:text-blue-400">
+                            <span className="material-symbols-outlined text-sm font-black">edit</span>
+                            <span className="text-[10px] font-black uppercase tracking-widest">Preferred Name (Editable - prefilled from BVN)</span>
+                          </div>
+                          <div className="space-y-2">
+                            <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Preferred First Name</p>
+                            <input 
+                              required 
+                              type="text" 
+                              value={formData.preferred_first_name} 
+                              onChange={(e) => setFormData({ ...formData, preferred_first_name: e.target.value })} 
+                              onBlur={(e) => {
+                                const formatted = e.target.value.trim().toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
+                                setFormData(prev => ({ ...prev, preferred_first_name: formatted }));
+                              }}
+                              className="input-field-onboarding" 
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Preferred Surname</p>
+                            <input 
+                              required 
+                              type="text" 
+                              value={formData.preferred_surname} 
+                              onChange={(e) => setFormData({ ...formData, preferred_surname: e.target.value })} 
+                              onBlur={(e) => {
+                                const formatted = e.target.value.trim().toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
+                                setFormData(prev => ({ ...prev, preferred_surname: formatted }));
+                              }}
+                              className="input-field-onboarding" 
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Preferred Middle Name</p>
+                            <input 
+                              type="text" 
+                              value={formData.preferred_middle_name} 
+                              onChange={(e) => setFormData({ ...formData, preferred_middle_name: e.target.value })} 
+                              onBlur={(e) => {
+                                const formatted = e.target.value.trim().toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
+                                setFormData(prev => ({ ...prev, preferred_middle_name: formatted }));
+                              }}
+                              className="input-field-onboarding" 
+                            />
+                          </div>
                         </div>
                         <div className="space-y-2">
                           <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">NIN</p>
