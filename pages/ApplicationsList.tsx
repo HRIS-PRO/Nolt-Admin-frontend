@@ -22,6 +22,33 @@ const ApplicationsList: React.FC<ApplicationsListProps> = ({ navigate, formatMon
   const [selectedApp, setSelectedApp] = useState<{ id: string, type: string, amount: number, data?: any } | null>(null);
   const [showModal, setShowModal] = useState(false);
 
+  // Computed values for Investment Certificate
+  const isInvestment = selectedApp && !selectedApp.type.toLowerCase().includes('loan');
+
+  const principal = selectedApp ? parseFloat(selectedApp.data?.investment_amount || selectedApp.amount || 0) : 0;
+  const rate = selectedApp ? parseFloat(selectedApp.data?.interest_rate || 0) : 0;
+  const tenureDays = selectedApp ? parseInt(selectedApp.data?.tenure_days || 0) : 0;
+
+  const valDate = selectedApp?.data?.start_date 
+    ? new Date(selectedApp.data.start_date).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) 
+    : 'N/A';
+  const matDate = selectedApp?.data?.maturity_date 
+    ? new Date(selectedApp.data.maturity_date).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) 
+    : 'N/A';
+
+  const interestAmt = (principal * (rate / 100) * tenureDays) / 365;
+  const whtAmt = interestAmt * 0.1; // 10% WHT
+  const maturityValue = principal + interestAmt - whtAmt;
+
+  const principalStr = principal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const interestAmtStr = interestAmt.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const whtAmtStr = whtAmt.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const maturityValueStr = maturityValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+  const casaNumber = selectedApp?.data?.casa_account_number || '22222222222222';
+  const investmentType = selectedApp?.data?.investment_type || 'NOLT Investment';
+  const customerName = selectedApp?.data?.fullName || user.name;
+
   const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
   const [showLiquidationModal, setShowLiquidationModal] = useState(false);
   const [liquidationType, setLiquidationType] = useState<'FULL' | 'CUSTOM'>('FULL');
@@ -730,7 +757,7 @@ const ApplicationsList: React.FC<ApplicationsListProps> = ({ navigate, formatMon
                 }
 
                 /* Targeted Certificate Alignment */
-                .modal-container .max-w-3xl {
+                .modal-container .max-w-3xl, .modal-container .max-w-\\[700px\\] {
                   width: 210mm !important; /* A4 Width */
                   max-width: 100% !important;
                   margin: 0 auto !important;
@@ -739,6 +766,20 @@ const ApplicationsList: React.FC<ApplicationsListProps> = ({ navigate, formatMon
                   border: none !important;
                   box-shadow: none !important;
                   border-radius: 0 !important;
+                }
+
+                /* Force Grid Columns to Stay side-by-side during print */
+                .intro-grid-print {
+                  display: grid !important;
+                  grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
+                  gap: 1.5rem !important;
+                  align-items: center !important;
+                }
+                .investor-details-print {
+                  grid-column: span 3 / span 3 !important;
+                }
+                .nuban-card-print {
+                  grid-column: span 2 / span 2 !important;
                 }
 
                 /* Remove scrollbars and overflows for print */
@@ -751,99 +792,267 @@ const ApplicationsList: React.FC<ApplicationsListProps> = ({ navigate, formatMon
 
             {/* Modal Content - Full Details (Certificate View) */}
             <div className="flex-1 overflow-y-auto p-8 md:p-12 bg-slate-50 dark:bg-slate-900/50 print:bg-white print:p-0">
-              <div className="max-w-3xl mx-auto bg-white dark:bg-slate-800 p-8 md:p-16 rounded-[2rem] shadow-xl border border-slate-100 dark:border-slate-700 space-y-10 print:shadow-none print:border-none print:p-0">
-                {/* Document Header / Letterhead */}
-                <div className="flex justify-between items-start border-b-2 border-slate-100 dark:border-slate-700 pb-8 min-h-[120px]">
-                  <div className="space-y-6">
-                    <div className="flex items-center gap-2 text-primary mb-2">
-                       <img 
-                        src="https://noltfinance.s3.us-east-1.amazonaws.com/logo+updated+white.png" 
-                        className="h-12 w-auto object-contain [filter:invert(38%)_sepia(98%)_saturate(2136%)_hue-rotate(187deg)_brightness(101%)_contrast(101%)] dark:[filter:none]" 
-                        alt="NOLT" 
+              {isInvestment ? (
+                /* ══ BEAUTIFUL BRANDED INVESTMENT CERTIFICATE (EXACT TEMPLATE) ══ */
+                <div className="max-w-[700px] mx-auto bg-[#d6e8f7] rounded-[14px] overflow-hidden shadow-2xl print:bg-white print:shadow-none print:rounded-none">
+                  {/* HEADER */}
+                  <div className="bg-[#028ff5] p-8 pb-4 text-white relative flex justify-between items-end min-h-[140px] rounded-t-[14px] print:rounded-none">
+                    <div className="space-y-3">
+                      <img 
+                        src="https://pub-74b956e78e404291a932f28ada63b70c.r2.dev/NF-Logo-White%20(2).png" 
+                        alt="NOLT Finance" 
+                        className="h-10 w-auto object-contain"
                       />
+                      <p className="text-[10px] font-black uppercase tracking-[0.25em] text-white/80">Investment Certificate</p>
+                      <p className="text-[9px] text-white/60">NOLT Finance Company Limited &nbsp;•&nbsp; RC: 1870631</p>
                     </div>
-                    <h1 className="text-3xl font-black text-slate-900 dark:text-white uppercase tracking-tight">
-                      {selectedApp.type.toLowerCase().includes('loan') ? 'Loan Agreement' : 'Investment Certificate'}
-                    </h1>
+                    <img 
+                      src="https://pub-74b956e78e404291a932f28ada63b70c.r2.dev/Inv_Bkt-view.png" 
+                      alt="Certificate of Investment" 
+                      className="h-28 w-auto object-contain z-10 shrink-0 print:h-20"
+                    />
                   </div>
-                  <div className="text-right">
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Date Issued</p>
-                    <p className="font-bold dark:text-white">{selectedApp.submittedAt || new Date().toLocaleDateString()}</p>
-                    <div className="mt-4">
-                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Status</p>
-                      <p className={`text-xs font-black px-3 py-1 rounded-full inline-block ${selectedApp.status === 'ACTIVE' || selectedApp.status === 'DISBURSED' || selectedApp.status === 'APPROVED' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-primary/10 text-primary'}`}>
-                        {selectedApp.status}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Agreement Body / Clauses */}
-                <div className="prose dark:prose-invert max-w-none text-slate-600 dark:text-slate-300 leading-relaxed font-medium space-y-8">
-                  <section>
-                    <h4 className="text-slate-900 dark:text-white font-black uppercase text-sm tracking-widest mb-4 flex items-center gap-2">
-                      <span className="size-6 rounded-lg bg-slate-100 dark:bg-slate-700 flex items-center justify-center text-[10px]">01</span>
-                      Parties Involved
-                    </h4>
-                    <p className="pl-8">
-                      This formal certificate serves as an agreement between <strong>NOLT Finance</strong> ("The Provider") and the Applicant identified as <strong>{selectedApp.data?.fullName || user.name}</strong> (Account ID: #{selectedApp.id}).
-                    </p>
-                  </section>
                   
-                  <section>
-                    <h4 className="text-slate-900 dark:text-white font-black uppercase text-sm tracking-widest mb-4 flex items-center gap-2">
-                      <span className="size-6 rounded-lg bg-slate-100 dark:bg-slate-700 flex items-center justify-center text-[10px]">02</span>
-                      {selectedApp.type.toLowerCase().includes('loan') ? 'Principal Loan Amount' : 'Investment Principal'}
-                    </h4>
-                    <p className="pl-8">
-                      The total sum agreed upon for this {selectedApp.type.toLowerCase().includes('loan') ? 'disbursement' : 'investment plan'} is <strong>{formatMoney(selectedApp.amount)}</strong>. All interest calculations, payment cycles, and maturity terms are strictly governed by the standard operating policy of NOLT Finance.
-                    </p>
-                  </section>
+                  {/* ACCENT BARS */}
+                  <div className="h-1 bg-white"></div>
+                  <div className="h-0.5 bg-[#f8c14b]"></div>
 
-                  <section>
-                    <h4 className="text-slate-900 dark:text-white font-black uppercase text-sm tracking-widest mb-4 flex items-center gap-2">
-                      <span className="size-6 rounded-lg bg-slate-100 dark:bg-slate-700 flex items-center justify-center text-[10px]">03</span>
-                      Compliance & Security
-                    </h4>
-                    <p className="pl-8">
-                      The Client agrees to maintain the accuracy of all provided data. NOLT Finance guarantees the security of all funds/data transition and confirms that this {selectedApp.type.toLowerCase().includes('loan') ? 'loan' : 'investment'} follows all registered and regulatory compliance mandates.
-                    </p>
-                  </section>
-                </div>
+                  {/* MAIN BODY */}
+                  <div className="bg-white p-8 md:p-10 space-y-8 text-slate-800">
+                    {/* INTRO GRID */}
+                    <div className="grid grid-cols-1 md:grid-cols-5 gap-6 items-center intro-grid-print">
+                      {/* Left: Investor Details */}
+                      <div className="md:col-span-3 space-y-2 investor-details-print">
+                        <p className="text-[10px] font-black uppercase tracking-wider text-[#028ff5]">This is to certify that —</p>
+                        <h2 className="text-2xl font-black text-[#031421] leading-tight uppercase">{customerName}</h2>
+                        <p className="text-xs text-slate-500 font-bold">Has invested the sum of</p>
+                        <p className="text-2xl font-black text-[#028ff5]">&#8358;{principalStr}</p>
+                        <p className="text-xs text-slate-500 font-medium">In the <strong className="text-[#031421] uppercase">{investmentType.replace('_', ' ')}</strong> product</p>
+                        <p className="text-xs text-slate-400">Investment ID: <strong className="text-[#031421]">#{selectedApp.id}</strong></p>
+                      </div>
 
-                {/* Signature Section */}
-                <div className="pt-10 border-t-2 border-slate-100 dark:border-slate-700 flex flex-col md:flex-row justify-between items-end gap-8">
-                  <div className="space-y-4">
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Client Digital Signature</p>
-                    <div className="w-64 h-24 bg-slate-50 dark:bg-slate-900/50 rounded-xl border-2 border-dashed border-slate-200 dark:border-slate-700 flex items-center justify-center relative overflow-hidden">
-                        {/* Display User's REAL signature if available */}
-                        {selectedApp.data?.signatures?.[0] ? (
-                          <img 
-                            src={selectedApp.data.signatures[0]} 
-                            alt="Digital Signature" 
-                            className="w-full h-full object-contain px-4" 
-                          />
-                        ) : (
-                          <svg className="absolute inset-0 w-full h-full text-primary opacity-80" viewBox="0 0 200 80">
-                              <path d="M20,60 C40,20 60,80 80,40 C100,0 120,60 140,20 C160,-20 180,40 190,30" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
-                          </svg>
-                        )}
+                      {/* Right: NUBAN Card */}
+                      <div className="md:col-span-2 rounded-[8px] overflow-hidden shadow-lg border border-slate-100 nuban-card-print">
+                        <div className="bg-[#028ff5] px-4 py-2">
+                          <p className="text-[9px] font-black uppercase tracking-wider text-white">Account Number</p>
+                        </div>
+                        <div className="bg-[#031421] p-4 text-white space-y-3">
+                          <p className="text-xl font-black text-[#f8c14b] tracking-wider">{casaNumber}</p>
+                          <div className="border-t border-white/10"></div>
+                          <p className="text-[10px] leading-relaxed text-[#ade5fc]/80 font-medium">To top up on your investment, make transfers to your account number <strong className="text-white">{casaNumber}</strong>.</p>
+                        </div>
+                      </div>
                     </div>
-                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em]">Verified via NOLT Platform</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Authorized Seal</p>
-                    <div className="size-24 rounded-full border-4 border-primary/20 flex items-center justify-center text-primary ml-auto relative">
-                        <div className="absolute inset-2 rounded-full border border-primary/10 border-dashed animate-spin-slow"></div>
-                        <span className="material-symbols-outlined text-5xl filled">verified</span>
+
+                    {/* DETAILS CARD */}
+                    <div className="space-y-3">
+                      <p className="text-xs text-slate-500 font-medium">Transaction details are as follows:</p>
+                      <div className="bg-[#031421] text-white rounded-[10px] overflow-hidden shadow-lg">
+                        {/* Details Header */}
+                        <div className="bg-[#028ff5] px-6 py-3">
+                          <p className="text-[9px] font-black uppercase tracking-widest text-white">Transaction Details</p>
+                        </div>
+                        
+                        {/* Details Body */}
+                        <div className="grid grid-cols-2 divide-x divide-white/5">
+                          {/* LEFT */}
+                          <div className="p-6 space-y-4">
+                            <div className="border-b border-white/5 pb-3">
+                              <p className="text-[9px] font-black uppercase tracking-wider text-[#ade5fc]">Principal</p>
+                              <p className="text-base font-black text-[#f8c14b]">&#8358;{principalStr}</p>
+                            </div>
+                            <div className="border-b border-white/5 pb-3">
+                              <p className="text-[9px] font-black uppercase tracking-wider text-[#ade5fc]">Tenure</p>
+                              <p className="text-sm font-bold">{tenureDays} Day(s)</p>
+                            </div>
+                            <div className="border-b border-white/5 pb-3">
+                              <p className="text-[9px] font-black uppercase tracking-wider text-[#ade5fc]">Interest Rate</p>
+                              <p className="text-sm font-bold">{rate.toFixed(2)}% per annum</p>
+                            </div>
+                            <div>
+                              <p className="text-[9px] font-black uppercase tracking-wider text-[#ade5fc]">Value Date</p>
+                              <p className="text-sm font-bold">{valDate}</p>
+                            </div>
+                          </div>
+
+                          {/* RIGHT */}
+                          <div className="p-6 space-y-4">
+                            <div className="border-b border-white/5 pb-3">
+                              <p className="text-[9px] font-black uppercase tracking-wider text-[#ade5fc]">Maturity Date</p>
+                              <p className="text-sm font-bold">{matDate}</p>
+                            </div>
+                            <div className="border-b border-white/5 pb-3">
+                              <p className="text-[9px] font-black uppercase tracking-wider text-[#ade5fc]">Interest Amount</p>
+                              <p className="text-sm font-black text-[#35A374]">&#8358;{interestAmtStr}</p>
+                            </div>
+                            <div className="border-b border-white/5 pb-3">
+                              <p className="text-[9px] font-black uppercase tracking-wider text-[#ade5fc]">WHT</p>
+                              <p className="text-sm font-bold">&#8358;{whtAmtStr}</p>
+                            </div>
+                            <div>
+                              <p className="text-[9px] font-black uppercase tracking-wider text-[#ade5fc]">Maturity Value</p>
+                              <p className="text-base font-black text-[#f8c14b]">&#8358;{maturityValueStr}</p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* DISCLAIMER */}
+                    <div className="flex rounded-r-[6px] rounded-l-none overflow-hidden border border-[#028ff5]/10">
+                      <div className="w-1 bg-[#028ff5]"></div>
+                      <div className="bg-[#e8f4fe] p-4 flex-1">
+                        <p className="text-[11px] leading-relaxed text-[#444444] italic font-medium">Please note that pre-liquidation of this investment before the maturity date above will attract a <strong className="text-red-600">30% charge on the accrued interest</strong>. However, if we do not receive any instruction from you on maturity, we shall be pleased to roll over at the terms and conditions prevailing on the rollover date.</p>
+                      </div>
+                    </div>
+
+                    {/* SIGNATURES */}
+                    <div className="pt-8 border-t border-slate-100 flex justify-between items-end gap-6">
+                      {/* Sig 1 */}
+                      <div className="w-1/3 text-left space-y-2">
+                        <img 
+                          src="https://pub-74b956e78e404291a932f28ada63b70c.r2.dev/Inv_AS1.png" 
+                          alt="Authorized Signatory 1" 
+                          className="h-10 w-auto object-contain"
+                        />
+                        <div className="border-t border-[#031421] pt-1">
+                          <p className="text-[10px] font-black text-[#031421] uppercase">Authorized Signatory</p>
+                          <p className="text-[9px] text-[#028ff5]">NOLT Finance</p>
+                        </div>
+                      </div>
+
+                      {/* Stamp */}
+                      <div className="w-1/3 flex justify-center">
+                        <img 
+                          src="https://pub-74b956e78e404291a932f28ada63b70c.r2.dev/NF_Stamp.jpg" 
+                          alt="Stamp" 
+                          className="h-16 w-auto object-contain rounded-full shadow-sm"
+                        />
+                      </div>
+
+                      {/* Sig 2 */}
+                      <div className="w-1/3 text-right space-y-2">
+                        <img 
+                          src="https://pub-74b956e78e404291a932f28ada63b70c.r2.dev/Inv_AS2.png" 
+                          alt="Authorized Signatory 2" 
+                          className="h-10 w-auto object-contain ml-auto"
+                        />
+                        <div className="border-t border-[#031421] pt-1">
+                          <p className="text-[10px] font-black text-[#031421] uppercase">Authorized Signatory</p>
+                          <p className="text-[9px] text-[#028ff5]">NOLT Finance</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* SEAL NOTE */}
+                    <div className="pt-6 border-t border-slate-100 text-center">
+                      <p className="text-[8px] font-black text-slate-400 uppercase tracking-[0.4em]">This is a computer-generated document. No physical signature is required.</p>
                     </div>
                   </div>
-                </div>
 
-                <div className="pt-8 text-center border-t border-slate-100 dark:border-slate-700">
-                   <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.5em]">This is a computer-generated document. No physical signature is required.</p>
+                  {/* FOOTER */}
+                  <div className="bg-[#031421] px-8 py-4 text-white text-[9px] flex justify-between items-center rounded-b-[14px] print:rounded-none">
+                    <p className="text-slate-400">NOLT Finance Company Limited &nbsp;•&nbsp; RC: 1870631</p>
+                    <p className="font-bold text-[#ade5fc] uppercase tracking-wider">Licensed by CBN</p>
+                    <p className="font-bold text-[#ade5fc]">www.noltfinance.com</p>
+                  </div>
                 </div>
-              </div>
+              ) : (
+                /* ══ DEFAULT LOAN AGREEMENT TEMPLATE ══ */
+                <div className="max-w-3xl mx-auto bg-white dark:bg-slate-800 p-8 md:p-16 rounded-[2rem] shadow-xl border border-slate-100 dark:border-slate-700 space-y-10 print:shadow-none print:border-none print:p-0">
+                  {/* Document Header / Letterhead */}
+                  <div className="flex justify-between items-start border-b-2 border-slate-100 dark:border-slate-700 pb-8 min-h-[120px]">
+                    <div className="space-y-6">
+                      <div className="flex items-center gap-2 text-primary mb-2">
+                         <img 
+                          src="https://noltfinance.s3.us-east-1.amazonaws.com/logo+updated+white.png" 
+                          className="h-12 w-auto object-contain [filter:invert(38%)_sepia(98%)_saturate(2136%)_hue-rotate(187deg)_brightness(101%)_contrast(101%)] dark:[filter:none]" 
+                          alt="NOLT" 
+                        />
+                      </div>
+                      <h1 className="text-3xl font-black text-slate-900 dark:text-white uppercase tracking-tight">
+                        Loan Agreement
+                      </h1>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Date Issued</p>
+                      <p className="font-bold dark:text-white">{selectedApp.submittedAt || new Date().toLocaleDateString()}</p>
+                      <div className="mt-4">
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Status</p>
+                        <p className={`text-xs font-black px-3 py-1 rounded-full inline-block ${selectedApp.status === 'ACTIVE' || selectedApp.status === 'DISBURSED' || selectedApp.status === 'APPROVED' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-primary/10 text-primary'}`}>
+                          {selectedApp.status}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Agreement Body / Clauses */}
+                  <div className="prose dark:prose-invert max-w-none text-slate-600 dark:text-slate-300 leading-relaxed font-medium space-y-8">
+                    <section>
+                      <h4 className="text-slate-900 dark:text-white font-black uppercase text-sm tracking-widest mb-4 flex items-center gap-2">
+                        <span className="size-6 rounded-lg bg-slate-100 dark:bg-slate-700 flex items-center justify-center text-[10px]">01</span>
+                        Parties Involved
+                      </h4>
+                      <p className="pl-8">
+                        This formal certificate serves as an agreement between <strong>NOLT Finance</strong> ("The Provider") and the Applicant identified as <strong>{selectedApp.data?.fullName || user.name}</strong> (Account ID: #{selectedApp.id}).
+                      </p>
+                    </section>
+                    
+                    <section>
+                      <h4 className="text-slate-900 dark:text-white font-black uppercase text-sm tracking-widest mb-4 flex items-center gap-2">
+                        <span className="size-6 rounded-lg bg-slate-100 dark:bg-slate-700 flex items-center justify-center text-[10px]">02</span>
+                        Principal Loan Amount
+                      </h4>
+                      <p className="pl-8">
+                        The total sum agreed upon for this disbursement is <strong>{formatMoney(selectedApp.amount)}</strong>. All interest calculations, payment cycles, and maturity terms are strictly governed by the standard operating policy of NOLT Finance.
+                      </p>
+                    </section>
+
+                    <section>
+                      <h4 className="text-slate-900 dark:text-white font-black uppercase text-sm tracking-widest mb-4 flex items-center gap-2">
+                        <span className="size-6 rounded-lg bg-slate-100 dark:bg-slate-700 flex items-center justify-center text-[10px]">03</span>
+                        Compliance & Security
+                      </h4>
+                      <p className="pl-8">
+                        The Client agrees to maintain the accuracy of all provided data. NOLT Finance guarantees the security of all funds/data transition and confirms that this loan follows all registered and regulatory compliance mandates.
+                      </p>
+                    </section>
+                  </div>
+
+                  {/* Signature Section */}
+                  <div className="pt-10 border-t-2 border-slate-100 dark:border-slate-700 flex flex-col md:flex-row justify-between items-end gap-8">
+                    <div className="space-y-4">
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Client Digital Signature</p>
+                      <div className="w-64 h-24 bg-slate-50 dark:bg-slate-900/50 rounded-xl border-2 border-dashed border-slate-200 dark:border-slate-700 flex items-center justify-center relative overflow-hidden">
+                          {/* Display User's REAL signature if available */}
+                          {selectedApp.data?.signatures?.[0] ? (
+                            <img 
+                              src={selectedApp.data.signatures[0]} 
+                              alt="Digital Signature" 
+                              className="w-full h-full object-contain px-4" 
+                            />
+                          ) : (
+                            <svg className="absolute inset-0 w-full h-full text-primary opacity-80" viewBox="0 0 200 80">
+                                <path d="M20,60 C40,20 60,80 80,40 C100,0 120,60 140,20 C160,-20 180,40 190,30" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
+                            </svg>
+                          )}
+                      </div>
+                      <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em]">Verified via NOLT Platform</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Authorized Seal</p>
+                      <div className="size-24 rounded-full border-4 border-primary/20 flex items-center justify-center text-primary ml-auto relative">
+                          <div className="absolute inset-2 rounded-full border border-primary/10 border-dashed animate-spin-slow"></div>
+                          <span className="material-symbols-outlined text-5xl filled">verified</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="pt-8 text-center border-t border-slate-100 dark:border-slate-700">
+                     <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.5em]">This is a computer-generated document. No physical signature is required.</p>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Modal Footer */}

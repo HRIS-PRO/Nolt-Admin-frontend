@@ -794,7 +794,32 @@ const LoanDetailsPage: React.FC<LoanDetailsPageProps> = ({ user, onLogout, toggl
                 </div>
             </div>
 
-            {/* Stage Tracker */}
+            {/* Customer Banking Info Bar */}
+            {loan.customer_id && (loan.cba_customer_id || loan.casa) && (
+                <div className="flex flex-wrap items-center gap-3 mt-4 mb-8">
+                    {loan.cba_customer_id && (
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-xs font-bold text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+                            <span className="material-symbols-outlined text-sm">badge</span>
+                            CBA ID: {loan.cba_customer_id}
+                        </span>
+                    )}
+                    {loan.casa && (
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-50 dark:bg-blue-900/20 text-xs font-bold text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800">
+                            <span className="material-symbols-outlined text-sm">account_balance</span>
+                            CASA: {loan.casa}
+                        </span>
+                    )}
+                    <button
+                        onClick={() => navigate(`/staff/customers/${loan.customer_id}`)}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 text-xs font-bold text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 transition-colors cursor-pointer"
+                    >
+                        <span className="material-symbols-outlined text-sm">person_search</span>
+                        View Customer Profile
+                        <span className="material-symbols-outlined text-sm">arrow_forward</span>
+                    </button>
+                </div>
+            )}
+
             <div className="bg-white dark:bg-[#0f172a] rounded-[24px] p-8 mb-8 shadow-sm border border-slate-200 dark:border-slate-800 relative overflow-hidden">
                 <div className="flex justify-between items-center relative z-10 overflow-x-auto pb-4">
                     {stages.map((stage, idx) => {

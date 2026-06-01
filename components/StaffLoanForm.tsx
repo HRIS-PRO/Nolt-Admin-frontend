@@ -139,6 +139,9 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess, initi
     const [email, setEmail] = useState('');
     const [bvn, setBvn] = useState('');
     const [nin, setNin] = useState('');
+    const [preferredFirstName, setPreferredFirstName] = useState('');
+    const [preferredSurname, setPreferredSurname] = useState('');
+    const [preferredMiddleName, setPreferredMiddleName] = useState('');
 
     // Address
     const [stateOfOrigin, setStateOfOrigin] = useState('');
@@ -229,6 +232,9 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess, initi
             setEmail(initialData.personal_email || '');
             setBvn(initialData.bvn || '');
             setNin(initialData.nin || '');
+            setPreferredFirstName(initialData.preferred_first_name || initialData.bvn_first_name || initialData.first_name || '');
+            setPreferredSurname(initialData.preferred_surname || initialData.bvn_surname || initialData.surname || '');
+            setPreferredMiddleName(initialData.preferred_middle_name || initialData.bvn_middle_name || initialData.middle_name || '');
 
             setStateOfOrigin(initialData.state_of_origin || '');
             setStateOfResidence(initialData.state_of_residence || '');
@@ -738,6 +744,9 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess, initi
                     personal_email: email,
                     bvn,
                     nin,
+                    preferred_first_name: preferredFirstName,
+                    preferred_surname: preferredSurname,
+                    preferred_middle_name: preferredMiddleName,
                     state_of_origin: stateOfOrigin,
                     state_of_residence: stateOfResidence,
                     residential_status: residentialStatus,
@@ -1130,6 +1139,56 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess, initi
                                         </div>
                                         {expandedSection === 'identity' && (
                                             <div className="grid grid-cols-1 md:grid-cols-12 gap-6 p-8 pt-0 border-t border-slate-50 dark:border-slate-800/50 mt-6 animate-in fade-in duration-300">
+                                                {isCustomerVerified && (
+                                                    <div className="md:col-span-12 grid grid-cols-3 gap-6 p-6 border border-blue-500/20 bg-blue-500/5 rounded-[2rem] mb-2">
+                                                        <div className="col-span-full flex items-center gap-2 text-blue-500">
+                                                            <span className="material-symbols-outlined text-sm font-black">edit</span>
+                                                            <span className="text-[10px] font-black uppercase tracking-widest">Preferred Name (Editable - prefilled from BVN)</span>
+                                                        </div>
+                                                        <div>
+                                                            <InputGroup label="Preferred First Name" required error={errors.preferredFirstName}>
+                                                                <input 
+                                                                    className="input-field" 
+                                                                    value={preferredFirstName} 
+                                                                    onChange={e => { setPreferredFirstName(e.target.value); clearError('preferredFirstName'); }} 
+                                                                    onBlur={(e) => {
+                                                                        const formatted = e.target.value.trim().toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
+                                                                        setPreferredFirstName(formatted);
+                                                                    }}
+                                                                    placeholder="Preferred First Name" 
+                                                                />
+                                                            </InputGroup>
+                                                        </div>
+                                                        <div>
+                                                            <InputGroup label="Preferred Surname" required error={errors.preferredSurname}>
+                                                                <input 
+                                                                    className="input-field" 
+                                                                    value={preferredSurname} 
+                                                                    onChange={e => { setPreferredSurname(e.target.value); clearError('preferredSurname'); }} 
+                                                                    onBlur={(e) => {
+                                                                        const formatted = e.target.value.trim().toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
+                                                                        setPreferredSurname(formatted);
+                                                                    }}
+                                                                    placeholder="Preferred Surname" 
+                                                                />
+                                                            </InputGroup>
+                                                        </div>
+                                                        <div>
+                                                            <InputGroup label="Preferred Middle Name">
+                                                                <input 
+                                                                    className="input-field" 
+                                                                    value={preferredMiddleName} 
+                                                                    onChange={e => setPreferredMiddleName(e.target.value)} 
+                                                                    onBlur={(e) => {
+                                                                        const formatted = e.target.value.trim().toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
+                                                                        setPreferredMiddleName(formatted);
+                                                                    }}
+                                                                    placeholder="Preferred Middle Name" 
+                                                                />
+                                                            </InputGroup>
+                                                        </div>
+                                                    </div>
+                                                )}
                                                 <div className="md:col-span-2">
                                                     <InputGroup label="Title">
                                                         <select className="input-field animate-none animate-none" value={title} onChange={e => setTitle(e.target.value)} disabled={isCustomerVerified}>

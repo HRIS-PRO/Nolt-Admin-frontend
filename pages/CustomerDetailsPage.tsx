@@ -139,6 +139,9 @@ const CustomerDetailsPage: React.FC<CustomerDetailsPageProps> = ({ user, onLogou
         ippis_number: profile.ippis_number || '',
         staff_id: profile.staff_id || '',
         average_monthly_income: profile.average_monthly_income || '',
+        preferred_first_name: profile.preferred_first_name || profile.bvn_first_name || '',
+        preferred_surname: profile.preferred_surname || profile.bvn_surname || '',
+        preferred_middle_name: profile.preferred_middle_name || profile.bvn_middle_name || '',
       });
     } else if (tier === 2) {
       setEditForm({
@@ -383,7 +386,22 @@ const CustomerDetailsPage: React.FC<CustomerDetailsPageProps> = ({ user, onLogou
                         <div>
                           <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-4 border-b border-slate-100 dark:border-slate-800 pb-2">PERSONAL INFORMATION</h4>
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <Field label="Full Legal Name" name="full_name" />
+                            <div className="md:col-span-2 p-4 bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800 rounded-2xl">
+                              <span className="block text-[8px] font-bold text-slate-400 uppercase tracking-widest mb-1">🔒 BVN Verified Name (Read-Only)</span>
+                              <span className="text-sm font-black text-slate-700 dark:text-slate-300 uppercase">
+                                {`${profile.bvn_first_name || ''} ${profile.bvn_surname || ''} ${profile.bvn_middle_name || ''}`.trim() || '—'}
+                              </span>
+                            </div>
+                            
+                            <div className="md:col-span-2 grid grid-cols-3 gap-4 border border-blue-500/20 bg-blue-500/5 p-4 rounded-2xl">
+                              <div className="col-span-full">
+                                <span className="block text-[8px] font-bold text-blue-500 uppercase tracking-widest">✏️ Preferred Name (Editable)</span>
+                              </div>
+                              <Field label="Preferred First Name" name="preferred_first_name" />
+                              <Field label="Preferred Surname" name="preferred_surname" />
+                              <Field label="Preferred Middle Name" name="preferred_middle_name" />
+                            </div>
+
                             <Field label="Email Address" name="personal_email" type="email" />
                             <Field label="Phone Number" name="phone_number" />
                             <Field label="Date of Birth" name="date_of_birth" type="date" />
@@ -418,8 +436,8 @@ const CustomerDetailsPage: React.FC<CustomerDetailsPageProps> = ({ user, onLogou
                       <div>
                         <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-4 border-b border-slate-100 dark:border-slate-800/50 pb-2">PERSONAL INFORMATION</h4>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                          <DV label="FULL LEGAL NAME" value={`${profile.title ? profile.title + ' ' : ''}${profile.full_name || '-'}`} />
-                          <div />
+                          <DV label="BVN VERIFIED NAME (READ-ONLY)" value={`${profile.bvn_first_name || ''} ${profile.bvn_surname || ''} ${profile.bvn_middle_name || ''}`.trim() || '-'} />
+                          <DV label="PREFERRED NAME (USED FOR BANKING)" value={`${profile.preferred_first_name || ''} ${profile.preferred_surname || ''} ${profile.preferred_middle_name || ''}`.trim() || '-'} />
                           <DV label="DATE OF BIRTH" value={profile.date_of_birth ? new Date(profile.date_of_birth).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) : '-'} />
                           <DV label="GENDER" value={profile.gender} />
                           <DV label="MARITAL STATUS" value={profile.marital_status} />
