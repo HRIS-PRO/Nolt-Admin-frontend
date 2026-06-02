@@ -775,7 +775,9 @@ const LoanDetailsPage: React.FC<LoanDetailsPageProps> = ({ user, onLogout, toggl
                                 );
                             })()}
                         </div>
-                        <h1 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight leading-none">{loan.applicant_full_name}</h1>
+                        <h1 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight leading-none">
+                            {[loan.preferred_first_name, loan.preferred_surname].filter(Boolean).join(' ') || loan.applicant_full_name}
+                        </h1>
 
                         {/* Edit Button Logic */}
                         {((loan.stage === 'sales' || loan.stage === 'submitted') &&
@@ -922,7 +924,30 @@ const LoanDetailsPage: React.FC<LoanDetailsPageProps> = ({ user, onLogout, toggl
                     <CollapsibleGroup title="Personal Information" icon="person" defaultOpen={true}>
                         <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-8">
                             <div className="space-y-8">
-                                <Field label="Full Name" value={loan.applicant_full_name} copy />
+                                {/* Preferred Name — prominent */}
+                                <div className="space-y-2">
+                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Preferred Name</p>
+                                    <p className="font-bold text-slate-900 dark:text-white text-lg">
+                                        {[loan.preferred_first_name, loan.preferred_middle_name, loan.preferred_surname].filter(Boolean).join(' ') || loan.applicant_full_name || 'Not provided'}
+                                    </p>
+                                </div>
+
+                                {/* BVN Verified Name — with badge */}
+                                {(loan.bvn_first_name || loan.bvn_surname) && (
+                                    <div className="space-y-2">
+                                        <div className="flex items-center gap-2">
+                                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Verified Name</p>
+                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 text-[9px] font-black uppercase tracking-wider rounded-full border border-emerald-200 dark:border-emerald-800">
+                                                <span className="material-symbols-outlined text-[11px]">verified</span>
+                                                BVN Verified
+                                            </span>
+                                        </div>
+                                        <p className="font-bold text-slate-600 dark:text-slate-300">
+                                            {[loan.bvn_surname, loan.bvn_first_name, loan.bvn_middle_name].filter(Boolean).join(' ')}
+                                        </p>
+                                    </div>
+                                )}
+
                                 <Field label="Gender" value={loan.gender} />
                                 <Field label="Date of Birth" value={formatDate(loan.date_of_birth)} />
                                 <Field label="Marital Status" value={loan.marital_status} />

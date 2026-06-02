@@ -938,11 +938,11 @@ const LoanFlow: React.FC<LoanFlowProps> = ({ initialStep, onComplete, navigate, 
               <div className="grid gap-6">
                 <div className="space-y-2">
                   <label className="text-sm font-black text-slate-500 uppercase">Bank Verification Number (BVN)</label>
-                  <input className="w-full h-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-6 text-lg font-bold dark:text-white focus:border-primary outline-none disabled:opacity-50 disabled:cursor-not-allowed" value={bvn} onChange={e => setBvn(e.target.value.replace(/[^0-9]/g, ''))} placeholder="11 digits" maxLength={11} disabled={!!user.profile?.bvn} title={user.profile?.bvn ? "Verified from profile" : ""} />
+                  <input className="w-full h-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-6 text-lg font-bold dark:text-white focus:border-primary outline-none disabled:opacity-50 disabled:cursor-not-allowed" value={bvn} onChange={e => setBvn(e.target.value.replace(/[^0-9]/g, ''))} placeholder="11 digits" maxLength={11} disabled={!!bvn} title={bvn ? "BVN cannot be changed" : ""} />
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-black text-slate-500 uppercase">National Identity Number (NIN)</label>
-                  <input className="w-full h-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-6 text-lg font-bold dark:text-white focus:border-primary outline-none disabled:opacity-50 disabled:cursor-not-allowed" value={nin} onChange={e => setNin(e.target.value.replace(/[^0-9]/g, ''))} placeholder="11 digits" maxLength={11} disabled={!!user.profile?.nin} title={user.profile?.nin ? "Verified from profile" : ""} />
+                  <input className="w-full h-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-6 text-lg font-bold dark:text-white focus:border-primary outline-none" value={nin} onChange={e => setNin(e.target.value.replace(/[^0-9]/g, ''))} placeholder="11 digits" maxLength={11} />
                 </div>
               </div>
               <NavActions isNextDisabled={!isValidBVN(bvn) || !isValidNIN(nin)} />

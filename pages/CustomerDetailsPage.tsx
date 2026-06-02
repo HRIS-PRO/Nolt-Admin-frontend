@@ -802,7 +802,7 @@ const CustomerDetailsPage: React.FC<CustomerDetailsPageProps> = ({ user, onLogou
                           <table className="w-full text-left border-collapse">
                             <thead>
                               <tr className="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-100 dark:border-slate-800">
-                                {['Date', 'Type', 'Amount Requested', 'Tenor', 'Status'].map(h => (
+                                {['Date', 'Type', 'Amount Requested', 'Tenor', 'Status', ''].map(h => (
                                   <th key={h} className="px-5 py-3.5 text-[9px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">{h}</th>
                                 ))}
                               </tr>
@@ -832,6 +832,15 @@ const CustomerDetailsPage: React.FC<CustomerDetailsPageProps> = ({ user, onLogou
                                       'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-400'
                                     }`}>{loan.status}</span>
                                   </td>
+                                  <td className="px-5 py-4 whitespace-nowrap">
+                                    <button
+                                      onClick={() => navigate(`/staff/loans/${loan.id}`)}
+                                      className="inline-flex items-center gap-1 px-3 py-1.5 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 text-[10px] font-black uppercase tracking-wider rounded-lg border border-blue-100 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors"
+                                    >
+                                      <span className="material-symbols-outlined text-[13px]">visibility</span>
+                                      View
+                                    </button>
+                                  </td>
                                 </tr>
                               ))}
                             </tbody>
@@ -851,7 +860,7 @@ const CustomerDetailsPage: React.FC<CustomerDetailsPageProps> = ({ user, onLogou
                           <table className="w-full text-left border-collapse">
                             <thead>
                               <tr className="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-100 dark:border-slate-800">
-                                {['Applied On', 'Type', 'Amount Requested', 'Status'].map(h => (
+                                {['Applied On', 'Type', 'Amount Requested', 'Status', ''].map(h => (
                                   <th key={h} className="px-5 py-3.5 text-[9px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">{h}</th>
                                 ))}
                               </tr>
@@ -872,6 +881,15 @@ const CustomerDetailsPage: React.FC<CustomerDetailsPageProps> = ({ user, onLogou
                                       loan.status === 'pending' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' :
                                       'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-400'
                                     }`}>{loan.status}</span>
+                                  </td>
+                                  <td className="px-5 py-4 whitespace-nowrap">
+                                    <button
+                                      onClick={() => navigate(`/staff/loans/${loan.id}`)}
+                                      className="inline-flex items-center gap-1 px-3 py-1.5 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 text-[10px] font-black uppercase tracking-wider rounded-lg border border-blue-100 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors"
+                                    >
+                                      <span className="material-symbols-outlined text-[13px]">visibility</span>
+                                      View
+                                    </button>
                                   </td>
                                 </tr>
                               ))}
