@@ -1252,12 +1252,12 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess, initi
                                                 </div>
                                                 <div className="md:col-span-4">
                                                     <InputGroup label="BVN" required error={errors.bvn}>
-                                                        <input className="input-field" value={bvn} onChange={handleNumericChange(setBvn, 'bvn', 11)} maxLength={11} placeholder="BVN" disabled={isCustomerVerified} />
+                                                        <input className="input-field" value={bvn} onChange={handleNumericChange(setBvn, 'bvn', 11)} maxLength={11} placeholder="BVN" disabled={isCustomerVerified || !!bvn} title={bvn ? "BVN cannot be changed" : ""} />
                                                     </InputGroup>
                                                 </div>
                                                 <div className="md:col-span-4">
                                                     <InputGroup label="NIN" required error={errors.nin}>
-                                                        <input className="input-field" value={nin} onChange={handleNumericChange(setNac => { }, 'nin', 11)} maxLength={11} placeholder="NIN" disabled={isCustomerVerified} />
+                                                        <input className="input-field" value={nin} onChange={handleNumericChange(setNac => { }, 'nin', 11)} maxLength={11} placeholder="NIN" />
                                                     </InputGroup>
                                                 </div>
                                                 <div className="md:col-span-4">

@@ -1554,19 +1554,19 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
             <div className="space-y-2">
               <label className="text-sm font-black text-slate-500 uppercase tracking-widest px-1">BVN</label>
               <input
-                disabled={!isStaff && !isOnBehalf && !!user.profile?.bvn}
-                className={`w-full h-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-6 text-lg font-bold dark:text-white focus:ring-2 focus:ring-primary focus:border-primary focus:shadow-xl focus:shadow-primary/10 outline-none transition-all ${(!isStaff && !isOnBehalf && user.profile?.bvn) ? 'opacity-70 cursor-not-allowed' : ''}`}
+                disabled={!isStaff && !isOnBehalf && !!bvn}
+                className={`w-full h-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-6 text-lg font-bold dark:text-white focus:ring-2 focus:ring-primary focus:border-primary focus:shadow-xl focus:shadow-primary/10 outline-none transition-all ${(!isStaff && !isOnBehalf && bvn) ? 'opacity-70 cursor-not-allowed' : ''}`}
                 value={bvn}
                 onChange={e => setBvn(e.target.value.replace(/\D/g, ''))}
                 maxLength={11}
                 placeholder="11-digit BVN e.g. 22233344455"
+                title={bvn ? "BVN cannot be changed" : ""}
               />
             </div>
             <div className="space-y-2">
               <label className="text-sm font-black text-slate-500 uppercase tracking-widest px-1">NIN</label>
               <input
-                disabled={!isStaff && !isOnBehalf && !!user.profile?.nin}
-                className={`w-full h-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-6 text-lg font-bold dark:text-white focus:ring-2 focus:ring-primary focus:border-primary focus:shadow-xl focus:shadow-primary/10 outline-none transition-all ${(!isStaff && !isOnBehalf && user.profile?.nin) ? 'opacity-70 cursor-not-allowed' : ''}`}
+                className="w-full h-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-6 text-lg font-bold dark:text-white focus:ring-2 focus:ring-primary focus:border-primary focus:shadow-xl focus:shadow-primary/10 outline-none transition-all"
                 value={nin}
                 onChange={e => setNin(e.target.value.replace(/\D/g, ''))}
                 maxLength={11}
