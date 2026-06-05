@@ -31,6 +31,8 @@ const LoanQueuePage: React.FC<LoanQueuePageProps> = ({ user, onLogout, toggleThe
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
     const [selectedLoans, setSelectedLoans] = useState<number[]>([]);
     const [isBulkApproving, setIsBulkApproving] = useState(false);
+    const [glAccounts, setGlAccounts] = useState<any[]>([]);
+    const [bulkGL, setBulkGL] = useState('');
 
 
     const fetchLoans = async () => {
@@ -91,7 +93,8 @@ const LoanQueuePage: React.FC<LoanQueuePageProps> = ({ user, onLogout, toggleThe
         setIsBulkApproving(true);
         try {
             const response = await axios.post(`${''}/api/staff/loans/bulk-approve`, {
-                loanIds: selectedLoans
+                loanIds: selectedLoans,
+                gl_account: bulkGL || null
             }, { withCredentials: true });
 
             alert(response.data.message);
@@ -146,6 +149,19 @@ const LoanQueuePage: React.FC<LoanQueuePageProps> = ({ user, onLogout, toggleThe
             };
         });
     }, [user.role, searchQuery, statusFilter, stageFilter, officerFilter, currentPage]);
+
+    // Fetch GL accounts when finance stage is filtered
+    useEffect(() => {
+        if (stageFilter === 'finance') {
+            axios.get('/api/gl-accounts', { withCredentials: true })
+                .then(res => {
+                    if (res.data.success) {
+                        setGlAccounts(res.data.data.filter((gl: any) => gl.status === 'Active'));
+                    }
+                })
+                .catch(err => console.error('Failed to fetch GL accounts:', err));
+        }
+    }, [stageFilter]);
 
     // Re-fetch on params change
 
@@ -294,8 +310,32 @@ const LoanQueuePage: React.FC<LoanQueuePageProps> = ({ user, onLogout, toggleThe
 
             {/* Bulk Action Bar */}
             {selectedLoans.length > 0 && stageFilter === 'finance' && ['finance', 'admin', 'super_admin', 'superadmin'].includes(user.role || '') && (
-                <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-2xl rounded-full px-6 py-3 flex items-center gap-4 z-50 animate-in slide-in-from-bottom-4">
+                <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-2xl rounded-2xl px-6 py-3 flex items-center gap-4 z-50 animate-in slide-in-from-bottom-4">
                     <span className="text-sm font-bold text-slate-700 dark:text-slate-200">{selectedLoans.length} selected</span>
+                    <div className="h-4 w-px bg-slate-200 dark:bg-slate-700"></div>
+                    <div className="relative">
+                        <div className={`flex items-center gap-2 px-3 py-2 rounded-xl border transition-colors ${
+                            bulkGL 
+                                ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-300 dark:border-emerald-700' 
+                                : 'bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700'
+                        }`}>
+                            <span className="material-symbols-outlined text-sm text-slate-400">account_balance</span>
+                            <span className="text-xs font-bold text-slate-700 dark:text-slate-300 max-w-[120px] truncate">
+                                {bulkGL ? glAccounts.find((g: any) => g.code === bulkGL)?.name || bulkGL : 'No GL Account'}
+                            </span>
+                            <span className="material-symbols-outlined text-xs text-slate-400">expand_more</span>
+                        </div>
+                        <select
+                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                            value={bulkGL}
+                            onChange={(e) => setBulkGL(e.target.value)}
+                        >
+                            <option value="">No GL Account</option>
+                            {glAccounts.map((gl: any) => (
+                                <option key={gl.id} value={gl.code}>{gl.code} — {gl.name}</option>
+                            ))}
+                        </select>
+                    </div>
                     <div className="h-4 w-px bg-slate-200 dark:bg-slate-700"></div>
                     <button
                         onClick={handleBulkApprove}
@@ -349,6 +389,7 @@ const LoanQueuePage: React.FC<LoanQueuePageProps> = ({ user, onLogout, toggleThe
                                     <th className="p-6">Stage & Progress</th>
                                     <th className="p-6">Ownership</th>
                                     <th className="p-6">Financials</th>
+
                                     <th className="p-6 text-center">Indemnity</th>
                                     <th className="p-6 text-right">Status</th>
                                 </tr>
@@ -481,6 +522,7 @@ const LoanQueuePage: React.FC<LoanQueuePageProps> = ({ user, onLogout, toggleThe
                                                         )}
                                                     </div>
                                                 </td>
+
                                                 <td className="p-6">
                                                     <div className="flex justify-center">
                                                         {loan.indemnity_document_url ? (

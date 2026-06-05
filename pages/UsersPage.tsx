@@ -24,11 +24,18 @@ const UsersPage: React.FC<UsersPageProps> = ({ user, onLogout, toggleTheme, them
     // Actions State
     const [showInviteModal, setShowInviteModal] = useState(false);
     const [showBulkModal, setShowBulkModal] = useState(false);
-    const [inviteForm, setInviteForm] = useState({ full_name: '', email: '', role: 'staff', password: '' });
+    const [inviteForm, setInviteForm] = useState({ full_name: '', email: '', role: 'staff', password: '', officer_code: '', officer_name: '' });
     const [recruiting, setRecruiting] = useState(false);
     const [bulkFile, setBulkFile] = useState<File | null>(null);
     const [bulking, setBulking] = useState(false);
     const [editingRoleId, setEditingRoleId] = useState<number | null>(null);
+    const [accountOfficers, setAccountOfficers] = useState<any[]>([]);
+    const [loadingOfficers, setLoadingOfficers] = useState(false);
+    const [officerDropdownOpen, setOfficerDropdownOpen] = useState(false);
+    const [officerSearch, setOfficerSearch] = useState('');
+    const [editingOfficerId, setEditingOfficerId] = useState<number | null>(null);
+    const [officerListSearch, setOfficerListSearch] = useState('');
+    const [assigningOfficerForId, setAssigningOfficerForId] = useState<number | null>(null);
 
     const fetchUsers = async () => {
         setIsLoading(true);
@@ -60,6 +67,38 @@ const UsersPage: React.FC<UsersPageProps> = ({ user, onLogout, toggleTheme, them
         fetchUsers();
     }, [currentPage, limit, searchQuery]);
 
+    const fetchAccountOfficers = async () => {
+        if (accountOfficers.length > 0) return; // Already loaded
+        setLoadingOfficers(true);
+        try {
+            const res = await axios.get('/api/staff/account-officers', { withCredentials: true });
+            setAccountOfficers(res.data.data || []);
+        } catch (err) {
+            console.error('Failed to fetch account officers:', err);
+        } finally {
+            setLoadingOfficers(false);
+        }
+    };
+
+    const handleOfficerAssign = async (userId: number, officerCode: string | null, officerName: string | null) => {
+        setAssigningOfficerForId(userId);
+        try {
+            await axios.patch(`/api/staff/users/${userId}/officer`, {
+                officer_code: officerCode,
+                officer_name: officerName
+            }, { withCredentials: true });
+            // Update local state
+            setUsers(users.map(u => u.id === userId ? { ...u, officer_code: officerCode, officer_name: officerName } : u));
+            setEditingOfficerId(null);
+            setOfficerListSearch('');
+            setAccountOfficers([]); // Reset to re-fetch available list next time
+        } catch (error: any) {
+            alert(error.response?.data?.message || 'Failed to update officer assignment');
+        } finally {
+            setAssigningOfficerForId(null);
+        }
+    };
+
     const handleInvite = async (e: React.FormEvent) => {
         e.preventDefault();
         setRecruiting(true);
@@ -67,7 +106,8 @@ const UsersPage: React.FC<UsersPageProps> = ({ user, onLogout, toggleTheme, them
             await axios.post(`${''}/api/staff/invite`, inviteForm, { withCredentials: true });
             alert("Invitation sent successfully!");
             setShowInviteModal(false);
-            setInviteForm({ email: '', full_name: '', role: 'staff', password: '' });
+            setInviteForm({ email: '', full_name: '', role: 'staff', password: '', officer_code: '', officer_name: '' });
+            setAccountOfficers([]); // Reset so next open re-fetches
             fetchUsers();
         } catch (error: any) {
             alert(error.response?.data?.message || "Failed to invite user");
@@ -237,6 +277,7 @@ const UsersPage: React.FC<UsersPageProps> = ({ user, onLogout, toggleTheme, them
                                 <th className="p-6 py-4">Role & Permissions</th>
 
                                 <th className="p-6 py-4">Referral Code</th>
+                                <th className="p-6 py-4">Account Officer</th>
                                 <th className="p-6 py-4 text-center">Account Status</th>
                                 <th className="p-6 py-4 pr-8 text-right">Descriptive Actions</th>
                             </tr>
@@ -312,6 +353,109 @@ const UsersPage: React.FC<UsersPageProps> = ({ user, onLogout, toggleTheme, them
                                             >
                                                 <span className="material-symbols-outlined text-sm">autorenew</span>
                                                 Generate
+                                            </button>
+                                        )}
+                                    </td>
+                                    {/* Account Officer Column */}
+                                    <td className="p-6 py-4 relative">
+                                        {editingOfficerId === u.id ? (
+                                            <div className="absolute z-40 top-2 left-0 w-72 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-2xl max-h-[280px] flex flex-col overflow-hidden animate-in fade-in duration-200">
+                                                <div className="p-3 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                                                    <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-800 rounded-lg px-3 py-2 flex-1">
+                                                        <span className="material-symbols-outlined text-slate-400 text-sm">search</span>
+                                                        <input
+                                                            type="text"
+                                                            value={officerListSearch}
+                                                            onChange={(e) => setOfficerListSearch(e.target.value)}
+                                                            placeholder="Search officers..."
+                                                            className="bg-transparent outline-none text-sm font-medium text-slate-700 dark:text-white placeholder:text-slate-400 w-full"
+                                                            autoFocus
+                                                        />
+                                                    </div>
+                                                    <button onClick={() => { setEditingOfficerId(null); setOfficerListSearch(''); }} className="ml-2 text-slate-400 hover:text-slate-600 dark:hover:text-white">
+                                                        <span className="material-symbols-outlined text-sm">close</span>
+                                                    </button>
+                                                </div>
+                                                <div className="overflow-y-auto flex-1">
+                                                    {loadingOfficers ? (
+                                                        <div className="p-4 text-center">
+                                                            <div className="size-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-1"></div>
+                                                            <p className="text-[10px] text-slate-400">Loading...</p>
+                                                        </div>
+                                                    ) : (
+                                                        <>
+                                                            {/* Unassign option */}
+                                                            {u.officer_code && (
+                                                                <button
+                                                                    onClick={() => handleOfficerAssign(u.id, null, null)}
+                                                                    disabled={assigningOfficerForId === u.id}
+                                                                    className="w-full px-4 py-2.5 text-left hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors flex items-center gap-2 border-b border-slate-100 dark:border-slate-800 disabled:opacity-50"
+                                                                >
+                                                                    {assigningOfficerForId === u.id ? (
+                                                                        <div className="size-4 border-2 border-red-400 border-t-transparent rounded-full animate-spin"></div>
+                                                                    ) : (
+                                                                        <span className="material-symbols-outlined text-sm text-red-500">person_remove</span>
+                                                                    )}
+                                                                    <span className="text-xs font-bold text-red-500">{assigningOfficerForId === u.id ? 'Removing...' : 'Remove Assignment'}</span>
+                                                                </button>
+                                                            )}
+                                                            {accountOfficers
+                                                                .filter(o => {
+                                                                    if (!officerListSearch.trim()) return true;
+                                                                    const q = officerListSearch.toLowerCase();
+                                                                    return o.officerName.toLowerCase().includes(q) || o.officerCode.toLowerCase().includes(q);
+                                                                })
+                                                                .map((officer: any) => (
+                                                                    <button
+                                                                        key={officer.officerCode}
+                                                                        onClick={() => handleOfficerAssign(u.id, officer.officerCode, officer.officerName)}
+                                                                        disabled={assigningOfficerForId === u.id}
+                                                                        className="w-full px-4 py-2.5 text-left hover:bg-blue-50 dark:hover:bg-blue-500/10 transition-colors disabled:opacity-50"
+                                                                    >
+                                                                        <p className="text-xs font-bold text-slate-800 dark:text-white">{officer.officerName}</p>
+                                                                        <p className="text-[9px] font-mono text-slate-400 tracking-wider">{officer.officerCode}</p>
+                                                                    </button>
+                                                                ))
+                                                            }
+                                                            {accountOfficers.filter(o => {
+                                                                if (!officerListSearch.trim()) return true;
+                                                                const q = officerListSearch.toLowerCase();
+                                                                return o.officerName.toLowerCase().includes(q) || o.officerCode.toLowerCase().includes(q);
+                                                            }).length === 0 && !loadingOfficers && (
+                                                                <div className="p-3 text-center text-[10px] text-slate-400">No officers available</div>
+                                                            )}
+                                                        </>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        ) : null}
+
+                                        {u.officer_code ? (
+                                            <div
+                                                onClick={() => {
+                                                    fetchAccountOfficers();
+                                                    setEditingOfficerId(editingOfficerId === u.id ? null : u.id);
+                                                }}
+                                                className="cursor-pointer group/officer"
+                                            >
+                                                <div className="flex items-center gap-2">
+                                                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/20">
+                                                        <span className="text-[10px] font-mono font-bold text-blue-600 dark:text-blue-400">{u.officer_code}</span>
+                                                    </span>
+                                                    <span className="material-symbols-outlined text-sm text-slate-300 group-hover/officer:text-blue-500 transition-colors">swap_horiz</span>
+                                                </div>
+                                                <p className="text-[10px] text-slate-500 font-medium mt-1 truncate max-w-[140px]">{u.officer_name}</p>
+                                            </div>
+                                        ) : (
+                                            <button
+                                                onClick={() => {
+                                                    fetchAccountOfficers();
+                                                    setEditingOfficerId(u.id);
+                                                }}
+                                                className="flex items-center gap-1.5 text-slate-400 hover:text-blue-500 transition-colors text-xs font-bold"
+                                            >
+                                                <span className="material-symbols-outlined text-sm">person_add</span>
+                                                Assign
                                             </button>
                                         )}
                                     </td>
@@ -447,6 +591,116 @@ const UsersPage: React.FC<UsersPageProps> = ({ user, onLogout, toggleTheme, them
                                     <option value="super_admin">Super Admin</option>
                                 </select>
                             </div>
+
+                            {/* Account Officer (CBA) Dropdown */}
+                            <div className="relative">
+                                <label className="block text-xs font-black uppercase tracking-widest text-blue-600 dark:text-blue-400 mb-2">Account Officer (Core Banking)</label>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        fetchAccountOfficers();
+                                        setOfficerDropdownOpen(!officerDropdownOpen);
+                                    }}
+                                    className={`w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border-2 ${
+                                        inviteForm.officer_code ? 'border-blue-500' : 'border-slate-200 dark:border-slate-700'
+                                    } outline-none font-bold text-left flex items-center justify-between transition-all ${
+                                        inviteForm.officer_code ? 'text-slate-900 dark:text-white' : 'text-slate-400'
+                                    }`}
+                                >
+                                    <span className="truncate">
+                                        {inviteForm.officer_code
+                                            ? `${inviteForm.officer_code} — ${inviteForm.officer_name}`
+                                            : '– No Account Officer –'
+                                        }
+                                    </span>
+                                    <span className={`material-symbols-outlined text-slate-400 transition-transform duration-200 ${officerDropdownOpen ? 'rotate-180' : ''}`}>
+                                        expand_more
+                                    </span>
+                                </button>
+
+                                {officerDropdownOpen && (
+                                    <div className="absolute z-50 mt-2 w-full bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-2xl max-h-[280px] flex flex-col overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
+                                        {/* Search input */}
+                                        <div className="p-3 border-b border-slate-100 dark:border-slate-800">
+                                            <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-800 rounded-lg px-3 py-2">
+                                                <span className="material-symbols-outlined text-slate-400 text-sm">search</span>
+                                                <input
+                                                    type="text"
+                                                    value={officerSearch}
+                                                    onChange={(e) => setOfficerSearch(e.target.value)}
+                                                    placeholder="Search officers..."
+                                                    className="bg-transparent outline-none text-sm font-medium text-slate-700 dark:text-white placeholder:text-slate-400 w-full"
+                                                    autoFocus
+                                                />
+                                            </div>
+                                        </div>
+
+                                        <div className="overflow-y-auto flex-1">
+                                            {loadingOfficers ? (
+                                                <div className="p-6 text-center">
+                                                    <div className="size-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
+                                                    <p className="text-xs text-slate-400 font-medium">Loading officers...</p>
+                                                </div>
+                                            ) : (
+                                                <>
+                                                    {/* None option */}
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            setInviteForm({ ...inviteForm, officer_code: '', officer_name: '' });
+                                                            setOfficerDropdownOpen(false);
+                                                            setOfficerSearch('');
+                                                        }}
+                                                        className={`w-full px-4 py-3 text-left hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors flex items-center gap-3 ${!inviteForm.officer_code ? 'bg-blue-50 dark:bg-blue-500/10' : ''}`}
+                                                    >
+                                                        <span className="material-symbols-outlined text-sm text-slate-400">person_off</span>
+                                                        <span className="text-sm font-bold text-slate-500">– No Account Officer –</span>
+                                                    </button>
+
+                                                    {accountOfficers
+                                                        .filter(o => {
+                                                            if (!officerSearch.trim()) return true;
+                                                            const q = officerSearch.toLowerCase();
+                                                            return o.officerName.toLowerCase().includes(q) || o.officerCode.toLowerCase().includes(q);
+                                                        })
+                                                        .map((officer: any) => (
+                                                            <button
+                                                                type="button"
+                                                                key={officer.officerCode}
+                                                                onClick={() => {
+                                                                    setInviteForm({ ...inviteForm, officer_code: officer.officerCode, officer_name: officer.officerName });
+                                                                    setOfficerDropdownOpen(false);
+                                                                    setOfficerSearch('');
+                                                                }}
+                                                                className={`w-full px-4 py-3 text-left hover:bg-blue-50 dark:hover:bg-blue-500/10 transition-colors flex items-center justify-between ${
+                                                                    inviteForm.officer_code === officer.officerCode ? 'bg-blue-50 dark:bg-blue-500/10' : ''
+                                                                }`}
+                                                            >
+                                                                <div>
+                                                                    <p className="text-sm font-bold text-slate-800 dark:text-white">{officer.officerName}</p>
+                                                                    <p className="text-[10px] font-mono text-slate-400 uppercase tracking-wider">{officer.officerCode}</p>
+                                                                </div>
+                                                                {inviteForm.officer_code === officer.officerCode && (
+                                                                    <span className="material-symbols-outlined text-blue-500 text-sm">check_circle</span>
+                                                                )}
+                                                            </button>
+                                                        ))
+                                                    }
+
+                                                    {accountOfficers.filter(o => {
+                                                        if (!officerSearch.trim()) return true;
+                                                        const q = officerSearch.toLowerCase();
+                                                        return o.officerName.toLowerCase().includes(q) || o.officerCode.toLowerCase().includes(q);
+                                                    }).length === 0 && !loadingOfficers && (
+                                                        <div className="p-4 text-center text-xs text-slate-400 font-medium">No matching officers found</div>
+                                                    )}
+                                                </>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
                             <button disabled={recruiting} className="w-full py-4 rounded-xl bg-blue-600 text-white font-black uppercase tracking-wider hover:bg-blue-700 transition-all shadow-lg shadow-blue-500/20 disabled:opacity-50 mt-4">
                                 {recruiting ? "Sending Invite..." : "Send Invitation"}
                             </button>

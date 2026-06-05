@@ -64,6 +64,19 @@ if ('geolocation' in navigator) {
   );
 }
 
+const ALLOWED_BI_AND_REPORTS_ROLES = [
+  'sales_manager',
+  'credit_manager',
+  'internal_audit',
+  'finance',
+  'compliance',
+  'md',
+  'hr',
+  'super_admin',
+  'superadmin',
+  'admin'
+];
+
 // ProtectedRoute Component extracted to prevent re-renders
 interface ProtectedRouteProps {
   children: React.ReactElement;
@@ -527,12 +540,14 @@ const AppContent: React.FC = () => {
         } />
         <Route path="/staff/reports" element={
           isLoading ? null : (user.isLoggedIn && user.role !== 'customer' ? (
-            <ReportsPage
-              user={user}
-              onLogout={handleLogoutRequest}
-              toggleTheme={toggleTheme}
-              theme={theme}
-            />
+            ALLOWED_BI_AND_REPORTS_ROLES.includes(user.role || '') ? (
+              <ReportsPage
+                user={user}
+                onLogout={handleLogoutRequest}
+                toggleTheme={toggleTheme}
+                theme={theme}
+              />
+            ) : <Navigate to="/staff-dashboard" />
           ) : <Navigate to="/login" />)
         } />
         <Route path="/staff/settings" element={
@@ -587,12 +602,14 @@ const AppContent: React.FC = () => {
         } />
         <Route path="/staff/timeline" element={
           isLoading ? null : (user?.isLoggedIn && user.role !== 'customer' ? (
-            <TimelineReportPage
-              user={user}
-              onLogout={handleLogoutRequest}
-              toggleTheme={toggleTheme}
-              theme={theme}
-            />
+            ALLOWED_BI_AND_REPORTS_ROLES.includes(user.role || '') ? (
+              <TimelineReportPage
+                user={user}
+                onLogout={handleLogoutRequest}
+                toggleTheme={toggleTheme}
+                theme={theme}
+              />
+            ) : <Navigate to="/staff-dashboard" />
           ) : <Navigate to="/login" />)
         } />
         <Route path="/staff/calculator" element={

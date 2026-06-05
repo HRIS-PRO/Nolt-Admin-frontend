@@ -15,6 +15,9 @@ import {
     PieChart,
     Pie
 } from 'recharts';
+import DateRangePicker from '../components/DateRangePicker';
+import DemographyReportPage from './DemographyReportPage';
+import { format, startOfYear } from 'date-fns';
 
 interface TimelineReportPageProps {
     user: { name: string; email: string; avatar_url?: string; role?: string; id?: number };
@@ -30,14 +33,33 @@ interface SummaryStats {
     totalVolume: number;
 }
 
+type ProductType = 'LOAN' | 'INVESTMENT';
+type ReportView = 'TAT' | 'DEMOGRAPHY';
+
+const PRODUCT_TYPE_OPTIONS: { value: ProductType; label: string; icon: string }[] = [
+    { value: 'LOAN', label: 'Loan Analytics', icon: 'credit_card' },
+    { value: 'INVESTMENT', label: 'Investment Analytics', icon: 'account_balance_wallet' },
+];
+
+const REPORT_VIEW_OPTIONS: { value: ReportView; label: string; icon: string; desc: string }[] = [
+    { value: 'TAT', label: 'TAT Report', icon: 'timer', desc: 'Turnaround time & pipeline metrics' },
+    { value: 'DEMOGRAPHY', label: 'Demography Report', icon: 'groups', desc: 'Applicant profiles & demographics' },
+];
+
 const TimelineReportPage: React.FC<TimelineReportPageProps> = ({ user, onLogout, toggleTheme, theme }) => {
     const [searchParams] = useSearchParams();
     const searchQuery = searchParams.get('search') || '';
     
-    const [productType, setProductType] = useState<'LOAN' | 'INVESTMENT'>('LOAN');
-    const [period, setPeriod] = useState<string>('this_month');
+    const [productType, setProductType] = useState<ProductType>('LOAN');
+    const [reportView, setReportView] = useState<ReportView>('TAT');
+    const [isProductDropdownOpen, setIsProductDropdownOpen] = useState(false);
+    const [isReportDropdownOpen, setIsReportDropdownOpen] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
     const [isExporting, setIsExporting] = useState(false);
+
+    // Date range state (default to start of this month -> today)
+    const [dateRangeStart, setDateRangeStart] = useState<Date | null>(startOfYear(new Date()));
+    const [dateRangeEnd, setDateRangeEnd] = useState<Date | null>(new Date());
     
     const [summary, setSummary] = useState<SummaryStats>({ 
         approved: 0, pending: 0, rejected: 0, totalVolume: 0 
@@ -50,9 +72,20 @@ const TimelineReportPage: React.FC<TimelineReportPageProps> = ({ user, onLogout,
     const [chartData, setChartData] = useState<any[]>([]);
 
     const fetchAnalytics = async () => {
+        if (reportView !== 'TAT') return; // Don't fetch TAT data when on demography view
         setIsLoading(true);
         try {
-            const response = await axios.get(`/api/staff/reports/tat-summary?type=${productType}&period=${period}`, { withCredentials: true });
+            const params: Record<string, string> = { type: productType };
+            if (dateRangeStart && dateRangeEnd) {
+                params.startDate = format(dateRangeStart, 'yyyy-MM-dd');
+                params.endDate = format(dateRangeEnd, 'yyyy-MM-dd');
+            } else if (dateRangeStart) {
+                params.startDate = format(dateRangeStart, 'yyyy-MM-dd');
+            } else {
+                params.period = 'this_month';
+            }
+            const queryString = new URLSearchParams(params).toString();
+            const response = await axios.get(`/api/staff/reports/tat-summary?${queryString}`, { withCredentials: true });
             if (response.data) {
                 setSummary(response.data.summary);
                 setDailyApprovals(response.data.dailyApprovals || []);
@@ -69,8 +102,15 @@ const TimelineReportPage: React.FC<TimelineReportPageProps> = ({ user, onLogout,
     };
 
     useEffect(() => {
-        fetchAnalytics();
-    }, [productType, searchQuery, period]);
+        if (reportView === 'TAT') {
+            fetchAnalytics();
+        }
+    }, [productType, searchQuery, dateRangeStart, dateRangeEnd, reportView]);
+
+    const handleDateRangeChange = (start: Date | null, end: Date | null) => {
+        setDateRangeStart(start);
+        setDateRangeEnd(end);
+    };
 
     const handleExportCsv = async () => {
         setIsExporting(true);
@@ -135,7 +175,10 @@ const TimelineReportPage: React.FC<TimelineReportPageProps> = ({ user, onLogout,
 
     const MIX_COLORS = ['#fbbf24', '#10b981', '#2563eb', '#8b5cf6'];
     const totalApps = summary.approved + summary.pending + summary.rejected;
-    const isDark = theme === 'dark' || !theme; // Defaulting to dark if undefined as per existing style
+    const isDark = theme === 'dark' || !theme;
+
+    const selectedProduct = PRODUCT_TYPE_OPTIONS.find(o => o.value === productType)!;
+    const selectedReportView = REPORT_VIEW_OPTIONS.find(o => o.value === reportView)!;
 
     return (
         <StaffLayout user={user} onLogout={onLogout} toggleTheme={toggleTheme} theme={theme}>
@@ -145,51 +188,187 @@ const TimelineReportPage: React.FC<TimelineReportPageProps> = ({ user, onLogout,
                 <motion.div 
                     initial={{ y: -20, opacity: 0 }}
                     animate={{ y: 0, opacity: 1 }}
-                    className="mb-8 flex flex-col md:flex-row justify-between items-start gap-4"
+                    className="mb-8 flex flex-col lg:flex-row justify-between items-start gap-6"
                 >
-                    <div>
-                        {/* <h1 className="text-3xl font-black text-[#fbbf24] tracking-tight uppercase mb-4 drop-shadow-sm flex items-center gap-3">
-                            <span className="material-symbols-outlined text-3xl">insights</span>
-                            {productType} ANALYTICS
-                        </h1> */}
-                        <div className={`flex p-1 rounded-xl border w-fit transition-colors ${isDark ? 'bg-[#111827] border-slate-800/60' : 'bg-white border-slate-200 shadow-sm'}`}>
-                            <button 
-                                onClick={() => setProductType('LOAN')}
-                                className={`px-6 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${productType === 'LOAN' ? 'bg-[#fbbf24] text-[#060b13] shadow-lg scale-105' : 'text-slate-500 hover:text-slate-700'}`}
+                    {/* Left: Report View Dropdown + Product Type Dropdown */}
+                    <div className="flex flex-wrap items-center gap-3">
+                        {/* Report View Dropdown (TAT / Demography) */}
+                        <div className="relative">
+                            <button
+                                onClick={() => { setIsReportDropdownOpen(!isReportDropdownOpen); setIsProductDropdownOpen(false); }}
+                                className={`flex items-center gap-4 px-6 py-3.5 rounded-2xl border transition-all ${isDark ? 'bg-[#111827] border-slate-800/60 hover:border-slate-700' : 'bg-white border-slate-200 hover:border-slate-300 shadow-sm'}`}
                             >
-                                Loans
+                                <div className={`size-10 rounded-xl flex items-center justify-center ${isDark ? 'bg-[#fbbf24]/10' : 'bg-amber-50'}`}>
+                                    <span className={`material-symbols-outlined text-xl ${isDark ? 'text-[#fbbf24]' : 'text-amber-500'}`}>
+                                        {selectedReportView.icon}
+                                    </span>
+                                </div>
+                                <div className="text-left">
+                                    <p className={`text-[8px] font-black uppercase tracking-[0.2em] ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>Report Type</p>
+                                    <p className={`text-sm font-black tracking-tight ${isDark ? 'text-white' : 'text-slate-900'}`}>{selectedReportView.label}</p>
+                                </div>
+                                <span className={`material-symbols-outlined text-lg ml-2 transition-transform ${isReportDropdownOpen ? 'rotate-180' : ''} ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                                    expand_more
+                                </span>
                             </button>
-                            <button 
-                                onClick={() => setProductType('INVESTMENT')}
-                                className={`px-6 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${productType === 'INVESTMENT' ? 'bg-[#fbbf24] text-[#060b13] shadow-lg scale-105' : 'text-slate-500 hover:text-slate-700'}`}
+
+                            <AnimatePresence>
+                                {isReportDropdownOpen && (
+                                    <motion.div
+                                        initial={{ opacity: 0, y: -8, scale: 0.96 }}
+                                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                                        exit={{ opacity: 0, y: -8, scale: 0.96 }}
+                                        transition={{ duration: 0.15 }}
+                                        className={`absolute left-0 top-full mt-2 z-50 w-full min-w-[280px] rounded-xl border overflow-hidden shadow-xl ${isDark ? 'bg-[#0a101f] border-slate-800/60' : 'bg-white border-slate-200 shadow-lg'}`}
+                                    >
+                                        {REPORT_VIEW_OPTIONS.map((option) => (
+                                            <button
+                                                key={option.value}
+                                                onClick={() => {
+                                                    setReportView(option.value);
+                                                    setIsReportDropdownOpen(false);
+                                                }}
+                                                className={`w-full flex items-center gap-4 px-5 py-3.5 text-left transition-all ${
+                                                    reportView === option.value
+                                                        ? isDark ? 'bg-[#fbbf24]/10 text-[#fbbf24]' : 'bg-amber-50 text-amber-600'
+                                                        : isDark ? 'text-slate-400 hover:bg-[#111827] hover:text-white' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                                                }`}
+                                            >
+                                                <span className={`material-symbols-outlined text-lg ${
+                                                    reportView === option.value
+                                                        ? isDark ? 'text-[#fbbf24]' : 'text-amber-500'
+                                                        : isDark ? 'text-slate-600' : 'text-slate-400'
+                                                }`}>
+                                                    {option.icon}
+                                                </span>
+                                                <div>
+                                                    <span className="text-[11px] font-black uppercase tracking-wider block">{option.label}</span>
+                                                    <span className={`text-[9px] font-bold ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>{option.desc}</span>
+                                                </div>
+                                                {reportView === option.value && (
+                                                    <span className={`material-symbols-outlined text-sm ml-auto ${isDark ? 'text-[#fbbf24]' : 'text-amber-500'}`}>check</span>
+                                                )}
+                                            </button>
+                                        ))}
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
+
+                            {isReportDropdownOpen && (
+                                <div className="fixed inset-0 z-40" onClick={() => setIsReportDropdownOpen(false)} />
+                            )}
+                        </div>
+
+                        {/* Divider */}
+                        <div className={`hidden lg:block w-px h-10 ${isDark ? 'bg-slate-800/60' : 'bg-slate-200'}`} />
+
+                        {/* Product Type Dropdown (Loan / Investment) */}
+                        <div className="relative">
+                            <button
+                                onClick={() => { setIsProductDropdownOpen(!isProductDropdownOpen); setIsReportDropdownOpen(false); }}
+                                className={`flex items-center gap-3 px-5 py-3 rounded-2xl border transition-all ${isDark ? 'bg-[#111827] border-slate-800/60 hover:border-slate-700' : 'bg-white border-slate-200 hover:border-slate-300 shadow-sm'}`}
                             >
-                                Investments
+                                <span className={`material-symbols-outlined text-lg ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                                    {selectedProduct.icon}
+                                </span>
+                                <div className="text-left">
+                                    <p className={`text-[8px] font-black uppercase tracking-[0.2em] ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>Product</p>
+                                    <p className={`text-xs font-black tracking-tight ${isDark ? 'text-white' : 'text-slate-900'}`}>{selectedProduct.label}</p>
+                                </div>
+                                <span className={`material-symbols-outlined text-sm ml-1 transition-transform ${isProductDropdownOpen ? 'rotate-180' : ''} ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                                    expand_more
+                                </span>
                             </button>
+
+                            <AnimatePresence>
+                                {isProductDropdownOpen && (
+                                    <motion.div
+                                        initial={{ opacity: 0, y: -8, scale: 0.96 }}
+                                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                                        exit={{ opacity: 0, y: -8, scale: 0.96 }}
+                                        transition={{ duration: 0.15 }}
+                                        className={`absolute left-0 top-full mt-2 z-50 w-full min-w-[240px] rounded-xl border overflow-hidden shadow-xl ${isDark ? 'bg-[#0a101f] border-slate-800/60' : 'bg-white border-slate-200 shadow-lg'}`}
+                                    >
+                                        {PRODUCT_TYPE_OPTIONS.map((option) => (
+                                            <button
+                                                key={option.value}
+                                                onClick={() => {
+                                                    setProductType(option.value);
+                                                    setIsProductDropdownOpen(false);
+                                                }}
+                                                className={`w-full flex items-center gap-4 px-5 py-3.5 text-left transition-all ${
+                                                    productType === option.value
+                                                        ? isDark ? 'bg-[#fbbf24]/10 text-[#fbbf24]' : 'bg-amber-50 text-amber-600'
+                                                        : isDark ? 'text-slate-400 hover:bg-[#111827] hover:text-white' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                                                }`}
+                                            >
+                                                <span className={`material-symbols-outlined text-lg ${
+                                                    productType === option.value
+                                                        ? isDark ? 'text-[#fbbf24]' : 'text-amber-500'
+                                                        : isDark ? 'text-slate-600' : 'text-slate-400'
+                                                }`}>
+                                                    {option.icon}
+                                                </span>
+                                                <span className="text-[11px] font-black uppercase tracking-wider">{option.label}</span>
+                                                {productType === option.value && (
+                                                    <span className={`material-symbols-outlined text-sm ml-auto ${isDark ? 'text-[#fbbf24]' : 'text-amber-500'}`}>check</span>
+                                                )}
+                                            </button>
+                                        ))}
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
+
+                            {isProductDropdownOpen && (
+                                <div className="fixed inset-0 z-40" onClick={() => setIsProductDropdownOpen(false)} />
+                            )}
                         </div>
                     </div>
-                    <div className="flex flex-col items-end gap-4">
-                        <div className={`flex p-1 rounded-xl border transition-colors ${isDark ? 'bg-[#111827] border-slate-800/60' : 'bg-white border-slate-200 shadow-sm'}`}>
-                            {[
-                                { label: 'This Wk', value: 'this_week' },
-                                { label: 'Last Wk', value: 'last_week' },
-                                { label: 'This Mo', value: 'this_month' },
-                                { label: 'Last Mo', value: 'last_month' },
-                                { label: 'This Yr', value: 'this_year' },
-                            ].map((p) => (
-                                <button
-                                    key={p.value}
-                                    onClick={() => setPeriod(p.value)}
-                                    className={`px-4 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-tight transition-all ${period === p.value ? 'bg-[#fbbf2415] text-[#fbbf24] border border-[#fbbf2430]' : 'text-slate-500 hover:text-slate-700 border border-transparent'}`}
-                                >
-                                    {p.label}
-                                </button>
-                            ))}
-                        </div>
+
+                    {/* Right: Date Range Picker & Snapshot */}
+                    <div className="flex flex-col items-end gap-3">
+                        <DateRangePicker
+                            startDate={dateRangeStart}
+                            endDate={dateRangeEnd}
+                            onChange={handleDateRangeChange}
+                            isDark={isDark}
+                        />
                         <p className={`text-[10px] font-bold uppercase tracking-widest px-3 py-1.5 rounded-full border transition-colors ${isDark ? 'text-slate-500 bg-slate-900/80 border-slate-800/50' : 'text-slate-400 bg-white border-slate-200 shadow-sm'}`}>
                             Snapshot: {new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
                         </p>
                     </div>
                 </motion.div>
+
+                {/* ========== CONDITIONAL REPORT RENDERING ========== */}
+                <AnimatePresence mode="wait">
+                    {reportView === 'DEMOGRAPHY' ? (
+                        <motion.div
+                            key="demography"
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -20 }}
+                            transition={{ duration: 0.3 }}
+                        >
+                            <DemographyReportPage
+                                user={user}
+                                onLogout={onLogout}
+                                toggleTheme={toggleTheme}
+                                theme={theme}
+                                productType={productType}
+                                dateRangeStart={dateRangeStart}
+                                dateRangeEnd={dateRangeEnd}
+                            />
+                        </motion.div>
+                    ) : (
+                        <motion.div
+                            key="tat"
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -20 }}
+                            transition={{ duration: 0.3 }}
+                        >
+
+                {/* ========== TAT REPORT CONTENT ========== */}
 
                 {/* Hero Stats */}
                 <motion.div 
@@ -408,7 +587,7 @@ const TimelineReportPage: React.FC<TimelineReportPageProps> = ({ user, onLogout,
                     </div>
                 </motion.div>
 
-                {/* Floating Export Button */}
+                {/* Floating Export Button for TAT */}
                 <div className="fixed bottom-10 right-10 flex flex-col gap-4 items-end">
                     <AnimatePresence>
                         {isExporting && (
@@ -428,9 +607,13 @@ const TimelineReportPage: React.FC<TimelineReportPageProps> = ({ user, onLogout,
                         className={`group flex items-center gap-4 px-8 py-4 rounded-full font-black text-[12px] uppercase tracking-[0.2em] shadow-xl hover:scale-105 active:scale-95 transition-all z-50 disabled:opacity-50 ${isDark ? 'bg-[#fbbf24] text-[#060b13] shadow-[0_15px_40px_rgba(251,191,36,0.3)]' : 'bg-slate-900 text-white shadow-[0_15px_40px_rgba(15,23,42,0.2)] hover:bg-slate-800'}`}
                     >
                         <span className="material-symbols-outlined text-2xl">download</span>
-                        {isExporting ? 'Processing' : 'Export Demography Data'}
+                        {isExporting ? 'Processing' : 'Export TAT Data'}
                     </button>
                 </div>
+
+                        </motion.div>
+                    )}
+                </AnimatePresence>
 
             </div>
         </StaffLayout>
