@@ -1,0 +1,16 @@
+# Dependencies
+node_modules/
+
+# Build output — never commit compiled assets
+dist/
+build/
+.vite/
+
+# Environment variables
+.env
+.env.local
+.env.production
+
+# Editor
+.DS_Store
+*.log

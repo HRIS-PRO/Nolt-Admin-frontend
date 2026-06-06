@@ -719,13 +719,13 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ user, onLogout, toggleTheme
                                                     <span className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-wider">Live Secret Key</span>
                                                     <span className="px-2 py-0.5 rounded font-black text-[9px] uppercase tracking-widest bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">Active</span>
                                                 </div>
-                                                <p className="text-[11px] text-slate-500 dark:text-slate-400 font-bold font-mono">sk_live_51Nv92J8...U9h8s3</p>
+                                                <p className="text-[11px] text-slate-500 dark:text-slate-400 font-bold font-mono">sk_live_••••••••••••••••••••••</p>
                                             </div>
                                             <div className="flex items-center gap-2 shrink-0">
                                                 <button 
                                                     onClick={() => {
-                                                        navigator.clipboard.writeText("REDACTED_LIVE_KEY");
-                                                        alert("Live Secret Key copied to clipboard!");
+                                                        alert("Live Secret Key is managed securely via backend environment variables and cannot be copied from the UI.");
+                                                        // DO NOT hardcode keys here — use process.env on the backend
                                                     }}
                                                     className="px-3 py-2 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-355 hover:bg-slate-200 dark:hover:bg-slate-700 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all"
                                                 >
@@ -746,13 +746,13 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ user, onLogout, toggleTheme
                                                     <span className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-wider">Test Secret Key</span>
                                                     <span className="px-2 py-0.5 rounded font-black text-[9px] uppercase tracking-widest bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">Active</span>
                                                 </div>
-                                                <p className="text-[11px] text-slate-500 dark:text-slate-400 font-bold font-mono">sk_test_51Nv92J8...T5y2r1</p>
+                                                <p className="text-[11px] text-slate-500 dark:text-slate-400 font-bold font-mono">sk_test_••••••••••••••••••••••</p>
                                             </div>
                                             <div className="flex items-center gap-2 shrink-0">
                                                 <button 
                                                     onClick={() => {
-                                                        navigator.clipboard.writeText("REDACTED_TEST_KEY");
-                                                        alert("Test Secret Key copied to clipboard!");
+                                                        alert("Test Secret Key is managed securely via backend environment variables and cannot be copied from the UI.");
+                                                        // DO NOT hardcode keys here — use process.env on the backend
                                                     }}
                                                     className="px-3 py-2 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-355 hover:bg-slate-200 dark:hover:bg-slate-700 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all"
                                                 >
