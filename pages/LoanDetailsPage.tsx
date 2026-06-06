@@ -35,6 +35,10 @@ const ActionCard = ({ loan, userRole, onActionComplete }: { loan: any, userRole:
     const [reason, setReason] = useState('');
     const [showReturnModal, setShowReturnModal] = useState(false);
     const [returnTargetStage, setReturnTargetStage] = useState('');
+    const [glAccounts, setGlAccounts] = useState<any[]>([]);
+    const [selectedGL, setSelectedGL] = useState(loan.gl_account || '');
+    const [startDate, setStartDate] = useState(loan.start_date ? new Date(loan.start_date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]);
+    const [isStartDateExpanded, setIsStartDateExpanded] = useState(false);
 
     // Disbursement Logic State
     const [applyManagementFee, setApplyManagementFee] = useState(loan.apply_management_fee || false);
@@ -95,6 +99,7 @@ const ActionCard = ({ loan, userRole, onActionComplete }: { loan: any, userRole:
                 payload.data.apply_management_fee = applyManagementFee;
                 payload.data.apply_insurance_fee = applyInsuranceFee;
                 payload.data.disbursement_amount = calculateDisbursementAmount();
+                payload.data.start_date = startDate;
 
                 if (isSpecialLoan) {
                     payload.data.existing_loan_balance = existingLoanBalance;
@@ -103,6 +108,9 @@ const ActionCard = ({ loan, userRole, onActionComplete }: { loan: any, userRole:
                 if (isBuyOver) {
                     payload.data.buy_over_amount = buyOverAmount;
                 }
+            }
+            if (action === 'approve' && stage === 'finance') {
+                payload.data.gl_account = selectedGL;
             }
 
             await axios.post(
@@ -143,6 +151,18 @@ const ActionCard = ({ loan, userRole, onActionComplete }: { loan: any, userRole:
     };
 
     const stage = loan.stage || 'submitted';
+
+    useEffect(() => {
+        if (stage === 'finance') {
+            axios.get('/api/gl-accounts', { withCredentials: true })
+                .then(res => {
+                    if (res.data.success) {
+                        setGlAccounts(res.data.data.filter((gl: any) => gl.status === 'Active'));
+                    }
+                })
+                .catch(err => console.error("Failed to fetch GL accounts:", err));
+        }
+    }, [stage]);
 
     // --- VISIBILITY CHECK ---
     const isAllowed = (() => {
@@ -364,6 +384,39 @@ const ActionCard = ({ loan, userRole, onActionComplete }: { loan: any, userRole:
                     </div>
                 )}
 
+                {/* Loan Start Date Picker - Only for Credit 1 and Credit 2 */}
+                {(stage === 'credit_check_1' || stage === 'credit_check_2') && (
+                    <div className="mb-6 p-5 rounded-[20px] bg-slate-50 dark:bg-[#111C2A] border border-slate-200 dark:border-slate-700 space-y-3">
+                        <button 
+                            onClick={() => setIsStartDateExpanded(!isStartDateExpanded)}
+                            className="w-full flex items-center justify-between text-left focus:outline-none"
+                        >
+                            <div>
+                                <p className="text-[9px] font-black text-blue-600 dark:text-blue-400 uppercase tracking-widest mb-1 select-none">Loan Start Date</p>
+                                <p className="text-sm font-black text-slate-800 dark:text-slate-200">
+                                    {startDate ? new Date(startDate).toLocaleDateString('en-NG', { day: 'numeric', month: 'short', year: 'numeric' }) : 'Today'}
+                                </p>
+                            </div>
+                            <span className={`material-symbols-outlined text-slate-400 transition-transform duration-200 ${isStartDateExpanded ? 'rotate-180' : ''}`}>
+                                expand_more
+                            </span>
+                        </button>
+                        
+                        {isStartDateExpanded && (
+                            <div className="space-y-2 pt-3 border-t border-slate-200/60 dark:border-slate-700 animate-in fade-in duration-200">
+                                <label htmlFor="loan-start-date" className="text-[9px] font-black text-slate-400 uppercase tracking-widest block">Select Date</label>
+                                <input 
+                                    id="loan-start-date"
+                                    type="date"
+                                    value={startDate}
+                                    onChange={(e) => setStartDate(e.target.value)}
+                                    className="w-full bg-white dark:bg-slate-800 border-2 border-blue-500 rounded-xl p-3 text-sm font-bold text-slate-700 dark:text-slate-200 focus:ring-4 focus:ring-blue-500/20 focus:outline-none transition-all"
+                                />
+                            </div>
+                        )}
+                    </div>
+                )}
+
                 {/* Upload Section */}
                 {/* Upload Section */}
                 {(() => {
@@ -395,6 +448,41 @@ const ActionCard = ({ loan, userRole, onActionComplete }: { loan: any, userRole:
                         </div>
                     )}
 
+                {/* Finance GL Selection */}
+                {stage === 'finance' && (
+                    <div className="mb-6 p-5 rounded-[24px] bg-slate-50 dark:bg-[#111C2A] border border-emerald-500/20 relative overflow-hidden">
+                        <label className="text-[10px] font-black uppercase tracking-widest text-emerald-500 mb-3 block">
+                            SELECT BANK GL (FINANCE NODE)
+                        </label>
+                        <div className="relative">
+                            <select
+                                value={selectedGL}
+                                onChange={async (e) => {
+                                    const val = e.target.value;
+                                    setSelectedGL(val);
+                                    try {
+                                        await axios.patch(`/api/staff/loans/${loan.id}/gl-account`, 
+                                            { gl_account: val || null }, 
+                                            { withCredentials: true }
+                                        );
+                                    } catch (err: any) {
+                                        console.error('Failed to save GL:', err);
+                                    }
+                                }}
+                                className="w-full p-4 rounded-[16px] bg-transparent border-2 border-[#0099FF] text-slate-900 dark:text-white text-sm font-bold focus:outline-none focus:ring-4 focus:ring-[#0099FF]/20 cursor-pointer appearance-none transition-all"
+                                style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2364748b'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 1.25rem center', backgroundSize: '1.25em 1.25em', paddingRight: '3rem' }}
+                            >
+                                <option value="" className="text-slate-500 bg-white dark:bg-slate-800">-- SELECT BANK GL ACCOUNT --</option>
+                                {glAccounts.map((gl) => (
+                                    <option key={gl.id} value={gl.code} className="text-slate-900 dark:text-white bg-white dark:bg-slate-800">
+                                        {gl.code} - {gl.name}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                    </div>
+                )}
+
                 {/* Reason Input */}
                 <div className="mb-6">
                     <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2 block">
@@ -412,7 +500,7 @@ const ActionCard = ({ loan, userRole, onActionComplete }: { loan: any, userRole:
                     <button
                         onClick={() => handleAction('approve')}
                         disabled={actionLoading}
-                        className="w-full py-4 rounded-xl bg-blue-600 text-white font-black text-sm uppercase tracking-wider hover:bg-blue-700 transition-all shadow-lg flex items-center justify-center gap-2"
+                        className={`w-full py-4 rounded-xl text-white font-black text-sm uppercase tracking-wider transition-all shadow-lg flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed`}
                     >
                         {actionLoading ? <span className="size-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : 'Approve & Proceed'}
                     </button>

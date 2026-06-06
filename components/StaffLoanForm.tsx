@@ -183,6 +183,15 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess, initi
     const [buyOverCompanyName, setBuyOverCompanyName] = useState('');
     const [buyOverAccountName, setBuyOverAccountName] = useState('');
     const [buyOverAccountNumber, setBuyOverAccountNumber] = useState('');
+    const [buyOverBankName, setBuyOverBankName] = useState('');
+    const [isVerifyingBuyOverBank, setIsVerifyingBuyOverBank] = useState(false);
+    const [buyOverBankVerificationResult, setBuyOverBankVerificationResult] = useState<{
+        account_name: string;
+        isMatch: boolean;
+        matchedNames: string[];
+        reason: string;
+    } | null>(null);
+    const [buyOverBankVerificationError, setBuyOverBankVerificationError] = useState<string | null>(null);
 
     // Documents
     const [uploadedDocs, setUploadedDocs] = useState<Record<string, { name: string, size: string, url: string } | null>>({
@@ -255,6 +264,7 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess, initi
             setTopUpAmount(initialData.topup_amount || '');
             setBuyOverAmount(initialData.buy_over_amount || '');
             setBuyOverCompanyName(initialData.buy_over_company_name || '');
+            setBuyOverBankName(initialData.buy_over_bank_name || '');
             setBuyOverAccountName(initialData.buy_over_company_account_name || '');
             setBuyOverAccountNumber(initialData.buy_over_company_account_number || '');
 
@@ -387,6 +397,50 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess, initi
         const timeout = setTimeout(verifyAccount, 500);
         return () => clearTimeout(timeout);
     }, [bankName, accountNumber, bankList]);
+
+    // Auto-verify Buy Over bank account
+    useEffect(() => {
+        const selectedBank = bankList.find(b => b.name === buyOverBankName);
+        if (!selectedBank || !/^\d{10}$/.test(buyOverAccountNumber)) {
+            setBuyOverBankVerificationResult(null);
+            setBuyOverBankVerificationError(null);
+            setBuyOverAccountName('');
+            return;
+        }
+
+        const verifyBuyOverAccount = async () => {
+            setIsVerifyingBuyOverBank(true);
+            setBuyOverBankVerificationResult(null);
+            setBuyOverBankVerificationError(null);
+            setBuyOverAccountName('');
+
+            try {
+                const response = await axios.post('/api/misc/resolve-account', {
+                    account_number: buyOverAccountNumber,
+                    bank_code: selectedBank.code,
+                    first_name: buyOverCompanyName,
+                    surname: ''
+                });
+
+                if (response.data.success) {
+                    // For buy over, we don't strictly require a name match because company names can differ slightly
+                    // But we still pass the company name so it can try to match
+                    setBuyOverBankVerificationResult(response.data.data);
+                    setBuyOverAccountName(response.data.data.account_name);
+                } else {
+                    setBuyOverBankVerificationError(response.data.message || 'Verification failed.');
+                }
+            } catch (err: any) {
+                const msg = err.response?.data?.message || 'Could not verify account. Please check the details.';
+                setBuyOverBankVerificationError(msg);
+            } finally {
+                setIsVerifyingBuyOverBank(false);
+            }
+        };
+
+        const timeout = setTimeout(verifyBuyOverAccount, 500);
+        return () => clearTimeout(timeout);
+    }, [buyOverBankName, buyOverAccountNumber, bankList, buyOverCompanyName]);
 
     const updateReference = (index: number, field: string, value: string) => {
         const newRefs = [...references];
@@ -573,8 +627,14 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess, initi
                 if (loanType === 'buy_over') {
                     if (!buyOverAmount) newErrors.buyOverAmount = "Required";
                     if (!buyOverCompanyName) newErrors.buyOverCompanyName = "Required";
+                    if (!buyOverBankName) newErrors.buyOverBankName = "Required";
+                    if (!buyOverAccountNumber) {
+                        newErrors.buyOverAccountNumber = "Required";
+                    } else if (!/^\d{10}$/.test(buyOverAccountNumber)) {
+                        newErrors.buyOverAccountNumber = "Must be 10 digits";
+                    }
                     if (!buyOverAccountName) newErrors.buyOverAccountName = "Required";
-                    if (!buyOverAccountNumber) newErrors.buyOverAccountNumber = "Required";
+                    if (isVerifyingBuyOverBank) newErrors.buyOverAccountNumber = "Verifying...";
                 }
             }
 
@@ -777,6 +837,7 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess, initi
                     // Buy Over Specifics
                     buy_over_amount: loanType === 'buy_over' ? (parseFloat(buyOverAmount) || 0) : 0,
                     buy_over_company_name: loanType === 'buy_over' ? buyOverCompanyName : null,
+                    buy_over_bank_name: loanType === 'buy_over' ? buyOverBankName : null,
                     buy_over_company_account_name: loanType === 'buy_over' ? buyOverAccountName : null,
                     buy_over_company_account_number: loanType === 'buy_over' ? buyOverAccountNumber : null,
                 };
@@ -1035,12 +1096,51 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess, initi
                                             <InputGroup label="Buy Over Company Name" required error={errors.buyOverCompanyName}>
                                                 <input className="input-field" value={buyOverCompanyName} onChange={e => { setBuyOverCompanyName(e.target.value); clearError('buyOverCompanyName'); }} />
                                             </InputGroup>
-                                            <InputGroup label="Company Account Name" required error={errors.buyOverAccountName}>
-                                                <input className="input-field" value={buyOverAccountName} onChange={e => { setBuyOverAccountName(e.target.value); clearError('buyOverAccountName'); }} />
+                                            
+                                            <InputGroup label="Buy Over Bank Name" required error={errors.buyOverBankName}>
+                                                <select className="input-field" value={buyOverBankName} onChange={e => { setBuyOverBankName(e.target.value); setBuyOverAccountName(''); clearError('buyOverBankName'); }}>
+                                                    <option value="">Select Bank</option>
+                                                    {bankList.map((b, i) => <option key={i} value={b.name}>{b.name}</option>)}
+                                                </select>
                                             </InputGroup>
+
                                             <InputGroup label="Company Account Number" required error={errors.buyOverAccountNumber}>
-                                                <input className="input-field" value={buyOverAccountNumber} onChange={handleNumericChange(setBuyOverAccountNumber, 'buyOverAccountNumber')} />
+                                                <div className="relative">
+                                                    <input
+                                                        className={`input-field pr-10 ${buyOverBankVerificationResult ? '!border-green-500' : ''}`}
+                                                        value={buyOverAccountNumber}
+                                                        onChange={e => { const val = e.target.value.replace(/\D/g, ''); if (val.length <= 10) { setBuyOverAccountNumber(val); setBuyOverAccountName(''); clearError('buyOverAccountNumber'); } }}
+                                                        maxLength={10}
+                                                        placeholder="10 Digits"
+                                                    />
+                                                    {isVerifyingBuyOverBank && (
+                                                        <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                                                            <div className="size-5 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
+                                                        </div>
+                                                    )}
+                                                    {!isVerifyingBuyOverBank && buyOverBankVerificationResult && (
+                                                        <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                                                            <span className="material-symbols-outlined text-green-500 text-xl filled">check_circle</span>
+                                                        </div>
+                                                    )}
+                                                </div>
                                             </InputGroup>
+
+                                            <InputGroup label="Company Account Name (Auto-Verified)" required error={errors.buyOverAccountName}>
+                                                <input
+                                                    className={`input-field cursor-not-allowed ${buyOverBankVerificationResult ? '!bg-green-50 dark:!bg-green-900/20 !border-green-500 !text-green-800 dark:!text-green-300' : ''}`}
+                                                    value={buyOverAccountName}
+                                                    readOnly
+                                                    placeholder={isVerifyingBuyOverBank ? 'Verifying...' : 'Auto-fills after verification'}
+                                                />
+                                            </InputGroup>
+                                            
+                                            {buyOverBankVerificationError && (
+                                                <div className="md:col-span-2 p-3 rounded-xl border bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800 flex items-start gap-2 animate-in fade-in duration-300">
+                                                    <span className="material-symbols-outlined text-lg text-amber-600 filled">warning</span>
+                                                    <p className="text-xs font-medium text-amber-700 dark:text-amber-400">{buyOverBankVerificationError}</p>
+                                                </div>
+                                            )}
                                         </>
                                     )}
                                 </div>
@@ -1416,7 +1516,7 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess, initi
                                                 </InputGroup>
 
                                                 {loanType === 'buy_over' && (
-                                                    <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-6 p-6 bg-slate-50 dark:bg-slate-800/40 rounded-3xl border border-slate-100 dark:border-slate-800/50 mt-2">
+                                                    <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-6 p-6 bg-slate-50 dark:bg-slate-800/40 rounded-3xl border border-slate-100 dark:border-slate-800/50 mt-2 animate-in fade-in duration-300">
                                                         <div className="md:col-span-2">
                                                             <h4 className="text-xs font-black uppercase tracking-widest text-slate-400 mb-2 flex items-center gap-2">
                                                                 <span className="material-symbols-outlined text-lg">swap_horiz</span>
@@ -1429,12 +1529,47 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess, initi
                                                         <InputGroup label="Buy Over Company Name" required error={errors.buyOverCompanyName}>
                                                             <input className="input-field" value={buyOverCompanyName} onChange={e => { setBuyOverCompanyName(e.target.value); clearError('buyOverCompanyName'); }} />
                                                         </InputGroup>
-                                                        <InputGroup label="Company Account Name" required error={errors.buyOverAccountName}>
-                                                            <input className="input-field" value={buyOverAccountName} onChange={e => { setBuyOverAccountName(e.target.value); clearError('buyOverAccountName'); }} />
+                                                        <InputGroup label="Buy Over Bank Name" required error={errors.buyOverBankName}>
+                                                            <select className="input-field" value={buyOverBankName} onChange={e => { setBuyOverBankName(e.target.value); setBuyOverAccountName(''); clearError('buyOverBankName'); }}>
+                                                                <option value="">Select Bank</option>
+                                                                {bankList.map((b, i) => <option key={i} value={b.name}>{b.name}</option>)}
+                                                            </select>
                                                         </InputGroup>
                                                         <InputGroup label="Company Account Number" required error={errors.buyOverAccountNumber}>
-                                                            <input className="input-field" value={buyOverAccountNumber} onChange={handleNumericChange(setBuyOverAccountNumber, 'buyOverAccountNumber')} />
+                                                            <div className="relative">
+                                                                <input
+                                                                    className={`input-field pr-10 ${buyOverBankVerificationResult ? '!border-green-500' : ''}`}
+                                                                    value={buyOverAccountNumber}
+                                                                    onChange={e => { const val = e.target.value.replace(/\D/g, ''); if (val.length <= 10) { setBuyOverAccountNumber(val); setBuyOverAccountName(''); clearError('buyOverAccountNumber'); } }}
+                                                                    maxLength={10}
+                                                                    placeholder="10 Digits"
+                                                                />
+                                                                {isVerifyingBuyOverBank && (
+                                                                    <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                                                                        <div className="size-5 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
+                                                                    </div>
+                                                                )}
+                                                                {!isVerifyingBuyOverBank && buyOverBankVerificationResult && (
+                                                                    <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                                                                        <span className="material-symbols-outlined text-green-500 text-xl filled">check_circle</span>
+                                                                    </div>
+                                                                )}
+                                                            </div>
                                                         </InputGroup>
+                                                        <InputGroup label="Company Account Name (Auto-Verified)" required error={errors.buyOverAccountName}>
+                                                            <input
+                                                                className={`input-field cursor-not-allowed ${buyOverBankVerificationResult ? '!bg-green-50 dark:!bg-green-900/20 !border-green-500 !text-green-800 dark:!text-green-300' : ''}`}
+                                                                value={buyOverAccountName}
+                                                                readOnly
+                                                                placeholder={isVerifyingBuyOverBank ? 'Verifying...' : 'Auto-fills after verification'}
+                                                            />
+                                                        </InputGroup>
+                                                        {buyOverBankVerificationError && (
+                                                            <div className="md:col-span-2 p-3 rounded-xl border bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800 flex items-start gap-2 animate-in fade-in duration-300">
+                                                                <span className="material-symbols-outlined text-lg text-amber-600 filled">warning</span>
+                                                                <p className="text-xs font-medium text-amber-700 dark:text-amber-400">{buyOverBankVerificationError}</p>
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 )}
 

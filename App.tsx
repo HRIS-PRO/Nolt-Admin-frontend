@@ -40,6 +40,7 @@ import ProductsPage from './pages/ProductsPage';
 import LogoutWarningModal from './components/modals/LogoutWarningModal';
 import JointAcceptancePage from './pages/investment/JointAcceptancePage';
 import CustomerDetailsPage from './pages/CustomerDetailsPage';
+import CbaMigrationPage from './pages/CbaMigrationPage';
 
 // Setup Global Axios Interceptor for GPS Tracking
 axios.interceptors.request.use((config) => {
@@ -63,6 +64,19 @@ if ('geolocation' in navigator) {
     { enableHighAccuracy: true, timeout: 5000, maximumAge: 60000 }
   );
 }
+
+const ALLOWED_BI_AND_REPORTS_ROLES = [
+  'sales_manager',
+  'credit_manager',
+  'internal_audit',
+  'finance',
+  'compliance',
+  'md',
+  'hr',
+  'super_admin',
+  'superadmin',
+  'admin'
+];
 
 // ProtectedRoute Component extracted to prevent re-renders
 interface ProtectedRouteProps {
@@ -527,12 +541,14 @@ const AppContent: React.FC = () => {
         } />
         <Route path="/staff/reports" element={
           isLoading ? null : (user.isLoggedIn && user.role !== 'customer' ? (
-            <ReportsPage
-              user={user}
-              onLogout={handleLogoutRequest}
-              toggleTheme={toggleTheme}
-              theme={theme}
-            />
+            ALLOWED_BI_AND_REPORTS_ROLES.includes(user.role || '') ? (
+              <ReportsPage
+                user={user}
+                onLogout={handleLogoutRequest}
+                toggleTheme={toggleTheme}
+                theme={theme}
+              />
+            ) : <Navigate to="/staff-dashboard" />
           ) : <Navigate to="/login" />)
         } />
         <Route path="/staff/settings" element={
@@ -587,12 +603,14 @@ const AppContent: React.FC = () => {
         } />
         <Route path="/staff/timeline" element={
           isLoading ? null : (user?.isLoggedIn && user.role !== 'customer' ? (
-            <TimelineReportPage
-              user={user}
-              onLogout={handleLogoutRequest}
-              toggleTheme={toggleTheme}
-              theme={theme}
-            />
+            ALLOWED_BI_AND_REPORTS_ROLES.includes(user.role || '') ? (
+              <TimelineReportPage
+                user={user}
+                onLogout={handleLogoutRequest}
+                toggleTheme={toggleTheme}
+                theme={theme}
+              />
+            ) : <Navigate to="/staff-dashboard" />
           ) : <Navigate to="/login" />)
         } />
         <Route path="/staff/calculator" element={
@@ -605,6 +623,16 @@ const AppContent: React.FC = () => {
               formatMoney={formatMoney}
             />
           ) : <Navigate to="/login" />)
+        } />
+        <Route path="/staff/cba-migration" element={
+          isLoading ? null : (user.isLoggedIn && (user.role === 'super_admin' || user.role === 'superadmin') ? (
+            <CbaMigrationPage
+              user={user}
+              onLogout={handleLogoutRequest}
+              toggleTheme={toggleTheme}
+              theme={theme}
+            />
+          ) : <Navigate to="/staff-dashboard" />)
         } />
 
         {/* Protected Routes */}

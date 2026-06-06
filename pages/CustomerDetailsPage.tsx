@@ -35,6 +35,12 @@ const CustomerDetailsPage: React.FC<CustomerDetailsPageProps> = ({ user, onLogou
   const [uploadingUtilityBill, setUploadingUtilityBill] = useState(false);
   const [isSendingPassword, setIsSendingPassword] = useState(false);
 
+  // CBA Registration retry state
+  const [cbaRetrying, setCbaRetrying] = useState(false);
+  const [cbaRetryStep, setCbaRetryStep] = useState(0);
+  const [cbaRetryTimedOut, setCbaRetryTimedOut] = useState(false);
+  const [cbaRetryError, setCbaRetryError] = useState<string | null>(null);
+
   useEffect(() => { fetchCustomerData(); }, [id]);
   useEffect(() => {
     if (activeTab === 'LOAN' && id && !hasFetchedCba) fetchCbaLoans(id);
@@ -95,6 +101,58 @@ const CustomerDetailsPage: React.FC<CustomerDetailsPageProps> = ({ user, onLogou
       alert(e.response?.data?.message || 'Failed to send password.');
     } finally {
       setIsSendingPassword(false);
+    }
+  };
+
+  const CBA_TIMEOUT_MS = 60000;
+
+  const handleRetryCbaRegistration = async () => {
+    if (!id) return;
+    setCbaRetryError(null);
+    setCbaRetrying(true);
+    setCbaRetryStep(0);
+    setCbaRetryTimedOut(false);
+
+    const controller = new AbortController();
+
+    const timeoutId = setTimeout(() => {
+      controller.abort();
+      setCbaRetryTimedOut(true);
+    }, CBA_TIMEOUT_MS);
+
+    // Animate progress steps
+    const stepInterval = setInterval(() => {
+      setCbaRetryStep(prev => (prev < 3 ? prev + 1 : prev));
+    }, 3000);
+
+    try {
+      const response = await axios.post(
+        API('/api/staff/kyc/retry-cba-registration'),
+        { userId: id },
+        { withCredentials: true, timeout: CBA_TIMEOUT_MS, signal: controller.signal }
+      );
+
+      clearTimeout(timeoutId);
+      clearInterval(stepInterval);
+      if (controller.signal.aborted) return;
+
+      if (response.data.success) {
+        setCbaRetrying(false);
+        // Refresh the entire profile to get updated CASA and balance
+        await fetchCustomerData();
+      } else {
+        setCbaRetrying(false);
+        setCbaRetryError(response.data.message || 'CBA registration failed');
+      }
+    } catch (err: any) {
+      clearTimeout(timeoutId);
+      clearInterval(stepInterval);
+      if (axios.isCancel(err) || err.code === 'ECONNABORTED' || err.name === 'AbortError' || err.message?.includes('timeout')) {
+        setCbaRetryTimedOut(true);
+      } else {
+        setCbaRetrying(false);
+        setCbaRetryError(err.response?.data?.message || 'Error connecting to Core Banking Application');
+      }
     }
   };
 
@@ -327,7 +385,7 @@ const CustomerDetailsPage: React.FC<CustomerDetailsPageProps> = ({ user, onLogou
           <div className="mt-6 md:mt-0 bg-slate-50 dark:bg-slate-800/50 rounded-2xl p-6 min-w-[300px]">
             <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">AVAILABLE BALANCE</div>
             <div className="text-3xl font-black text-slate-900 dark:text-white tracking-tight mb-4">{balance !== null ? formatMoney(balance) : '₦0.00'}</div>
-            {profile.casa && (
+            {profile.casa ? (
               <div className="flex items-center justify-between bg-white dark:bg-slate-900 p-3 rounded-xl border border-slate-200 dark:border-slate-800">
                 <div className="flex items-center gap-3">
                   <div className="size-8 rounded-lg bg-blue-50 dark:bg-blue-500/10 flex items-center justify-center text-blue-500">
@@ -341,6 +399,35 @@ const CustomerDetailsPage: React.FC<CustomerDetailsPageProps> = ({ user, onLogou
                 <button onClick={() => copyToClipboard(profile.casa)} className="text-slate-400 hover:text-blue-500 transition-colors p-2">
                   <svg className="size-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
                 </button>
+              </div>
+            ) : profile.bvn ? (
+              <div className="space-y-3">
+                <div className="p-3 bg-amber-50 dark:bg-amber-900/10 rounded-xl border border-amber-200 dark:border-amber-800">
+                  <div className="flex items-center gap-2 mb-2">
+                    <svg className="size-4 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+                    <span className="text-[10px] font-black text-amber-700 dark:text-amber-400 uppercase tracking-widest">Missing CBA Registration</span>
+                  </div>
+                  <p className="text-[10px] font-bold text-amber-600/80 dark:text-amber-400/70 leading-relaxed mb-3">
+                    This customer has no CASA account. They need to be registered on the Core Banking Application.
+                  </p>
+                  {cbaRetryError && (
+                    <div className="p-2 bg-rose-50 dark:bg-rose-900/10 rounded-lg border border-rose-200 dark:border-rose-800 mb-3">
+                      <p className="text-[9px] font-black text-rose-600 uppercase tracking-widest">{cbaRetryError}</p>
+                    </div>
+                  )}
+                  <button
+                    onClick={handleRetryCbaRegistration}
+                    disabled={cbaRetrying}
+                    className="w-full py-2.5 bg-amber-600 hover:bg-amber-700 disabled:opacity-60 text-white rounded-xl text-[10px] font-black uppercase tracking-[0.15em] shadow-md transition-all flex items-center justify-center gap-2"
+                  >
+                    <svg className="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
+                    Register on CBA
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="p-3 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700">
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider text-center">No CASA — BVN required first</p>
               </div>
             )}
           </div>
@@ -954,6 +1041,85 @@ const CustomerDetailsPage: React.FC<CustomerDetailsPageProps> = ({ user, onLogou
           </div>
         </div>
       </div>
+
+      {/* CBA Processing Overlay */}
+      {cbaRetrying && (
+        <div className="fixed inset-0 z-[200] bg-black/70 backdrop-blur-md flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-white dark:bg-[#1e293b] rounded-[32px] p-10 w-full max-w-md shadow-2xl border border-slate-100 dark:border-slate-800">
+            {!cbaRetryTimedOut ? (
+              <div className="text-center space-y-8">
+                <div className="w-20 h-20 mx-auto relative">
+                  <div className="absolute inset-0 rounded-full border-4 border-slate-100 dark:border-slate-800" />
+                  <div className="absolute inset-0 rounded-full border-4 border-blue-500 border-t-transparent animate-spin" />
+                  <div className="absolute inset-3 rounded-full bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center">
+                    <svg className="size-8 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
+                  </div>
+                </div>
+
+                <div>
+                  <h3 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight mb-2">
+                    Registering on CBA
+                  </h3>
+                  <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">
+                    Do not close this page
+                  </p>
+                </div>
+
+                <div className="space-y-3 text-left">
+                  {['Connecting to Core Banking...', 'Creating account...', 'Syncing customer data...', 'Finalizing registration...'].map((step, i) => (
+                    <div key={i} className={`flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-500 ${
+                      cbaRetryStep > i
+                        ? 'bg-emerald-50 dark:bg-emerald-900/10'
+                        : cbaRetryStep === i
+                        ? 'bg-blue-50 dark:bg-blue-900/10'
+                        : 'bg-slate-50 dark:bg-slate-800/30'
+                    }`}>
+                      {cbaRetryStep > i ? (
+                        <svg className="size-4 text-emerald-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
+                      ) : cbaRetryStep === i ? (
+                        <div className="size-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin shrink-0" />
+                      ) : (
+                        <div className="size-4 rounded-full border-2 border-slate-200 dark:border-slate-700 shrink-0" />
+                      )}
+                      <span className={`text-[10px] font-black uppercase tracking-widest ${
+                        cbaRetryStep > i ? 'text-emerald-600' : cbaRetryStep === i ? 'text-blue-600' : 'text-slate-300 dark:text-slate-600'
+                      }`}>{step}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="text-center space-y-6">
+                <div className="w-16 h-16 mx-auto bg-amber-50 dark:bg-amber-900/20 rounded-full flex items-center justify-center">
+                  <svg className="size-8 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                </div>
+                <div>
+                  <h3 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight mb-2">
+                    Request Timed Out
+                  </h3>
+                  <p className="text-xs font-bold text-slate-500 leading-relaxed">
+                    The CBA service didn't respond in time. The registration may still be processing in the background.
+                  </p>
+                </div>
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => { setCbaRetrying(false); setCbaRetryTimedOut(false); }}
+                    className="flex-1 py-3 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-200 dark:hover:bg-slate-700 transition-all"
+                  >
+                    Dismiss
+                  </button>
+                  <button
+                    onClick={() => { setCbaRetrying(false); setCbaRetryTimedOut(false); fetchCustomerData(); }}
+                    className="flex-[2] py-3 bg-blue-600 text-white rounded-xl text-[10px] font-black uppercase tracking-[0.15em] shadow-lg hover:bg-blue-700 transition-all"
+                  >
+                    Refresh Profile
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </StaffLayout>
   );
 };

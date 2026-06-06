@@ -47,6 +47,7 @@ const StaffLayout: React.FC<StaffLayoutProps> = ({ children, user, onLogout, tog
                 { label: 'Users', icon: 'group', path: '/staff/users' },
                 { label: 'Customers', icon: 'groups', path: '/staff/customers' },
                 { label: 'Audit Trail', icon: 'verified_user', path: '/staff/audit' },
+                { label: 'CBA Migration', icon: 'sync_alt', path: '/staff/cba-migration' },
             ]
         }
     ];
@@ -95,16 +96,22 @@ const StaffLayout: React.FC<StaffLayoutProps> = ({ children, user, onLogout, tog
                     {navGroups.map((group, idx) => {
                         // Filter items based on role
                         const filteredItems = group.items.filter(item => {
-                            if (item.label === 'Customers' || item.label === 'Timeline') {
-                                return user?.role === 'super_admin' || user?.role === 'customer_experience';
+                            const role = user?.role || '';
+                            const allowedBiAndReportsRoles = ['sales_manager', 'credit_manager', 'internal_audit', 'finance', 'compliance', 'md', 'hr', 'super_admin', 'superadmin', 'admin'];
+                            
+                            if (item.label === 'Reports' || item.label === 'BI Dashboard') {
+                                return allowedBiAndReportsRoles.includes(role);
                             }
-                            if (item.label === 'Users' || item.label === 'Audit Trail') {
-                                return user?.role === 'super_admin';
+                            if (item.label === 'Customers') {
+                                return role === 'super_admin' || role === 'customer_experience';
+                            }
+                            if (item.label === 'Users' || item.label === 'Audit Trail' || item.label === 'CBA Migration') {
+                                return role === 'super_admin';
                             }
                             if (item.label === 'Promotions') {
-                                return user?.role === 'super_admin' || user?.role === 'marketing';
+                                return role === 'super_admin' || role === 'marketing';
                             }
-                            if (user?.role === 'marketing') {
+                            if (role === 'marketing') {
                                 // Marketing should only see these specific tabs
                                 return ['Dashboard', 'Loans', 'Investments', 'Promotions'].includes(item.label);
                             }
