@@ -47,6 +47,7 @@ const StaffLayout: React.FC<StaffLayoutProps> = ({ children, user, onLogout, tog
                 { label: 'Users', icon: 'group', path: '/staff/users' },
                 { label: 'Customers', icon: 'groups', path: '/staff/customers' },
                 { label: 'Audit Trail', icon: 'verified_user', path: '/staff/audit' },
+                { label: 'CBA Migration', icon: 'sync_alt', path: '/staff/cba-migration' },
             ]
         }
     ];
@@ -104,7 +105,7 @@ const StaffLayout: React.FC<StaffLayoutProps> = ({ children, user, onLogout, tog
                             if (item.label === 'Customers') {
                                 return role === 'super_admin' || role === 'customer_experience';
                             }
-                            if (item.label === 'Users' || item.label === 'Audit Trail') {
+                            if (item.label === 'Users' || item.label === 'Audit Trail' || item.label === 'CBA Migration') {
                                 return role === 'super_admin';
                             }
                             if (item.label === 'Promotions') {

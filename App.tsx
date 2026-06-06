@@ -40,6 +40,7 @@ import ProductsPage from './pages/ProductsPage';
 import LogoutWarningModal from './components/modals/LogoutWarningModal';
 import JointAcceptancePage from './pages/investment/JointAcceptancePage';
 import CustomerDetailsPage from './pages/CustomerDetailsPage';
+import CbaMigrationPage from './pages/CbaMigrationPage';
 
 // Setup Global Axios Interceptor for GPS Tracking
 axios.interceptors.request.use((config) => {
@@ -622,6 +623,16 @@ const AppContent: React.FC = () => {
               formatMoney={formatMoney}
             />
           ) : <Navigate to="/login" />)
+        } />
+        <Route path="/staff/cba-migration" element={
+          isLoading ? null : (user.isLoggedIn && (user.role === 'super_admin' || user.role === 'superadmin') ? (
+            <CbaMigrationPage
+              user={user}
+              onLogout={handleLogoutRequest}
+              toggleTheme={toggleTheme}
+              theme={theme}
+            />
+          ) : <Navigate to="/staff-dashboard" />)
         } />
 
         {/* Protected Routes */}

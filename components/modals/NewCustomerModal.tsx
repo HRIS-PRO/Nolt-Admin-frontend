@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import axios from 'axios';
 
@@ -28,6 +28,12 @@ const NewCustomerModal: React.FC<NewCustomerModalProps> = ({ isOpen, onClose, on
   const [onboardedData, setOnboardedData] = useState<any>(null);
   const [cbaBalance, setCbaBalance] = useState<number | null>(null);
   const [fetchingBalance, setFetchingBalance] = useState(false);
+
+  // CBA Processing overlay state
+  const [cbaProcessing, setCbaProcessing] = useState(false);
+  const [cbaProcessingStep, setCbaProcessingStep] = useState(0);
+  const [cbaTimedOut, setCbaTimedOut] = useState(false);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   // Form state pre-filled from BVN
   const [formData, setFormData] = useState({
@@ -58,6 +64,31 @@ const NewCustomerModal: React.FC<NewCustomerModalProps> = ({ isOpen, onClose, on
       handleLookupBVN(initialBvn);
     }
   }, [initialBvn, isOpen]);
+
+  // Block ESC key during CBA processing
+  useEffect(() => {
+    if (!cbaProcessing) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown, true);
+    return () => window.removeEventListener('keydown', handleKeyDown, true);
+  }, [cbaProcessing]);
+
+  // Animate processing steps
+  useEffect(() => {
+    if (!cbaProcessing || cbaTimedOut) return;
+    const steps = [0, 1, 2, 3];
+    let stepIdx = 0;
+    const interval = setInterval(() => {
+      stepIdx = (stepIdx + 1) % steps.length;
+      setCbaProcessingStep(stepIdx);
+    }, 2500);
+    return () => clearInterval(interval);
+  }, [cbaProcessing, cbaTimedOut]);
 
   if (!isOpen) return null;
 
@@ -166,6 +197,8 @@ const NewCustomerModal: React.FC<NewCustomerModalProps> = ({ isOpen, onClose, on
     setCurrentStep(2);
   };
 
+  const CBA_TIMEOUT_MS = 60000; // 60 second timeout for CBA operations
+
   const handleOnboard = async (e: React.FormEvent) => {
     e.preventDefault();
     setOnboardingProgress(true);
@@ -183,12 +216,38 @@ const NewCustomerModal: React.FC<NewCustomerModalProps> = ({ isOpen, onClose, on
       bvn
     };
 
+    // Enter non-cancellable CBA processing state
+    setCbaProcessing(true);
+    setCbaProcessingStep(0);
+    setCbaTimedOut(false);
+
+    // Create an AbortController so we can cancel the request on timeout
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
+    // Setup timeout safety net
+    const timeoutId = setTimeout(() => {
+      controller.abort(); // Cancel the in-flight request
+      setCbaTimedOut(true);
+      setOnboardingProgress(false);
+    }, CBA_TIMEOUT_MS);
+
     try {
-      const response = await axios.post('/api/staff/kyc/onboard-customer', payload);
+      const response = await axios.post('/api/staff/kyc/onboard-customer', payload, {
+        timeout: CBA_TIMEOUT_MS,
+        signal: controller.signal
+      });
+
+      clearTimeout(timeoutId);
+
+      // If we were aborted between timeout and response, ignore the result
+      if (controller.signal.aborted) return;
+
       if (response.data.success) {
         setCustomerOnboarded(true);
         const custData = response.data.customer;
         setOnboardedData(custData);
+        setCbaProcessing(false);
         if (custData.casa) {
           setFetchingBalance(true);
           try {
@@ -201,12 +260,21 @@ const NewCustomerModal: React.FC<NewCustomerModalProps> = ({ isOpen, onClose, on
         }
         if (onSuccess) onSuccess(bvn);
       } else {
+        setCbaProcessing(false);
         setError(response.data.message || 'Onboarding failed');
       }
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Error during onboarding process');
+      clearTimeout(timeoutId);
+      if (axios.isCancel(err) || err.code === 'ECONNABORTED' || err.name === 'AbortError' || err.message?.includes('timeout')) {
+        // Timeout or aborted — show retry state
+        setCbaTimedOut(true);
+      } else {
+        setCbaProcessing(false);
+        setError(err.response?.data?.message || 'Error during onboarding process');
+      }
     } finally {
       setOnboardingProgress(false);
+      abortControllerRef.current = null;
     }
   };
 
@@ -220,6 +288,9 @@ const NewCustomerModal: React.FC<NewCustomerModalProps> = ({ isOpen, onClose, on
     setOnboardedData(null);
     setCbaBalance(null);
     setFetchingBalance(false);
+    setCbaProcessing(false);
+    setCbaProcessingStep(0);
+    setCbaTimedOut(false);
     setFormData({
       title: '',
       firstName: '',
@@ -263,6 +334,143 @@ const NewCustomerModal: React.FC<NewCustomerModalProps> = ({ isOpen, onClose, on
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 backdrop-blur-md p-4 overflow-y-auto">
+
+      {/* ═══════════ NON-CANCELLABLE CBA PROCESSING OVERLAY ═══════════ */}
+      <AnimatePresence>
+        {cbaProcessing && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-950/80 backdrop-blur-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white dark:bg-[#1e293b] rounded-[40px] shadow-2xl w-full max-w-md p-12 text-center border border-slate-100 dark:border-slate-800 relative overflow-hidden"
+            >
+              {!cbaTimedOut ? (
+                /* ── Active Processing State ── */
+                <div className="space-y-8">
+                  {/* Pulsing core banking icon */}
+                  <div className="relative mx-auto w-24 h-24">
+                    <div className="absolute inset-0 rounded-full bg-blue-500/20 animate-ping" style={{ animationDuration: '2s' }} />
+                    <div className="absolute inset-2 rounded-full bg-blue-500/10 animate-ping" style={{ animationDuration: '2.5s', animationDelay: '0.5s' }} />
+                    <div className="relative w-24 h-24 rounded-full bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center shadow-2xl shadow-blue-600/30">
+                      <span className="material-symbols-outlined text-white text-3xl font-black">account_balance</span>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    <h3 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight">Processing with Core Banking</h3>
+                    <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider leading-relaxed max-w-xs mx-auto">
+                      Creating customer profile and CASA account. Please do not close this window.
+                    </p>
+                  </div>
+
+                  {/* Animated progress steps */}
+                  <div className="space-y-3 max-w-xs mx-auto">
+                    {[
+                      { label: 'Validating customer data', icon: 'person_search' },
+                      { label: 'Connecting to CBA service', icon: 'sync' },
+                      { label: 'Creating CASA account', icon: 'account_balance_wallet' },
+                      { label: 'Finalizing registration', icon: 'how_to_reg' },
+                    ].map((step, idx) => (
+                      <div key={idx} className={`flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-500 ${
+                        cbaProcessingStep === idx
+                          ? 'bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800'
+                          : cbaProcessingStep > idx
+                            ? 'opacity-50'
+                            : 'opacity-30'
+                      }`}>
+                        <div className={`w-6 h-6 rounded-full flex items-center justify-center transition-all duration-500 ${
+                          cbaProcessingStep === idx
+                            ? 'bg-blue-600 text-white'
+                            : cbaProcessingStep > idx
+                              ? 'bg-emerald-500 text-white'
+                              : 'bg-slate-200 dark:bg-slate-700 text-slate-400'
+                        }`}>
+                          {cbaProcessingStep > idx ? (
+                            <span className="material-symbols-outlined text-[12px] font-black">check</span>
+                          ) : cbaProcessingStep === idx ? (
+                            <span className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                          ) : (
+                            <span className="material-symbols-outlined text-[12px]">{step.icon}</span>
+                          )}
+                        </div>
+                        <span className={`text-[10px] font-black uppercase tracking-widest ${
+                          cbaProcessingStep === idx ? 'text-blue-600 dark:text-blue-400' : 'text-slate-400'
+                        }`}>
+                          {step.label}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Warning bar */}
+                  <div className="px-4 py-3 bg-amber-50 dark:bg-amber-900/10 rounded-2xl border border-amber-200 dark:border-amber-800/50">
+                    <div className="flex items-center justify-center gap-2">
+                      <span className="material-symbols-outlined text-amber-600 text-sm">warning</span>
+                      <p className="text-[9px] font-black text-amber-700 dark:text-amber-400 uppercase tracking-widest">
+                        Do not close or refresh this page
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                /* ── Timeout State ── */
+                <div className="space-y-8">
+                  <div className="w-20 h-20 rounded-full bg-rose-100 dark:bg-rose-900/20 flex items-center justify-center mx-auto">
+                    <span className="material-symbols-outlined text-rose-500 text-3xl">schedule</span>
+                  </div>
+
+                  <div className="space-y-3">
+                    <h3 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight">Request Timed Out</h3>
+                    <p className="text-[11px] font-bold text-slate-500 dark:text-slate-400 leading-relaxed max-w-xs mx-auto">
+                      The Core Banking service is taking longer than expected. The customer may or may not have been created.
+                    </p>
+                  </div>
+
+                  <div className="p-4 bg-amber-50 dark:bg-amber-900/10 rounded-2xl border border-amber-200 dark:border-amber-800">
+                    <p className="text-[10px] font-black text-amber-700 dark:text-amber-400 uppercase tracking-widest leading-relaxed">
+                      Please search for the customer by BVN before trying again to avoid duplicate records.
+                    </p>
+                  </div>
+
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => {
+                        abortControllerRef.current?.abort();
+                        setCbaProcessing(false);
+                        setCbaTimedOut(false);
+                        setOnboardingProgress(false);
+                      }}
+                      className="flex-1 py-4 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-200 dark:hover:bg-slate-700 transition-all"
+                    >
+                      Go Back
+                    </button>
+                    <button
+                      onClick={() => {
+                        abortControllerRef.current?.abort();
+                        setCbaProcessing(false);
+                        setCbaTimedOut(false);
+                        resetModal();
+                      }}
+                      className="flex-[2] py-4 bg-blue-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] shadow-xl hover:bg-blue-700 transition-all flex items-center justify-center gap-2"
+                    >
+                      <span className="material-symbols-outlined text-sm">search</span>
+                      Search by BVN First
+                    </button>
+                  </div>
+                </div>
+              )}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <motion.div
         initial={{ opacity: 0, scale: 0.95, y: 20 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -275,8 +483,13 @@ const NewCustomerModal: React.FC<NewCustomerModalProps> = ({ isOpen, onClose, on
               <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mt-1">Automated KYC Tiering & Provisioning</p>
             </div>
             <button
-              onClick={() => { resetModal(); onClose(); }}
-              className="w-12 h-12 rounded-full bg-slate-50 dark:bg-slate-800 flex items-center justify-center text-slate-400 hover:text-rose-500 transition-all hover:bg-rose-50 dark:hover:bg-rose-900/20"
+              onClick={() => { if (!cbaProcessing) { resetModal(); onClose(); } }}
+              disabled={cbaProcessing}
+              className={`w-12 h-12 rounded-full bg-slate-50 dark:bg-slate-800 flex items-center justify-center transition-all ${
+                cbaProcessing
+                  ? 'text-slate-200 dark:text-slate-700 cursor-not-allowed'
+                  : 'text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20'
+              }`}
             >
               <span className="material-symbols-outlined font-black">close</span>
             </button>
@@ -288,9 +501,19 @@ const NewCustomerModal: React.FC<NewCustomerModalProps> = ({ isOpen, onClose, on
             {customerOnboarded ? (
               <div className="flex flex-col items-center justify-center py-6 animate-in fade-in zoom-in duration-500 w-full">
                 <div className="w-full bg-white dark:bg-[#1e293b] rounded-[32px] border border-slate-100 dark:border-slate-800 shadow-xl overflow-hidden mb-6">
-                  <div className="bg-emerald-50 dark:bg-emerald-900/20 px-6 py-3 flex items-center justify-end">
-                    <span className="text-[10px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-widest">
-                      {onboardedData?.already_exists ? 'CORE BANKING RECORD FOUND' : 'CUSTOMER PROFILE CREATED'}
+                  <div className={`${
+                      !onboardedData?.casa
+                        ? 'bg-amber-50 dark:bg-amber-900/20'
+                        : 'bg-emerald-50 dark:bg-emerald-900/20'
+                    } px-6 py-3 flex items-center justify-end`}>
+                    <span className={`text-[10px] font-black uppercase tracking-widest ${
+                      !onboardedData?.casa
+                        ? 'text-amber-600 dark:text-amber-400'
+                        : 'text-emerald-600 dark:text-emerald-400'
+                    }`}>
+                      {onboardedData?.already_exists
+                        ? (onboardedData?.casa ? 'CORE BANKING RECORD FOUND' : 'CUSTOMER FOUND — MISSING CASA')
+                        : (onboardedData?.casa ? 'CUSTOMER PROFILE CREATED' : 'CREATED — MISSING CASA')}
                     </span>
                   </div>
 
@@ -375,6 +598,15 @@ const NewCustomerModal: React.FC<NewCustomerModalProps> = ({ isOpen, onClose, on
                          VIEW DEEP PROFILE
                        </button>
                     </div> */}
+                    {/* CBA Registration Notice */}
+                    {!onboardedData?.casa && (
+                      <div className="p-4 bg-amber-50 dark:bg-amber-900/10 rounded-2xl border border-amber-200 dark:border-amber-800 flex items-center gap-3">
+                        <span className="material-symbols-outlined text-amber-600 text-lg shrink-0">warning</span>
+                        <p className="text-[10px] font-bold text-amber-600 dark:text-amber-400/80 leading-relaxed">
+                          This customer has no CASA account. Go to their <strong>Customer Details Page</strong> to register them on the Core Banking Application.
+                        </p>
+                      </div>
+                    )}
                   </div>
                 </div>
 

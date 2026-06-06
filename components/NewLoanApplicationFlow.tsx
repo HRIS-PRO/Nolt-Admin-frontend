@@ -29,7 +29,7 @@ const NewLoanApplicationFlow: React.FC<NewLoanApplicationFlowProps> = ({ isOpen,
     const handleSearch = async (valueToSearch?: string) => {
         const val = valueToSearch || searchValue;
         if (!val) return;
-        
+
         // Validation length
         if (lookupType === 'bvn' && val.length !== 11) {
             setError("BVN must be 11 digits");
@@ -45,7 +45,7 @@ const NewLoanApplicationFlow: React.FC<NewLoanApplicationFlowProps> = ({ isOpen,
         try {
             const param = lookupType === 'bvn' ? `bvn=${val}` : `casa=${val}`;
             const response = await axios.get(`/api/staff/customers/lookup?${param}`);
-            
+
             if (response.data.success) {
                 setCustomerData(response.data.customer);
                 setLoanHistory(response.data.loans || []);
@@ -87,10 +87,10 @@ const NewLoanApplicationFlow: React.FC<NewLoanApplicationFlowProps> = ({ isOpen,
     // When showing full modals like NEW_CUSTOMER or LOAN_FORM, we don't render the wrapper styling.
     if (currentState === 'NEW_CUSTOMER') {
         return (
-            <NewCustomerModal 
-                isOpen={true} 
-                onClose={resetFlow} 
-                onSuccess={handleCustomerCreated} 
+            <NewCustomerModal
+                isOpen={true}
+                onClose={resetFlow}
+                onSuccess={handleCustomerCreated}
                 initialBvn={lookupType === 'bvn' ? searchValue : ''}
             />
         );
@@ -99,9 +99,9 @@ const NewLoanApplicationFlow: React.FC<NewLoanApplicationFlowProps> = ({ isOpen,
     if (currentState === 'LOAN_FORM') {
         const enrichedInitialData = { ...customerData, loan_type: selectedLoanType };
         return (
-            <StaffLoanForm 
-                onClose={resetFlow} 
-                onSuccess={() => { onSuccess(); resetFlow(); }} 
+            <StaffLoanForm
+                onClose={resetFlow}
+                onSuccess={() => { onSuccess(); resetFlow(); }}
                 initialData={enrichedInitialData}
                 user={user}
                 isCustomerVerified={true}
@@ -134,13 +134,13 @@ const NewLoanApplicationFlow: React.FC<NewLoanApplicationFlowProps> = ({ isOpen,
                                         </p>
                                     </div>
                                     <div className="flex p-1 bg-slate-100 dark:bg-slate-800 rounded-2xl">
-                                        <button 
+                                        <button
                                             onClick={() => { setLookupType('bvn'); setSearchValue(''); setError(null); }}
                                             className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${lookupType === 'bvn' ? 'bg-white dark:bg-slate-700 text-primary shadow-sm' : 'text-slate-400'}`}
                                         >
                                             BVN
                                         </button>
-                                        <button 
+                                        <button
                                             onClick={() => { setLookupType('casa'); setSearchValue(''); setError(null); }}
                                             className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${lookupType === 'casa' ? 'bg-white dark:bg-slate-700 text-primary shadow-sm' : 'text-slate-400'}`}
                                         >
@@ -148,8 +148,8 @@ const NewLoanApplicationFlow: React.FC<NewLoanApplicationFlowProps> = ({ isOpen,
                                         </button>
                                     </div>
                                     <div className="space-y-4">
-                                        <input 
-                                            type="text" 
+                                        <input
+                                            type="text"
                                             maxLength={lookupType === 'bvn' ? 11 : 10}
                                             value={searchValue}
                                             onChange={(e) => setSearchValue(e.target.value.replace(/\D/g, ''))}
@@ -158,7 +158,7 @@ const NewLoanApplicationFlow: React.FC<NewLoanApplicationFlowProps> = ({ isOpen,
                                             className="w-full px-6 py-4 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-2xl text-center text-xl font-black tracking-[0.2em] focus:ring-2 focus:ring-primary transition-all disabled:opacity-50 placeholder:text-slate-300 dark:placeholder:text-slate-600 placeholder:text-sm placeholder:tracking-normal dark:text-white"
                                         />
                                         {error && <p className="text-red-500 text-xs text-center font-bold">{error}</p>}
-                                        <button 
+                                        <button
                                             onClick={() => handleSearch()}
                                             disabled={loading || searchValue.length < 10}
                                             className="w-full py-4 bg-primary text-white rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-primary-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 relative overflow-hidden group"
@@ -188,17 +188,17 @@ const NewLoanApplicationFlow: React.FC<NewLoanApplicationFlowProps> = ({ isOpen,
                                 <div>
                                     <h4 className="text-xl font-black text-slate-900 dark:text-white uppercase mb-2 tracking-tight">Customer Not Found</h4>
                                     <p className="text-sm font-bold text-slate-500 uppercase tracking-widest leading-relaxed">
-                                        No customer found with {lookupType.toUpperCase()} {searchValue}.<br/>Would you like to onboard them?
+                                        No customer found with {lookupType.toUpperCase()} {searchValue}.<br />Would you like to onboard them?
                                     </p>
                                 </div>
                                 <div className="flex gap-4 w-full max-w-sm mt-4">
-                                    <button 
+                                    <button
                                         onClick={() => setCurrentState('LOOKUP')}
                                         className="flex-1 py-4 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all"
                                     >
                                         Try Again
                                     </button>
-                                    <button 
+                                    <button
                                         onClick={() => setCurrentState('NEW_CUSTOMER')}
                                         className="flex-1 py-4 bg-primary text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-primary-600 transition-all shadow-lg shadow-primary/20"
                                     >
@@ -268,7 +268,7 @@ const NewLoanApplicationFlow: React.FC<NewLoanApplicationFlowProps> = ({ isOpen,
                                         <div className="w-1 h-4 bg-primary rounded-full"></div>
                                         <h4 className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-widest">Existing Loans on CBS</h4>
                                     </div>
-                                    
+
                                     {cbaLoans.length > 0 ? (
                                         <div className="space-y-4">
                                             {cbaLoans.map((loan, idx) => {
@@ -373,23 +373,23 @@ const NewLoanApplicationFlow: React.FC<NewLoanApplicationFlowProps> = ({ isOpen,
                                             <div className="p-6 bg-purple-50/50 dark:bg-purple-900/10 rounded-3xl border border-purple-200 dark:border-purple-800 border-dashed mb-8">
                                                 <h4 className="text-sm font-black text-purple-700 dark:text-purple-400 uppercase italic tracking-tight mb-1">Active IPPIS Loan Detected</h4>
                                                 <p className="text-[10px] font-black text-purple-500/70 dark:text-purple-400/70 uppercase tracking-widest mb-6">This customer has an active IPPIS loan. Please select an action to proceed.</p>
-                                                
+
                                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                                    <button 
+                                                    <button
                                                         onClick={() => setSelectedLoanType('topup')}
                                                         className={`p-4 rounded-lg border transition-all text-left ${selectedLoanType === 'topup' ? 'bg-white border-purple-400 shadow-md ring-2 ring-purple-100' : 'bg-white/60 border-purple-100 hover:bg-white'}`}
                                                     >
                                                         <p className="font-black text-slate-900 text-sm mb-1">TOP-UP</p>
                                                         <p className="text-[9px] font-bold text-slate-400 uppercase leading-relaxed">Add funds to the existing loan</p>
                                                     </button>
-                                                    <button 
+                                                    <button
                                                         onClick={() => setSelectedLoanType('re-app')}
                                                         className={`p-4 rounded-lg border transition-all text-left ${selectedLoanType === 're-app' ? 'bg-white border-purple-400 shadow-md ring-2 ring-purple-100' : 'bg-white/60 border-purple-100 hover:bg-white'}`}
                                                     >
                                                         <p className="font-black text-slate-900 text-sm mb-1">RE-APP</p>
                                                         <p className="text-[9px] font-bold text-slate-400 uppercase leading-relaxed">Re-apply for a new loan term</p>
                                                     </button>
-                                                    <button 
+                                                    <button
                                                         onClick={() => setSelectedLoanType('add_on')}
                                                         className={`p-4 rounded-lg border transition-all text-left ${selectedLoanType === 'add_on' ? 'bg-white border-purple-400 shadow-md ring-2 ring-purple-100' : 'bg-white/60 border-purple-100 hover:bg-white'}`}
                                                     >
@@ -412,21 +412,21 @@ const NewLoanApplicationFlow: React.FC<NewLoanApplicationFlowProps> = ({ isOpen,
 
                                 {/* Footer Actions */}
                                 <div className="mt-auto pt-6 flex items-center justify-between gap-4">
-                                    <button 
+                                    <button
                                         onClick={() => setCurrentState('LOOKUP')}
                                         className="px-6 py-4 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-2xl text-xs font-black uppercase tracking-widest transition-all flex items-center gap-2"
                                     >
                                         <span className="material-symbols-outlined text-lg">search</span>
                                         Wrong Customer? Search Again
                                     </button>
-                                    <button 
+                                    <button
                                         onClick={() => setCurrentState('LOAN_FORM')}
                                         disabled={(() => {
                                             if (!customerData.is_active) return true;
                                             const activeLoans = cbaLoans.filter(loan => loan.currentBalance < 0 && loan.nextTotalPayment !== 0);
                                             const hasActiveLoan = activeLoans.length > 0;
                                             const hasActiveIppisLoan = activeLoans.some(loan => loan.product === 'NOLT IPPIS');
-                                            
+
                                             if (hasActiveLoan) {
                                                 if (!hasActiveIppisLoan) return true; // Disabled if active but not IPPIS
                                                 if (!['topup', 're-app', 'add_on'].includes(selectedLoanType)) return true; // Disabled until they select an IPPIS option
