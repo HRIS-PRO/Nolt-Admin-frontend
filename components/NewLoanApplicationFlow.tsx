@@ -97,6 +97,12 @@ const NewLoanApplicationFlow: React.FC<NewLoanApplicationFlowProps> = ({ isOpen,
     }
 
     if (currentState === 'LOAN_FORM') {
+        // Determine if the loan type must be locked (customer has an active loan —
+        // they were forced to choose topup/add_on, so we must prevent switching back to 'new').
+        const activeLoans = cbaLoans.filter(loan => loan.currentBalance < 0 && loan.nextTotalPayment !== 0);
+        const hasActiveLoan = activeLoans.length > 0;
+        const isLoanTypeLocked = hasActiveLoan && ['topup', 're-app', 'add_on'].includes(selectedLoanType);
+
         const enrichedInitialData = { ...customerData, loan_type: selectedLoanType };
         return (
             <StaffLoanForm
@@ -105,6 +111,7 @@ const NewLoanApplicationFlow: React.FC<NewLoanApplicationFlowProps> = ({ isOpen,
                 initialData={enrichedInitialData}
                 user={user}
                 isCustomerVerified={true}
+                lockedLoanType={isLoanTypeLocked ? selectedLoanType : undefined}
             />
         );
     }
@@ -284,7 +291,7 @@ const NewLoanApplicationFlow: React.FC<NewLoanApplicationFlowProps> = ({ isOpen,
                                                                     {loan.loanAccountNo} • {(loan.product || '').toUpperCase()}
                                                                 </p>
                                                                 <p className="text-[10px] font-black tracking-widest text-slate-400 uppercase mt-1">
-                                                                    Outstanding: <span className="text-rose-500">{isActive ? `₦${Math.abs(loan.currentBalance).toLocaleString()}` : 'NO'}</span>
+                                                                    Outstanding Principal: <span className="text-rose-500">{isActive ? `₦${Math.abs(loan.currentBalance).toLocaleString()}` : 'NO'}</span>
                                                                 </p>
                                                             </div>
                                                         </div>
@@ -374,7 +381,7 @@ const NewLoanApplicationFlow: React.FC<NewLoanApplicationFlowProps> = ({ isOpen,
                                                 <h4 className="text-sm font-black text-purple-700 dark:text-purple-400 uppercase italic tracking-tight mb-1">Active IPPIS Loan Detected</h4>
                                                 <p className="text-[10px] font-black text-purple-500/70 dark:text-purple-400/70 uppercase tracking-widest mb-6">This customer has an active IPPIS loan. Please select an action to proceed.</p>
 
-                                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                                     <button
                                                         onClick={() => setSelectedLoanType('topup')}
                                                         className={`p-4 rounded-lg border transition-all text-left ${selectedLoanType === 'topup' ? 'bg-white border-purple-400 shadow-md ring-2 ring-purple-100' : 'bg-white/60 border-purple-100 hover:bg-white'}`}
@@ -382,13 +389,13 @@ const NewLoanApplicationFlow: React.FC<NewLoanApplicationFlowProps> = ({ isOpen,
                                                         <p className="font-black text-slate-900 text-sm mb-1">TOP-UP</p>
                                                         <p className="text-[9px] font-bold text-slate-400 uppercase leading-relaxed">Add funds to the existing loan</p>
                                                     </button>
-                                                    <button
+                                                    {/* <button
                                                         onClick={() => setSelectedLoanType('re-app')}
                                                         className={`p-4 rounded-lg border transition-all text-left ${selectedLoanType === 're-app' ? 'bg-white border-purple-400 shadow-md ring-2 ring-purple-100' : 'bg-white/60 border-purple-100 hover:bg-white'}`}
                                                     >
                                                         <p className="font-black text-slate-900 text-sm mb-1">RE-APP</p>
                                                         <p className="text-[9px] font-bold text-slate-400 uppercase leading-relaxed">Re-apply for a new loan term</p>
-                                                    </button>
+                                                    </button> */}
                                                     <button
                                                         onClick={() => setSelectedLoanType('add_on')}
                                                         className={`p-4 rounded-lg border transition-all text-left ${selectedLoanType === 'add_on' ? 'bg-white border-purple-400 shadow-md ring-2 ring-purple-100' : 'bg-white/60 border-purple-100 hover:bg-white'}`}

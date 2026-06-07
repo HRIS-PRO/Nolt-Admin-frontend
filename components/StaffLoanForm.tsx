@@ -16,6 +16,9 @@ interface StaffLoanFormProps {
     loanId?: string;
     user?: any;
     isCustomerVerified?: boolean;
+    /** When set, the loan type is locked and cannot be changed by staff.
+     *  Used when a customer has an active loan and was forced to choose topup/add_on. */
+    lockedLoanType?: string;
 }
 
 const NIGERIAN_STATES = [
@@ -114,7 +117,9 @@ const FileUpload = ({
 
 // --- Main Component ---
 
-const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess, initialData, loanId, user, isCustomerVerified }) => {
+const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ 
+    onClose, onSuccess, initialData, loanId, user, isCustomerVerified, lockedLoanType 
+}) => {
     const [step, setStep] = useState(0);
     const [loading, setLoading] = useState(false);
     const [uploadProgress, setUploadProgress] = useState<Record<string, number>>({});
@@ -944,6 +949,15 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess, initi
                             <div className="p-6 bg-slate-50 dark:bg-slate-800/50 rounded-3xl border border-slate-100 dark:border-slate-800 mb-8">
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-6">
                                     <InputGroup label="Loan Type">
+                                        {lockedLoanType ? (
+                                            <div className="input-field flex items-center gap-2 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 cursor-not-allowed">
+                                                <span className="material-symbols-outlined text-amber-500 text-[16px]">lock</span>
+                                                <span className="font-black text-amber-700 dark:text-amber-400 uppercase tracking-wider text-sm">
+                                                    {lockedLoanType.replace('_', ' ').toUpperCase()}
+                                                </span>
+                                                <span className="ml-auto text-[9px] font-black text-amber-500 uppercase tracking-widest">Locked — Active Loan</span>
+                                            </div>
+                                        ) : (
                                         <select className="input-field" value={loanType} onChange={e => {
                                             setLoanType(e.target.value);
                                             // Reset step to 0 if switching back to 'new' (wizard mode)
@@ -955,6 +969,7 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess, initi
                                             <option value="re-app">Re-app</option>
                                             <option value="add_on">Add-on</option>
                                         </select>
+                                        )}
                                     </InputGroup>
                                 </div>
                                 <div className="p-4 bg-blue-50 text-blue-800 rounded-xl text-sm font-medium">
@@ -1481,6 +1496,15 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess, initi
                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-8 pt-0 border-t border-slate-50 dark:border-slate-800/50 mt-6 animate-in fade-in duration-300">
                                                 <div className="md:col-span-2">
                                                     <InputGroup label="Loan Type">
+                                                        {lockedLoanType ? (
+                                                            <div className="input-field flex items-center gap-2 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 cursor-not-allowed">
+                                                                <span className="material-symbols-outlined text-amber-500 text-[16px]">lock</span>
+                                                                <span className="font-black text-amber-700 dark:text-amber-400 uppercase tracking-wider text-sm">
+                                                                    {lockedLoanType.replace('_', ' ').toUpperCase()}
+                                                                </span>
+                                                                <span className="ml-auto text-[9px] font-black text-amber-500 uppercase tracking-widest">Locked — Active Loan</span>
+                                                            </div>
+                                                        ) : (
                                                         <select
                                                             className="input-field animate-none"
                                                             value={loanType}
@@ -1498,6 +1522,7 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ onClose, onSuccess, initi
                                                             <option value="re-app">Re-app</option>
                                                             <option value="add_on">Add-on</option>
                                                         </select>
+                                                        )}
                                                     </InputGroup>
                                                 </div>
 
