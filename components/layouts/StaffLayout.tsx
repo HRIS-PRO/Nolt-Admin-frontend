@@ -97,10 +97,13 @@ const StaffLayout: React.FC<StaffLayoutProps> = ({ children, user, onLogout, tog
                         // Filter items based on role
                         const filteredItems = group.items.filter(item => {
                             const role = user?.role || '';
-                            const allowedBiAndReportsRoles = ['sales_manager', 'credit_manager', 'internal_audit', 'finance', 'compliance', 'md', 'hr', 'super_admin', 'superadmin', 'admin'];
+                            const allowedBiAndReportsRoles = ['sales_manager', 'credit_manager', 'internal_audit', 'finance', 'compliance', 'md', 'hr', 'super_admin', 'superadmin', 'admin', 'customer_experience'];
                             
                             if (item.label === 'Reports' || item.label === 'BI Dashboard') {
                                 return allowedBiAndReportsRoles.includes(role);
+                            }
+                            if (item.label === 'Products') {
+                                return role !== 'customer_experience';
                             }
                             if (item.label === 'Customers') {
                                 return role === 'super_admin' || role === 'customer_experience';
