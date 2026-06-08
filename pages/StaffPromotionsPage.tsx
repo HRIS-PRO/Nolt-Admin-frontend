@@ -468,7 +468,7 @@ const StaffPromotionsPage: React.FC<StaffPromotionsPageProps> = ({ user, onLogou
                                                 className="w-full h-12 px-4 rounded-xl bg-slate-800/80 border border-slate-700/50 text-white focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-all font-bold text-xs appearance-none"
                                             >
                                                 <option value="ALL_PRODUCTS">All Products</option>
-                                                <option value="IPPIS">IPPIS</option>
+                                                <option value="NOLT_IPPIS">NOLT IPPIS</option>
                                                 <option value="NOLT_RISE">NOLT Rise</option>
                                                 <option value="NOLT_VAULT">NOLT Vault</option>
                                                 <option value="NOLT_SURGE">NOLT Surge</option>
