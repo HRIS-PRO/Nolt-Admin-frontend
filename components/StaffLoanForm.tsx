@@ -1372,7 +1372,7 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
                                                 </div>
                                                 <div className="md:col-span-4">
                                                     <InputGroup label="NIN" required error={errors.nin}>
-                                                        <input className="input-field" value={nin} onChange={handleNumericChange(setNac => { }, 'nin', 11)} maxLength={11} placeholder="NIN" />
+                                                        <input className="input-field" value={nin} onChange={handleNumericChange(setNin, 'nin', 11)} maxLength={11} placeholder="NIN" />
                                                     </InputGroup>
                                                 </div>
                                                 <div className="md:col-span-4">
