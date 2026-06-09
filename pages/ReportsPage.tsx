@@ -110,6 +110,8 @@ const ReportsPage: React.FC<ReportsPageProps> = ({ user, onLogout, toggleTheme, 
                 "IPPIS No",
                 "Staff ID",
                 "Phone No",
+                "CASA Account",
+                "CBA Customer ID",
                 "Status",
                 "Creation Date",
                 "Disb. Date"
@@ -138,6 +140,8 @@ const ReportsPage: React.FC<ReportsPageProps> = ({ user, onLogout, toggleTheme, 
                         `"${r.ippis_number || ''}"`,
                         `"${r.staff_id || ''}"`,
                         `"${r.mobile_number || ''}"`,
+                        `"${r.casa || ''}"`,
+                        `"${r.cba_customer_id || ''}"`,
                         `"${r.status || r.stage || ''}"`,
                         `"${formatDate(r.created_at)}"`,
                         `"${formatDate(r.disb_date)}"`
@@ -264,6 +268,8 @@ const ReportsPage: React.FC<ReportsPageProps> = ({ user, onLogout, toggleTheme, 
                                 <th className="p-4">Bank</th>
                                 <th className="p-4">Tenure</th>
                                 <th className="p-4">Officer</th>
+                                <th className="p-4">CASA</th>
+                                <th className="p-4">CBA ID</th>
                                 <th className="p-4">Status</th>
                                 <th className="p-4">Creation Date</th>
                                 <th className="p-4">Disb. Date</th>
@@ -301,6 +307,12 @@ const ReportsPage: React.FC<ReportsPageProps> = ({ user, onLogout, toggleTheme, 
                                         </td>
                                         <td className="p-4">{r.loan_tenure_months} M</td>
                                         <td className="p-4">{r.officer_name || '-'}</td>
+                                        <td className="p-4">
+                                            <div className="font-mono text-xs font-bold text-slate-800 dark:text-slate-200">{r.casa || '-'}</div>
+                                        </td>
+                                        <td className="p-4">
+                                            <div className="font-mono text-xs text-slate-500">{r.cba_customer_id || '-'}</div>
+                                        </td>
                                         <td className="p-4">
                                             <span className={`px-2 py-1 rounded border text-[10px] font-black uppercase tracking-wider 
                                                 ${(r.status === 'approved' || r.stage === 'disbursed')
