@@ -96,6 +96,9 @@ const ReportsPage: React.FC<ReportsPageProps> = ({ user, onLogout, toggleTheme, 
 
             const headers = [
                 "Applicant Name",
+                "CASA Account",
+                "CBA Customer ID",
+                "IPPIS No",
                 "Institution/Ministry",
                 "Amount",
                 "Disbursement Amount",
@@ -107,7 +110,6 @@ const ReportsPage: React.FC<ReportsPageProps> = ({ user, onLogout, toggleTheme, 
                 "Branch",
                 "Account Officer",
                 "Loan Type",
-                "IPPIS No",
                 "Staff ID",
                 "Phone No",
                 "Status",
@@ -124,6 +126,9 @@ const ReportsPage: React.FC<ReportsPageProps> = ({ user, onLogout, toggleTheme, 
 
                     const row = [
                         `"${r.applicant_full_name || ''}"`,
+                        `"${r.casa || ''}"`,
+                        `"${r.cba_customer_id || ''}"`,
+                        `"${r.ippis_number || ''}"`,
                         `"${r.mda_tertiary || ''}"`,
                         `${amount}`,
                         `${r.disbursement_amount || 0}`,
@@ -135,7 +140,6 @@ const ReportsPage: React.FC<ReportsPageProps> = ({ user, onLogout, toggleTheme, 
                         `""`, // Branch (Empty)
                         `"${r.officer_name || ''}"`,
                         `"${r.loan_type || ''}"`,
-                        `"${r.ippis_number || ''}"`,
                         `"${r.staff_id || ''}"`,
                         `"${r.mobile_number || ''}"`,
                         `"${r.status || r.stage || ''}"`,
@@ -257,6 +261,8 @@ const ReportsPage: React.FC<ReportsPageProps> = ({ user, onLogout, toggleTheme, 
                         <thead className="bg-slate-50/50 dark:bg-[#0f172a]/30 text-[10px] uppercase text-slate-500 font-black tracking-wider">
                             <tr>
                                 <th className="p-4">Applicant</th>
+                                <th className="p-4">CASA</th>
+                                <th className="p-4">CBA ID</th>
                                 <th className="p-4">Institution</th>
                                 <th className="p-4">Amount</th>
                                 <th className="p-4">Disbursement</th>
@@ -282,6 +288,12 @@ const ReportsPage: React.FC<ReportsPageProps> = ({ user, onLogout, toggleTheme, 
                                 reports.map((r, i) => (
                                     <tr key={i} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
                                         <td className="p-4 font-bold text-slate-900 dark:text-white">{r.applicant_full_name}</td>
+                                        <td className="p-4">
+                                            <div className="font-mono text-xs font-bold text-slate-800 dark:text-slate-200">{r.casa || '-'}</div>
+                                        </td>
+                                        <td className="p-4">
+                                            <div className="font-mono text-xs text-slate-500">{r.cba_customer_id || '-'}</div>
+                                        </td>
                                         <td className="p-4 max-w-[200px] truncate" title={r.mda_tertiary}>{r.mda_tertiary}</td>
                                         <td className="p-4">
                                             {/* Show TopUp Amount for special loans, else Eligible/Requested */}
@@ -301,6 +313,7 @@ const ReportsPage: React.FC<ReportsPageProps> = ({ user, onLogout, toggleTheme, 
                                         </td>
                                         <td className="p-4">{r.loan_tenure_months} M</td>
                                         <td className="p-4">{r.officer_name || '-'}</td>
+
                                         <td className="p-4">
                                             <span className={`px-2 py-1 rounded border text-[10px] font-black uppercase tracking-wider 
                                                 ${(r.status === 'approved' || r.stage === 'disbursed')

@@ -37,7 +37,17 @@ const ActionCard = ({ loan, userRole, onActionComplete }: { loan: any, userRole:
     const [returnTargetStage, setReturnTargetStage] = useState('');
     const [glAccounts, setGlAccounts] = useState<any[]>([]);
     const [selectedGL, setSelectedGL] = useState(loan.gl_account || '');
-    const [startDate, setStartDate] = useState(loan.start_date ? new Date(loan.start_date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]);
+    const [startDate, setStartDate] = useState(() => {
+        if (loan.start_date) {
+            // Slice directly — never parse through Date to avoid UTC timezone shift.
+            // e.g. "2026-06-30T00:00:00.000Z" → "2026-06-30"
+            //      "2026-06-30 00:00:00"       → "2026-06-30"
+            return String(loan.start_date).slice(0, 10);
+        }
+        // Fallback: today in LOCAL time (not UTC) so WAT doesn't shift it back a day
+        const t = new Date();
+        return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
+    });
     const [isStartDateExpanded, setIsStartDateExpanded] = useState(false);
 
     // Disbursement Logic State
