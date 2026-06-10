@@ -49,6 +49,13 @@ const ActionCard = ({ loan, userRole, onActionComplete }: { loan: any, userRole:
         return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
     });
     const [isStartDateExpanded, setIsStartDateExpanded] = useState(false);
+    const [manualInterestRate, setManualInterestRate] = useState(() => {
+        // postgres returns NUMERIC as a string e.g. "3.5000" — parse and strip trailing zeros
+        const raw = loan.manual_interest_rate;
+        if (raw === null || raw === undefined || raw === '') return '';
+        const n = parseFloat(String(raw));
+        return isNaN(n) ? '' : String(n); // e.g. "3.5", not "3.5000"
+    });
 
     // Disbursement Logic State
     const [applyManagementFee, setApplyManagementFee] = useState(loan.apply_management_fee || false);
@@ -110,6 +117,12 @@ const ActionCard = ({ loan, userRole, onActionComplete }: { loan: any, userRole:
                 payload.data.apply_insurance_fee = applyInsuranceFee;
                 payload.data.disbursement_amount = calculateDisbursementAmount();
                 payload.data.start_date = startDate;
+
+                // Include manual interest rate if set
+                const parsedRate = parseFloat(manualInterestRate);
+                if (!isNaN(parsedRate) && parsedRate > 0) {
+                    payload.data.manual_interest_rate = parsedRate;
+                }
 
                 if (isSpecialLoan) {
                     payload.data.existing_loan_balance = existingLoanBalance;
@@ -425,6 +438,45 @@ const ActionCard = ({ loan, userRole, onActionComplete }: { loan: any, userRole:
                             </div>
                         )}
                     </div>
+                )}
+
+                {/* Manual Interest Rate — Credit Check 1 & 2 (new / buy-over / re-app only) */}
+                {(stage === 'credit_check_1' || stage === 'credit_check_2') &&
+                 ['new', 'buy_over', 're-app', 're_app'].includes(loan.loan_type?.toLowerCase()) && (
+                    <div className="mb-6 p-5 rounded-[20px] bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-700 space-y-3">
+                        <div className="flex items-center gap-2 mb-1">
+                            <span className="material-symbols-outlined text-amber-500 text-sm">percent</span>
+                            <p className="text-[9px] font-black text-amber-600 dark:text-amber-400 uppercase tracking-widest">Monthly Interest Rate</p>
+                            <span className="text-[9px] font-bold text-amber-500 bg-amber-100 dark:bg-amber-900/30 px-2 py-0.5 rounded-full">Sent to CBA</span>
+                        </div>
+                        <div className="relative">
+                            <input
+                                type="number"
+                                step="0.0001"
+                                min="0"
+                                max="100"
+                                value={manualInterestRate}
+                                onChange={e => setManualInterestRate(e.target.value)}
+                                placeholder="e.g. 3.5"
+                                className="w-full px-4 py-3 pr-14 rounded-2xl bg-white dark:bg-slate-800 border-2 border-amber-300 dark:border-amber-700 text-slate-900 dark:text-white font-bold text-sm focus:ring-2 focus:ring-amber-400 outline-none transition-all placeholder:text-slate-300"
+                            />
+                            <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-black text-amber-500">%/mo</span>
+                        </div>
+                        {manualInterestRate && !isNaN(parseFloat(manualInterestRate)) && parseFloat(manualInterestRate) > 0 ? (
+                            <p className="text-[10px] font-bold text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                                <span className="material-symbols-outlined text-[10px] text-emerald-500">check_circle</span>
+                                CBA will receive:
+                                <span className="text-amber-600 dark:text-amber-400 font-black">{(parseFloat(manualInterestRate) * 12).toFixed(4)}% annual</span>
+                                <span className="text-slate-400">(monthly × 12)</span>
+                            </p>
+                        ) : (
+                            <p className="text-[10px] font-bold text-slate-400 flex items-center gap-1.5">
+                                <span className="material-symbols-outlined text-[10px] text-slate-400">warning</span>
+                                Not set — will fall back to product rate or 3.5% default
+                            </p>
+                        )}
+                    </div>
+
                 )}
 
                 {/* Upload Section */}

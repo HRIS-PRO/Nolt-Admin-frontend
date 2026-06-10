@@ -415,8 +415,8 @@ const StaffInvestmentDetailsPage: React.FC<StaffInvestmentDetailsPageProps> = ({
 
     return (
         <StaffLayout user={user} onLogout={onLogout} toggleTheme={toggleTheme} theme={theme}>
-            {/* Critical Alert for Missing CASA */}
-            {investment && investment.status === 'active' && !investment.casa_account_number && (
+            {/* Critical Alert for Missing CASA — commented out: CASA is now auto-filled from user profile on activation */}
+            {/* investment && investment.status === 'active' && !investment.casa_account_number && (
                 <div className="mb-8 p-6 rounded-[32px] bg-orange-50 dark:bg-orange-600/10 border-2 border-orange-200 dark:border-orange-500/20 flex flex-col md:flex-row items-center justify-between gap-6 shadow-xl shadow-orange-500/10 animate-in zoom-in-95 duration-500">
                     <div className="flex items-center gap-5">
                         <div className="size-14 rounded-2xl bg-orange-500 text-white flex items-center justify-center shadow-lg shadow-orange-500/30 shrink-0">
@@ -442,7 +442,7 @@ const StaffInvestmentDetailsPage: React.FC<StaffInvestmentDetailsPageProps> = ({
                         Resolve Now
                     </button>
                 </div>
-            )}
+            ) */}
 
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8">
@@ -484,7 +484,7 @@ const StaffInvestmentDetailsPage: React.FC<StaffInvestmentDetailsPageProps> = ({
                     )}
                     <div>
                         <div className="flex items-center gap-3 mb-1">
-                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">INV-{investment.id}</p>
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{investment.cba_td_account_number ? `#${investment.cba_td_account_number}` : `INV-${investment.id}`}</p>
                             <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border uppercase tracking-wider ${investment.status === 'active' ? 'border-green-500/20 bg-green-500/10 text-green-500' :
                                 investment.status === 'completed' ? 'border-blue-500/20 bg-blue-500/10 text-blue-500' :
                                     investment.status === 'rejected' || investment.status === 'terminated' ? 'border-red-500/20 bg-red-500/10 text-red-500' :
@@ -530,9 +530,36 @@ const StaffInvestmentDetailsPage: React.FC<StaffInvestmentDetailsPageProps> = ({
                     </button>
                 )}
             </div>
-            
+
+            {/* Customer Banking Info Bar */}
+            {investment.customer_id && (investment.cba_customer_id || investment.casa) && (
+                <div className="flex flex-wrap items-center gap-3 mt-4 mb-8 animate-in fade-in slide-in-from-top-2 duration-300">
+                    {investment.cba_customer_id && (
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-xs font-bold text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+                            <span className="material-symbols-outlined text-sm">badge</span>
+                            CBA ID: {investment.cba_customer_id}
+                        </span>
+                    )}
+                    {investment.casa && (
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-50 dark:bg-blue-900/20 text-xs font-bold text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800">
+                            <span className="material-symbols-outlined text-sm">account_balance</span>
+                            CASA: {investment.casa}
+                        </span>
+                    )}
+                    <button
+                        onClick={() => navigate(`/staff/customers/${investment.customer_id}`)}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 text-xs font-bold text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 transition-colors cursor-pointer"
+                    >
+                        <span className="material-symbols-outlined text-sm">person_search</span>
+                        View Customer Profile
+                        <span className="material-symbols-outlined text-sm">arrow_forward</span>
+                    </button>
+                </div>
+            )}
+
             {/* System Priority Warnings */}
             <div className="space-y-4 mb-8">
+                {/* CASA missing warning — commented out: CASA is now auto-filled from user_profiles on Finance approval
                 {!investment.casa_account_number && investment.status === 'active' && (
                     <div className="p-6 rounded-[24px] bg-orange-50 dark:bg-orange-500/10 border-2 border-orange-200 dark:border-orange-500/20 flex items-start gap-4 animate-in fade-in slide-in-from-top-4 duration-500">
                         <div className="size-12 rounded-full bg-orange-500 text-white flex items-center justify-center shrink-0 shadow-lg shadow-orange-500/20">
@@ -546,6 +573,7 @@ const StaffInvestmentDetailsPage: React.FC<StaffInvestmentDetailsPageProps> = ({
                         </div>
                     </div>
                 )}
+                */}
 
                 {investment.has_failed_selfie && (
                     <div className="p-6 rounded-[24px] bg-red-50 dark:bg-red-500/10 border-2 border-red-200 dark:border-red-500/20 flex items-start gap-4 animate-in fade-in slide-in-from-top-4 duration-500">
@@ -573,6 +601,7 @@ const StaffInvestmentDetailsPage: React.FC<StaffInvestmentDetailsPageProps> = ({
                     { id: 'finance', label: 'Finance', icon: 'payments' },
                     { id: 'completed', label: 'Payout', icon: 'account_balance_wallet' }
                 ] : [
+                    { id: 'sales', label: 'Sales', icon: 'handshake' },
                     { id: 'submitted', label: 'Customer Exp.', icon: 'support_agent' },
                     { id: 'compliance_review', label: 'Compliance', icon: 'policy' },
                     { id: 'finance_review', label: 'Finance', icon: 'payments' },
@@ -1210,10 +1239,13 @@ const StaffInvestmentDetailsPage: React.FC<StaffInvestmentDetailsPageProps> = ({
                                                     {investment.status === 'pending' && (() => {
                                                         const userRole = user?.role;
                                                         const stage = investment.stage || 'submitted';
+                                                        const currentUserId = user?.id;
+                                                        const isSalesOfficer = investment.sales_officer_id && investment.sales_officer_id === currentUserId;
                                                         const canApprove = (
-                                                            (stage === 'submitted' && (userRole === 'customer_experience' || userRole === 'super_admin')) ||
-                                                            (stage === 'compliance_review' && (userRole === 'compliance' || userRole === 'super_admin')) ||
-                                                            (stage === 'finance_review' && (userRole === 'finance' || userRole === 'super_admin'))
+                                                            (stage === 'sales' && (isSalesOfficer || userRole === 'super_admin' || userRole === 'admin')) ||
+                                                            (stage === 'submitted' && (userRole === 'customer_experience' || userRole === 'super_admin' || userRole === 'admin')) ||
+                                                            (stage === 'compliance_review' && (userRole === 'compliance' || userRole === 'super_admin' || userRole === 'admin')) ||
+                                                            (stage === 'finance_review' && (userRole === 'finance' || userRole === 'super_admin' || userRole === 'admin'))
                                                         );
                             
                                                         if (canApprove) {
@@ -1258,7 +1290,7 @@ const StaffInvestmentDetailsPage: React.FC<StaffInvestmentDetailsPageProps> = ({
                                                                             >
                                                                                 Reject
                                                                             </button>
-                                                                            {stage !== 'submitted' && (
+                                                                            {stage !== 'sales' && (
                                                                                 <button
                                                                                     onClick={() => {
                                                                                         setReason('');
@@ -1428,81 +1460,31 @@ const StaffInvestmentDetailsPage: React.FC<StaffInvestmentDetailsPageProps> = ({
                                                     </div>
                                                 )}
 
-                            {/* CASA Account Input Card */}
-                                                <div className="bg-white dark:bg-[#1e293b] rounded-2xl p-6 border border-slate-200 dark:border-slate-800 shadow-sm">
-                                                    <div className="flex items-center gap-3 mb-6 pb-4 border-b border-slate-100 dark:border-slate-800/60">
-                                                        <div className="flex items-center justify-center size-10 rounded-xl bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400">
-                                                            <span className="material-symbols-outlined text-[20px]">account_balance</span>
-                                                        </div>
-                                                        <div>
-                                                            <h3 className="text-base font-bold text-slate-900 dark:text-white">CASA Setting</h3>
-                                                            <p className="text-xs font-medium text-slate-500">Account Management</p>
-                                                        </div>
-                                                    </div>
-                            
-                                                    <div className="space-y-4">
-                                                        {['sales_manager', 'admin', 'super_admin', 'superadmin', 'finance', 'customer_experience'].includes(user?.role?.toLowerCase() || '') ? (
-                                                            <>
-                                                                {!investment.casa_account_number && investment.status === 'active' && (
-                                                                    <div className="p-3 bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 rounded-xl flex items-start gap-2 mb-2">
-                                                                        <span className="material-symbols-outlined text-amber-500 text-[18px] mt-0.5">warning</span>
-                                                                        <p className="text-xs font-medium text-amber-800 dark:text-amber-400 leading-relaxed">
-                                                                            This investment is ACTIVE but missing a CASA number. Certificate cannot be dispatched until provided.
-                                                                        </p>
-                                                                    </div>
-                                                                )}
-                            
-                                                                <div className="space-y-3">
-                                                                    <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">CASA Account Number</label>
-                            
-                                                                    {!investment.casa_account_number && investment.suggested_casa_number && (
-                                                                        <div className="p-3 bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/20 rounded-xl flex items-center justify-between">
-                                                                            <div>
-                                                                                <p className="text-[11px] font-medium text-blue-600 dark:text-blue-400 mb-0.5">Previous Account Found</p>
-                                                                                <p className="text-sm font-bold text-blue-900 dark:text-blue-300 font-mono">{investment.suggested_casa_number}</p>
-                                                                            </div>
-                                                                            <button
-                                                                                onClick={() => {
-                                                                                    const el = document.getElementById('casa_number_input') as HTMLInputElement;
-                                                                                    if (el) el.value = investment.suggested_casa_number;
-                                                                                }}
-                                                                                className="px-3 py-1.5 bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-500/30 rounded-lg text-xs font-semibold hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors shadow-sm"
-                                                                            >
-                                                                                Use This
-                                                                            </button>
-                                                                        </div>
-                                                                    )}
-                            
-                                                                    <div className="flex flex-col 2xl:flex-row gap-3 mt-2">
-                                                                        <input
-                                                                            type="text"
-                                                                            placeholder="Enter CASA Number..."
-                                                                            defaultValue={investment.casa_account_number || ''}
-                                                                            id="casa_number_input"
-                                                                            className="flex-1 w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all outline-none"
-                                                                        />
-                                                                        <button
-                                                                            onClick={() => {
-                                                                                const val = (document.getElementById('casa_number_input') as HTMLInputElement).value;
-                                                                                handleCASAUpdate(val);
-                                                                            }}
-                                                                            disabled={isActioning}
-                                                                            className="px-5 py-2.5 w-full 2xl:w-auto shrink-0 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-xl text-sm font-semibold hover:bg-slate-800 dark:hover:bg-slate-100 transition-colors disabled:opacity-50 shadow-sm"
-                                                                        >
-                                                                            Save Settings
-                                                                        </button>
-                                                                    </div>
-                                                                    <p className="text-[11px] text-slate-500 mt-1">Clicking "Save Settings" will automatically email the client their certificate if active.</p>
-                                                                </div>
-                                                            </>
-                                                        ) : (
-                                                            <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-700/50 flex justify-between items-center">
-                                                                <span className="text-sm font-medium text-slate-500 dark:text-slate-400">Assigned Number</span>
-                                                                <span className="text-sm font-semibold text-slate-900 dark:text-white font-mono">{investment.casa_account_number || 'Pending'}</span>
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                </div>
+                            {/* CASA Account Input Card — commented out.
+                                 CASA is now auto-populated from user_profiles when Finance approves the investment.
+                                 The certificate is dispatched automatically. Manual entry is no longer required.
+                            <div className="bg-white dark:bg-[#1e293b] rounded-2xl p-6 border border-slate-200 dark:border-slate-800 shadow-sm">
+                                ...removed...
+                            </div>
+                            */}
+                            {/* CASA Read-Only Display */}
+                            {investment.casa_account_number && (
+                                <div className="bg-white dark:bg-[#1e293b] rounded-2xl p-6 border border-slate-200 dark:border-slate-800 shadow-sm">
+                                    <div className="flex items-center gap-3 mb-4">
+                                        <div className="flex items-center justify-center size-10 rounded-xl bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400">
+                                            <span className="material-symbols-outlined text-[20px]">account_balance</span>
+                                        </div>
+                                        <div>
+                                            <h3 className="text-base font-bold text-slate-900 dark:text-white">CASA Account</h3>
+                                            <p className="text-xs font-medium text-slate-500">Auto-linked from customer profile</p>
+                                        </div>
+                                    </div>
+                                    <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-700/50 flex justify-between items-center">
+                                        <span className="text-sm font-medium text-slate-500 dark:text-slate-400">Account Number</span>
+                                        <span className="text-sm font-semibold text-slate-900 dark:text-white font-mono">{investment.casa_account_number}</span>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     )}
 
@@ -1537,6 +1519,7 @@ const StaffInvestmentDetailsPage: React.FC<StaffInvestmentDetailsPageProps> = ({
                                             <option value="">Select Stage...</option>
                                             {(() => {
                                                 const allStages = [
+                                                    { id: 'sales', label: 'Sales' },
                                                     { id: 'submitted', label: 'Customer Exp.' },
                                                     { id: 'compliance_review', label: 'Compliance' },
                                                     { id: 'finance_review', label: 'Finance' }

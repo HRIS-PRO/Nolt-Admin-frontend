@@ -828,7 +828,7 @@ const ApplicationsList: React.FC<ApplicationsListProps> = ({ navigate, formatMon
                         <p className="text-xs text-slate-500 font-bold">Has invested the sum of</p>
                         <p className="text-2xl font-black text-[#028ff5]">&#8358;{principalStr}</p>
                         <p className="text-xs text-slate-500 font-medium">In the <strong className="text-[#031421] uppercase">{investmentType.replace('_', ' ')}</strong> product</p>
-                        <p className="text-xs text-slate-400">Investment ID: <strong className="text-[#031421]">#{selectedApp.id}</strong></p>
+                        <p className="text-xs text-slate-400">Investment ID: <strong className="text-[#031421]">{selectedApp.data?.cba_td_account_number ? `#${selectedApp.data.cba_td_account_number}` : `#${selectedApp.id}`}</strong></p>
                       </div>
 
                       {/* Right: NUBAN Card */}
