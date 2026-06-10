@@ -21,8 +21,12 @@ const LoanQueuePage: React.FC<LoanQueuePageProps> = ({ user, onLogout, toggleThe
     const statusFilter = searchParams.get('status') || '';
     const stageFilter = searchParams.get('stage') || '';
     const officerFilter = searchParams.get('officer') || '';
+    const dateFrom = searchParams.get('date_from') || '';
+    const dateTo = searchParams.get('date_to') || '';
     const currentPage = parseInt(searchParams.get('page') || '1', 10);
     const itemsPerPage = 10;
+
+    const [showCustomDate, setShowCustomDate] = useState(false);
 
     const [loans, setLoans] = useState<any[]>([]);
     const [officers, setOfficers] = useState<any[]>([]);
@@ -44,6 +48,8 @@ const LoanQueuePage: React.FC<LoanQueuePageProps> = ({ user, onLogout, toggleThe
                     status: statusFilter,
                     stage: stageFilter,
                     officer: officerFilter,
+                    date_from: dateFrom,
+                    date_to: dateTo,
                     page: currentPage,
                     limit: itemsPerPage
                 },
@@ -148,7 +154,7 @@ const LoanQueuePage: React.FC<LoanQueuePageProps> = ({ user, onLogout, toggleThe
                 socket.off('loan_updated', handleLoanChange);
             };
         });
-    }, [user.role, searchQuery, statusFilter, stageFilter, officerFilter, currentPage]);
+    }, [user.role, searchQuery, statusFilter, stageFilter, officerFilter, dateFrom, dateTo, currentPage]);
 
     // Fetch GL accounts when finance stage is filtered
     useEffect(() => {
@@ -188,6 +194,55 @@ const LoanQueuePage: React.FC<LoanQueuePageProps> = ({ user, onLogout, toggleThe
             .map(word => word[0].toUpperCase())
             .join('');
     };
+
+    // Compute today's date string in WAT (UTC+1) — used for quick presets
+    const getLocalDateStr = (offsetDays = 0) => {
+        const d = new Date();
+        d.setDate(d.getDate() + offsetDays);
+        // WAT adjustment
+        const wat = new Date(d.getTime() + 60 * 60 * 1000);
+        return wat.toISOString().slice(0, 10);
+    };
+
+    const applyDatePreset = (preset: string) => {
+        const today = getLocalDateStr(0);
+        setSearchParams(prev => {
+            const p = new URLSearchParams(prev);
+            p.set('page', '1');
+            if (preset === 'today') {
+                p.set('date_from', today); p.set('date_to', today);
+                setShowCustomDate(false);
+            } else if (preset === 'yesterday') {
+                const y = getLocalDateStr(-1);
+                p.set('date_from', y); p.set('date_to', y);
+                setShowCustomDate(false);
+            } else if (preset === 'last7') {
+                p.set('date_from', getLocalDateStr(-6)); p.set('date_to', today);
+                setShowCustomDate(false);
+            } else if (preset === 'last30') {
+                p.set('date_from', getLocalDateStr(-29)); p.set('date_to', today);
+                setShowCustomDate(false);
+            } else if (preset === 'custom') {
+                setShowCustomDate(true);
+                return p; // Don't clear dates yet
+            } else {
+                p.delete('date_from'); p.delete('date_to');
+                setShowCustomDate(false);
+            }
+            return p;
+        });
+    };
+
+    const activeDatePreset = (() => {
+        if (!dateFrom && !dateTo) return '';
+        const today = getLocalDateStr(0);
+        const yesterday = getLocalDateStr(-1);
+        if (dateFrom === today && dateTo === today) return 'today';
+        if (dateFrom === yesterday && dateTo === yesterday) return 'yesterday';
+        if (dateFrom === getLocalDateStr(-6) && dateTo === today) return 'last7';
+        if (dateFrom === getLocalDateStr(-29) && dateTo === today) return 'last30';
+        return 'custom';
+    })();
 
     const stats = [
         { label: 'Total Volume', value: `₦${Number(loans.reduce((acc, curr) => acc + (Number(curr.requested_loan_amount) || 0), 0)).toLocaleString()}`, icon: 'payments', color: 'blue' },
@@ -266,7 +321,7 @@ const LoanQueuePage: React.FC<LoanQueuePageProps> = ({ user, onLogout, toggleThe
                             className="w-full pl-12 pr-4 py-3 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm focus:ring-2 focus:ring-blue-500 outline-none transition-all"
                         />
                     </div>
-                    <div className="flex gap-2 items-center">
+                    <div className="flex gap-2 items-center flex-wrap">
                         <select
                             value={statusFilter}
                             onChange={(e) => handleFilterChange('status', e.target.value)}
@@ -305,8 +360,61 @@ const LoanQueuePage: React.FC<LoanQueuePageProps> = ({ user, onLogout, toggleThe
                                 <option key={officer.id} value={officer.id}>{officer.full_name}</option>
                             ))}
                         </select>
+
+                        {/* ── Date Filter ── */}
+                        <div className="flex items-center gap-1.5 p-1 bg-slate-100 dark:bg-slate-800 rounded-2xl">
+                            {(([
+                                { label: 'Today', key: 'today' },
+                                { label: 'Yesterday', key: 'yesterday' },
+                                { label: '7 Days', key: 'last7' },
+                                { label: '30 Days', key: 'last30' },
+                                { label: 'Custom', key: 'custom' },
+                                ...(activeDatePreset ? [{ label: 'Clear', key: 'clear' }] : [])
+                            ] as { label: string; key: string }[])).map(({ label, key }) => {
+                                const isClear = key === 'clear';
+                                const isActive = !isClear && activeDatePreset === key;
+                                return (
+                                    <button
+                                        key={key}
+                                        onClick={() => applyDatePreset(key)}
+                                        className={`px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap ${
+                                            isActive
+                                                ? 'bg-blue-600 text-white shadow-sm'
+                                                : isClear
+                                                ? 'text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20'
+                                                : 'text-slate-500 hover:bg-white dark:hover:bg-slate-700'
+                                        }`}
+                                    >
+                                        {isClear && <span className="material-symbols-outlined text-[10px] mr-0.5">close</span>}
+                                        {label}
+                                    </button>
+                                );
+                            })}
+                        </div>
+
+
+                        {/* Custom date range inputs — visible only when 'Custom' is active */}
+                        {(showCustomDate || activeDatePreset === 'custom') && (
+                            <div className="flex items-center gap-2 animate-in fade-in slide-in-from-top-1 duration-200">
+                                <input
+                                    type="date"
+                                    value={dateFrom}
+                                    onChange={e => handleFilterChange('date_from', e.target.value)}
+                                    className="px-3 py-2.5 rounded-2xl bg-white dark:bg-slate-800 border border-blue-300 dark:border-blue-700 text-xs font-bold text-slate-700 dark:text-slate-200 outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                                />
+                                <span className="text-slate-400 text-xs font-black">→</span>
+                                <input
+                                    type="date"
+                                    value={dateTo}
+                                    onChange={e => handleFilterChange('date_to', e.target.value)}
+                                    min={dateFrom}
+                                    className="px-3 py-2.5 rounded-2xl bg-white dark:bg-slate-800 border border-blue-300 dark:border-blue-700 text-xs font-bold text-slate-700 dark:text-slate-200 outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                                />
+                            </div>
+                        )}
                     </div>
                 </div>
+
 
             {/* Bulk Action Bar */}
             {selectedLoans.length > 0 && stageFilter === 'finance' && ['finance', 'admin', 'super_admin', 'superadmin'].includes(user.role || '') && (

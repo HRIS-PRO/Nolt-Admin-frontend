@@ -27,6 +27,15 @@ const CustomerDetailsPage: React.FC<CustomerDetailsPageProps> = ({ user, onLogou
   const [cbaError, setCbaError] = useState<string | null>(null);
   const [hasFetchedCba, setHasFetchedCba] = useState(false);
 
+  // CBA Investments state
+  const [cbaInvestments, setCbaInvestments] = useState<any[]>([]);
+  const [cbaInvestmentTotal, setCbaInvestmentTotal] = useState<any>(null);
+  const [isCbaInvestmentsLoading, setIsCbaInvestmentsLoading] = useState(false);
+  const [cbaInvestmentsError, setCbaInvestmentsError] = useState<string | null>(null);
+  const [hasFetchedCbaInvestments, setHasFetchedCbaInvestments] = useState(false);
+  const [selectedCbaInvestment, setSelectedCbaInvestment] = useState<any>(null);
+  const [selectedCbaLoan, setSelectedCbaLoan] = useState<any>(null);
+
   // Edit state
   const [editingTier, setEditingTier] = useState<1 | 2 | 3 | null>(null);
   const [editForm, setEditForm] = useState<any>({});
@@ -44,6 +53,7 @@ const CustomerDetailsPage: React.FC<CustomerDetailsPageProps> = ({ user, onLogou
   useEffect(() => { fetchCustomerData(); }, [id]);
   useEffect(() => {
     if (activeTab === 'LOAN' && id && !hasFetchedCba) fetchCbaLoans(id);
+    if (activeTab === 'INVESTMENT' && id && !hasFetchedCbaInvestments) fetchCbaInvestments(id);
   }, [activeTab, id]);
 
   const handleUtilityBillUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -86,6 +96,27 @@ const CustomerDetailsPage: React.FC<CustomerDetailsPageProps> = ({ user, onLogou
     } finally {
       setIsCbaLoading(false);
       setHasFetchedCba(true);
+    }
+  };
+
+  const fetchCbaInvestments = async (customerId: string) => {
+    setIsCbaInvestmentsLoading(true);
+    setCbaInvestmentsError(null);
+    try {
+      const res = await axios.get(API(`/api/staff/customers/${customerId}/cba-investments`), { withCredentials: true });
+      if (res.data.success) {
+        setCbaInvestments(res.data.investments || []);
+        setCbaInvestmentTotal(res.data.total);
+      } else {
+        setCbaInvestmentsError(res.data.message || 'Failed to load CBA investment data.');
+      }
+    } catch (e: any) {
+      console.error('CBA investments', e);
+      const msg = e?.response?.data?.message || e?.message || 'Could not reach the CBA service.';
+      setCbaInvestmentsError(msg);
+    } finally {
+      setIsCbaInvestmentsLoading(false);
+      setHasFetchedCbaInvestments(true);
     }
   };
 
@@ -707,14 +738,14 @@ const CustomerDetailsPage: React.FC<CustomerDetailsPageProps> = ({ user, onLogou
 
             {/* ══════════════ LOAN TAB ══════════════ */}
             {activeTab === 'LOAN' && (
-              <div className="space-y-8">
+              <div className="space-y-8 animate-in fade-in duration-300">
                 {isCbaLoading ? (
                   <div className="flex flex-col items-center justify-center py-16 gap-4">
                     <span className="w-10 h-10 border-4 border-blue-600/20 border-t-blue-600 rounded-full animate-spin" />
-                    <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Fetching loan data from CBA…</p>
+                    <p className="text-xs font-bold text-slate-400 uppercase tracking-widest animate-pulse">Fetching loan data from CBA…</p>
                   </div>
                 ) : cbaError ? (
-                  <div className="bg-rose-50 dark:bg-rose-900/10 border border-rose-200 dark:border-rose-800 rounded-3xl p-10 flex flex-col items-center gap-4 text-center">
+                  <div className="bg-rose-50 dark:bg-rose-900/10 border border-rose-200 dark:border-rose-800 rounded-3xl p-10 flex flex-col items-center gap-4 text-center animate-in zoom-in-95">
                     <div className="size-14 rounded-full bg-rose-100 dark:bg-rose-900/30 flex items-center justify-center">
                       <svg className="size-7 text-rose-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
                     </div>
@@ -724,102 +755,91 @@ const CustomerDetailsPage: React.FC<CustomerDetailsPageProps> = ({ user, onLogou
                     </div>
                     <button
                       onClick={() => { setHasFetchedCba(false); setCbaError(null); if (id) fetchCbaLoans(id); }}
-                      className="px-5 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold uppercase tracking-wider rounded-xl transition-colors"
+                      className="px-5 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold uppercase tracking-wider rounded-xl transition-colors cursor-pointer"
                     >
                       Retry
                     </button>
                   </div>
                 ) : (
                   <>
-                    {/* ── ACTIVE CBA LOANS ── */}
-                    {cbaLoans.filter(l => l.currentBalance < 0 && l.nextTotalPayment !== 0).length > 0 && (() => {
-                      const activeLoans = cbaLoans.filter(l => l.currentBalance < 0 && l.nextTotalPayment !== 0);
-                      const fmt = (n: number) => new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN' }).format(n);
+                    {/* Loan Stats Dashboard */}
+                    {(cbaLoans.length > 0 || loans.length > 0) && (() => {
+                      const activeCbaLoans = cbaLoans.filter(l => l.currentBalance < 0 && l.nextTotalPayment !== 0);
+                      const totalPrincipal = activeCbaLoans.reduce((s, l) => s + (l.loanAmount || 0), 0);
+                      const totalOutstanding = activeCbaLoans.reduce((s, l) => s + Math.abs(l.currentBalance || 0), 0);
+                      
                       return (
-                        <div className="space-y-4">
-                          {/* Section header */}
-                          <div className="flex items-center gap-3">
-                            <div className="flex items-center gap-2">
-                              <div className="size-2.5 rounded-full bg-emerald-500 animate-pulse" />
-                              <h3 className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-widest">Active CBA Loans</h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="bg-gradient-to-br from-blue-500 to-indigo-600 rounded-3xl p-6 text-white shadow-lg shadow-blue-500/15">
+                            <div className="flex justify-between items-center mb-4">
+                              <span className="text-[10px] font-black uppercase tracking-widest text-blue-100">Total Active Principal</span>
+                              <span className="material-symbols-outlined text-blue-200">payments</span>
                             </div>
-                            <span className="px-2 py-0.5 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 text-[10px] font-black uppercase tracking-wider rounded-full border border-emerald-100 dark:border-emerald-800">
-                              {activeLoans.length} Active
-                            </span>
+                            <h4 className="text-3xl font-black tracking-tight">{formatMoney(totalPrincipal)}</h4>
+                            <p className="text-[10px] text-blue-200 font-bold uppercase tracking-wider mt-2">
+                              {activeCbaLoans.length} active loan{activeCbaLoans.length !== 1 ? 's' : ''} in CBA
+                            </p>
                           </div>
-
-                          {/* Summary stat cards — aggregate across all active loans */}
-                          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                            {[
-                              {
-                                label: 'Total Principal', icon: 'payments', color: 'blue',
-                                value: fmt(activeLoans.reduce((s, l) => s + (l.loanAmount || 0), 0)),
-                                sub: `${activeLoans.length} loan${activeLoans.length > 1 ? 's' : ''}`,
-                              },
-                              {
-                                label: 'Outstanding Balance', icon: 'account_balance', color: 'rose',
-                                value: fmt(activeLoans.reduce((s, l) => s + Math.abs(l.currentBalance || 0), 0)),
-                                sub: 'Total owed',
-                              },
-                              {
-                                label: 'Next Repayment', icon: 'calendar_month', color: 'amber',
-                                value: fmt(activeLoans.reduce((s, l) => s + (l.nextTotalPayment || 0), 0)),
-                                sub: activeLoans[0]?.nextPaymentDate || 'N/A',
-                              },
-                              {
-                                label: 'Interest Rate', icon: 'percent', color: 'indigo',
-                                value: `${activeLoans[0]?.interestrate || 0}%`,
-                                sub: 'Per annum',
-                              },
-                            ].map(card => (
-                              <div key={card.label} className="bg-white dark:bg-slate-900 rounded-2xl p-5 border border-slate-100 dark:border-slate-800 shadow-sm">
-                                <div className="flex items-center justify-between mb-3">
-                                  <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-tight">{card.label}</span>
-                                  <div className="size-7 rounded-full bg-slate-50 dark:bg-slate-800 flex items-center justify-center">
-                                    <span className="material-symbols-outlined text-blue-500 text-[13px]">{card.icon}</span>
-                                  </div>
-                                </div>
-                                <div className="text-[15px] font-black text-slate-900 dark:text-white tracking-tight leading-tight">{card.value}</div>
-                                <div className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1">{card.sub}</div>
-                              </div>
-                            ))}
+                          <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 border border-slate-100 dark:border-slate-800 shadow-sm">
+                            <div className="flex justify-between items-center mb-4">
+                              <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Total Outstanding Balance</span>
+                              <span className="material-symbols-outlined text-rose-500">account_balance</span>
+                            </div>
+                            <h4 className="text-3xl font-black text-rose-600 dark:text-rose-400 tracking-tight">{formatMoney(totalOutstanding)}</h4>
+                            <p className="text-[10px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider mt-2">Current aggregate debt</p>
                           </div>
+                        </div>
+                      );
+                    })()}
 
-                          {/* Loans table */}
+                    {/* Active CBA Loans Table */}
+                    {cbaLoans.filter(l => l.currentBalance < 0 && l.nextTotalPayment !== 0).length > 0 && (() => {
+                      const activeCbaLoans = cbaLoans.filter(l => l.currentBalance < 0 && l.nextTotalPayment !== 0);
+                      return (
+                        <div className="space-y-4 animate-in fade-in">
+                          <div className="flex items-center gap-2">
+                            <div className="size-2.5 rounded-full bg-emerald-500 animate-pulse" />
+                            <h3 className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-widest">Active CBA Loans</h3>
+                          </div>
                           <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm overflow-hidden">
                             <table className="w-full text-left border-collapse">
                               <thead>
                                 <tr className="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-100 dark:border-slate-800">
-                                  {['Loan Ref', 'Product', 'Principal', 'Outstanding', 'Rate', 'Next Payment', 'Due Date', 'Maturity'].map(h => (
+                                  {['Loan Ref', 'Product', 'Principal', 'Outstanding', 'Rate', 'Maturity', ''].map(h => (
                                     <th key={h} className="px-5 py-3.5 text-[9px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">{h}</th>
                                   ))}
                                 </tr>
                               </thead>
                               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                                {activeLoans.map(loan => (
-                                  <tr key={loan.loanAccountNo} className="hover:bg-blue-50/30 dark:hover:bg-slate-800/40 transition-colors">
-                                    <td className="px-5 py-4 whitespace-nowrap">
-                                      <div className="flex items-center gap-2">
-                                        <div className="size-1.5 rounded-full bg-emerald-500 shrink-0" />
-                                        <span className="text-[11px] font-bold text-slate-500 font-mono">#{loan.loanAccountNo}</span>
-                                      </div>
+                                {activeCbaLoans.map(loan => (
+                                  <tr key={loan.loanAccountNo} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
+                                    <td className="px-5 py-4 text-[11px] font-bold text-slate-900 dark:text-white font-mono whitespace-nowrap">
+                                      #{loan.loanAccountNo}
                                     </td>
-                                    <td className="px-5 py-4 whitespace-nowrap">
-                                      <span className="text-sm font-black text-slate-900 dark:text-white">{loan.product}</span>
-                                      {loan.loanDuration && <div className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mt-0.5">{loan.loanDuration}</div>}
+                                    <td className="px-5 py-4 text-[11px] font-bold text-slate-500 truncate max-w-[150px]" title={loan.product}>
+                                      {loan.product}
                                     </td>
-                                    <td className="px-5 py-4 whitespace-nowrap text-sm font-bold text-slate-900 dark:text-white">{fmt(loan.loanAmount || 0)}</td>
-                                    <td className="px-5 py-4 whitespace-nowrap">
-                                      <span className="text-sm font-black text-rose-600 dark:text-rose-400">{fmt(Math.abs(loan.currentBalance || 0))}</span>
+                                    <td className="px-5 py-4 text-sm font-black text-slate-900 dark:text-white whitespace-nowrap">
+                                      {formatMoney(loan.loanAmount || 0)}
                                     </td>
-                                    <td className="px-5 py-4 whitespace-nowrap">
-                                      <span className="px-2 py-1 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 text-[10px] font-black rounded-lg">{loan.interestrate}%</span>
+                                    <td className="px-5 py-4 text-sm font-black text-rose-600 dark:text-rose-400 whitespace-nowrap">
+                                      {formatMoney(Math.abs(loan.currentBalance || 0))}
                                     </td>
-                                    <td className="px-5 py-4 whitespace-nowrap text-sm font-bold text-slate-900 dark:text-white">{fmt(loan.nextTotalPayment || 0)}</td>
-                                    <td className="px-5 py-4 whitespace-nowrap">
-                                      <span className="px-2 py-1 bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 text-[10px] font-black rounded-lg">{loan.nextPaymentDate || '—'}</span>
+                                    <td className="px-5 py-4 text-[11px] font-bold text-slate-900 dark:text-white whitespace-nowrap">
+                                      {loan.interestrate}%
                                     </td>
-                                    <td className="px-5 py-4 whitespace-nowrap text-[11px] font-bold text-slate-500">{loan.maturityDate || '—'}</td>
+                                    <td className="px-5 py-4 text-[11px] font-bold text-slate-500 whitespace-nowrap">
+                                      {loan.maturityDate || '—'}
+                                    </td>
+                                    <td className="px-5 py-4 whitespace-nowrap text-right">
+                                      <button
+                                        onClick={() => setSelectedCbaLoan(loan)}
+                                        className="inline-flex items-center gap-1 px-3 py-1.5 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 text-[10px] font-black uppercase tracking-wider rounded-lg border border-blue-100 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors cursor-pointer"
+                                      >
+                                        <span className="material-symbols-outlined text-[13px]">info</span>
+                                        Details
+                                      </button>
+                                    </td>
                                   </tr>
                                 ))}
                               </tbody>
@@ -829,51 +849,58 @@ const CustomerDetailsPage: React.FC<CustomerDetailsPageProps> = ({ user, onLogou
                       );
                     })()}
 
-                    {/* ── SETTLED / INACTIVE CBA LOANS ── */}
-                    {cbaLoans.filter(l => l.currentBalance >= 0 || l.nextTotalPayment === 0).length > 0 && (
-                      <div className="space-y-4">
-                        <div className="flex items-center gap-3">
+                    {/* Settled CBA Loans Table */}
+                    {cbaLoans.filter(l => l.currentBalance >= 0 || l.nextTotalPayment === 0).length > 0 && (() => {
+                      const settledCbaLoans = cbaLoans.filter(l => l.currentBalance >= 0 || l.nextTotalPayment === 0);
+                      return (
+                        <div className="space-y-4 animate-in fade-in">
                           <div className="flex items-center gap-2">
                             <div className="size-2.5 rounded-full bg-slate-400" />
                             <h3 className="text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">Settled CBA Loans</h3>
                           </div>
-                          <span className="px-2 py-0.5 bg-slate-100 dark:bg-slate-800 text-slate-500 text-[10px] font-black uppercase tracking-wider rounded-full">
-                            {cbaLoans.filter(l => l.currentBalance >= 0 || l.nextTotalPayment === 0).length} Closed
-                          </span>
-                        </div>
-                        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm overflow-hidden">
-                          <table className="w-full text-left border-collapse">
-                            <thead>
-                              <tr className="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-100 dark:border-slate-800">
-                                {['Loan Ref', 'Product', 'Principal', 'Start Date', 'Maturity Date', 'Status'].map(h => (
-                                  <th key={h} className="px-5 py-3.5 text-[9px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">{h}</th>
-                                ))}
-                              </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                              {cbaLoans.filter(l => l.currentBalance >= 0 || l.nextTotalPayment === 0).map(loan => (
-                                <tr key={loan.loanAccountNo} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
-                                  <td className="px-5 py-4 text-[11px] font-bold text-slate-400 font-mono whitespace-nowrap">#{loan.loanAccountNo}</td>
-                                  <td className="px-5 py-4 text-sm font-black text-slate-900 dark:text-white whitespace-nowrap">{loan.product}</td>
-                                  <td className="px-5 py-4 text-sm font-bold text-slate-700 dark:text-slate-300 whitespace-nowrap">
-                                    {new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN' }).format(loan.loanAmount || 0)}
-                                  </td>
-                                  <td className="px-5 py-4 text-[11px] font-bold text-slate-500 whitespace-nowrap">{loan.startDate || '—'}</td>
-                                  <td className="px-5 py-4 text-[11px] font-bold text-slate-500 whitespace-nowrap">{loan.maturityDate || '—'}</td>
-                                  <td className="px-5 py-4 whitespace-nowrap">
-                                    <span className="px-2.5 py-1 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 rounded-full text-[9px] font-black uppercase tracking-widest">SETTLED</span>
-                                  </td>
+                          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm overflow-hidden">
+                            <table className="w-full text-left border-collapse">
+                              <thead>
+                                <tr className="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-100 dark:border-slate-800">
+                                  {['Loan Ref', 'Product', 'Principal', 'Start Date', 'Maturity Date', 'Status', ''].map(h => (
+                                    <th key={h} className="px-5 py-3.5 text-[9px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">{h}</th>
+                                  ))}
                                 </tr>
-                              ))}
-                            </tbody>
-                          </table>
+                              </thead>
+                              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                                {settledCbaLoans.map(loan => (
+                                  <tr key={loan.loanAccountNo} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
+                                    <td className="px-5 py-4 text-[11px] font-bold text-slate-400 font-mono whitespace-nowrap">#{loan.loanAccountNo}</td>
+                                    <td className="px-5 py-4 text-[11px] font-bold text-slate-500 truncate max-w-[150px]">{loan.product}</td>
+                                    <td className="px-5 py-4 text-sm font-bold text-slate-700 dark:text-slate-300 whitespace-nowrap">
+                                      {formatMoney(loan.loanAmount || 0)}
+                                    </td>
+                                    <td className="px-5 py-4 text-[11px] font-bold text-slate-500 whitespace-nowrap">{loan.startDate || '—'}</td>
+                                    <td className="px-5 py-4 text-[11px] font-bold text-slate-500 whitespace-nowrap">{loan.maturityDate || '—'}</td>
+                                    <td className="px-5 py-4 whitespace-nowrap">
+                                      <span className="px-2.5 py-1 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 rounded-full text-[9px] font-black uppercase tracking-widest">SETTLED</span>
+                                    </td>
+                                    <td className="px-5 py-4 whitespace-nowrap text-right">
+                                      <button
+                                        onClick={() => setSelectedCbaLoan(loan)}
+                                        className="inline-flex items-center gap-1 px-3 py-1.5 bg-slate-50 dark:bg-slate-800/60 text-slate-600 dark:text-slate-400 text-[10px] font-black uppercase tracking-wider rounded-lg border border-slate-100 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                                      >
+                                        <span className="material-symbols-outlined text-[13px]">info</span>
+                                        Details
+                                      </button>
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
                         </div>
-                      </div>
-                    )}
+                      );
+                    })()}
 
-                    {/* ── INTERNAL NOLT LOANS (top-up, re-app, add-on) ── */}
+                    {/* Internal Nolt Loans Table */}
                     {loans.filter(l => ['topup', 're-app', 'add_on', 'top_up', 're_app', 'add-on'].includes((l.loan_type || '').toLowerCase())).length > 0 && (
-                      <div className="space-y-4">
+                      <div className="space-y-4 animate-in fade-in">
                         <div className="flex items-center gap-3">
                           <div className="flex items-center gap-2">
                             <div className="size-2.5 rounded-full bg-purple-500" />
@@ -906,10 +933,10 @@ const CustomerDetailsPage: React.FC<CustomerDetailsPageProps> = ({ user, onLogou
                                     </span>
                                   </td>
                                   <td className="px-5 py-4 text-sm font-black text-slate-900 dark:text-white whitespace-nowrap">
-                                    {new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN' }).format(Number(loan.requested_loan_amount))}
+                                    {formatMoney(Number(loan.requested_loan_amount))}
                                   </td>
                                   <td className="px-5 py-4 text-[11px] font-bold text-slate-500 whitespace-nowrap">
-                                    {loan.loan_tenure ? `${loan.loan_tenure} months` : '—'}
+                                    {loan.loan_tenure_months || loan.loan_tenure ? `${loan.loan_tenure_months || loan.loan_tenure} months` : '—'}
                                   </td>
                                   <td className="px-5 py-4 whitespace-nowrap">
                                     <span className={`px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-widest ${
@@ -919,10 +946,10 @@ const CustomerDetailsPage: React.FC<CustomerDetailsPageProps> = ({ user, onLogou
                                       'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-400'
                                     }`}>{loan.status}</span>
                                   </td>
-                                  <td className="px-5 py-4 whitespace-nowrap">
+                                  <td className="px-5 py-4 whitespace-nowrap text-right">
                                     <button
                                       onClick={() => navigate(`/staff/loans/${loan.id}`)}
-                                      className="inline-flex items-center gap-1 px-3 py-1.5 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 text-[10px] font-black uppercase tracking-wider rounded-lg border border-blue-100 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors"
+                                      className="inline-flex items-center gap-1 px-3 py-1.5 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 text-[10px] font-black uppercase tracking-wider rounded-lg border border-blue-100 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors cursor-pointer"
                                     >
                                       <span className="material-symbols-outlined text-[13px]">visibility</span>
                                       View
@@ -936,9 +963,9 @@ const CustomerDetailsPage: React.FC<CustomerDetailsPageProps> = ({ user, onLogou
                       </div>
                     )}
 
-                    {/* ── ALL OTHER PENDING / ACTIVE LOANS ── */}
+                    {/* Pending Applications Table */}
                     {loans.filter(l => !['topup', 're-app', 'add_on', 'top_up', 're_app', 'add-on'].includes((l.loan_type || '').toLowerCase()) && l.status !== 'disbursed').length > 0 && (
-                      <div className="space-y-4">
+                      <div className="space-y-4 animate-in fade-in">
                         <div className="flex items-center gap-2">
                           <div className="size-2.5 rounded-full bg-amber-400" />
                           <h3 className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-widest">Pending Applications</h3>
@@ -960,19 +987,19 @@ const CustomerDetailsPage: React.FC<CustomerDetailsPageProps> = ({ user, onLogou
                                   </td>
                                   <td className="px-5 py-4 text-sm font-black text-slate-900 dark:text-white whitespace-nowrap">{loan.loan_type}</td>
                                   <td className="px-5 py-4 text-sm font-black text-slate-900 dark:text-white whitespace-nowrap">
-                                    {new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN' }).format(Number(loan.requested_loan_amount))}
+                                    {formatMoney(Number(loan.requested_loan_amount))}
                                   </td>
                                   <td className="px-5 py-4 whitespace-nowrap">
                                     <span className={`px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-widest ${
-                                      loan.status === 'active'  ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' :
+                                      loan.status === 'active'  ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-emerald-400' :
                                       loan.status === 'pending' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' :
                                       'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-400'
                                     }`}>{loan.status}</span>
                                   </td>
-                                  <td className="px-5 py-4 whitespace-nowrap">
+                                  <td className="px-5 py-4 whitespace-nowrap text-right">
                                     <button
                                       onClick={() => navigate(`/staff/loans/${loan.id}`)}
-                                      className="inline-flex items-center gap-1 px-3 py-1.5 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 text-[10px] font-black uppercase tracking-wider rounded-lg border border-blue-100 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors"
+                                      className="inline-flex items-center gap-1 px-3 py-1.5 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 text-[10px] font-black uppercase tracking-wider rounded-lg border border-blue-100 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors cursor-pointer"
                                     >
                                       <span className="material-symbols-outlined text-[13px]">visibility</span>
                                       View
@@ -987,7 +1014,7 @@ const CustomerDetailsPage: React.FC<CustomerDetailsPageProps> = ({ user, onLogou
                     )}
 
                     {cbaLoans.length === 0 && loans.length === 0 && (
-                      <div className="text-center py-20 bg-white dark:bg-slate-900 rounded-3xl border border-slate-100 dark:border-slate-800/50 shadow-sm">
+                      <div className="text-center py-20 bg-white dark:bg-slate-900 rounded-3xl border border-slate-100 dark:border-slate-800/50 shadow-sm animate-in fade-in">
                         <div className="size-16 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-4 text-slate-400">
                           <span className="material-symbols-outlined text-2xl">credit_card_off</span>
                         </div>
@@ -999,7 +1026,120 @@ const CustomerDetailsPage: React.FC<CustomerDetailsPageProps> = ({ user, onLogou
               </div>
             )}
 
-            {activeTab !== 'IDENTITY & KYC' && activeTab !== 'LOAN' && (
+            {/* ══════════════ INVESTMENT TAB ══════════════ */}
+            {activeTab === 'INVESTMENT' && (
+              <div className="space-y-8 animate-in fade-in duration-300">
+                {isCbaInvestmentsLoading ? (
+                  <div className="flex flex-col items-center justify-center py-16 gap-4">
+                    <span className="w-10 h-10 border-4 border-purple-600/20 border-t-purple-600 rounded-full animate-spin" />
+                    <p className="text-xs font-bold text-slate-400 uppercase tracking-widest animate-pulse">Fetching investment data from CBA…</p>
+                  </div>
+                ) : cbaInvestmentsError ? (
+                  <div className="bg-rose-50 dark:bg-rose-900/10 border border-rose-200 dark:border-rose-800 rounded-3xl p-10 flex flex-col items-center gap-4 text-center animate-in zoom-in-95">
+                    <div className="size-14 rounded-full bg-rose-100 dark:bg-rose-900/30 flex items-center justify-center">
+                      <svg className="size-7 text-rose-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+                    </div>
+                    <div>
+                      <p className="text-sm font-black text-rose-700 dark:text-rose-400 uppercase tracking-wider mb-1">CBA Fetch Failed</p>
+                      <p className="text-xs text-rose-500 dark:text-rose-400/70 font-medium max-w-xs">{cbaInvestmentsError}</p>
+                    </div>
+                    <button
+                      onClick={() => { setHasFetchedCbaInvestments(false); setCbaInvestmentsError(null); if (id) fetchCbaInvestments(id); }}
+                      className="px-5 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold uppercase tracking-wider rounded-xl transition-colors cursor-pointer"
+                    >
+                      Retry
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    {/* Investment Stats Dashboard */}
+                    {cbaInvestmentTotal && (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="bg-gradient-to-br from-purple-500 to-indigo-600 rounded-3xl p-6 text-white shadow-lg shadow-purple-500/15">
+                          <div className="flex justify-between items-center mb-4">
+                            <span className="text-[10px] font-black uppercase tracking-widest text-purple-100">Total Investment Principal</span>
+                            <span className="material-symbols-outlined text-purple-200">account_balance_wallet</span>
+                          </div>
+                          <h4 className="text-3xl font-black tracking-tight">{formatMoney(cbaInvestmentTotal.investmentTotal || 0)}</h4>
+                          <p className="text-[10px] text-purple-200 font-bold uppercase tracking-wider mt-2">Active fixed deposits in CBA</p>
+                        </div>
+                        <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 border border-slate-100 dark:border-slate-800 shadow-sm">
+                          <div className="flex justify-between items-center mb-4">
+                            <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Total Deposit Accounts</span>
+                            <span className="material-symbols-outlined text-purple-500">receipt_long</span>
+                          </div>
+                          <h4 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight">{cbaInvestmentTotal.investmentCount || 0}</h4>
+                          <p className="text-[10px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider mt-2">Active portfolios</p>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Fixed Deposit Portfolios Table */}
+                    {cbaInvestments.length > 0 ? (
+                      <div className="space-y-4">
+                        <div className="flex items-center gap-2">
+                          <div className="size-2.5 rounded-full bg-purple-500 animate-pulse" />
+                          <h3 className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-widest">CBA Fixed Deposits</h3>
+                        </div>
+                        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm overflow-hidden">
+                          <table className="w-full text-left border-collapse">
+                            <thead>
+                              <tr className="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-100 dark:border-slate-800">
+                                {['TD Account No', 'Product', 'Principal', 'Rate', 'Duration', 'Maturity Date', ''].map(h => (
+                                  <th key={h} className="px-5 py-3.5 text-[9px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">{h}</th>
+                                ))}
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                              {cbaInvestments.map(inv => (
+                                <tr key={inv.tdAccountNo} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
+                                  <td className="px-5 py-4 text-[11px] font-bold text-slate-900 dark:text-white font-mono whitespace-nowrap">
+                                    {inv.tdAccountNo}
+                                  </td>
+                                  <td className="px-5 py-4 text-[11px] font-bold text-slate-500 truncate max-w-[150px]" title={inv.product}>
+                                    {inv.product}
+                                  </td>
+                                  <td className="px-5 py-4 text-sm font-black text-slate-900 dark:text-white whitespace-nowrap">
+                                    ₦{Number(String(inv.tdAmount).replace(/,/g, '')).toLocaleString()}
+                                  </td>
+                                  <td className="px-5 py-4 text-[11px] font-bold text-slate-900 dark:text-white whitespace-nowrap">
+                                    {inv.interestrate}%
+                                  </td>
+                                  <td className="px-5 py-4 text-[11px] font-bold text-slate-500 whitespace-nowrap">
+                                    {inv.tdDuration}
+                                  </td>
+                                  <td className="px-5 py-4 text-[11px] font-bold text-slate-500 whitespace-nowrap">
+                                    {inv.maturityDate}
+                                  </td>
+                                  <td className="px-5 py-4 whitespace-nowrap text-right">
+                                    <button
+                                      onClick={() => setSelectedCbaInvestment(inv)}
+                                      className="inline-flex items-center gap-1 px-3 py-1.5 bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400 text-[10px] font-black uppercase tracking-wider rounded-lg border border-purple-100 dark:border-purple-800 hover:bg-purple-100 dark:hover:bg-purple-900/40 transition-colors cursor-pointer"
+                                    >
+                                      <span className="material-symbols-outlined text-[13px]">info</span>
+                                      Details
+                                    </button>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="text-center py-20 bg-white dark:bg-slate-900 rounded-3xl border border-slate-100 dark:border-slate-800/50 shadow-sm animate-in fade-in">
+                        <div className="size-16 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-4 text-slate-400">
+                          <span className="material-symbols-outlined text-2xl">receipt_long</span>
+                        </div>
+                        <p className="text-[11px] uppercase tracking-widest text-slate-500 font-black">No active fixed deposits found</p>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            )}
+
+            {activeTab !== 'IDENTITY & KYC' && activeTab !== 'LOAN' && activeTab !== 'INVESTMENT' && (
               <div className="bg-white dark:bg-slate-900 rounded-3xl p-8 border border-slate-100 dark:border-slate-800/50 shadow-sm text-center py-20">
                 <p className="text-slate-500 uppercase tracking-wider text-sm font-bold">Content for {activeTab} is currently being implemented.</p>
               </div>
@@ -1117,6 +1257,186 @@ const CustomerDetailsPage: React.FC<CustomerDetailsPageProps> = ({ user, onLogou
                 </div>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {selectedCbaInvestment && (
+        <div className="fixed inset-0 z-[200] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200" onClick={() => setSelectedCbaInvestment(null)}>
+          <div className="bg-white dark:bg-slate-900 rounded-[32px] w-full max-w-lg shadow-2xl border border-slate-100 dark:border-slate-800 p-8 space-y-6 relative overflow-hidden animate-in zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
+            {/* Background Accent Gradient */}
+            <div className="absolute top-0 inset-x-0 h-2 bg-gradient-to-r from-purple-500 via-indigo-500 to-blue-500" />
+            
+            <div className="flex justify-between items-start">
+              <div>
+                <span className="px-3 py-1 bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400 text-[9px] font-black uppercase tracking-wider rounded-full border border-purple-100 dark:border-purple-800">
+                  Fixed Deposit Portfolio
+                </span>
+                <h3 className="text-xl font-black text-slate-900 dark:text-white uppercase tracking-tight mt-2">
+                  Account Details
+                </h3>
+              </div>
+              <button 
+                onClick={() => setSelectedCbaInvestment(null)} 
+                className="size-8 rounded-full bg-slate-50 hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-600 dark:hover:text-white transition-all flex items-center justify-center cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-lg">close</span>
+              </button>
+            </div>
+
+            <div className="grid grid-cols-2 gap-5 divide-y divide-slate-100 dark:divide-slate-800/50 [&>div]:pt-3 first:pt-0 overflow-y-auto max-h-[60vh] pr-2">
+              <div className="col-span-2">
+                <span className="block text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Product Name</span>
+                <span className="text-xs font-bold text-slate-900 dark:text-white leading-normal">{selectedCbaInvestment.product}</span>
+              </div>
+              <div>
+                <span className="block text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">TD Account Number</span>
+                <span className="text-sm font-bold text-slate-900 dark:text-white font-mono">{selectedCbaInvestment.tdAccountNo}</span>
+              </div>
+              <div>
+                <span className="block text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Settlement Account</span>
+                <span className="text-sm font-bold text-slate-900 dark:text-white font-mono">{selectedCbaInvestment.settlementAcctNo}</span>
+              </div>
+              <div>
+                <span className="block text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Principal Amount</span>
+                <span className="text-sm font-black text-slate-900 dark:text-white">₦{Number(String(selectedCbaInvestment.tdAmount).replace(/,/g, '')).toLocaleString()}</span>
+              </div>
+              <div>
+                <span className="block text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Maturity Amount</span>
+                <span className="text-sm font-black text-emerald-600 dark:text-emerald-400">₦{Number(String(selectedCbaInvestment.matureAmount).replace(/,/g, '')).toLocaleString()}</span>
+              </div>
+              <div>
+                <span className="block text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Interest Rate</span>
+                <span className="text-sm font-bold text-slate-900 dark:text-white">{selectedCbaInvestment.interestrate}% p.a.</span>
+              </div>
+              <div>
+                <span className="block text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Duration / Tenor</span>
+                <span className="text-sm font-bold text-slate-900 dark:text-white">{selectedCbaInvestment.tdDuration}</span>
+              </div>
+              <div>
+                <span className="block text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Start Date</span>
+                <span className="text-xs font-bold text-slate-600 dark:text-slate-300">{selectedCbaInvestment.startDate}</span>
+              </div>
+              <div>
+                <span className="block text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Maturity Date</span>
+                <span className="text-xs font-bold text-slate-600 dark:text-slate-300">{selectedCbaInvestment.maturityDate}</span>
+              </div>
+              <div>
+                <span className="block text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Total Interest</span>
+                <span className="text-xs font-black text-purple-600 dark:text-purple-400">₦{Number(String(selectedCbaInvestment.totalInterest).replace(/,/g, '')).toLocaleString()}</span>
+              </div>
+              <div>
+                <span className="block text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">WHT Tax Deducted</span>
+                <span className="text-xs font-bold text-slate-900 dark:text-white font-mono">₦{Number(String(selectedCbaInvestment.taxAmount).replace(/,/g, '')).toLocaleString()}</span>
+              </div>
+              <div className="col-span-2">
+                <span className="block text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Investment Purpose</span>
+                <span className="text-xs font-medium text-slate-600 dark:text-slate-300">{selectedCbaInvestment.tdPurpose || '—'}</span>
+              </div>
+              <div className="col-span-2">
+                <span className="block text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Branch / Node</span>
+                <span className="text-xs font-medium text-slate-600 dark:text-slate-300">{selectedCbaInvestment.branch || '—'}</span>
+              </div>
+            </div>
+
+            <div className="pt-2">
+              <button
+                onClick={() => setSelectedCbaInvestment(null)}
+                className="w-full py-3.5 bg-slate-900 hover:bg-black dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 rounded-2xl text-xs font-black uppercase tracking-widest transition-all shadow-md cursor-pointer"
+              >
+                Close Details
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {selectedCbaLoan && (
+        <div className="fixed inset-0 z-[200] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200" onClick={() => setSelectedCbaLoan(null)}>
+          <div className="bg-white dark:bg-slate-900 rounded-[32px] w-full max-w-lg shadow-2xl border border-slate-100 dark:border-slate-800 p-8 space-y-6 relative overflow-hidden animate-in zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
+            {/* Background Accent Gradient */}
+            <div className="absolute top-0 inset-x-0 h-2 bg-gradient-to-r from-blue-500 via-indigo-500 to-emerald-500" />
+            
+            <div className="flex justify-between items-start">
+              <div>
+                <span className="px-3 py-1 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 text-[9px] font-black uppercase tracking-wider rounded-full border border-blue-100 dark:border-blue-800">
+                  CBA Loan Account
+                </span>
+                <h3 className="text-xl font-black text-slate-900 dark:text-white uppercase tracking-tight mt-2">
+                  Loan Details
+                </h3>
+              </div>
+              <button 
+                onClick={() => setSelectedCbaLoan(null)} 
+                className="size-8 rounded-full bg-slate-50 hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-600 dark:hover:text-white transition-all flex items-center justify-center cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-lg">close</span>
+              </button>
+            </div>
+
+            <div className="grid grid-cols-2 gap-5 divide-y divide-slate-100 dark:divide-slate-800/50 [&>div]:pt-3 first:pt-0 overflow-y-auto max-h-[60vh] pr-2">
+              <div className="col-span-2">
+                <span className="block text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Product Name</span>
+                <span className="text-xs font-bold text-slate-900 dark:text-white leading-normal">{selectedCbaLoan.product}</span>
+              </div>
+              <div>
+                <span className="block text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Loan Account Number</span>
+                <span className="text-sm font-bold text-slate-900 dark:text-white font-mono">{selectedCbaLoan.loanAccountNo}</span>
+              </div>
+              <div>
+                <span className="block text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Principal Amount</span>
+                <span className="text-sm font-black text-slate-900 dark:text-white">{formatMoney(selectedCbaLoan.loanAmount || 0)}</span>
+              </div>
+              <div>
+                <span className="block text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Outstanding Balance</span>
+                <span className="text-sm font-black text-rose-600 dark:text-rose-400">{formatMoney(Math.abs(selectedCbaLoan.currentBalance || 0))}</span>
+              </div>
+              <div>
+                <span className="block text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Interest Rate</span>
+                <span className="text-sm font-bold text-slate-900 dark:text-white">{selectedCbaLoan.interestrate}% p.a.</span>
+              </div>
+              <div>
+                <span className="block text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Duration / Tenor</span>
+                <span className="text-sm font-bold text-slate-900 dark:text-white">{selectedCbaLoan.loanDuration || selectedCbaLoan.tdDuration || '—'}</span>
+              </div>
+              <div>
+                <span className="block text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Start Date</span>
+                <span className="text-xs font-bold text-slate-600 dark:text-slate-300">{selectedCbaLoan.startDate || '—'}</span>
+              </div>
+              <div>
+                <span className="block text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Maturity Date</span>
+                <span className="text-xs font-bold text-slate-600 dark:text-slate-300">{selectedCbaLoan.maturityDate || '—'}</span>
+              </div>
+              <div>
+                <span className="block text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Next Payment Date</span>
+                <span className="text-xs font-bold text-slate-900 dark:text-white">{selectedCbaLoan.nextPaymentDate || '—'}</span>
+              </div>
+              <div>
+                <span className="block text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Next Repayment Amount</span>
+                <span className="text-xs font-black text-emerald-600 dark:text-emerald-400">{formatMoney(selectedCbaLoan.nextTotalPayment || selectedCbaLoan.nextPrincipalPayment || 0)}</span>
+              </div>
+              {selectedCbaLoan.settlementAcctNo && (
+                <div>
+                  <span className="block text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Settlement Account</span>
+                  <span className="text-sm font-bold text-slate-900 dark:text-white font-mono">{selectedCbaLoan.settlementAcctNo}</span>
+                </div>
+              )}
+              {selectedCbaLoan.branch && (
+                <div className="col-span-2">
+                  <span className="block text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Branch / Node</span>
+                  <span className="text-xs font-medium text-slate-600 dark:text-slate-300">{selectedCbaLoan.branch}</span>
+                </div>
+              )}
+            </div>
+
+            <div className="pt-2">
+              <button
+                onClick={() => setSelectedCbaLoan(null)}
+                className="w-full py-3.5 bg-slate-900 hover:bg-black dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 rounded-2xl text-xs font-black uppercase tracking-widest transition-all shadow-md cursor-pointer"
+              >
+                Close Details
+              </button>
+            </div>
           </div>
         </div>
       )}

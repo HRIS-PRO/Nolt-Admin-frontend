@@ -5,6 +5,7 @@ import StaffLayout from '../components/layouts/StaffLayout';
 import { SavedDraft, UserState, Currency, InvestmentPlan } from '../types';
 import { investmentService } from '../services/investmentService';
 import { profileService } from '../services/profileService';
+import NewInvestmentLookupFlow from '../components/NewInvestmentLookupFlow';
 
 interface StaffInvestmentsPageProps {
     user: { name: string; email: string; avatar_url?: string; role?: string };
@@ -40,6 +41,8 @@ const StaffInvestmentsPage: React.FC<StaffInvestmentsPageProps> = ({ user, onLog
     const [officerFilter, setOfficerFilter] = useState('all');
     const [openDropdownId, setOpenDropdownId] = useState<number | null>(null);
     const [showStaffApplicationFlow, setShowStaffApplicationFlow] = useState(false);
+    const [showLookupFlow, setShowLookupFlow] = useState(false);
+    const [selectedInvestmentCustomer, setSelectedInvestmentCustomer] = useState<any>(null);
     const [banks, setBanks] = useState<{ name: string; code: string }[]>([]);
     const [isVerifyingBank, setIsVerifyingBank] = useState(false);
     const [wizardStep, setWizardStep] = useState(1);
@@ -104,7 +107,9 @@ const StaffInvestmentsPage: React.FC<StaffInvestmentsPageProps> = ({ user, onLog
         tenure: '365',
         currency: 'NGN' as Currency,
         rollover: 'principal_interest',
-        paymentMethod: 'bank_transfer' as 'bank_transfer' | 'paystack',
+        rolloverAtMaturity: 0,
+        cbaRolloverOption: 1,
+        paymentMethod: 'bank_transfer' as 'bank_transfer',
         receiptUrl: ''
     });
 
@@ -153,41 +158,63 @@ const StaffInvestmentsPage: React.FC<StaffInvestmentsPageProps> = ({ user, onLog
 
     const [rateLoading, setRateLoading] = useState(false);
     const [dynamicInterestRate, setDynamicInterestRate] = useState<number | null>(null);
+    const [investmentProducts, setInvestmentProducts] = useState<any[]>([]);
+    const [selectedProduct, setSelectedProduct] = useState<any>(null);
+
+    // Fetch investment products on mount
+    useEffect(() => {
+        const fetchInvestmentProducts = async () => {
+            try {
+                const res = await fetch('/api/staff/products/investments/active');
+                if (!res.ok) return;
+                const data = await res.json();
+                setInvestmentProducts(data);
+                if (data.length > 0) {
+                    setSelectedProduct(data[0]);
+                    setWizardData(prev => ({ ...prev, plan: data[0].custom_name.replace(/^NOLT[_ ]/i, '').toUpperCase() as InvestmentPlan }));
+                }
+            } catch (err) {
+                console.error('Failed to fetch investment products:', err);
+            }
+        };
+        fetchInvestmentProducts();
+    }, []);
 
     useEffect(() => {
         const fetchRate = async () => {
             const numericAmount = parseFloat(wizardData.amount) || 0;
-            if (!numericAmount || !wizardData.plan || !wizardData.currency) {
+            const numericDuration = parseInt(wizardData.tenure) || 0;
+            const productCode = selectedProduct?.cba_product_code;
+
+            if (!numericAmount || !numericDuration || !productCode) {
                 setDynamicInterestRate(null);
                 return;
             }
+
             setRateLoading(true);
             try {
-                const payload: any = {
-                    plan: wizardData.plan,
-                    currency: wizardData.currency,
-                    amount: numericAmount,
-                    tenure: wizardData.plan === 'SURGE' ? 365 : (parseInt(wizardData.tenure) || 30)
-                };
-                if (wizardData.plan === 'VAULT') {
-                    payload.payout_frequency = wizardData.payoutFrequency;
-                }
-                const data = await investmentService.getRate(payload);
-                setDynamicInterestRate(data ? data.interest_rate : null);
+                const res = await fetch(
+                    `/api/staff/investments/cba-rate?productCode=${productCode}&amount=${numericAmount}&duration=${numericDuration}`
+                );
+                if (!res.ok) throw new Error('Rate fetch failed');
+                const data = await res.json();
+                // CBA may return 0 legitimately — store as-is (null means no response)
+                setDynamicInterestRate(data?.interestRate ?? null);
             } catch (err) {
-                console.error("Error fetching rate:", err);
+                console.error('CBA rate fetch failed:', err);
                 setDynamicInterestRate(null);
             } finally {
                 setRateLoading(false);
             }
         };
-        const debounceTimer = setTimeout(fetchRate, 500);
+
+        const debounceTimer = setTimeout(fetchRate, 600);
         return () => clearTimeout(debounceTimer);
-    }, [wizardData.amount, wizardData.tenure, wizardData.plan, wizardData.currency]);
+    }, [wizardData.amount, wizardData.tenure, selectedProduct]);
 
     const returns = React.useMemo(() => {
         const principal = parseFloat(wizardData.amount) || 0;
-        const tenureToUse = wizardData.plan === 'SURGE' ? 365 : (parseInt(wizardData.tenure) || 30);
+        const tenureToUse = parseInt(wizardData.tenure) || 30;
         const rateToUse = dynamicInterestRate ?? 0;
         const interestEarned = (principal * rateToUse * (tenureToUse / 365)) / 100;
         return { principal, interestEarned, total: principal + interestEarned };
@@ -444,58 +471,108 @@ const StaffInvestmentsPage: React.FC<StaffInvestmentsPageProps> = ({ user, onLog
         navigate('/investment', { state: { draft } });
     };
 
+    const handleCustomerConfirmed = (customer: any) => {
+        setSelectedInvestmentCustomer(customer);
+        setShowLookupFlow(false);
+        setWizardData(prev => ({
+            ...prev,
+            // Identity — from profile
+            title:         customer.title || 'Mr',
+            firstName:     customer.first_name || '',
+            lastName:      customer.surname || '',
+            middleName:    customer.middle_name || '',
+            gender:        customer.gender || '',
+            dob:           customer.date_of_birth ? String(customer.date_of_birth).slice(0, 10) : '',
+            maritalStatus: customer.marital_status || 'Single',
+            bvn:           customer.bvn || '',
+            nin:           customer.nin || '',
+            email:         customer.email || '',
+            phoneNumber:   customer.mobile_number || '',
+
+            // Address — from profile
+            stateOfOrigin:    customer.state_of_origin || 'Abia',
+            stateOfResidence: customer.state_of_residence || 'Abia',
+            homeAddress:      customer.address || '',
+
+            // NOK — from profile (may be null)
+            nokName:         customer.nok_name || '',
+            nokRelationship: customer.nok_relationship || '',
+            nokPhoneNumber:  customer.nok_phone_number || '',
+
+            // Bank — from profile (often null)
+            bankName:      customer.bank_name || '',
+            bankCode:      customer.bank_code || '',
+            accountNumber: customer.account_number || '',
+            accountName:   customer.account_name || '',
+
+            // Manual fields reset to blank
+            maidenName: '',
+            isPep: false,
+            religion: 'Prefer not to say',
+            tin: '',
+        }));
+        setWizardStep(1);
+        setShowStaffApplicationFlow(true);
+    };
+
     const resetWizardData = () => {
         setWizardData({
             entityType: 'INDIVIDUAL', email: '', phoneNumber: '', bvn: '', nin: '', tin: '', title: 'Mr', firstName: '', lastName: '', middleName: '', isPep: false, gender: '', dob: '', maidenName: '', religion: 'Prefer not to say', maritalStatus: 'Single', stateOfOrigin: 'Abia', stateOfResidence: 'Abia', homeAddress: '', nokName: '', nokRelationship: '', nokAddress: '', nokPhoneNumber: '', nokCountryCode: '+234', isNokSameAddress: false, companyName: '', rcNumber: '', isAuthorizedRep: false, incorpDate: '', businessAddress: '', businessNature: '', directorCount: 1, directors: [{ surname: '', firstName: '', middleName: '', phone: '', gender: '', dob: '', bvn: '', nin: '', isPep: false }], bankName: '', bankCode: '', accountNumber: '', accountName: '',
-            uploadedDocs: {}, plan: 'RISE', amount: '', targetAmount: '', payoutFrequency: 'monthly', tenure: '365', currency: 'NGN', rollover: 'principal_interest', paymentMethod: 'bank_transfer', receiptUrl: ''
+            uploadedDocs: {}, plan: 'RISE', amount: '', targetAmount: '', payoutFrequency: 'monthly', tenure: '365', currency: 'NGN', rollover: 'principal_interest', rolloverAtMaturity: 0, cbaRolloverOption: 1, paymentMethod: 'bank_transfer', receiptUrl: ''
         });
         setWizardStep(1);
     };
 
     const validateStep = (step: number) => {
         const d = wizardData;
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-        if (step === 1) {
-            if (d.entityType === 'INDIVIDUAL') {
-                if (!d.firstName || !d.lastName) { alert("First name and Surname are required"); return false; }
-                if (!d.gender) { alert("Gender is required"); return false; }
-                if (!d.dob) { alert("Date of Birth is required"); return false; }
-                if (!d.email || !emailRegex.test(d.email)) { alert("A valid email is required"); return false; }
-                if (!d.phoneNumber || d.phoneNumber.length < 11) { alert("Valid 11-digit phone number is required"); return false; }
-                if (!d.bvn || d.bvn.length < 11) { alert("Valid 11-digit BVN is required"); return false; }
-                if (!d.nin || d.nin.length < 11) { alert("Valid 11-digit NIN is required"); return false; }
-            } else {
-                if (!d.companyName) { alert("Company name is required"); return false; }
-                if (!d.email || !emailRegex.test(d.email)) { alert("A valid company email is required"); return false; }
-                if (!d.rcNumber) { alert("RC Number is required"); return false; }
-                if (!d.incorpDate) { alert("Incorporation Date is required"); return false; }
-                if (!d.businessNature) { alert("Nature of Business is required"); return false; }
-                if (!d.businessAddress) { alert("Business Address is required"); return false; }
-            }
-        }
+        // Step 1: Profile Check — validated via button disabled state, nothing to alert
+        if (step === 1) return true;
 
+        // Step 2: Personal Info — only manual fields required
         if (step === 2) {
-            if (wizardData.entityType === 'INDIVIDUAL') {
-                if (!d.homeAddress) { alert("Home address is required"); return false; }
-                if (!d.nokName || !d.nokRelationship || !d.nokAddress || !d.nokPhoneNumber) { alert("All Next of Kin details are required"); return false; }
-            }
-            if (!d.bankName || !d.accountNumber || d.accountNumber.length < 10) { alert("Valid bank details (10-digit account) are required"); return false; }
-            if (!d.accountName) { alert("Account name must be resolved before proceeding"); return false; }
+            // Profile fields (title, name, gender, dob, email, phone, bvn, nin) are pre-filled
+            // Only validate the manually entered ones if needed (all optional except what's already blocked by profile check)
+            return true;
         }
 
+        // Step 3: Address & NOK
         if (step === 3) {
+            if (d.entityType === 'INDIVIDUAL') {
+                if (!d.homeAddress) { alert('Home address is required'); return false; }
+                if (!d.nokName || !d.nokRelationship || !d.nokPhoneNumber) {
+                    alert('All Next of Kin details are required (Name, Relationship, Phone)'); return false;
+                }
+            }
+            return true;
+        }
+
+        // Step 4: Bank Details
+        if (step === 4) {
+            if (!d.bankName || !d.accountNumber || d.accountNumber.length < 10) {
+                alert('Valid bank details (10-digit account number) are required'); return false;
+            }
+            if (!d.accountName) { alert('Account name must be resolved before proceeding'); return false; }
+            return true;
+        }
+
+        // Step 5: Documents
+        if (step === 5) {
             const missing = currentDocs.filter(doc => doc.required && !d.uploadedDocs[doc.id]);
             if (missing.length > 0) {
                 alert(`Missing required documents: ${missing.map(m => m.label).join(', ')}`);
                 return false;
             }
+            return true;
         }
 
-        if (step === 4) {
-            if (!d.amount || parseFloat(d.amount) <= 0) { alert("Investment amount must be greater than zero"); return false; }
-            if (!d.tenure || parseInt(d.tenure) < 30) { alert("Tenure must be at least 30 days"); return false; }
-            if (dynamicInterestRate === null) { alert("No valid interest rate found for this configuration. Please adjust amount or tenure."); return false; }
+        // Step 6: Investment Settings
+        if (step === 6) {
+            if (!d.amount || parseFloat(d.amount) <= 0) { alert('Investment amount must be greater than zero'); return false; }
+            if (!d.tenure || parseInt(d.tenure) < 30) { alert('Tenure must be at least 30 days'); return false; }
+            if (!selectedProduct) { alert('Please select an investment plan'); return false; }
+            // CBA may return 0 legitimately — do not block submission
+            return true;
         }
 
         return true;
@@ -513,6 +590,8 @@ const StaffInvestmentsPage: React.FC<StaffInvestmentsPageProps> = ({ user, onLog
                 ...((wizardData.plan === 'VAULT') ? { payout_frequency: wizardData.payoutFrequency } : {}),
                 currency: wizardData.currency,
                 rollover_option: wizardData.rollover,
+                rollover_at_maturity: wizardData.rolloverAtMaturity,
+                cba_rollover_option: wizardData.cbaRolloverOption,
                 interest_rate: dynamicInterestRate,
 
                 // Common Contact
@@ -586,39 +665,7 @@ const StaffInvestmentsPage: React.FC<StaffInvestmentsPageProps> = ({ user, onLog
     };
 
     const handleWizardSubmit = async () => {
-        if (wizardData.paymentMethod === 'paystack') {
-            try {
-                setIsSubmitting(true);
-                // @ts-ignore
-                const handler = window.PaystackPop.setup({
-                    key: import.meta.env.VITE_PAYSTACK_PUBLIC_KEY,
-                    email: wizardData.email,
-                    amount: Math.round(parseFloat(wizardData.amount) * 100),
-                    currency: wizardData.currency || 'NGN',
-                    ref: `STAFF_${Date.now()}`,
-                    metadata: {
-                        custom_fields: [
-                            { display_name: "Staff Email", variable_name: "staff_email", value: user.email },
-                            { display_name: "Customer Name", variable_name: "customer_name", value: `${wizardData.firstName} ${wizardData.lastName}` }
-                        ]
-                    },
-                    callback: (response: any) => {
-                        executeSubmission(response.reference);
-                    },
-                    onClose: () => {
-                        setIsSubmitting(false);
-                        alert('Payment window closed. Please try again.');
-                    }
-                });
-                handler.openIframe();
-            } catch (err) {
-                console.error("Paystack initialization failed:", err);
-                alert("Failed to initialize payment gateway.");
-                setIsSubmitting(false);
-            }
-        } else {
-            await executeSubmission();
-        }
+        await executeSubmission();
     };
 
     const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, fieldId: string) => {
@@ -641,6 +688,14 @@ const StaffInvestmentsPage: React.FC<StaffInvestmentsPageProps> = ({ user, onLog
 
     return (
         <div className="relative">
+            {/* Investment Customer Lookup Flow */}
+            <NewInvestmentLookupFlow
+                isOpen={showLookupFlow}
+                onClose={() => setShowLookupFlow(false)}
+                onCustomerConfirmed={handleCustomerConfirmed}
+                user={user}
+            />
+
             {showStaffApplicationFlow && (
                 <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4">
                     <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setShowStaffApplicationFlow(false)} />
@@ -653,14 +708,21 @@ const StaffInvestmentsPage: React.FC<StaffInvestmentsPageProps> = ({ user, onLog
                                         <span className="material-symbols-outlined filled">add_circle</span>
                                     </div>
                                     <div>
-                                        <h2 className="font-black text-xl text-slate-900 dark:text-white uppercase tracking-tight">Quick Application</h2>
-                                        <div className="flex items-center gap-2 mt-0.5">
-                                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Step {wizardStep} of 5</span>
+                                        <h2 className="font-black text-xl text-slate-900 dark:text-white uppercase tracking-tight">New Investment Application</h2>
+                                        <div className="flex items-center gap-3 mt-1.5">
+                                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Step {wizardStep} of 6</span>
                                             <div className="flex gap-1">
-                                                {[1, 2, 3, 4, 5].map(s => (
-                                                    <div key={s} className={`h-1 w-3 rounded-full transition-all ${s <= wizardStep ? 'bg-purple-600' : 'bg-slate-200 dark:bg-slate-700'}`} />
+                                                {[1, 2, 3, 4, 5, 6].map(s => (
+                                                    <div key={s} className={`h-1.5 rounded-full transition-all duration-300 ${
+                                                        s < wizardStep ? 'bg-emerald-500 w-4' :
+                                                        s === wizardStep ? 'bg-purple-600 w-6' :
+                                                        'bg-slate-200 dark:bg-slate-700 w-3'
+                                                    }`} />
                                                 ))}
                                             </div>
+                                            <span className="text-[9px] font-bold text-purple-500 uppercase tracking-widest">
+                                                {wizardStep === 1 ? 'Profile Check' : wizardStep === 2 ? 'Personal Info' : wizardStep === 3 ? 'Address & NOK' : wizardStep === 4 ? 'Bank Details' : wizardStep === 5 ? 'Documents' : 'Investment'}
+                                            </span>
                                         </div>
                                     </div>
                                 </div>
@@ -671,385 +733,353 @@ const StaffInvestmentsPage: React.FC<StaffInvestmentsPageProps> = ({ user, onLog
 
                             {/* Content */}
                             <div className="p-10 max-h-[70vh] overflow-y-auto">
-                                {wizardStep === 1 && (
-                                    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4">
-                                        <div className="grid grid-cols-2 gap-6">
-                                            <div className="space-y-2">
-                                                <label className="text-[10px] font-black uppercase text-slate-400 px-1">Entity Type</label>
-                                                <div className="flex p-1 bg-slate-100 dark:bg-slate-800 rounded-2xl">
-                                                    <button
-                                                        onClick={() => setWizardData({ ...wizardData, entityType: 'INDIVIDUAL' })}
-                                                        className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${wizardData.entityType === 'INDIVIDUAL' ? 'bg-white dark:bg-slate-700 text-purple-600 shadow-sm' : 'text-slate-500'}`}
-                                                    >Individual</button>
-                                                    <button
-                                                        onClick={() => setWizardData({ ...wizardData, entityType: 'CORPORATE' })}
-                                                        className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${wizardData.entityType === 'CORPORATE' ? 'bg-white dark:bg-slate-700 text-purple-600 shadow-sm' : 'text-slate-500'}`}
-                                                    >Corporate</button>
+                                {wizardStep === 1 && (() => {
+                                    const c = selectedInvestmentCustomer;
+                                    type MissingField = { label: string; key: string };
+                                    const requiredFields: MissingField[] = [
+                                        { label: 'Full Name', key: 'full_name' },
+                                        { label: 'Email Address', key: 'email' },
+                                        { label: 'Phone Number', key: 'mobile_number' },
+                                        { label: 'BVN', key: 'bvn' },
+                                        { label: 'NIN', key: 'nin' },
+                                        { label: 'Gender', key: 'gender' },
+                                        { label: 'Date of Birth', key: 'date_of_birth' },
+                                    ];
+                                    const missingFields = requiredFields.filter(f => !c?.[f.key]);
+                                    const hasBlocker = missingFields.length > 0;
+
+                                    return hasBlocker ? (
+                                        // BLOCKING ERROR STATE
+                                        <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
+                                            <div className="flex flex-col items-center text-center gap-4 py-4">
+                                                <div className="size-20 rounded-3xl bg-rose-100 dark:bg-rose-900/20 flex items-center justify-center">
+                                                    <span className="material-symbols-outlined text-4xl text-rose-500">person_off</span>
+                                                </div>
+                                                <div>
+                                                    <h3 className="font-black text-lg text-slate-900 dark:text-white">Customer Profile Incomplete</h3>
+                                                    <p className="text-sm font-medium text-slate-500 dark:text-slate-400 mt-1 max-w-sm">
+                                                        The following required fields are missing from <span className="font-black text-slate-700 dark:text-slate-300">{c?.full_name || 'this customer'}</span>'s profile. Please edit the customer before creating an investment.
+                                                    </p>
                                                 </div>
                                             </div>
+
                                             <div className="space-y-2">
-                                                <label className="text-[10px] font-black uppercase text-slate-400 px-1">Customer Email</label>
+                                                {missingFields.map(f => (
+                                                    <div key={f.key} className="flex items-center gap-3 p-4 rounded-2xl bg-rose-50 dark:bg-rose-900/10 border border-rose-200 dark:border-rose-800">
+                                                        <span className="material-symbols-outlined text-rose-500 text-sm">error</span>
+                                                        <span className="text-sm font-black text-rose-700 dark:text-rose-400">{f.label}</span>
+                                                        <span className="ml-auto text-[10px] font-bold text-rose-400 uppercase tracking-widest">Missing</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+
+                                            <button
+                                                onClick={() => {
+                                                    setShowStaffApplicationFlow(false);
+                                                    // Navigate to customer profile edit — adjust route as needed
+                                                    window.open(`/customers/${c?.id || c?.user_id}`, '_blank');
+                                                }}
+                                                className="w-full h-14 rounded-2xl bg-rose-600 hover:bg-rose-700 text-white font-black uppercase tracking-widest text-xs transition-all flex items-center justify-center gap-2 shadow-lg shadow-rose-600/20"
+                                            >
+                                                <span className="material-symbols-outlined text-sm">open_in_new</span>
+                                                Edit Customer Profile
+                                            </button>
+                                        </div>
+                                    ) : (
+                                        // ALL CLEAR — show read-only customer summary
+                                        <div className="space-y-5 animate-in fade-in slide-in-from-bottom-4">
+                                            <div className="flex items-center gap-3 pb-3 border-b border-slate-100 dark:border-slate-800">
+                                                <div className="size-10 rounded-2xl bg-emerald-100 dark:bg-emerald-900/20 flex items-center justify-center">
+                                                    <span className="material-symbols-outlined text-emerald-600 text-lg">verified_user</span>
+                                                </div>
+                                                <div>
+                                                    <p className="text-[9px] font-black text-emerald-600 uppercase tracking-widest">Profile Verified</p>
+                                                    <p className="text-sm font-black text-slate-900 dark:text-white">All required fields are present</p>
+                                                </div>
+                                            </div>
+
+                                            {/* Customer Summary Card */}
+                                            <div className="p-6 rounded-[24px] bg-slate-50 dark:bg-slate-800/60 space-y-4">
+                                                <div className="flex items-center gap-4">
+                                                    <div className="size-14 rounded-2xl bg-purple-600/10 text-purple-600 flex items-center justify-center">
+                                                        <span className="material-symbols-outlined text-2xl">person</span>
+                                                    </div>
+                                                    <div>
+                                                        <p className="font-black text-lg text-slate-900 dark:text-white">{c?.full_name}</p>
+                                                        <p className="text-xs font-bold text-slate-500">{c?.email}</p>
+                                                    </div>
+                                                </div>
+
+                                                <div className="grid grid-cols-2 gap-3">
+                                                    {[
+                                                        { icon: 'call', label: 'Phone', value: c?.mobile_number },
+                                                        { icon: 'wc', label: 'Gender', value: c?.gender },
+                                                        { icon: 'cake', label: 'Date of Birth', value: c?.date_of_birth ? String(c.date_of_birth).slice(0, 10) : '' },
+                                                        { icon: 'fingerprint', label: 'BVN', value: c?.bvn ? `${String(c.bvn).slice(0, 4)}•••••••` : '' },
+                                                        { icon: 'badge', label: 'NIN', value: c?.nin ? `${String(c.nin).slice(0, 4)}•••••••` : '' },
+                                                        { icon: 'account_balance', label: 'CASA', value: c?.casa || 'N/A' },
+                                                    ].map(item => (
+                                                        <div key={item.label} className="flex items-center gap-2.5 p-3 rounded-xl bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700">
+                                                            <span className="material-symbols-outlined text-purple-500 text-sm">{item.icon}</span>
+                                                            <div className="min-w-0">
+                                                                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none">{item.label}</p>
+                                                                <p className="text-xs font-bold text-slate-800 dark:text-slate-200 mt-0.5 truncate">{item.value || '—'}</p>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+
+                                            <div className="flex items-center gap-2 p-4 rounded-2xl bg-blue-50 dark:bg-blue-900/10 border border-blue-200 dark:border-blue-800">
+                                                <span className="material-symbols-outlined text-blue-500 text-sm">info</span>
+                                                <p className="text-[11px] font-bold text-blue-700 dark:text-blue-300">
+                                                    Customer details are pulled from their profile. To update any field, edit the customer record directly.
+                                                </p>
+                                            </div>
+                                        </div>
+                                    );
+                                })()}
+
+
+
+                                {/* ═══ STEP 2: Personal Info ═══ */}
+                                {wizardStep === 2 && (
+                                    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
+
+                                        {/* Entity Type Toggle */}
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-black uppercase text-slate-400 px-1">Account Type</label>
+                                            <div className="flex p-1 bg-slate-100 dark:bg-slate-800 rounded-2xl">
+                                                <button
+                                                    onClick={() => setWizardData({ ...wizardData, entityType: 'INDIVIDUAL' })}
+                                                    className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 ${wizardData.entityType === 'INDIVIDUAL' ? 'bg-white dark:bg-slate-700 text-purple-600 shadow-sm' : 'text-slate-400'}`}
+                                                >
+                                                    <span className="material-symbols-outlined text-sm">person</span>
+                                                    Individual
+                                                </button>
+                                                <button
+                                                    onClick={() => setWizardData({ ...wizardData, entityType: 'CORPORATE' })}
+                                                    className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 ${wizardData.entityType === 'CORPORATE' ? 'bg-white dark:bg-slate-700 text-purple-600 shadow-sm' : 'text-slate-400'}`}
+                                                >
+                                                    <span className="material-symbols-outlined text-sm">business</span>
+                                                    Corporate
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        {/* FROM PROFILE — read-only display */}
+                                        <div className="space-y-3">
+                                            <div className="flex items-center gap-2 pb-2 border-b border-slate-100 dark:border-slate-800">
+                                                <div className="size-6 rounded-lg bg-emerald-100 dark:bg-emerald-900/20 flex items-center justify-center">
+                                                    <span className="material-symbols-outlined text-emerald-600 text-sm">lock</span>
+                                                </div>
+                                                <h3 className="font-black text-sm uppercase text-slate-800 dark:text-slate-200 tracking-widest">From Customer Profile</h3>
+                                                <span className="ml-auto text-[9px] font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-900/20 px-2 py-0.5 rounded-full uppercase tracking-widest">Auto-filled</span>
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-3">
+                                                {[
+                                                    { label: 'Title', value: wizardData.title },
+                                                    { label: 'Full Name', value: `${wizardData.firstName} ${wizardData.middleName ? wizardData.middleName + ' ' : ''}${wizardData.lastName}`.trim() },
+                                                    { label: 'Gender', value: wizardData.gender },
+                                                    { label: 'Date of Birth', value: wizardData.dob },
+                                                    { label: 'Marital Status', value: wizardData.maritalStatus },
+                                                    { label: 'Phone Number', value: wizardData.phoneNumber },
+                                                    { label: 'Email Address', value: wizardData.email },
+                                                    { label: 'BVN', value: wizardData.bvn ? `${wizardData.bvn.slice(0,4)}•••••••` : '' },
+                                                    { label: 'NIN', value: wizardData.nin ? `${wizardData.nin.slice(0,4)}•••••••` : '' },
+                                                ].map(item => (
+                                                    <div key={item.label} className="flex items-start gap-2.5 p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-700">
+                                                        <span className="material-symbols-outlined text-emerald-500 text-sm mt-0.5">check_circle</span>
+                                                        <div className="min-w-0">
+                                                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{item.label}</p>
+                                                            <p className="text-xs font-bold text-slate-800 dark:text-slate-200 mt-0.5 truncate">{item.value || '—'}</p>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+
+                                        {/* MANUAL ENTRY — not in profile */}
+                                        <div className="space-y-4">
+                                            <div className="flex items-center gap-2 pb-2 border-b border-slate-100 dark:border-slate-800">
+                                                <div className="size-6 rounded-lg bg-amber-100 dark:bg-amber-900/20 flex items-center justify-center">
+                                                    <span className="material-symbols-outlined text-amber-600 text-sm">edit</span>
+                                                </div>
+                                                <h3 className="font-black text-sm uppercase text-slate-800 dark:text-slate-200 tracking-widest">Additional Information</h3>
+                                                <span className="ml-auto text-[9px] font-bold text-amber-600 bg-amber-50 dark:bg-amber-900/20 px-2 py-0.5 rounded-full uppercase tracking-widest">Enter Manually</span>
+                                            </div>
+
+                                            {/* PEP */}
+                                            <div className="flex items-center justify-between p-4 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700">
+                                                <div>
+                                                    <p className="text-sm font-black text-slate-900 dark:text-white">Politically Exposed Person (PEP)?</p>
+                                                    <p className="text-[10px] font-bold text-slate-500 mt-0.5">Is this customer a senior politician or affiliated with one?</p>
+                                                </div>
+                                                <div className="flex items-center gap-2 ml-4 shrink-0">
+                                                    <button onClick={() => setWizardData({ ...wizardData, isPep: true })} className={`px-4 py-2 rounded-xl text-xs font-black uppercase transition-all ${wizardData.isPep ? 'bg-purple-600 text-white' : 'bg-slate-200 dark:bg-slate-700 text-slate-500'}`}>Yes</button>
+                                                    <button onClick={() => setWizardData({ ...wizardData, isPep: false })} className={`px-4 py-2 rounded-xl text-xs font-black uppercase transition-all ${!wizardData.isPep ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900' : 'bg-slate-200 dark:bg-slate-700 text-slate-500'}`}>No</button>
+                                                </div>
+                                            </div>
+
+                                            {/* Mother's Maiden Name */}
+                                            <div className="space-y-2">
+                                                <label className="text-[10px] font-black uppercase text-slate-400 px-1">Mother's Maiden Name</label>
                                                 <input
-                                                    type="email"
-                                                    placeholder="customer@example.com"
-                                                    value={wizardData.email}
-                                                    onChange={e => setWizardData({ ...wizardData, email: e.target.value })}
+                                                    type="text"
+                                                    value={wizardData.maidenName}
+                                                    onChange={e => setWizardData({ ...wizardData, maidenName: e.target.value })}
+                                                    placeholder="Enter mother's maiden name"
+                                                    className="w-full h-14 px-5 rounded-2xl bg-slate-50 dark:bg-slate-800 border-none focus:ring-2 focus:ring-purple-500 transition-all font-bold text-sm"
+                                                />
+                                            </div>
+
+                                            {/* Religion */}
+                                            <div className="space-y-2">
+                                                <label className="text-[10px] font-black uppercase text-slate-400 px-1">Religion</label>
+                                                <select value={wizardData.religion} onChange={e => setWizardData({ ...wizardData, religion: e.target.value })} className="w-full h-14 px-5 rounded-2xl bg-slate-50 dark:bg-slate-800 border-none focus:ring-2 focus:ring-purple-500 transition-all font-bold text-sm appearance-none">
+                                                    <option value="Christianity">Christianity</option>
+                                                    <option value="Islam">Islam</option>
+                                                    <option value="Prefer not to say">Prefer not to say</option>
+                                                </select>
+                                            </div>
+
+                                            {/* TIN (Optional) */}
+                                            <div className="space-y-2">
+                                                <label className="text-[10px] font-black uppercase text-slate-400 px-1">TIN — Tax Identification Number <span className="text-slate-300 normal-case">(Optional)</span></label>
+                                                <input
+                                                    type="text"
+                                                    value={wizardData.tin}
+                                                    onChange={e => setWizardData({ ...wizardData, tin: e.target.value })}
+                                                    placeholder="Enter TIN if available"
                                                     className="w-full h-14 px-5 rounded-2xl bg-slate-50 dark:bg-slate-800 border-none focus:ring-2 focus:ring-purple-500 transition-all font-bold text-sm"
                                                 />
                                             </div>
                                         </div>
+                                    </div>
+                                )}
 
-                                        {wizardData.entityType === 'INDIVIDUAL' ? (
-                                            <div className="space-y-6 animate-in fade-in">
-                                                <div className="flex items-center gap-2 pb-2 border-b border-slate-100 dark:border-slate-800">
-                                                    <span className="material-symbols-outlined text-purple-500 text-lg">person</span>
-                                                    <h3 className="font-black text-sm uppercase text-slate-800 dark:text-slate-200 tracking-widest">Personal Details</h3>
-                                                </div>
-                                                <div className="grid grid-cols-3 gap-6">
-                                                    <div className="space-y-2">
-                                                        <label className="text-[10px] font-black uppercase text-slate-400 px-1">Title</label>
-                                                        <select value={wizardData.title} onChange={e => setWizardData({ ...wizardData, title: e.target.value })} className="w-full h-14 px-5 rounded-2xl bg-slate-50 dark:bg-slate-800 border-none focus:ring-2 focus:ring-purple-500 transition-all font-bold text-sm appearance-none">
-                                                            <option value="Mr">Mr</option>
-                                                            <option value="Mrs">Mrs</option>
-                                                            <option value="Ms">Ms</option>
-                                                            <option value="Dr">Dr</option>
-                                                            <option value="Prof">Prof</option>
-                                                            <option value="Chief">Chief</option>
-                                                        </select>
-                                                    </div>
-                                                    <div className="col-span-2 space-y-2 flex items-center justify-between bg-slate-50 dark:bg-slate-800 p-4 rounded-2xl">
-                                                        <div>
-                                                            <p className="text-sm font-black text-slate-900 dark:text-white">Politically Exposed Person (PEP)?</p>
-                                                            <p className="text-[10px] font-bold text-slate-500">Is this person a senior politician or affiliated with one?</p>
-                                                        </div>
-                                                        <div className="flex items-center gap-2">
-                                                            <button onClick={() => setWizardData({ ...wizardData, isPep: true })} className={`px-4 py-2 rounded-xl text-xs font-black uppercase transition-all ${wizardData.isPep ? 'bg-purple-600 text-white' : 'bg-slate-200 dark:bg-slate-700 text-slate-500'}`}>Yes</button>
-                                                            <button onClick={() => setWizardData({ ...wizardData, isPep: false })} className={`px-4 py-2 rounded-xl text-xs font-black uppercase transition-all ${!wizardData.isPep ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900' : 'bg-slate-200 dark:bg-slate-700 text-slate-500'}`}>No</button>
-                                                        </div>
-                                                    </div>
-                                                </div>
-
-                                                <div className="grid grid-cols-3 gap-6">
-                                                    <div className="space-y-2">
-                                                        <label className="text-[10px] font-black uppercase text-slate-400 px-1">First Name</label>
-                                                        <input type="text" value={wizardData.firstName} onChange={e => setWizardData({ ...wizardData, firstName: e.target.value })} className="w-full h-14 px-5 rounded-2xl bg-slate-50 dark:bg-slate-800 border-none focus:ring-2 focus:ring-purple-500 transition-all font-bold text-sm" />
-                                                    </div>
-                                                    <div className="space-y-2">
-                                                        <label className="text-[10px] font-black uppercase text-slate-400 px-1">Middle Name (Optional)</label>
-                                                        <input type="text" value={wizardData.middleName} onChange={e => setWizardData({ ...wizardData, middleName: e.target.value })} className="w-full h-14 px-5 rounded-2xl bg-slate-50 dark:bg-slate-800 border-none focus:ring-2 focus:ring-purple-500 transition-all font-bold text-sm" />
-                                                    </div>
-                                                    <div className="space-y-2">
-                                                        <label className="text-[10px] font-black uppercase text-slate-400 px-1">Surname</label>
-                                                        <input type="text" value={wizardData.lastName} onChange={e => setWizardData({ ...wizardData, lastName: e.target.value })} className="w-full h-14 px-5 rounded-2xl bg-slate-50 dark:bg-slate-800 border-none focus:ring-2 focus:ring-purple-500 transition-all font-bold text-sm" />
-                                                    </div>
-                                                </div>
-
-                                                <div className="grid grid-cols-3 gap-6">
-                                                    <div className="space-y-2">
-                                                        <label className="text-[10px] font-black uppercase text-slate-400 px-1">Gender</label>
-                                                        <select value={wizardData.gender} onChange={e => setWizardData({ ...wizardData, gender: e.target.value })} className="w-full h-14 px-5 rounded-2xl bg-slate-50 dark:bg-slate-800 border-none focus:ring-2 focus:ring-purple-500 transition-all font-bold text-sm appearance-none">
-                                                            <option value="">Select Gender</option>
-                                                            <option value="Male">Male</option>
-                                                            <option value="Female">Female</option>
-                                                        </select>
-                                                    </div>
-                                                    <div className="space-y-2">
-                                                        <label className="text-[10px] font-black uppercase text-slate-400 px-1">Date of Birth</label>
-                                                        <input type="date" value={wizardData.dob} onChange={e => setWizardData({ ...wizardData, dob: e.target.value })} className="w-full h-14 px-5 rounded-2xl bg-slate-50 dark:bg-slate-800 border-none focus:ring-2 focus:ring-purple-500 transition-all font-bold text-sm" />
-                                                    </div>
-                                                    <div className="space-y-2">
-                                                        <label className="text-[10px] font-black uppercase text-slate-400 px-1">Mother's Maiden Name</label>
-                                                        <input type="text" value={wizardData.maidenName} onChange={e => setWizardData({ ...wizardData, maidenName: e.target.value })} className="w-full h-14 px-5 rounded-2xl bg-slate-50 dark:bg-slate-800 border-none focus:ring-2 focus:ring-purple-500 transition-all font-bold text-sm" />
-                                                    </div>
-                                                </div>
-
-                                                <div className="grid grid-cols-4 gap-6">
-                                                    <div className="space-y-2">
-                                                        <label className="text-[10px] font-black uppercase text-slate-400 px-1">Religion</label>
-                                                        <select value={wizardData.religion} onChange={e => setWizardData({ ...wizardData, religion: e.target.value })} className="w-full h-14 px-5 rounded-2xl bg-slate-50 dark:bg-slate-800 border-none focus:ring-2 focus:ring-purple-500 transition-all font-bold text-sm appearance-none">
-                                                            <option value="Christianity">Christianity</option>
-                                                            <option value="Islam">Islam</option>
-                                                            <option value="Prefer not to say">Prefer not to say</option>
-                                                        </select>
-                                                    </div>
-                                                    <div className="space-y-2">
-                                                        <label className="text-[10px] font-black uppercase text-slate-400 px-1">Marital Status</label>
-                                                        <select value={wizardData.maritalStatus} onChange={e => setWizardData({ ...wizardData, maritalStatus: e.target.value })} className="w-full h-14 px-5 rounded-2xl bg-slate-50 dark:bg-slate-800 border-none focus:ring-2 focus:ring-purple-500 transition-all font-bold text-sm appearance-none">
-                                                            <option value="Single">Single</option>
-                                                            <option value="Married">Married</option>
-                                                            <option value="Divorced">Divorced</option>
-                                                            <option value="Widowed">Widowed</option>
-                                                        </select>
-                                                    </div>
-                                                    <div className="space-y-2">
-                                                        <label className="text-[10px] font-black uppercase text-slate-400 px-1">Phone Number</label>
-                                                        <input type="tel" value={wizardData.phoneNumber} onChange={e => setWizardData({ ...wizardData, phoneNumber: e.target.value.replace(/\D/g, "").slice(0, 11) })} maxLength={11} className="w-full h-14 px-5 rounded-2xl bg-slate-50 dark:bg-slate-800 border-none focus:ring-2 focus:ring-purple-500 transition-all font-bold text-sm" />
-                                                    </div>
-                                                </div>
-
-                                                <div className="grid grid-cols-2 gap-6">
-                                                    <div className="space-y-2">
-                                                        <label className="text-[10px] font-black uppercase text-slate-400 px-1">BVN (Bank Verification Number)</label>
-                                                        <input type="text" value={wizardData.bvn} onChange={e => setWizardData({ ...wizardData, bvn: e.target.value.replace(/\D/g, "").slice(0, 11) })} maxLength={11} className="w-full h-14 px-5 rounded-2xl bg-slate-50 dark:bg-slate-800 border-none focus:ring-2 focus:ring-purple-500 transition-all font-bold text-sm" />
-                                                    </div>
-                                                    <div className="space-y-2">
-                                                        <label className="text-[10px] font-black uppercase text-slate-400 px-1">NIN (National Identity Number)</label>
-                                                        <input type="text" value={wizardData.nin} onChange={e => setWizardData({ ...wizardData, nin: e.target.value.replace(/\D/g, "").slice(0, 11) })} maxLength={11} className="w-full h-14 px-5 rounded-2xl bg-slate-50 dark:bg-slate-800 border-none focus:ring-2 focus:ring-purple-500 transition-all font-bold text-sm" />
-                                                    </div>
-                                                </div>
+                                {/* ═══ STEP 3: Address & NOK ═══ */}
+                                {wizardStep === 3 && (
+                                    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
+                                        {(wizardData.homeAddress || wizardData.stateOfOrigin !== 'Abia') && (
+                                            <div className="flex items-center gap-2 p-3 rounded-xl bg-blue-50 dark:bg-blue-900/10 border border-blue-200 dark:border-blue-800">
+                                                <span className="material-symbols-outlined text-blue-500 text-sm">info</span>
+                                                <p className="text-[11px] font-bold text-blue-700 dark:text-blue-300">Pre-filled from customer profile — edit if needed.</p>
                                             </div>
-                                        ) : (
-                                            <div className="space-y-6 animate-in fade-in">
+                                        )}
+                                        {wizardData.entityType === 'INDIVIDUAL' && (
+                                            <>
                                                 <div className="flex items-center gap-2 pb-2 border-b border-slate-100 dark:border-slate-800">
-                                                    <span className="material-symbols-outlined text-purple-500 text-lg">domain</span>
-                                                    <h3 className="font-black text-sm uppercase text-slate-800 dark:text-slate-200 tracking-widest">Corporate Details</h3>
+                                                    <span className="material-symbols-outlined text-purple-500 text-lg">home</span>
+                                                    <h3 className="font-black text-sm uppercase text-slate-800 dark:text-slate-200 tracking-widest">Address</h3>
                                                 </div>
-
                                                 <div className="grid grid-cols-2 gap-6">
                                                     <div className="space-y-2">
-                                                        <label className="text-[10px] font-black uppercase text-slate-400 px-1">Company / Organization Name</label>
-                                                        <input type="text" value={wizardData.companyName} onChange={e => setWizardData({ ...wizardData, companyName: e.target.value })} className="w-full h-14 px-5 rounded-2xl bg-slate-50 dark:bg-slate-800 border-none focus:ring-2 focus:ring-purple-500 transition-all font-bold text-sm" />
+                                                        <label className="text-[10px] font-black uppercase text-slate-400 px-1">State of Origin</label>
+                                                        <select value={wizardData.stateOfOrigin} onChange={e => setWizardData({ ...wizardData, stateOfOrigin: e.target.value })} className="w-full h-14 px-5 rounded-2xl bg-slate-50 dark:bg-slate-800 border-none focus:ring-2 focus:ring-purple-500 transition-all font-bold text-sm appearance-none">
+                                                            {NIGERIAN_STATES.map(state => <option key={state} value={state}>{state}</option>)}
+                                                        </select>
                                                     </div>
                                                     <div className="space-y-2">
-                                                        <label className="text-[10px] font-black uppercase text-slate-400 px-1">Company Email</label>
-                                                        <input type="email" value={wizardData.email} onChange={e => setWizardData({ ...wizardData, email: e.target.value })} className="w-full h-14 px-5 rounded-2xl bg-slate-50 dark:bg-slate-800 border-none focus:ring-2 focus:ring-purple-500 transition-all font-bold text-sm" />
+                                                        <label className="text-[10px] font-black uppercase text-slate-400 px-1">State of Residence</label>
+                                                        <select value={wizardData.stateOfResidence} onChange={e => setWizardData({ ...wizardData, stateOfResidence: e.target.value })} className="w-full h-14 px-5 rounded-2xl bg-slate-50 dark:bg-slate-800 border-none focus:ring-2 focus:ring-purple-500 transition-all font-bold text-sm appearance-none">
+                                                            {NIGERIAN_STATES.map(state => <option key={state} value={state}>{state}</option>)}
+                                                        </select>
                                                     </div>
                                                 </div>
-
-                                                <div className="grid grid-cols-3 gap-6">
-                                                    <div className="space-y-2">
-                                                        <label className="text-[10px] font-black uppercase text-slate-400 px-1">Date of Incorporation</label>
-                                                        <input type="date" value={wizardData.incorpDate} onChange={e => setWizardData({ ...wizardData, incorpDate: e.target.value })} className="w-full h-14 px-5 rounded-2xl bg-slate-50 dark:bg-slate-800 border-none focus:ring-2 focus:ring-purple-500 transition-all font-bold text-sm" />
-                                                    </div>
-                                                    <div className="space-y-2">
-                                                        <label className="text-[10px] font-black uppercase text-slate-400 px-1">RC Number</label>
-                                                        <input type="text" value={wizardData.rcNumber} onChange={e => setWizardData({ ...wizardData, rcNumber: e.target.value })} className="w-full h-14 px-5 rounded-2xl bg-slate-50 dark:bg-slate-800 border-none focus:ring-2 focus:ring-purple-500 transition-all font-bold text-sm" />
-                                                    </div>
-                                                    <div className="space-y-2">
-                                                        <label className="text-[10px] font-black uppercase text-slate-400 px-1">Nature of Business</label>
-                                                        <input type="text" value={wizardData.businessNature} onChange={e => setWizardData({ ...wizardData, businessNature: e.target.value })} className="w-full h-14 px-5 rounded-2xl bg-slate-50 dark:bg-slate-800 border-none focus:ring-2 focus:ring-purple-500 transition-all font-bold text-sm" />
-                                                    </div>
-                                                </div>
-
                                                 <div className="space-y-2">
-                                                    <label className="text-[10px] font-black uppercase text-slate-400 px-1">Registered Business Address</label>
-                                                    <input type="text" value={wizardData.businessAddress} onChange={e => setWizardData({ ...wizardData, businessAddress: e.target.value })} className="w-full h-14 px-5 rounded-2xl bg-slate-50 dark:bg-slate-800 border-none focus:ring-2 focus:ring-purple-500 transition-all font-bold text-sm" />
+                                                    <label className="text-[10px] font-black uppercase text-slate-400 px-1">Home Address</label>
+                                                    <input type="text" placeholder="House number, Street, City" value={wizardData.homeAddress} onChange={e => setWizardData({ ...wizardData, homeAddress: e.target.value })} className="w-full h-14 px-5 rounded-2xl bg-slate-50 dark:bg-slate-800 border-none focus:ring-2 focus:ring-purple-500 transition-all font-bold text-sm" />
                                                 </div>
-
-                                                <div className="mt-8 flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
-                                                    <div className="flex items-center gap-2">
-                                                        <span className="material-symbols-outlined text-purple-500 text-lg">groups</span>
-                                                        <h3 className="font-black text-sm uppercase text-slate-800 dark:text-slate-200 tracking-widest">Directors Setup</h3>
+                                                <div className="flex items-center gap-2 pt-2 pb-2 border-b border-slate-100 dark:border-slate-800">
+                                                    <span className="material-symbols-outlined text-purple-500 text-lg">family_history</span>
+                                                    <h3 className="font-black text-sm uppercase text-slate-800 dark:text-slate-200 tracking-widest">Next of Kin</h3>
+                                                    {(wizardData.nokName || wizardData.nokRelationship) && (
+                                                        <span className="ml-auto text-[9px] font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-900/20 px-2 py-0.5 rounded-full uppercase tracking-widest">Pre-filled</span>
+                                                    )}
+                                                </div>
+                                                <div className="grid grid-cols-2 gap-6">
+                                                    <div className="space-y-2">
+                                                        <label className="text-[10px] font-black uppercase text-slate-400 px-1">Full Name</label>
+                                                        <input type="text" value={wizardData.nokName} onChange={e => setWizardData({ ...wizardData, nokName: e.target.value })} placeholder="Next of kin full name" className="w-full h-14 px-5 rounded-2xl bg-slate-50 dark:bg-slate-800 border-none focus:ring-2 focus:ring-purple-500 transition-all font-bold text-sm" />
                                                     </div>
-                                                    <div className="flex items-center gap-4">
-                                                        <label className="text-[10px] font-black uppercase text-slate-400">Total Directors:</label>
-                                                        <select
-                                                            value={wizardData.directorCount}
-                                                            onChange={e => {
-                                                                const newCount = parseInt(e.target.value);
-                                                                let dirs = [...wizardData.directors];
-                                                                if (newCount > dirs.length) {
-                                                                    for (let i = dirs.length; i < newCount; i++) {
-                                                                        dirs.push({ surname: '', firstName: '', middleName: '', phone: '', gender: '', dob: '', bvn: '', nin: '', isPep: false });
-                                                                    }
-                                                                } else {
-                                                                    dirs = dirs.slice(0, newCount);
-                                                                }
-                                                                setWizardData({ ...wizardData, directorCount: newCount, directors: dirs });
-                                                            }}
-                                                            className="h-10 px-4 rounded-xl bg-slate-100 dark:bg-slate-800 font-bold text-sm outline-none cursor-pointer border-none"
-                                                        >
-                                                            {[1, 2, 3, 4, 5].map(n => <option key={n} value={n}>{n}</option>)}
+                                                    <div className="space-y-2">
+                                                        <label className="text-[10px] font-black uppercase text-slate-400 px-1">Relationship</label>
+                                                        <select value={wizardData.nokRelationship} onChange={e => setWizardData({ ...wizardData, nokRelationship: e.target.value })} className="w-full h-14 px-5 rounded-2xl bg-slate-50 dark:bg-slate-800 border-none focus:ring-2 focus:ring-purple-500 transition-all font-bold text-sm appearance-none">
+                                                            <option value="">Select Relationship</option>
+                                                            <option value="Spouse">Spouse</option>
+                                                            <option value="Parent">Parent</option>
+                                                            <option value="Child">Child</option>
+                                                            <option value="Brother">Brother</option>
+                                                            <option value="Sister">Sister</option>
+                                                            <option value="Other">Other</option>
                                                         </select>
                                                     </div>
-                                                </div>
-
-                                                <div className="space-y-4">
-                                                    {wizardData.directors.map((dir, idx) => (
-                                                        <div key={idx} className="p-6 rounded-2xl border border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/20 space-y-4 relative">
-                                                            <div className="absolute -top-3 -left-3 size-8 rounded-full bg-purple-600 text-white flex items-center justify-center font-black text-xs shadow-lg">#{idx + 1}</div>
-                                                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                                                                <div className="space-y-1">
-                                                                    <label className="text-[9px] font-black uppercase text-slate-400 px-1">First Name</label>
-                                                                    <input type="text" value={dir.firstName} onChange={e => { const nd = [...wizardData.directors]; nd[idx].firstName = e.target.value; setWizardData({ ...wizardData, directors: nd }); }} className="w-full h-12 px-4 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-bold" />
-                                                                </div>
-                                                                <div className="space-y-1">
-                                                                    <label className="text-[9px] font-black uppercase text-slate-400 px-1">Surname</label>
-                                                                    <input type="text" value={dir.surname} onChange={e => { const nd = [...wizardData.directors]; nd[idx].surname = e.target.value; setWizardData({ ...wizardData, directors: nd }); }} className="w-full h-12 px-4 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-bold" />
-                                                                </div>
-                                                                <div className="space-y-1">
-                                                                    <label className="text-[9px] font-black uppercase text-slate-400 px-1">Phone</label>
-                                                                    <input type="tel" value={dir.phone} onChange={e => { const nd = [...wizardData.directors]; nd[idx].phone = e.target.value.replace(/\D/g, "").slice(0, 11); setWizardData({ ...wizardData, directors: nd }); }} maxLength={11} className="w-full h-12 px-4 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-bold" />
-                                                                </div>
-                                                                <div className="space-y-1">
-                                                                    <label className="text-[9px] font-black uppercase text-slate-400 px-1">DOB</label>
-                                                                    <input type="date" value={dir.dob} onChange={e => { const nd = [...wizardData.directors]; nd[idx].dob = e.target.value; setWizardData({ ...wizardData, directors: nd }); }} className="w-full h-12 px-4 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-bold" />
-                                                                </div>
-                                                            </div>
-                                                            <div className="flex items-center gap-4 text-xs font-bold text-slate-500">
-                                                                <label className="flex items-center gap-2 cursor-pointer hover:text-slate-800 dark:hover:text-white transition-colors">
-                                                                    <input type="checkbox" checked={dir.isPep} onChange={e => { const nd = [...wizardData.directors]; nd[idx].isPep = e.target.checked; setWizardData({ ...wizardData, directors: nd }); }} className="rounded accent-purple-600 size-4" />
-                                                                    Politically Exposed Person?
-                                                                </label>
-                                                            </div>
+                                                    <div className="space-y-2 col-span-2">
+                                                        <label className="text-[10px] font-black uppercase text-slate-400 px-1">NOK Phone Number</label>
+                                                        <div className="flex gap-2">
+                                                            <input type="text" placeholder="+234" value={wizardData.nokCountryCode} onChange={e => setWizardData({ ...wizardData, nokCountryCode: e.target.value })} className="w-20 h-14 px-3 rounded-2xl bg-slate-50 dark:bg-slate-800 border-none focus:ring-2 focus:ring-purple-500 transition-all font-bold text-sm" />
+                                                            <input type="tel" placeholder="8012345678" value={wizardData.nokPhoneNumber} onChange={e => setWizardData({ ...wizardData, nokPhoneNumber: e.target.value.replace(/\D/g, '') })} className="flex-1 h-14 px-5 rounded-2xl bg-slate-50 dark:bg-slate-800 border-none focus:ring-2 focus:ring-purple-500 transition-all font-bold text-sm" />
                                                         </div>
-                                                    ))}
+                                                    </div>
+                                                    <div className="space-y-2 col-span-2">
+                                                        <div className="flex justify-between items-center px-1">
+                                                            <label className="text-[10px] font-black uppercase text-slate-400">NOK Address</label>
+                                                            <label className="flex items-center gap-2 cursor-pointer text-[10px] font-black text-purple-600 uppercase">
+                                                                <input type="checkbox" checked={wizardData.isNokSameAddress} onChange={e => setWizardData({ ...wizardData, isNokSameAddress: e.target.checked, nokAddress: e.target.checked ? wizardData.homeAddress : '' })} className="size-3 rounded accent-purple-600" />
+                                                                Same as Customer
+                                                            </label>
+                                                        </div>
+                                                        <input type="text" value={wizardData.nokAddress} onChange={e => setWizardData({ ...wizardData, nokAddress: e.target.value })} className="w-full h-14 px-5 rounded-2xl bg-slate-50 dark:bg-slate-800 border-none focus:ring-2 focus:ring-purple-500 transition-all font-bold text-sm" />
+                                                    </div>
                                                 </div>
-                                            </div>
+                                            </>
                                         )}
                                     </div>
                                 )}
 
-                                {wizardStep === 2 && (
-                                    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4">
-                                        {wizardData.entityType === 'INDIVIDUAL' && (
-                                            <>
-                                                <div className="flex items-center gap-2 pb-2 border-b border-slate-100 dark:border-slate-800">
-                                            <span className="material-symbols-outlined text-purple-500 text-lg">home</span>
-                                            <h3 className="font-black text-sm uppercase text-slate-800 dark:text-slate-200 tracking-widest">Address & Contact</h3>
-                                        </div>
-                                        <div className="grid grid-cols-2 gap-6">
-                                            <div className="space-y-2">
-                                                <label className="text-[10px] font-black uppercase text-slate-400 px-1">State of Origin</label>
-                                                <select value={wizardData.stateOfOrigin} onChange={e => setWizardData({ ...wizardData, stateOfOrigin: e.target.value })} className="w-full h-14 px-5 rounded-2xl bg-slate-50 dark:bg-slate-800 border-none focus:ring-2 focus:ring-purple-500 transition-all font-bold text-sm appearance-none">
-                                                    {NIGERIAN_STATES.map(state => <option key={state} value={state}>{state}</option>)}
-                                                </select>
-                                            </div>
-                                            <div className="space-y-2">
-                                                <label className="text-[10px] font-black uppercase text-slate-400 px-1">State of Residence</label>
-                                                <select value={wizardData.stateOfResidence} onChange={e => setWizardData({ ...wizardData, stateOfResidence: e.target.value })} className="w-full h-14 px-5 rounded-2xl bg-slate-50 dark:bg-slate-800 border-none focus:ring-2 focus:ring-purple-500 transition-all font-bold text-sm appearance-none">
-                                                    {NIGERIAN_STATES.map(state => <option key={state} value={state}>{state}</option>)}
-                                                </select>
-                                            </div>
-                                        </div>
-                                        <div className="space-y-2">
-                                            <label className="text-[10px] font-black uppercase text-slate-400 px-1">Home Address</label>
-                                            <input type="text" placeholder="House number, Street, City" value={wizardData.homeAddress} onChange={e => setWizardData({ ...wizardData, homeAddress: e.target.value })} className="w-full h-14 px-5 rounded-2xl bg-slate-50 dark:bg-slate-800 border-none focus:ring-2 focus:ring-purple-500 transition-all font-bold text-sm" />
-                                        </div>
-
-                                        <div className="flex items-center gap-2 pt-4 pb-2 border-b border-slate-100 dark:border-slate-800">
-                                            <span className="material-symbols-outlined text-purple-500 text-lg">family_history</span>
-                                            <h3 className="font-black text-sm uppercase text-slate-800 dark:text-slate-200 tracking-widest">Next of Kin</h3>
-                                        </div>
-                                        <div className="grid grid-cols-2 gap-6">
-                                            <div className="space-y-2">
-                                                <label className="text-[10px] font-black uppercase text-slate-400 px-1">Full Name</label>
-                                                <input type="text" value={wizardData.nokName} onChange={e => setWizardData({ ...wizardData, nokName: e.target.value })} className="w-full h-14 px-5 rounded-2xl bg-slate-50 dark:bg-slate-800 border-none focus:ring-2 focus:ring-purple-500 transition-all font-bold text-sm" />
-                                            </div>
-                                            <div className="space-y-2">
-                                                <label className="text-[10px] font-black uppercase text-slate-400 px-1">Relationship</label>
-                                                <select 
-                                                    value={wizardData.nokRelationship} 
-                                                    onChange={e => setWizardData({ ...wizardData, nokRelationship: e.target.value })} 
-                                                    className="w-full h-14 px-5 rounded-2xl bg-slate-50 dark:bg-slate-800 border-none focus:ring-2 focus:ring-purple-500 transition-all font-bold text-sm appearance-none"
-                                                >
-                                                    <option value="">Select Relationship</option>
-                                                    <option value="Spouse">Spouse</option>
-                                                    <option value="Parent">Parent</option>
-                                                    <option value="Child">Child</option>
-                                                    <option value="Brother">Brother</option>
-                                                    <option value="Sister">Sister</option>
-                                                    <option value="Nephew">Nephew</option>
-                                                    <option value="Niece">Niece</option>
-                                                    <option value="Uncle">Uncle</option>
-                                                    <option value="Aunt">Aunt</option>
-                                                    <option value="Cousin">Cousin</option>
-                                                    <option value="Grandparent">Grandparent</option>
-                                                    <option value="Grandchild">Grandchild</option>
-                                                    <option value="Business Partner">Business Partner</option>
-                                                    <option value="Other">Other</option>
-                                                </select>
-                                            </div>
-                                            <div className="space-y-2 col-span-2">
-                                                <label className="text-[10px] font-black uppercase text-slate-400 px-1">Phone Number</label>
-                                                <div className="flex gap-2">
-                                                    <input
-                                                        type="text"
-                                                        placeholder="+234"
-                                                        value={wizardData.nokCountryCode}
-                                                        onChange={e => setWizardData({ ...wizardData, nokCountryCode: e.target.value })}
-                                                        className="w-20 h-14 px-3 rounded-2xl bg-slate-50 dark:bg-slate-800 border-none focus:ring-2 focus:ring-purple-500 transition-all font-bold text-sm"
-                                                    />
-                                                    <input
-                                                        type="tel"
-                                                        placeholder="8012345678"
-                                                        value={wizardData.nokPhoneNumber}
-                                                        onChange={e => setWizardData({ ...wizardData, nokPhoneNumber: e.target.value.replace(/\D/g, "") })}
-                                                        className="flex-1 h-14 px-5 rounded-2xl bg-slate-50 dark:bg-slate-800 border-none focus:ring-2 focus:ring-purple-500 transition-all font-bold text-sm"
-                                                    />
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div className="space-y-2">
-                                            <div className="flex justify-between items-center px-1">
-                                                <label className="text-[10px] font-black uppercase text-slate-400">Home Address</label>
-                                                <label className="flex items-center gap-2 cursor-pointer text-[10px] font-black text-purple-600 uppercase">
-                                                    <input type="checkbox" checked={wizardData.isNokSameAddress} onChange={e => setWizardData({ ...wizardData, isNokSameAddress: e.target.checked, nokAddress: e.target.checked ? wizardData.homeAddress : '' })} className="size-3 rounded accent-purple-600" />
-                                                    Same as Customer Address
-                                                </label>
-                                            </div>
-                                            <input type="text" value={wizardData.nokAddress} onChange={e => setWizardData({ ...wizardData, nokAddress: e.target.value })} className="w-full h-14 px-5 rounded-2xl bg-slate-50 dark:bg-slate-800 border-none focus:ring-2 focus:ring-purple-500 transition-all font-bold text-sm" />
-                                        </div>
-
-                                            </>
-                                        )}
-
-                                        <div className="flex items-center gap-2 pt-4 pb-2 border-b border-slate-100 dark:border-slate-800">
+                                {/* ═══ STEP 4: Bank Details ═══ */}
+                                {wizardStep === 4 && (
+                                    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
+                                        <div className="flex items-center gap-2 pb-2 border-b border-slate-100 dark:border-slate-800">
                                             <span className="material-symbols-outlined text-purple-500 text-lg">account_balance</span>
                                             <h3 className="font-black text-sm uppercase text-slate-800 dark:text-slate-200 tracking-widest">Payout Bank Details</h3>
+                                            {wizardData.bankName && <span className="ml-auto text-[9px] font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-900/20 px-2 py-0.5 rounded-full uppercase tracking-widest">Pre-filled</span>}
                                         </div>
+                                        {wizardData.bankName && (
+                                            <div className="flex items-center gap-2 p-3 rounded-xl bg-blue-50 dark:bg-blue-900/10 border border-blue-200 dark:border-blue-800">
+                                                <span className="material-symbols-outlined text-blue-500 text-sm">info</span>
+                                                <p className="text-[11px] font-bold text-blue-700 dark:text-blue-300">Pre-filled from profile — update if payout account is different.</p>
+                                            </div>
+                                        )}
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                             <div className="space-y-2">
                                                 <label className="text-[10px] font-black uppercase text-slate-400 px-1">Bank Name</label>
-                                                <select
-                                                    className="w-full h-14 px-5 rounded-2xl bg-slate-50 dark:bg-slate-800 border-none focus:ring-2 focus:ring-purple-500 transition-all font-bold text-sm appearance-none"
-                                                    value={wizardData.bankCode}
-                                                    onChange={e => {
-                                                        const selectedBank = banks.find(b => b.code === e.target.value);
-                                                        setWizardData({ ...wizardData, bankCode: e.target.value, bankName: selectedBank?.name || '' });
-                                                    }}
-                                                >
+                                                <select className="w-full h-14 px-5 rounded-2xl bg-slate-50 dark:bg-slate-800 border-none focus:ring-2 focus:ring-purple-500 transition-all font-bold text-sm appearance-none" value={wizardData.bankCode} onChange={e => { const b = banks.find(b => b.code === e.target.value); setWizardData({ ...wizardData, bankCode: e.target.value, bankName: b?.name || '' }); }}>
                                                     <option value="">Select Bank</option>
-                                                    {banks.map(bank => (
-                                                        <option key={bank.code} value={bank.code}>{bank.name}</option>
-                                                    ))}
+                                                    {banks.map(bank => <option key={bank.code} value={bank.code}>{bank.name}</option>)}
                                                 </select>
                                             </div>
                                             <div className="space-y-2">
                                                 <label className="text-[10px] font-black uppercase text-slate-400 px-1">Account Number</label>
                                                 <div className="relative">
-                                                    <input
-                                                        className="w-full h-14 px-5 rounded-2xl bg-slate-50 dark:bg-slate-800 border-none focus:ring-2 focus:ring-purple-500 transition-all font-bold text-sm"
-                                                        value={wizardData.accountNumber}
-                                                        onChange={e => setWizardData({ ...wizardData, accountNumber: e.target.value.replace(/\D/g, "").slice(0, 10) })}
-                                                        maxLength={10}
-                                                        placeholder="10 digits"
-                                                    />
-                                                    {isVerifyingBank && (
-                                                        <div className="absolute right-4 top-1/2 -translate-y-1/2">
-                                                            <div className="size-4 border-2 border-purple-600/20 border-t-purple-600 rounded-full animate-spin" />
-                                                        </div>
-                                                    )}
+                                                    <input className="w-full h-14 px-5 rounded-2xl bg-slate-50 dark:bg-slate-800 border-none focus:ring-2 focus:ring-purple-500 transition-all font-bold text-sm" value={wizardData.accountNumber} onChange={e => setWizardData({ ...wizardData, accountNumber: e.target.value.replace(/\D/g, '').slice(0, 10) })} maxLength={10} placeholder="10 digits" />
+                                                    {isVerifyingBank && <div className="absolute right-4 top-1/2 -translate-y-1/2"><div className="size-4 border-2 border-purple-600/20 border-t-purple-600 rounded-full animate-spin" /></div>}
                                                 </div>
                                             </div>
                                         </div>
                                         <div className="space-y-2">
                                             <label className="text-[10px] font-black uppercase text-slate-400 px-1 flex items-center justify-between">
                                                 <span>Account Name</span>
-                                                {isVerifyingBank && <span className="text-[8px] text-purple-600 animate-pulse uppercase">Resolving Account...</span>}
+                                                {isVerifyingBank && <span className="text-[8px] text-purple-600 animate-pulse uppercase">Resolving...</span>}
                                             </label>
-                                            <input
-                                                className={`w-full h-14 px-5 rounded-2xl transition-all font-bold text-sm ${isVerifyingBank ? 'bg-purple-50 dark:bg-purple-900/10' : 'bg-slate-50 dark:bg-slate-800'} border-none focus:ring-2 focus:ring-purple-500 shadow-sm`}
-                                                value={wizardData.accountName}
-                                                onChange={e => setWizardData({ ...wizardData, accountName: e.target.value })}
-                                                placeholder={isVerifyingBank ? "Resolving..." : "Resolved account name"}
-                                                readOnly={isVerifyingBank}
-                                            />
+                                            <input className={`w-full h-14 px-5 rounded-2xl transition-all font-bold text-sm ${isVerifyingBank ? 'bg-purple-50 dark:bg-purple-900/10' : 'bg-slate-50 dark:bg-slate-800'} border-none focus:ring-2 focus:ring-purple-500`} value={wizardData.accountName} onChange={e => setWizardData({ ...wizardData, accountName: e.target.value })} placeholder={isVerifyingBank ? 'Resolving...' : 'Resolved account name'} readOnly={isVerifyingBank} />
                                         </div>
                                     </div>
                                 )}
 
-                                {wizardStep === 3 && (
+                                {/* ═══ STEP 5: Documents ═══ */}
+                                {wizardStep === 5 && (
                                     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4">
                                         <div className="flex items-center gap-4 pb-2 border-b border-slate-100 dark:border-slate-800">
                                             <div className="size-10 rounded-xl bg-purple-600/10 text-purple-600 flex items-center justify-center">
@@ -1071,8 +1101,7 @@ const StaffInvestmentsPage: React.FC<StaffInvestmentsPageProps> = ({ user, onLog
                                                             <div className="px-3 py-1 bg-amber-500/10 text-amber-500 rounded-lg text-[10px] font-black uppercase animate-pulse">Uploading...</div>
                                                         ) : wizardData.uploadedDocs[doc.id] ? (
                                                             <div className="px-3 py-1 bg-emerald-500/10 text-emerald-500 rounded-lg text-[10px] font-black uppercase flex items-center gap-1">
-                                                                <span className="material-symbols-outlined text-[14px]">check_circle</span>
-                                                                Uploaded
+                                                                <span className="material-symbols-outlined text-[14px]">check_circle</span>Uploaded
                                                             </div>
                                                         ) : (
                                                             <div className="px-3 py-1 bg-slate-200 dark:bg-slate-700 text-slate-500 rounded-lg text-[10px] font-black uppercase">Pending</div>
@@ -1082,11 +1111,7 @@ const StaffInvestmentsPage: React.FC<StaffInvestmentsPageProps> = ({ user, onLog
                                                         <h4 className="text-[11px] font-black text-slate-900 dark:text-white uppercase leading-tight line-clamp-1">{doc.label}</h4>
                                                         <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">{doc.required ? 'Required' : 'Optional'}</p>
                                                     </div>
-                                                    <input
-                                                        type="file"
-                                                        className="absolute inset-0 opacity-0 cursor-pointer z-10"
-                                                        onChange={(e) => handleFileUpload(e, doc.id)}
-                                                    />
+                                                    <input type="file" className="absolute inset-0 opacity-0 cursor-pointer z-10" onChange={(e) => handleFileUpload(e, doc.id)} />
                                                     {wizardData.uploadedDocs[doc.id] && wizardData.uploadedDocs[doc.id] !== 'uploading...' && (
                                                         <div className="absolute inset-0 bg-emerald-500/5 backdrop-blur-[1px] pointer-events-none border-2 border-emerald-500/20 rounded-[24px]" />
                                                     )}
@@ -1096,16 +1121,32 @@ const StaffInvestmentsPage: React.FC<StaffInvestmentsPageProps> = ({ user, onLog
                                     </div>
                                 )}
 
-                                {wizardStep === 4 && (
+                                {/* ═══ STEP 6: Investment Settings ═══ */}
+                                {wizardStep === 6 && (
                                     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4">
                                         <div className="grid grid-cols-2 gap-6">
                                             <div className="space-y-2">
                                                 <label className="text-[10px] font-black uppercase text-slate-400 px-1">Investment Plan</label>
-                                                <select value={wizardData.plan} onChange={e => setWizardData({ ...wizardData, plan: e.target.value as InvestmentPlan })} className="w-full h-14 px-5 rounded-2xl bg-slate-50 dark:bg-slate-800 border-none focus:ring-2 focus:ring-purple-500 transition-all font-bold text-sm appearance-none">
-                                                    <option value="RISE">RISE (Standard)</option>
-                                                    <option value="SURGE">SURGE (Compounding)</option>
-                                                    <option value="VAULT">VAULT (Fixed)</option>
-                                                </select>
+                                                {investmentProducts.length === 0 ? (
+                                                    <div className="w-full h-14 px-5 rounded-2xl bg-slate-50 dark:bg-slate-800 flex items-center gap-3 text-sm font-bold text-slate-400">
+                                                        <div className="size-4 border-2 border-purple-600/30 border-t-purple-600 rounded-full animate-spin" />
+                                                        Loading plans...
+                                                    </div>
+                                                ) : (
+                                                    <select
+                                                        value={wizardData.plan}
+                                                        onChange={e => {
+                                                            const product = investmentProducts.find(p => p.custom_name === e.target.value);
+                                                            setSelectedProduct(product || null);
+                                                            setWizardData({ ...wizardData, plan: e.target.value.replace(/^NOLT[_ ]/i, '').toUpperCase() as InvestmentPlan });
+                                                        }}
+                                                        className="w-full h-14 px-5 rounded-2xl bg-slate-50 dark:bg-slate-800 border-none focus:ring-2 focus:ring-purple-500 transition-all font-bold text-sm appearance-none"
+                                                    >
+                                                        {investmentProducts.map(p => (
+                                                            <option key={p.id} value={p.custom_name}>{p.custom_name}</option>
+                                                        ))}
+                                                    </select>
+                                                )}
                                             </div>
                                             <div className="space-y-2">
                                                 <label className="text-[10px] font-black uppercase text-slate-400 px-1">Currency</label>
@@ -1180,11 +1221,39 @@ const StaffInvestmentsPage: React.FC<StaffInvestmentsPageProps> = ({ user, onLog
                                                 <option value="none">Payout All (No Rollover)</option>
                                             </select>
                                         </div>
+
+                                        {/* CBA Rollover Fields */}
+                                        <div className="grid grid-cols-2 gap-6">
+                                            <div className="space-y-2">
+                                                <label className="text-[10px] font-black uppercase text-slate-400 px-1">Rollover At Maturity <span className="text-purple-500">CBA</span></label>
+                                                <select
+                                                    value={wizardData.rolloverAtMaturity}
+                                                    onChange={e => setWizardData({ ...wizardData, rolloverAtMaturity: parseInt(e.target.value) })}
+                                                    className="w-full h-14 px-5 rounded-2xl bg-slate-50 dark:bg-slate-800 border-none focus:ring-2 focus:ring-purple-500 transition-all font-bold text-sm appearance-none"
+                                                >
+                                                    <option value={0}>0 — Do Not Rollover</option>
+                                                    <option value={1}>1 — Rollover Automatically</option>
+                                                </select>
+                                            </div>
+                                            <div className="space-y-2">
+                                                <label className={`text-[10px] font-black uppercase px-1 ${wizardData.rolloverAtMaturity === 0 ? 'text-slate-300 dark:text-slate-600' : 'text-slate-400'}`}>Rollover Option <span className="text-purple-500">CBA</span></label>
+                                                <select
+                                                    value={wizardData.cbaRolloverOption}
+                                                    onChange={e => setWizardData({ ...wizardData, cbaRolloverOption: parseInt(e.target.value) })}
+                                                    disabled={wizardData.rolloverAtMaturity === 0}
+                                                    className={`w-full h-14 px-5 rounded-2xl border-none focus:ring-2 focus:ring-purple-500 transition-all font-bold text-sm appearance-none ${wizardData.rolloverAtMaturity === 0 ? 'bg-slate-100 dark:bg-slate-900 opacity-50 cursor-not-allowed' : 'bg-slate-50 dark:bg-slate-800'}`}
+                                                >
+                                                    <option value={1}>1 — Rollover Principal & Interest</option>
+                                                    <option value={2}>2 — Rollover Principal Only</option>
+                                                </select>
+                                            </div>
+                                        </div>
                                     </div>
                                 )}
 
-                                {wizardStep === 5 && (
-                                    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4">
+                                {/* ═══ STEP 6 SUMMARY + RECEIPT ═══ (shown after investment settings within step 6) */}
+                                {wizardStep === 6 && wizardData.amount && (
+                                    <div className="space-y-8 mt-4 animate-in fade-in slide-in-from-bottom-4">
                                         <div className="p-8 rounded-[32px] bg-slate-900 text-white space-y-6 shadow-2xl relative overflow-hidden">
                                             <div className="absolute top-0 right-0 p-8 opacity-10">
                                                 <span className="material-symbols-outlined text-8xl">account_balance_wallet</span>
@@ -1218,11 +1287,25 @@ const StaffInvestmentsPage: React.FC<StaffInvestmentsPageProps> = ({ user, onLog
 
                                                 <div>
                                                     <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Plan & Tenure</p>
-                                                    <p className="font-bold text-sm text-purple-300">NOLT {wizardData.plan} ({wizardData.tenure} Days)</p>
+                                                    <p className="font-bold text-sm text-purple-300">{wizardData.plan} ({wizardData.tenure} Days)</p>
                                                 </div>
                                                 <div>
                                                     <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Interest Rate</p>
-                                                    <p className="font-black text-sm text-purple-400">{dynamicInterestRate ? `${dynamicInterestRate}% p.a` : 'Fetching...'}</p>
+                                                    <p className="font-black text-sm text-purple-400">{rateLoading ? (
+                                                         <div className="flex items-center gap-1.5">
+                                                             <div className="size-3 border-2 border-purple-400/30 border-t-purple-400 rounded-full animate-spin" />
+                                                             <span className="text-xs font-bold text-slate-400">Fetching from CBA...</span>
+                                                         </div>
+                                                     ) : dynamicInterestRate === null ? (
+                                                         <p className="text-xs font-bold text-slate-400">Enter amount and tenure</p>
+                                                     ) : dynamicInterestRate === 0 ? (
+                                                         <div className="flex items-center gap-1.5">
+                                                             <span className="material-symbols-outlined text-amber-400 text-sm">warning</span>
+                                                             <p className="text-sm font-black text-amber-400">0% — CBA not configured</p>
+                                                         </div>
+                                                     ) : (
+                                                         <p className="font-black text-sm text-purple-400">{dynamicInterestRate}% p.a</p>
+                                                     )}</p>
                                                 </div>
 
                                                 <div>
@@ -1237,20 +1320,18 @@ const StaffInvestmentsPage: React.FC<StaffInvestmentsPageProps> = ({ user, onLog
                                         </div>
 
                                         <div className="space-y-4">
-                                            <label className="text-[10px] font-black uppercase text-slate-400 px-1">Select Payment Method</label>
-                                            <div className="grid grid-cols-2 gap-4">
-                                                <button onClick={() => setWizardData({ ...wizardData, paymentMethod: 'bank_transfer' })} className={`flex flex-col items-center gap-3 p-6 rounded-[24px] border-2 transition-all ${wizardData.paymentMethod === 'bank_transfer' ? 'border-purple-600 bg-purple-600/5' : 'border-slate-100 dark:border-slate-800 hover:border-slate-200'}`}>
-                                                    <span className="material-symbols-outlined text-3xl">account_balance</span>
-                                                    <span className="font-black text-[10px] uppercase">Bank Transfer</span>
-                                                </button>
-                                                <button onClick={() => setWizardData({ ...wizardData, paymentMethod: 'paystack' })} className={`flex flex-col items-center gap-3 p-6 rounded-[24px] border-2 transition-all ${wizardData.paymentMethod === 'paystack' ? 'border-purple-600 bg-purple-600/5' : 'border-slate-100 dark:border-slate-800 hover:border-slate-200'}`}>
-                                                    <span className="material-symbols-outlined text-3xl">payments</span>
-                                                    <span className="font-black text-[10px] uppercase">Paystack Online</span>
-                                                </button>
+                                            <label className="text-[10px] font-black uppercase text-slate-400 px-1">Payment Method</label>
+                                            <div className="flex items-center gap-3 p-4 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700">
+                                                <span className="material-symbols-outlined text-purple-600">account_balance</span>
+                                                <div>
+                                                    <p className="text-sm font-black text-slate-900 dark:text-white">Bank Transfer</p>
+                                                    <p className="text-[10px] font-bold text-slate-500">Upload payment receipt to confirm</p>
+                                                </div>
+                                                <div className="ml-auto size-6 rounded-full bg-purple-600 flex items-center justify-center">
+                                                    <span className="material-symbols-outlined text-white text-sm">check</span>
+                                                </div>
                                             </div>
                                         </div>
-
-                                        {wizardData.paymentMethod === 'bank_transfer' && (
                                             <div className="p-8 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-[32px] flex flex-col items-center gap-4 hover:border-purple-600/30 transition-colors bg-slate-50/50 dark:bg-slate-900/30 relative animate-in zoom-in-95 duration-300">
                                                 <input type="file" onChange={async (e) => {
                                                     const file = e.target.files?.[0];
@@ -1269,7 +1350,6 @@ const StaffInvestmentsPage: React.FC<StaffInvestmentsPageProps> = ({ user, onLog
                                                 </div>
                                                 {wizardData.receiptUrl && <div className="px-4 py-2 bg-emerald-500 text-white rounded-xl text-[10px] font-black uppercase flex items-center gap-2 animate-in fade-in">Proof Attached <span className="material-symbols-outlined text-xs">check_circle</span></div>}
                                             </div>
-                                        )}
                                     </div>
                                 )}
                             </div>
@@ -1279,20 +1359,27 @@ const StaffInvestmentsPage: React.FC<StaffInvestmentsPageProps> = ({ user, onLog
                                 {wizardStep > 1 && (
                                     <button
                                         onClick={() => setWizardStep(wizardStep - 1)}
-                                        className="flex-1 h-14 rounded-2xl bg-white dark:bg-slate-800 text-slate-500 border border-slate-200 dark:border-slate-700 font-black uppercase tracking-widest text-[10px] hover:bg-slate-100 transition-all font-bold"
+                                        className="flex-1 h-14 rounded-2xl bg-white dark:bg-slate-800 text-slate-500 border border-slate-200 dark:border-slate-700 font-black uppercase tracking-widest text-[10px] hover:bg-slate-100 transition-all"
                                     >Back</button>
                                 )}
                                 <button
                                     onClick={() => {
                                         if (validateStep(wizardStep)) {
-                                            if (wizardStep < 5) setWizardStep(wizardStep + 1);
+                                            if (wizardStep < 6) setWizardStep(wizardStep + 1);
                                             else handleWizardSubmit();
                                         }
                                     }}
-                                    disabled={isSubmitting || (wizardStep === 5 && wizardData.paymentMethod === 'bank_transfer' && !wizardData.receiptUrl)}
-                                    className="flex-[2] h-14 rounded-2xl bg-purple-600 text-white font-black uppercase tracking-widest text-xs shadow-xl shadow-purple-600/20 hover:bg-purple-700 transition-all active:scale-95 disabled:opacity-50 font-black"
+                                    disabled={isSubmitting ||
+                                        (wizardStep === 6 && !wizardData.receiptUrl) ||
+                                        (wizardStep === 1 && (() => {
+                                            const c = selectedInvestmentCustomer;
+                                            const required = ['full_name','email','mobile_number','bvn','nin','gender','date_of_birth'];
+                                            return required.some(k => !c?.[k]);
+                                        })())
+                                    }
+                                    className="flex-[2] h-14 rounded-2xl bg-purple-600 text-white font-black uppercase tracking-widest text-xs shadow-xl shadow-purple-600/20 hover:bg-purple-700 transition-all active:scale-95 disabled:opacity-50"
                                 >
-                                    {isSubmitting ? 'Processing...' : (wizardStep === 5 ? 'Submit Application' : 'Continue')}
+                                    {isSubmitting ? 'Processing...' : (wizardStep === 6 ? 'Submit Application' : 'Continue')}
                                 </button>
                             </div>
                         </div>
@@ -1322,7 +1409,7 @@ const StaffInvestmentsPage: React.FC<StaffInvestmentsPageProps> = ({ user, onLog
                             >
                                 APPLICATIONS
                             </button>
-                            <button
+                            {/* <button
                                 onClick={() => { setActiveTab('rate_guide'); handleCloseForm(); }}
                                 className={`px-6 py-2 rounded-xl text-xs font-black transition-all uppercase tracking-widest ${activeTab === 'rate_guide'
                                     ? 'bg-white dark:bg-slate-700 text-purple-600 shadow-sm'
@@ -1330,7 +1417,7 @@ const StaffInvestmentsPage: React.FC<StaffInvestmentsPageProps> = ({ user, onLog
                                     }`}
                             >
                                 RATE GUIDE
-                            </button>
+                            </button> */}
                         </div>
                     </div>
 
@@ -1363,7 +1450,7 @@ const StaffInvestmentsPage: React.FC<StaffInvestmentsPageProps> = ({ user, onLog
                                     </div>
                                     <div className="flex items-center gap-4 flex-wrap">
                                         <button
-                                            onClick={() => setShowStaffApplicationFlow(true)}
+                                            onClick={() => setShowLookupFlow(true)}
                                             className="px-6 py-2 bg-purple-600 text-white rounded-xl text-sm font-black uppercase tracking-widest hover:bg-purple-700 transition-all flex items-center gap-2 shadow-lg shadow-purple-600/20"
                                         >
                                             <span className="material-symbols-outlined text-sm">add_circle</span>
@@ -1385,7 +1472,8 @@ const StaffInvestmentsPage: React.FC<StaffInvestmentsPageProps> = ({ user, onLog
                                             className="px-4 py-2 bg-white dark:bg-[#1e293b] border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300 outline-none"
                                         >
                                             <option value="all">All Stages</option>
-                                            <option value="submitted">Submitted</option>
+                                            <option value="sales">Sales</option>
+                                            <option value="submitted">Customer Exp.</option>
                                             <option value="compliance_review">Compliance</option>
                                             <option value="finance_review">Finance</option>
                                             <option value="active">Active</option>
