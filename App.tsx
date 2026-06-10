@@ -75,7 +75,8 @@ const ALLOWED_BI_AND_REPORTS_ROLES = [
   'hr',
   'super_admin',
   'superadmin',
-  'admin'
+  'admin',
+  'customer_experience'
 ];
 
 // ProtectedRoute Component extracted to prevent re-renders
