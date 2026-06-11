@@ -56,6 +56,18 @@ const ActionCard = ({ loan, userRole, onActionComplete }: { loan: any, userRole:
         const n = parseFloat(String(raw));
         return isNaN(n) ? '' : String(n); // e.g. "3.5", not "3.5000"
     });
+    const [product, setProduct] = useState<any>(null);
+
+    // Fetch matching product so we can show its default interest rate
+    useEffect(() => {
+        if (!loan.product_type) return;
+        axios.get('/api/staff/products/loans/active', { withCredentials: true })
+            .then(res => {
+                const match = res.data.find((p: any) => p.custom_name.toLowerCase() === loan.product_type.toLowerCase());
+                setProduct(match || null);
+            })
+            .catch(() => setProduct(null));
+    }, [loan.product_type]);
 
     // Disbursement Logic State
     const [applyManagementFee, setApplyManagementFee] = useState(loan.apply_management_fee || false);
@@ -472,7 +484,7 @@ const ActionCard = ({ loan, userRole, onActionComplete }: { loan: any, userRole:
                         ) : (
                             <p className="text-[10px] font-bold text-slate-400 flex items-center gap-1.5">
                                 <span className="material-symbols-outlined text-[10px] text-slate-400">warning</span>
-                                Not set — will fall back to product rate or 3.5% default
+                                Not set — will fall back to product rate{product?.interest_rate != null ? ` (${parseFloat(product.interest_rate)}%/mo)` : ' or 3.5%l'} default
                             </p>
                         )}
                     </div>
