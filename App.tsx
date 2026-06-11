@@ -81,7 +81,7 @@ const ALLOWED_BI_AND_REPORTS_ROLES = [
 
 // ProtectedRoute Component extracted to prevent re-renders
 interface ProtectedRouteProps {
-  children: React.ReactElement;
+  children: React.ReactElement; 
   user: UserState;
   isLoading: boolean;
   theme: Theme;

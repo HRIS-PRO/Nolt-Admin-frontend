@@ -159,7 +159,22 @@ const TimelineReportPage: React.FC<TimelineReportPageProps> = ({ user, onLogout,
         }
     };
 
-    if (user.role !== 'customer_experience' && user.role !== 'super_admin' && user.role !== 'superadmin') {
+
+    const allowedRoles = [
+        'sales_manager',
+        'credit_manager',
+        'internal_audit',
+        'finance',
+        'compliance',
+        'md',
+        'hr',
+        'super_admin',
+        'superadmin',
+        'admin',
+        'customer_experience'
+    ];
+
+    if (!allowedRoles.includes(user.role)) {
         return (
             <StaffLayout user={user} onLogout={onLogout} toggleTheme={toggleTheme} theme={theme}>
                 <div className="flex flex-col items-center justify-center min-h-[60vh] text-center">
