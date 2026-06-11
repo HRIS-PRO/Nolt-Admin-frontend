@@ -20,6 +20,10 @@ export interface UserProfile {
   is_identity_verified: boolean;
   verification_ref?: string;
   updated_at?: string;
+  title?: string;
+  gender?: string;
+  casa?: string;
+  cba_customer_id?: string;
   
   // Bank Details
   bank_name?: string;
@@ -92,6 +96,21 @@ export const profileService = {
 
   verifyBank: async (data: { account_number: string; bank_code: string; bvn_name: string; is_corporate?: boolean }): Promise<{ success: boolean; message?: string; data?: any }> => {
     const response = await axios.post(`${API_URL}/api/profile/verify-bank`, data, { withCredentials: true });
+    return response.data;
+  },
+
+  registerCBA: async (): Promise<{ success: boolean; already_exists?: boolean; message: string; casa?: string; cba_customer_id?: string }> => {
+    const response = await axios.post(`${API_URL}/api/profile/register-cba`, {}, { withCredentials: true });
+    return response.data;
+  },
+
+  getBalance: async (): Promise<{ success: boolean; balance: number | null; casa?: string; acct_name?: string; message?: string }> => {
+    const response = await axios.get(`${API_URL}/api/profile/balance`, { withCredentials: true });
+    return response.data;
+  },
+
+  getTotalInvestment: async (): Promise<{ success: boolean; investment_total: number | null; investment_count: number; message?: string }> => {
+    const response = await axios.get(`${API_URL}/api/profile/investment-total`, { withCredentials: true });
     return response.data;
   }
 };

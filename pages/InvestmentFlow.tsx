@@ -5,6 +5,7 @@ import { useSearchParams, useLocation } from 'react-router-dom';
 import { AppStep, SavedDraft, Currency, InvestmentPlan, PayoutFrequency, UserState } from '../types';
 import { storageService } from '../services/storageService';
 import { investmentService } from '../services/investmentService';
+import { productService, InvestmentProduct } from '../services/productService';
 import GiftInvestmentFlow from './investment/GiftInvestmentFlow';
 import { PaymentModal } from '../components/PaymentModal';
 import CameraCapture from '../components/CameraCapture';
@@ -34,6 +35,17 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
 
   const [subStep, setSubStep] = useState(incomingDraft?.subStep ?? 0);
   const [loading, setLoading] = useState(false);
+
+  // Live investment products from DB
+  const [investmentProducts, setInvestmentProducts] = useState<InvestmentProduct[]>([]);
+  const [productsLoading, setProductsLoading] = useState(true);
+
+  useEffect(() => {
+    productService.getInvestmentProducts()
+      .then(res => { if (res.success) setInvestmentProducts(res.products); })
+      .catch(() => {})
+      .finally(() => setProductsLoading(false));
+  }, []);
   const [isSaving, setIsSaving] = useState(false);
   const [isClaimingGift, setIsClaimingGift] = useState(false);
   const [giftToken, setGiftToken] = useState<string | null>(giftTokenFromUrl);
@@ -1131,17 +1143,50 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
                 <p className="text-lg text-slate-500 dark:text-slate-400 font-medium max-w-2xl">Choose a growth strategy that aligns with your financial horizon.</p>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {['RISE', 'SURGE', 'VAULT'].map((plan) => (
-                  <button key={plan} onClick={() => { setSelectedPlan(plan as InvestmentPlan); handleNext(); }} className={`group p-8 rounded-[2.5rem] border-2 transition-all text-left flex flex-col gap-5 shadow-xl ${selectedPlan === plan ? 'border-primary bg-white dark:bg-slate-800' : 'border-slate-100 dark:border-slate-800 bg-white/50 hover:border-primary/50'}`}>
-                    <div className="size-14 rounded-2xl bg-primary/10 flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-white transition-all">
-                      <span className="material-symbols-outlined text-3xl filled">{plan === 'RISE' ? 'rocket_launch' : plan === 'SURGE' ? 'bolt' : 'lock'}</span>
+                {productsLoading ? (
+                  [1, 2, 3].map(i => (
+                    <div key={i} className="p-8 rounded-[2.5rem] border-2 border-slate-100 dark:border-slate-800 bg-white/50 animate-pulse flex flex-col gap-5">
+                      <div className="size-14 rounded-2xl bg-slate-200 dark:bg-slate-700" />
+                      <div className="space-y-2">
+                        <div className="h-6 w-32 rounded bg-slate-200 dark:bg-slate-700" />
+                        <div className="h-4 w-48 rounded bg-slate-200 dark:bg-slate-700" />
+                      </div>
                     </div>
-                    <div>
-                      <h3 className="text-2xl font-black mb-2 uppercase tracking-tight dark:text-white">NOLT {plan}</h3>
-                      <p className="text-slate-500 font-bold leading-relaxed text-sm">{plan === 'RISE' ? 'Recurring savings for long-term growth.' : plan === 'SURGE' ? 'High yield, flexible liquidity.' : 'Fixed term, guaranteed returns.'}</p>
-                    </div>
-                  </button>
-                ))}
+                  ))
+                ) : investmentProducts.length > 0 ? (
+                  investmentProducts.map((product, i) => {
+                    // Derive plan key from cba_product_code (e.g. 'FD001' → 'RISE')
+                    const planKey = product.cba_product_code?.includes('RISE') || i === 0 ? 'RISE'
+                      : product.cba_product_code?.includes('SURGE') || i === 1 ? 'SURGE'
+                      : 'VAULT';
+                    const icons = ['rocket_launch', 'bolt', 'lock'];
+                    const isSelected = selectedPlan === planKey;
+                    return (
+                      <button
+                        key={product.id}
+                        onClick={() => { setSelectedPlan(planKey as InvestmentPlan); handleNext(); }}
+                        className={`group p-8 rounded-[2.5rem] border-2 transition-all text-left flex flex-col gap-5 shadow-xl ${
+                          isSelected ? 'border-primary bg-white dark:bg-slate-800' : 'border-slate-100 dark:border-slate-800 bg-white/50 hover:border-primary/50'
+                        }`}
+                      >
+                        <div className="size-14 rounded-2xl bg-primary/10 flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-white transition-all">
+                          <span className="material-symbols-outlined text-3xl filled">{icons[i % icons.length]}</span>
+                        </div>
+                        <div>
+                          <h3 className="text-2xl font-black mb-2 uppercase tracking-tight dark:text-white">{product.custom_name}</h3>
+                          <p className="text-slate-500 font-bold leading-relaxed text-sm">
+                            {product.interest_rate != null ? `${product.interest_rate}% p.a.` : 'Competitive returns'}
+                            {product.min_amount ? ` · Min ₦${product.min_amount.toLocaleString()}` : ''}
+                          </p>
+                        </div>
+                      </button>
+                    );
+                  })
+                ) : (
+                  <div className="col-span-3 py-12 text-center text-slate-400 dark:text-slate-500 font-bold">
+                    No investment plans available at this time. Please check back soon.
+                  </div>
+                )}
               </div>
             </>
           )}

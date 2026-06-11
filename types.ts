@@ -38,6 +38,10 @@ export interface UserProfile {
   is_identity_verified: boolean;
   last_selfie_verified_at?: string;
   updated_at?: string;
+  title?: string;
+  gender?: string;
+  casa?: string;
+  cba_customer_id?: string;
   bank_name?: string;
   bank_code?: string;
   account_number?: string;

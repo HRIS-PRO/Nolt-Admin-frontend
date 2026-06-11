@@ -110,6 +110,16 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, user, isLoadi
   if (user.role && user.role !== 'customer') {
     return <Navigate to="/staff-dashboard" replace />;
   }
+
+  // CASA gate: customers who haven't completed CBA registration must go to /profile
+  // Exception: skip this gate if they are already on the profile page (prevents infinite redirect loop)
+  if (user.role === 'customer' && !user.profile?.casa) {
+    const isOnProfilePage = window.location.pathname === '/profile';
+    if (!isOnProfilePage) {
+      return <Navigate to="/profile" replace />;
+    }
+  }
+
   return (
     <>
       <Navigation
