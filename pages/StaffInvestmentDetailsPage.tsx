@@ -106,6 +106,15 @@ const StaffInvestmentDetailsPage: React.FC<StaffInvestmentDetailsPageProps> = ({
     const [reason, setReason] = useState('');
     const [activePanel, setActivePanel] = useState<'overview' | 'manage' | 'activity'>('overview');
 
+    // ── KYC Tier State ───────────────────────────────────────────────────────
+    const INV_TIER_LIMITS: Record<number, number> = { 1: 300_000, 2: 500_000, 3: Infinity };
+    const [invCustomerKycTier, setInvCustomerKycTier] = useState<number>(1);
+    const [invSelectedTier, setInvSelectedTier] = useState<number>(1);
+    const invAmount = Number(investment?.investment_amount) || 0;
+    const invTierLimitExceeded =
+        (investment?.stage || 'submitted') === 'submitted' &&
+        invAmount > INV_TIER_LIMITS[invSelectedTier];
+
     const [showBioEditModal, setShowBioEditModal] = useState(false);
     const [bioEditData, setBioEditData] = useState<any>({});
     const [isSavingBio, setIsSavingBio] = useState(false);
@@ -159,6 +168,10 @@ const StaffInvestmentDetailsPage: React.FC<StaffInvestmentDetailsPageProps> = ({
             setDraftCASA(response.data.casa_account_number || '');
             const rawInt = response.data.interest_amount;
             setCustomInterest(rawInt && Number(rawInt) > 0 ? String(Number(rawInt)) : '');
+            // Seed KYC tier state from API response
+            const tier = Math.max(1, Number(response.data.customer_kyc_tier) || 1);
+            setInvCustomerKycTier(tier);
+            setInvSelectedTier(tier);
         } catch (error) {
             console.error("Failed to fetch investment details", error);
         } finally {
@@ -206,15 +219,40 @@ const StaffInvestmentDetailsPage: React.FC<StaffInvestmentDetailsPageProps> = ({
         if (action !== 'return') {
             if (!confirm(`Are you sure you want to ${action} this investment at the current stage?`)) return;
         }
+
         setIsActioning(true);
         try {
+            // ── KYC Tier Upgrade (CX / submitted stage approval only) ──
+            const stage = investment?.stage || 'submitted';
+            if (action === 'approve' && stage === 'submitted' && invSelectedTier !== invCustomerKycTier) {
+                try {
+                    const tierRes = await axios.post(
+                        '/api/staff/upgrade-customer-tier',
+                        {
+                            customer_id: investment.customer_id,
+                            new_tier: invSelectedTier,
+                            context: 'investment',
+                            context_id: investment.id
+                        },
+                        { withCredentials: true }
+                    );
+                    if (tierRes.data?.success) {
+                        setInvCustomerKycTier(invSelectedTier);
+                    }
+                } catch (tierError: any) {
+                    alert(tierError.response?.data?.message || 'Tier upgrade failed. Cannot proceed.');
+                    setIsActioning(false);
+                    return;
+                }
+            }
+
             const payload: any = { action, reason };
             if (action === 'return') {
                 payload.target_stage = targetStage;
             }
             await axios.put(`/api/staff/investments/${id}/action`, payload, { withCredentials: true });
             setReason('');
-            await fetchInvestment(); // Re-fetch to see updated stage
+            await fetchInvestment();
         } catch (error: any) {
             console.error(`Failed to ${action} investment`, error);
             alert(error.response?.data?.message || `Failed to ${action}`);
@@ -1264,19 +1302,62 @@ const StaffInvestmentDetailsPage: React.FC<StaffInvestmentDetailsPageProps> = ({
                                                                 <div className="mt-6 pt-6 border-t border-slate-100 dark:border-slate-800/60">
                                                                     <p className="text-xs text-slate-500 mb-4 text-center">You have the necessary permissions to review this stage.</p>
                                                                     <div className="flex flex-col gap-3">
-                                                                        <div className="mb-2">
-                                                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block px-1">Review Comment / Reason</label>
-                                                                            <textarea
-                                                                                value={reason}
-                                                                                onChange={(e) => setReason(e.target.value)}
-                                                                                placeholder="Add a comment for this action (required for rejection)..."
-                                                                                className="w-full bg-slate-50 dark:bg-slate-800 border-none rounded-2xl px-4 py-3 text-sm text-slate-900 dark:text-white placeholder:text-slate-500 focus:ring-2 focus:ring-slate-500/20 transition-all outline-none min-h-[100px] resize-none font-medium"
-                                                                            />
+                                                                        {/* ── KYC Tier Settings (CX / submitted stage) ── */}
+                                                                    {stage === 'submitted' && (
+                                                                        <div className="mb-4 p-4 rounded-[16px] bg-slate-50 dark:bg-[#111C2A] border border-[#0099FF]/30">
+                                                                            <label className="text-[10px] font-black uppercase tracking-widest text-[#0099FF] mb-3 block">
+                                                                                Customer Tier Settings
+                                                                            </label>
+                                                                            {invCustomerKycTier >= 3 ? (
+                                                                                <div className="w-full p-3 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 font-bold text-sm">
+                                                                                    Tier 3
+                                                                                </div>
+                                                                            ) : (
+                                                                                <select
+                                                                                    value={invSelectedTier}
+                                                                                    onChange={(e) => setInvSelectedTier(Number(e.target.value))}
+                                                                                    className="w-full p-3 rounded-xl bg-transparent border-2 border-[#0099FF] text-slate-900 dark:text-white text-sm font-bold focus:outline-none focus:ring-4 focus:ring-[#0099FF]/20 cursor-pointer appearance-none transition-all"
+                                                                                    style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2364748b'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 1rem center', backgroundSize: '1.25em 1.25em', paddingRight: '3rem' }}
+                                                                                >
+                                                                                    {invCustomerKycTier <= 1 && <option value={1}>Tier 1</option>}
+                                                                                    {invCustomerKycTier <= 2 && <option value={2}>Tier 2</option>}
+                                                                                    <option value={3}>Tier 3</option>
+                                                                                </select>
+                                                                            )}
                                                                         </div>
+                                                                    )}
+
+                                                                    {/* ── Limit Enforced Banner ── */}
+                                                                    {invTierLimitExceeded && (
+                                                                        <div className="mb-4 p-3 rounded-xl bg-red-500/10 border border-red-500/30 flex items-start gap-2">
+                                                                            <span className="material-symbols-outlined text-red-500 text-lg mt-0.5 shrink-0">warning</span>
+                                                                            <div>
+                                                                                <p className="text-[10px] font-black uppercase tracking-widest text-red-500 mb-1">Limit Enforced</p>
+                                                                                <p className="text-xs font-semibold text-red-700 dark:text-red-400 leading-relaxed">
+                                                                                    Tier {invSelectedTier} limit exceeded! Amount ₦{invAmount.toLocaleString()} exceeds ₦{(INV_TIER_LIMITS[invSelectedTier] ?? 0).toLocaleString()} threshold. Upgrade customer tier first.
+                                                                                </p>
+                                                                            </div>
+                                                                        </div>
+                                                                    )}
+
+                                                                    <div className="mb-2">
+                                                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block px-1">Review Comment / Reason</label>
+                                                                        <textarea
+                                                                            value={reason}
+                                                                            onChange={(e) => setReason(e.target.value)}
+                                                                            placeholder="Add a comment for this action (required for rejection)..."
+                                                                            className="w-full bg-slate-50 dark:bg-slate-800 border-none rounded-2xl px-4 py-3 text-sm text-slate-900 dark:text-white placeholder:text-slate-500 focus:ring-2 focus:ring-slate-500/20 transition-all outline-none min-h-[100px] resize-none font-medium"
+                                                                        />
+                                                                    </div>
                                                                         <button
                                                                             onClick={() => handleAction('approve')}
-                                                                            disabled={isActioning}
-                                                                            className="w-full py-2.5 bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-sm font-semibold rounded-xl hover:bg-slate-800 dark:hover:bg-slate-100 transition-colors shadow-sm disabled:opacity-50 flex justify-center items-center gap-2"
+                                                                            disabled={isActioning || invTierLimitExceeded}
+                                                                            title={invTierLimitExceeded ? `Tier ${invSelectedTier} limit exceeded. Upgrade tier to proceed.` : ''}
+                                                                            className={`w-full py-2.5 text-sm font-semibold rounded-xl transition-colors shadow-sm disabled:opacity-50 flex justify-center items-center gap-2 ${
+                                                                                invTierLimitExceeded
+                                                                                    ? 'bg-slate-400 dark:bg-slate-600 text-white cursor-not-allowed'
+                                                                                    : 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 hover:bg-slate-800 dark:hover:bg-slate-100'
+                                                                            }`}
                                                                         >
                                                                             {isActioning ? <span className="material-symbols-outlined animate-spin text-[18px]">autorenew</span> : null}
                                                                             Approve & Proceed
