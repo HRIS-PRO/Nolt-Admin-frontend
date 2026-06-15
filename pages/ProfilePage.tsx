@@ -29,7 +29,9 @@ const ProfilePage: React.FC = () => {
         bvn: '',
         nin: '',
         date_of_birth: '',
-        is_identity_verified: false
+        is_identity_verified: false,
+        title: '',
+        gender: ''
     });
 
     const [loading, setLoading] = useState(true);
@@ -230,31 +232,49 @@ const ProfilePage: React.FC = () => {
         setMessage(null);
 
         try {
+            // Step 1: Save profile (PUT /api/profile)
             console.log("[Profile] Saving profile:", profile);
             const response = await profileService.updateProfile(profile);
             console.log("[Profile] Update response:", response);
             
-            if (response.success) {
-                setMessage({ type: 'success', text: "Profile updated successfully! Redirecting..." });
-                setProfile(response.profile);
-                
-                // Dispatch event to instruct App.tsx to refetch profile state from the DB immediately
-                window.dispatchEvent(new Event('user-profile-updated'));
-
-                // Navigate back to dashboard natively using React Router
-                setTimeout(() => {
-                    navigate('/dashboard');
-                }, 2000);
-            } else {
+            if (!response.success) {
                 const errMsg = response.message || "Failed to update profile";
                 setMessage({ type: 'error', text: errMsg });
-                alert(errMsg);
+                setSaving(false);
+                return;
             }
+
+            setProfile(response.profile);
+
+            // Step 2: Register on Core Banking (POST /api/profile/register-cba)
+            try {
+                const cbaRes = await profileService.registerCBA();
+                if (cbaRes.success) {
+                    if (cbaRes.already_exists) {
+                        setMessage({ type: 'success', text: `ℹ️ ${cbaRes.message}` });
+                    } else {
+                        setMessage({ type: 'success', text: `✅ ${cbaRes.message}` });
+                    }
+                } else {
+                    // Profile saved but CBA failed — warn but don't block
+                    setMessage({ type: 'error', text: `⚠️ Profile saved, but banking registration failed: ${cbaRes.message}. Please try saving again.` });
+                }
+            } catch (cbaErr: any) {
+                // CBA network error — profile is already saved, just warn
+                setMessage({ type: 'error', text: "⚠️ Profile saved, but could not reach Core Banking. Please try saving again." });
+            }
+
+            // Dispatch event to instruct App.tsx to refetch profile state from the DB immediately
+            window.dispatchEvent(new Event('user-profile-updated'));
+
+            // Navigate back to dashboard
+            setTimeout(() => {
+                navigate('/dashboard');
+            }, 2500);
         } catch (err: any) {
             console.error("[Profile] Update error:", err);
             const errMsg = err.response?.data?.message || err.message || "An error occurred";
             setMessage({ type: 'error', text: errMsg });
-            alert(errMsg);
         } finally {
             setSaving(false);
         }
@@ -453,7 +473,38 @@ const ProfilePage: React.FC = () => {
                                                 </div>
                                             </div>
 
-                                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                        {/* Title & Gender Row */}
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                            <div className="space-y-2">
+                                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Title</label>
+                                                <select
+                                                    className="w-full h-14 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border-2 border-slate-100 dark:border-white/5 px-5 text-base font-bold dark:text-white focus:ring-2 focus:ring-primary focus:border-primary focus:shadow-lg focus:shadow-primary/10 outline-none transition-all"
+                                                    value={profile.title || ''}
+                                                    onChange={e => setProfile({...profile, title: e.target.value})}
+                                                >
+                                                    <option value="">Select Title</option>
+                                                    <option value="Mr">Mr</option>
+                                                    <option value="Mrs">Mrs</option>
+                                                    <option value="Miss">Miss</option>
+                                                    <option value="Ms">Ms</option>
+                                                    <option value="Master">Master</option>
+                                                </select>
+                                            </div>
+                                            <div className="space-y-2">
+                                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Gender</label>
+                                                <select
+                                                    className="w-full h-14 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border-2 border-slate-100 dark:border-white/5 px-5 text-base font-bold dark:text-white focus:ring-2 focus:ring-primary focus:border-primary focus:shadow-lg focus:shadow-primary/10 outline-none transition-all"
+                                                    value={profile.gender || ''}
+                                                    onChange={e => setProfile({...profile, gender: e.target.value})}
+                                                >
+                                                    <option value="">Select Gender</option>
+                                                    <option value="Male">Male</option>
+                                                    <option value="Female">Female</option>
+                                                </select>
+                                            </div>
+                                        </div>
+
+                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                                                 <div className="space-y-2">
                                                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Surname</label>
                                                     <input disabled={profile.is_identity_verified} className="w-full h-14 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border-2 border-slate-100 dark:border-white/5 px-5 text-base font-bold dark:text-white focus:ring-2 focus:ring-primary focus:border-primary focus:shadow-lg focus:shadow-primary/10 outline-none transition-all disabled:opacity-50" value={profile.surname} onChange={e => setProfile({...profile, surname: e.target.value})} placeholder="e.g. Obinali" />
