@@ -58,6 +58,23 @@ const ActionCard = ({ loan, userRole, onActionComplete }: { loan: any, userRole:
     });
     const [product, setProduct] = useState<any>(null);
 
+    // ── KYC Tier State ───────────────────────────────────────────────────────
+    const TIER_LIMITS: Record<number, number> = { 1: 300_000, 2: 500_000, 3: Infinity };
+    const [customerKycTier, setCustomerKycTier] = useState<number>(
+        Math.max(1, Number(loan.customer_kyc_tier) || 1)
+    );
+    const [selectedTier, setSelectedTier] = useState<number>(
+        Math.max(1, Number(loan.customer_kyc_tier) || 1)
+    );
+    const loanAmount = Number(
+        ['topup', 'add_on', 're-app', 're_app'].includes(loan.loan_type?.toLowerCase())
+            ? loan.topup_amount || loan.requested_loan_amount
+            : loan.loan_type?.toLowerCase() === 'buy_over'
+                ? loan.buy_over_amount || loan.requested_loan_amount
+                : loan.requested_loan_amount
+    ) || 0;
+    const tierLimitExceeded = (loan.stage || 'submitted') === 'customer_experience' && loanAmount > TIER_LIMITS[selectedTier];
+
     // Fetch matching product so we can show its default interest rate
     useEffect(() => {
         if (!loan.product_type) return;
@@ -117,6 +134,29 @@ const ActionCard = ({ loan, userRole, onActionComplete }: { loan: any, userRole:
 
         setActionLoading(true);
         try {
+            // ── KYC Tier Upgrade (CX approval only) ─────────────────────────
+            if (action === 'approve' && stage === 'customer_experience' && selectedTier !== customerKycTier) {
+                try {
+                    const tierRes = await axios.post(
+                        '/api/staff/upgrade-customer-tier',
+                        {
+                            customer_id: loan.customer_id,
+                            new_tier: selectedTier,
+                            context: 'loan',
+                            context_id: loan.id
+                        },
+                        { withCredentials: true }
+                    );
+                    if (tierRes.data?.success) {
+                        setCustomerKycTier(selectedTier);
+                    }
+                } catch (tierError: any) {
+                    alert(tierError.response?.data?.message || 'Tier upgrade failed. Cannot proceed.');
+                    setActionLoading(false);
+                    return;
+                }
+            }
+
             const payload: any = {
                 action,
                 data: { eligible_amount: eligibleAmount, tenure, target_stage: targetStage },
@@ -557,6 +597,48 @@ const ActionCard = ({ loan, userRole, onActionComplete }: { loan: any, userRole:
                     </div>
                 )}
 
+                {/* ── Customer Tier Settings (CX Stage Only) ── */}
+                {stage === 'customer_experience' && (
+                    <div className="mb-6 p-5 rounded-[20px] bg-slate-50 dark:bg-[#111C2A] border border-[#0099FF]/30">
+                        <label className="text-[10px] font-black uppercase tracking-widest text-[#0099FF] mb-3 block">
+                            Customer Tier Settings
+                        </label>
+                        {customerKycTier >= 3 ? (
+                            <div className="w-full p-4 rounded-[16px] bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 font-bold text-sm">
+                                Tier 3
+                            </div>
+                        ) : (
+                            <div className="relative">
+                                <select
+                                    value={selectedTier}
+                                    onChange={(e) => setSelectedTier(Number(e.target.value))}
+                                    className="w-full p-4 rounded-[16px] bg-transparent border-2 border-[#0099FF] text-slate-900 dark:text-white text-sm font-bold focus:outline-none focus:ring-4 focus:ring-[#0099FF]/20 cursor-pointer appearance-none transition-all"
+                                    style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2364748b'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 1.25rem center', backgroundSize: '1.25em 1.25em', paddingRight: '3rem' }}
+                                >
+                                    {customerKycTier <= 1 && <option value={1}>Tier 1</option>}
+                                    {customerKycTier <= 2 && <option value={2}>Tier 2</option>}
+                                    <option value={3}>Tier 3</option>
+                                </select>
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {/* ── Limit Enforced Banner (CX Stage Only) ── */}
+                {tierLimitExceeded && (
+                    <div className="mb-6 p-4 rounded-xl bg-red-500/10 border border-red-500/30 flex items-start gap-3">
+                        <span className="material-symbols-outlined text-red-500 text-xl mt-0.5 shrink-0">warning</span>
+                        <div>
+                            <p className="text-[10px] font-black uppercase tracking-widest text-red-500 mb-1">Limit Enforced</p>
+                            <p className="text-xs font-semibold text-red-700 dark:text-red-400 leading-relaxed">
+                                Tier {selectedTier} limit exceeded! Current size ₦{loanAmount.toLocaleString()} exceeds
+                                the ₦{(TIER_LIMITS[selectedTier] ?? 0).toLocaleString()} threshold limit.
+                                Please upgrade the customer tier status first.
+                            </p>
+                        </div>
+                    </div>
+                )}
+
                 {/* Reason Input */}
                 <div className="mb-6">
                     <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2 block">
@@ -573,8 +655,13 @@ const ActionCard = ({ loan, userRole, onActionComplete }: { loan: any, userRole:
                 <div className="space-y-3">
                     <button
                         onClick={() => handleAction('approve')}
-                        disabled={actionLoading}
-                        className={`w-full py-4 rounded-xl text-white font-black text-sm uppercase tracking-wider transition-all shadow-lg flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed`}
+                        disabled={actionLoading || tierLimitExceeded}
+                        title={tierLimitExceeded ? `Tier ${selectedTier} limit exceeded. Upgrade tier to proceed.` : ''}
+                        className={`w-full py-4 rounded-xl text-white font-black text-sm uppercase tracking-wider transition-all shadow-lg flex items-center justify-center gap-2 ${
+                            tierLimitExceeded
+                                ? 'bg-slate-400 dark:bg-slate-600 cursor-not-allowed opacity-60'
+                                : 'bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed'
+                        }`}
                     >
                         {actionLoading ? <span className="size-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : 'Approve & Proceed'}
                     </button>
