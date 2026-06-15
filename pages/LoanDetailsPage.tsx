@@ -66,14 +66,20 @@ const ActionCard = ({ loan, userRole, onActionComplete }: { loan: any, userRole:
     const [selectedTier, setSelectedTier] = useState<number>(
         Math.max(1, Number(loan.customer_kyc_tier) || 1)
     );
-    const loanAmount = Number(
+    const requestedAmount = Number(
         ['topup', 'add_on', 're-app', 're_app'].includes(loan.loan_type?.toLowerCase())
             ? loan.topup_amount || loan.requested_loan_amount
             : loan.loan_type?.toLowerCase() === 'buy_over'
                 ? loan.buy_over_amount || loan.requested_loan_amount
                 : loan.requested_loan_amount
     ) || 0;
-    const tierLimitExceeded = (loan.stage || 'submitted') === 'customer_experience' && loanAmount > TIER_LIMITS[selectedTier];
+    // ── Effective amount: MAX of requested, approved (DB), and disbursed (DB) ─
+    // Read directly from the loan object — NOT from UI state (eligibleAmount state
+    // is seeded from requested_loan_amount, not the credit-approved eligible_amount).
+    const dbApprovedAmount  = Number(loan.eligible_amount) || 0;
+    const dbDisbursedAmount = Number(loan.disbursement_amount) || 0;
+    const effectiveLoanAmount = Math.max(requestedAmount, dbApprovedAmount, dbDisbursedAmount);
+    const tierLimitExceeded = (loan.stage || 'submitted') === 'customer_experience' && effectiveLoanAmount > TIER_LIMITS[selectedTier];
 
     // Fetch matching product so we can show its default interest rate
     useEffect(() => {
@@ -631,7 +637,7 @@ const ActionCard = ({ loan, userRole, onActionComplete }: { loan: any, userRole:
                         <div>
                             <p className="text-[10px] font-black uppercase tracking-widest text-red-500 mb-1">Limit Enforced</p>
                             <p className="text-xs font-semibold text-red-700 dark:text-red-400 leading-relaxed">
-                                Tier {selectedTier} limit exceeded! Current size ₦{loanAmount.toLocaleString()} exceeds
+                                Tier {selectedTier} limit exceeded! Highest amount on record ₦{effectiveLoanAmount.toLocaleString()} exceeds
                                 the ₦{(TIER_LIMITS[selectedTier] ?? 0).toLocaleString()} threshold limit.
                                 Please upgrade the customer tier status first.
                             </p>
