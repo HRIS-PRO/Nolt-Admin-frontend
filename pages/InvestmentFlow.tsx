@@ -63,6 +63,7 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
 
   // Core State
   const [selectedPlan, setSelectedPlan] = useState<InvestmentPlan>(initialDraft?.data?.selectedPlan ?? 'RISE');
+  const [selectedCbaCode, setSelectedCbaCode] = useState<string>(initialDraft?.data?.selectedCbaCode ?? '');
   const [currency, setCurrency] = useState<Currency>(initialDraft?.data?.currency ?? 'NGN');
   const [amount, setAmount] = useState<string>(initialDraft?.data?.amount ?? '100000');
   const [tenure, setTenure] = useState<number>(initialDraft?.data?.tenure ?? 365);
@@ -527,7 +528,7 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
     prefillData();
   }, [initialDraft]); // Combined with draft check
 
-  // Rate Calculation (Dynamic from Backend)
+  // Rate Calculation (Dynamic from CBA, with local yield-rate fallback)
   useEffect(() => {
     const fetchRate = async () => {
       const numericAmount = parseFloat(amount.replace(/[^0-9.]/g, '')) || 0;
@@ -538,19 +539,39 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
 
       setRateLoading(true);
       try {
+        const tenureToFetch = selectedPlan === 'SURGE' ? 365 : tenure;
+
+        // ── Primary: CBA live rate ────────────────────────────────────────
+        if (selectedCbaCode) {
+          try {
+            const cbaRes = await fetch(
+              `/api/investments/fixed-deposit-rate?productCode=${encodeURIComponent(selectedCbaCode)}&amount=${numericAmount}&duration=${tenureToFetch}`,
+              { credentials: 'include' }
+            );
+            if (cbaRes.ok) {
+              const cbaData = await cbaRes.json();
+              if (cbaData.success && cbaData.interestRate !== null && cbaData.interestRate !== undefined) {
+                setDynamicInterestRate(cbaData.interestRate);
+                setServerMinAmount(0); // CBA doesn't return min amount
+                return;
+              }
+            }
+          } catch (cbaErr) {
+            console.warn('[CBA Rate] Failed, falling back to yield rates:', cbaErr);
+          }
+        }
+
+        // ── Fallback: local yield-rates table ────────────────────────────
         const payload: any = {
           plan: selectedPlan,
           currency,
           amount: numericAmount,
-          tenure: selectedPlan === 'SURGE' ? 365 : tenure
+          tenure: tenureToFetch
         };
-        
         if (selectedPlan === 'VAULT') {
           payload.payout_frequency = payoutFrequency;
         }
-
         const data = await investmentService.getRate(payload);
-
         if (data) {
           setDynamicInterestRate(data.interest_rate);
           setServerMinAmount(data.min_amount);
@@ -559,7 +580,7 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
           setServerMinAmount(0);
         }
       } catch (err) {
-        console.error("Error fetching rate:", err);
+        console.error('Error fetching rate:', err);
         setDynamicInterestRate(null);
       } finally {
         setRateLoading(false);
@@ -568,7 +589,7 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
 
     const debounceTimer = setTimeout(fetchRate, 500);
     return () => clearTimeout(debounceTimer);
-  }, [amount, tenure, selectedPlan, currency, payoutFrequency]);
+  }, [amount, tenure, selectedPlan, selectedCbaCode, currency, payoutFrequency]);
 
   const interestRate = dynamicInterestRate ?? 0;
 
@@ -596,7 +617,7 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
       amount: parseFloat(amount.replace(/[^0-9.]/g, '') || '0'),
       subStep: nextStep,
       data: {
-        selectedPlan, currency, amount, tenure, rollover, targetAmount, payoutFrequency,
+        selectedPlan, selectedCbaCode, currency, amount, tenure, rollover, targetAmount, payoutFrequency,
         entityType, title, fullName, surname, firstName, middleName, isOnBehalf, representativeRelation, isPep,
         gender, dob, maidenName, religion, maritalStatus, countryCode, mobileNumber, contactEmail, bvn, nin,
         stateOfOrigin, stateOfResidence, homeAddress, nokName, nokRelationship, nokAddress, nokPhoneNumber, nokCountryCode,
@@ -1164,7 +1185,11 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
                     return (
                       <button
                         key={product.id}
-                        onClick={() => { setSelectedPlan(planKey as InvestmentPlan); handleNext(); }}
+                        onClick={() => {
+                          setSelectedPlan(planKey as InvestmentPlan);
+                          setSelectedCbaCode(product.cba_product_code || '');
+                          handleNext();
+                        }}
                         className={`group p-8 rounded-[2.5rem] border-2 transition-all text-left flex flex-col gap-5 shadow-xl ${
                           isSelected ? 'border-primary bg-white dark:bg-slate-800' : 'border-slate-100 dark:border-slate-800 bg-white/50 hover:border-primary/50'
                         }`}
