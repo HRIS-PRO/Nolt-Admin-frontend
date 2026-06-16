@@ -35,6 +35,8 @@ const ActionCard = ({ loan, userRole, onActionComplete }: { loan: any, userRole:
     const [reason, setReason] = useState('');
     const [showReturnModal, setShowReturnModal] = useState(false);
     const [returnTargetStage, setReturnTargetStage] = useState('');
+    const [showCXRejectModal, setShowCXRejectModal] = useState(false);
+    const [cxRejectionReason, setCxRejectionReason] = useState('');
     const [glAccounts, setGlAccounts] = useState<any[]>([]);
     const [selectedGL, setSelectedGL] = useState(loan.gl_account || '');
     const [startDate, setStartDate] = useState(() => {
@@ -202,6 +204,29 @@ const ActionCard = ({ loan, userRole, onActionComplete }: { loan: any, userRole:
             onActionComplete();
         } catch (error: any) {
             alert(error.response?.data?.message || "Action failed");
+        } finally {
+            setActionLoading(false);
+        }
+    };
+
+    // ── CX-specific rejection handler (bypasses textarea requirement) ─────────
+    const handleCXReject = async () => {
+        if (!cxRejectionReason) {
+            alert('Please select a rejection reason.');
+            return;
+        }
+        setActionLoading(true);
+        try {
+            await axios.post(
+                `/api/staff/loans/${loan.id}/action`,
+                { action: 'reject', cx_rejection_reason: cxRejectionReason, reason: cxRejectionReason },
+                { withCredentials: true }
+            );
+            setShowCXRejectModal(false);
+            setCxRejectionReason('');
+            onActionComplete();
+        } catch (err: any) {
+            alert(err.response?.data?.message || 'Rejection failed. Please try again.');
         } finally {
             setActionLoading(false);
         }
@@ -686,7 +711,14 @@ const ActionCard = ({ loan, userRole, onActionComplete }: { loan: any, userRole:
                         </button>
 
                         <button
-                            onClick={() => handleAction('reject')}
+                            onClick={() => {
+                                const stage = loan.stage || 'submitted';
+                                if (stage === 'customer_experience' || stage === 'submitted') {
+                                    setShowCXRejectModal(true);
+                                } else {
+                                    handleAction('reject');
+                                }
+                            }}
                             disabled={actionLoading}
                             className="w-full py-3 rounded-xl bg-red-50 dark:bg-red-900/10 text-red-600 dark:text-red-400 font-bold text-xs uppercase tracking-wider hover:bg-red-100 transition-all border border-red-200"
                         >
@@ -771,6 +803,85 @@ const ActionCard = ({ loan, userRole, onActionComplete }: { loan: any, userRole:
                                         className="flex-1 py-3 rounded-xl bg-amber-500 text-white font-bold shadow-lg shadow-amber-500/20 hover:bg-amber-600 hover:shadow-amber-500/30 hover:-translate-y-0.5 transition-all disabled:opacity-50 disabled:shadow-none disabled:translate-y-0"
                                     >
                                         {actionLoading ? 'Processing...' : 'Confirm Return'}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* ── CX Rejection Modal ─────────────────────────────────── */}
+                    {showCXRejectModal && (
+                        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in duration-200">
+                            <div className="bg-white dark:bg-[#0d1a2a] rounded-2xl w-full max-w-md shadow-2xl border border-red-500/20 overflow-hidden">
+                                {/* Header */}
+                                <div className="bg-red-600 px-6 py-5 flex items-start justify-between">
+                                    <div>
+                                        <p className="text-[10px] font-black uppercase tracking-widest text-red-200 mb-1">Customer Experience Node</p>
+                                        <h3 className="text-xl font-black text-white">Reject Application</h3>
+                                        <p className="text-sm text-red-200 mt-1">Select the official rejection reason. An email will be sent to the customer.</p>
+                                    </div>
+                                    <button onClick={() => { setShowCXRejectModal(false); setCxRejectionReason(''); }} className="text-red-200 hover:text-white transition-colors mt-1">
+                                        <span className="material-symbols-outlined">close</span>
+                                    </button>
+                                </div>
+
+                                {/* Body */}
+                                <div className="p-6 space-y-5">
+                                    <div>
+                                        <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400 mb-2 block">
+                                            Rejection Reason <span className="text-red-500">*</span>
+                                        </label>
+                                        <div className="relative">
+                                            <select
+                                                value={cxRejectionReason}
+                                                onChange={(e) => setCxRejectionReason(e.target.value)}
+                                                className="w-full p-4 pr-10 rounded-xl bg-slate-50 dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white text-sm font-semibold focus:outline-none focus:ring-4 focus:ring-red-500/20 focus:border-red-500 cursor-pointer appearance-none transition-all"
+                                                style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2364748b'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 1rem center', backgroundSize: '1.25em 1.25em' }}
+                                            >
+                                                <option value="">-- Select a Rejection Reason --</option>
+                                                <option value="POOR_CREDIT_REPORT_IPPIS">POOR or BAD CREDIT REPORT (IPPIS)</option>
+                                                <option value="EXISTING_CUSTOMER_RECENT_LOAN">EXISTING CUSTOMER — WITH RECENTLY DISBURSED LOAN</option>
+                                                <option value="LOW_NET_PAY">LOW NET PAY</option>
+                                                <option value="OVERLEVERAGED">OVERLEVERAGED</option>
+                                                <option value="DOCUMENTS_INCOMPLETE">DOCUMENTS ARE NOT COMPLETE</option>
+                                                <option value="ENQUIRIES_NO_MATCH">ENQUIRIES ON LOANS (NO MATCH)</option>
+                                                <option value="EMPLOYER_NOT_ON_LIST">EMPLOYER NOT ON OUR LIST</option>
+                                                <option value="OUT_OF_RECOMMENDED_STATES">OUT OF THE RECOMMENDED STATES</option>
+                                                <option value="TRAVEL_LOAN">TRAVEL LOAN</option>
+                                                <option value="ASSET_FINANCING_ENQUIRIES">ASSET FINANCING ENQUIRIES</option>
+                                                <option value="SALARY_ADVANCE_LOAN_ENQUIRY">SALARY ADVANCE LOAN ENQUIRY</option>
+                                                <option value="BAD_CREDIT_REPORT_PRIVATE">BAD CREDIT REPORT (PRIVATE LOANS)</option>
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    {cxRejectionReason && (
+                                        <div className="flex items-start gap-3 p-3 rounded-xl bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-900/30">
+                                            <span className="material-symbols-outlined text-amber-500 text-base mt-0.5 shrink-0">mail</span>
+                                            <p className="text-xs text-amber-700 dark:text-amber-400 leading-relaxed">
+                                                A rejection email will automatically be sent to the customer when you confirm.
+                                            </p>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Footer */}
+                                <div className="px-6 pb-6 flex gap-3">
+                                    <button
+                                        onClick={() => { setShowCXRejectModal(false); setCxRejectionReason(''); }}
+                                        className="flex-1 py-3 rounded-xl font-bold text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors border border-slate-200 dark:border-slate-700"
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        onClick={handleCXReject}
+                                        disabled={actionLoading || !cxRejectionReason}
+                                        className="flex-1 py-3 rounded-xl bg-red-600 text-white font-black text-sm uppercase tracking-wider hover:bg-red-700 shadow-lg shadow-red-600/25 hover:-translate-y-0.5 transition-all disabled:opacity-50 disabled:shadow-none disabled:translate-y-0 flex items-center justify-center gap-2"
+                                    >
+                                        {actionLoading
+                                            ? <><span className="size-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Processing...</>
+                                            : <><span className="material-symbols-outlined text-sm">cancel</span> Reject Application</>
+                                        }
                                     </button>
                                 </div>
                             </div>
