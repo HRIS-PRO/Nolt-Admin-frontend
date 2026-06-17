@@ -844,12 +844,7 @@ const ActionCard = ({ loan, userRole, onActionComplete }: { loan: any, userRole:
                                                 <option value="LOW_NET_PAY">LOW NET PAY</option>
                                                 <option value="OVERLEVERAGED">OVERLEVERAGED</option>
                                                 <option value="DOCUMENTS_INCOMPLETE">DOCUMENTS ARE NOT COMPLETE</option>
-                                                <option value="ENQUIRIES_NO_MATCH">ENQUIRIES ON LOANS (NO MATCH)</option>
                                                 <option value="EMPLOYER_NOT_ON_LIST">EMPLOYER NOT ON OUR LIST</option>
-                                                <option value="OUT_OF_RECOMMENDED_STATES">OUT OF THE RECOMMENDED STATES</option>
-                                                <option value="TRAVEL_LOAN">TRAVEL LOAN</option>
-                                                <option value="ASSET_FINANCING_ENQUIRIES">ASSET FINANCING ENQUIRIES</option>
-                                                <option value="SALARY_ADVANCE_LOAN_ENQUIRY">SALARY ADVANCE LOAN ENQUIRY</option>
                                                 <option value="BAD_CREDIT_REPORT_PRIVATE">BAD CREDIT REPORT (PRIVATE LOANS)</option>
                                             </select>
                                         </div>
