@@ -290,28 +290,30 @@ const LoanQueuePage: React.FC<LoanQueuePageProps> = ({ user, onLogout, toggleThe
                     </div>
                 </div>
 
-                {/* Stats Grid */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+                {/* Stats Grid — always 2-col on mobile, 4-col on desktop */}
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 mb-6 md:mb-8">
                     {stats.map((stat, i) => (
                         <motion.div
                             key={stat.label}
                             initial={{ opacity: 0, y: 20 }}
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ delay: i * 0.1 }}
-                            className="bg-white dark:bg-slate-800/50 backdrop-blur-xl p-6 rounded-[2rem] border border-slate-200 dark:border-slate-800 shadow-sm hover:shadow-md transition-shadow"
+                            className="bg-white dark:bg-slate-800/50 backdrop-blur-xl p-4 md:p-6 rounded-2xl md:rounded-[2rem] border border-slate-200 dark:border-slate-800 shadow-sm hover:shadow-md transition-shadow"
                         >
-                            <div className={`size-12 rounded-2xl bg-${stat.color}-500/10 flex items-center justify-center mb-4`}>
-                                <span className={`material-symbols-outlined text-${stat.color}-500`}>{stat.icon}</span>
+                            <div className={`size-9 md:size-12 rounded-xl md:rounded-2xl bg-${stat.color}-500/10 flex items-center justify-center mb-3 md:mb-4`}>
+                                <span className={`material-symbols-outlined text-base md:text-xl text-${stat.color}-500`}>{stat.icon}</span>
                             </div>
-                            <p className="text-slate-500 dark:text-slate-400 text-xs font-bold uppercase tracking-widest">{stat.label}</p>
-                            <h4 className="text-2xl font-black text-slate-900 dark:text-white mt-1">{stat.value}</h4>
+                            <p className="text-slate-500 dark:text-slate-400 text-[9px] md:text-xs font-bold uppercase tracking-widest leading-tight">{stat.label}</p>
+                            <h4 className="text-lg md:text-2xl font-black text-slate-900 dark:text-white mt-1 truncate">{stat.value}</h4>
                         </motion.div>
                     ))}
                 </div>
 
-                {/* Filter Bar */}
-                <div className="bg-white/50 dark:bg-slate-900/50 backdrop-blur-md p-4 rounded-3xl border border-slate-200 dark:border-slate-800 mb-6 flex flex-wrap gap-4 items-center">
-                    <div className="flex-1 min-w-[200px] relative">
+                {/* Filter Bar — mobile-first stacked layout */}
+                <div className="bg-white/50 dark:bg-slate-900/50 backdrop-blur-md p-3 md:p-4 rounded-2xl md:rounded-3xl border border-slate-200 dark:border-slate-800 mb-6 space-y-3">
+
+                    {/* Row 1: Search */}
+                    <div className="relative">
                         <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-lg">search</span>
                         <input
                             type="text"
@@ -321,11 +323,13 @@ const LoanQueuePage: React.FC<LoanQueuePageProps> = ({ user, onLogout, toggleThe
                             className="w-full pl-12 pr-4 py-3 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm focus:ring-2 focus:ring-blue-500 outline-none transition-all"
                         />
                     </div>
-                    <div className="flex gap-2 items-center flex-wrap">
+
+                    {/* Row 2: Dropdown filters — 3-col on mobile */}
+                    <div className="grid grid-cols-3 gap-2">
                         <select
                             value={statusFilter}
                             onChange={(e) => handleFilterChange('status', e.target.value)}
-                            className="px-4 py-3 rounded-2xl bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs font-bold uppercase border border-slate-200 dark:border-slate-700 outline-none cursor-pointer hover:border-blue-500 transition-colors"
+                            className="w-full px-2 py-2.5 rounded-xl bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-[10px] font-bold uppercase border border-slate-200 dark:border-slate-700 outline-none cursor-pointer hover:border-blue-500 transition-colors truncate"
                         >
                             <option value="">All Status</option>
                             <option value="pending">Pending</option>
@@ -337,14 +341,14 @@ const LoanQueuePage: React.FC<LoanQueuePageProps> = ({ user, onLogout, toggleThe
                         <select
                             value={stageFilter}
                             onChange={(e) => handleFilterChange('stage', e.target.value)}
-                            className="px-4 py-3 rounded-2xl bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs font-bold uppercase border border-slate-200 dark:border-slate-700 outline-none cursor-pointer hover:border-blue-500 transition-colors"
+                            className="w-full px-2 py-2.5 rounded-xl bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-[10px] font-bold uppercase border border-slate-200 dark:border-slate-700 outline-none cursor-pointer hover:border-blue-500 transition-colors truncate"
                         >
                             <option value="">All Stages</option>
                             <option value="sales">Sales</option>
-                            <option value="customer_experience">Customer Experience</option>
-                            <option value="credit_check_1">Credit Check 1</option>
-                            <option value="credit_check_2">Credit Check 2</option>
-                            <option value="internal_audit">Internal Audit</option>
+                            <option value="customer_experience">Cust. Exp.</option>
+                            <option value="credit_check_1">Credit 1</option>
+                            <option value="credit_check_2">Credit 2</option>
+                            <option value="internal_audit">Audit</option>
                             <option value="finance">Finance</option>
                             <option value="disbursed">Disbursed</option>
                         </select>
@@ -352,7 +356,7 @@ const LoanQueuePage: React.FC<LoanQueuePageProps> = ({ user, onLogout, toggleThe
                         <select
                             value={officerFilter}
                             onChange={(e) => handleFilterChange('officer', e.target.value)}
-                            className="px-4 py-3 rounded-2xl bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs font-bold uppercase border border-slate-200 dark:border-slate-700 outline-none cursor-pointer hover:border-blue-500 transition-colors"
+                            className="w-full px-2 py-2.5 rounded-xl bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-[10px] font-bold uppercase border border-slate-200 dark:border-slate-700 outline-none cursor-pointer hover:border-blue-500 transition-colors truncate"
                         >
                             <option value="">All Officers</option>
                             <option value="unassigned">Unassigned</option>
@@ -360,9 +364,11 @@ const LoanQueuePage: React.FC<LoanQueuePageProps> = ({ user, onLogout, toggleThe
                                 <option key={officer.id} value={officer.id}>{officer.full_name}</option>
                             ))}
                         </select>
+                    </div>
 
-                        {/* ── Date Filter ── */}
-                        <div className="flex items-center gap-1.5 p-1 bg-slate-100 dark:bg-slate-800 rounded-2xl">
+                    {/* Row 3: Date filter — scrollable pill strip */}
+                    <div className="overflow-x-auto -mx-1 px-1 pb-0.5">
+                        <div className="flex items-center gap-1.5 p-1 bg-slate-100 dark:bg-slate-800 rounded-2xl w-max min-w-full">
                             {(([
                                 { label: 'Today', key: 'today' },
                                 { label: 'Yesterday', key: 'yesterday' },
@@ -391,28 +397,26 @@ const LoanQueuePage: React.FC<LoanQueuePageProps> = ({ user, onLogout, toggleThe
                                 );
                             })}
                         </div>
-
-
-                        {/* Custom date range inputs — visible only when 'Custom' is active */}
-                        {(showCustomDate || activeDatePreset === 'custom') && (
-                            <div className="flex items-center gap-2 animate-in fade-in slide-in-from-top-1 duration-200">
-                                <input
-                                    type="date"
-                                    value={dateFrom}
-                                    onChange={e => handleFilterChange('date_from', e.target.value)}
-                                    className="px-3 py-2.5 rounded-2xl bg-white dark:bg-slate-800 border border-blue-300 dark:border-blue-700 text-xs font-bold text-slate-700 dark:text-slate-200 outline-none focus:ring-2 focus:ring-blue-500 transition-all"
-                                />
-                                <span className="text-slate-400 text-xs font-black">→</span>
-                                <input
-                                    type="date"
-                                    value={dateTo}
-                                    onChange={e => handleFilterChange('date_to', e.target.value)}
-                                    min={dateFrom}
-                                    className="px-3 py-2.5 rounded-2xl bg-white dark:bg-slate-800 border border-blue-300 dark:border-blue-700 text-xs font-bold text-slate-700 dark:text-slate-200 outline-none focus:ring-2 focus:ring-blue-500 transition-all"
-                                />
-                            </div>
-                        )}
                     </div>
+
+                    {/* Custom date range inputs */}
+                    {(showCustomDate || activeDatePreset === 'custom') && (
+                        <div className="grid grid-cols-2 gap-2 animate-in fade-in slide-in-from-top-1 duration-200">
+                            <input
+                                type="date"
+                                value={dateFrom}
+                                onChange={e => handleFilterChange('date_from', e.target.value)}
+                                className="w-full px-3 py-2.5 rounded-2xl bg-white dark:bg-slate-800 border border-blue-300 dark:border-blue-700 text-xs font-bold text-slate-700 dark:text-slate-200 outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                            />
+                            <input
+                                type="date"
+                                value={dateTo}
+                                onChange={e => handleFilterChange('date_to', e.target.value)}
+                                min={dateFrom}
+                                className="w-full px-3 py-2.5 rounded-2xl bg-white dark:bg-slate-800 border border-blue-300 dark:border-blue-700 text-xs font-bold text-slate-700 dark:text-slate-200 outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                            />
+                        </div>
+                    )}
                 </div>
 
 
