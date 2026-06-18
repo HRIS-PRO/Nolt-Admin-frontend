@@ -1065,6 +1065,7 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
         setSubStep={setSubStep}
         selectedPlan={selectedPlan}
         setSelectedPlan={setSelectedPlan}
+        setSelectedCbaCode={setSelectedCbaCode}
         recipientName={recipientName}
         setRecipientName={setRecipientName}
         recipientEmail={recipientEmail}
@@ -1100,6 +1101,8 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
         setShowRolloverInfo={setShowRolloverInfo}
         minAmount={minAmount}
         rateLoading={rateLoading}
+        investmentProducts={investmentProducts}
+        productsLoading={productsLoading}
       />
     );
   }
