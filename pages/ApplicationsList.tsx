@@ -475,7 +475,7 @@ const ApplicationsList: React.FC<ApplicationsListProps> = ({ navigate, formatMon
                               <button 
                                 onClick={() => {
                                   setOpenDropdownId(null);
-                                  navigate('INVESTMENT_FLOW', { id: `T-${Math.floor(Math.random() * 9000) + 1000}`, type: 'INVESTMENT', subStep: 0, label: item.type, data: { isTopUp: true, originalInvestmentId: item.id.replace('INV-', ''), selectedPlan: item.type.includes('VAULT') ? 'VAULT' : item.type.includes('SURGE') ? 'SURGE' : 'RISE' }, updatedAt: Date.now() });
+                                  navigate('INVESTMENT_FLOW', { id: `T-${Math.floor(Math.random() * 9000) + 1000}`, type: 'INVESTMENT', subStep: 0, label: item.type, data: { isTopUp: true, originalInvestmentId: item.id.replace('INV-', ''), selectedPlan: item.type.includes('VAULT') ? 'VAULT' : item.type.includes('SURGE') ? 'SURGE' : 'RISE', cba_td_account_number: item.data?.cba_td_account_number, casa_account_number: item.data?.casa_account_number }, updatedAt: Date.now() });
                                 }}
                                 className="w-full flex items-center gap-4 px-6 py-4 text-xs font-black text-slate-600 dark:text-slate-300 hover:bg-emerald-500/10 hover:text-emerald-500 transition-all uppercase tracking-widest group"
                               >

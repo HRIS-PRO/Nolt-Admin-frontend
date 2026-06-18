@@ -27,6 +27,33 @@ const NIGERIAN_STATES = [
   "Rivers", "Sokoto", "Taraba", "Yobe", "Zamfara"
 ];
 
+// ─── Countdown auto-redirect for Top-Up success modal ────────────────────────
+const TopUpCountdown: React.FC<{ onDone: () => void }> = ({ onDone }) => {
+  const [seconds, setSeconds] = React.useState(3);
+  React.useEffect(() => {
+    if (seconds <= 0) { onDone(); return; }
+    const t = setTimeout(() => setSeconds(s => s - 1), 1000);
+    return () => clearTimeout(t);
+  }, [seconds, onDone]);
+  const pct = ((3 - seconds) / 3) * 100;
+  const r = 22; const circ = 2 * Math.PI * r;
+  return (
+    <div className="flex flex-col items-center gap-2">
+      <div className="relative size-14 flex items-center justify-center">
+        <svg className="absolute inset-0 -rotate-90" viewBox="0 0 56 56">
+          <circle cx="28" cy="28" r={r} fill="none" stroke="currentColor" strokeWidth="3" className="text-slate-100 dark:text-slate-700" />
+          <circle cx="28" cy="28" r={r} fill="none" stroke="currentColor" strokeWidth="3"
+            strokeDasharray={circ} strokeDashoffset={circ - (pct / 100) * circ}
+            className="text-primary transition-all duration-1000" strokeLinecap="round" />
+        </svg>
+        <span className="font-black text-xl text-primary">{seconds}</span>
+      </div>
+      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Redirecting to dashboard…</p>
+    </div>
+  );
+};
+// ─────────────────────────────────────────────────────────────────────────────
+
 const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, formatMoney, initialDraft, user, creatorRole }) => {
   const [searchParams] = useSearchParams();
   const location = useLocation();
@@ -161,11 +188,34 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
 
   // Top-Up
   const [isTopUp, setIsTopUp] = useState(incomingDraft?.data?.isTopUp ?? false);
-  const [casaNumber, setCasaNumber] = useState(incomingDraft?.data?.casaNumber ?? '');
+  const [casaNumber, setCasaNumber] = useState(incomingDraft?.data?.casa_account_number ?? user.profile?.casa ?? '');
   const [originalInvestmentId, setOriginalInvestmentId] = useState(incomingDraft?.data?.originalInvestmentId ?? null);
   const [isValidatingCasa, setIsValidatingCasa] = useState(false);
+  const [topUpAmount, setTopUpAmount] = useState('');
+  const [casaBalance, setCasaBalance] = useState<number | null>(null);
+  const [casaBalanceLoading, setCasaBalanceLoading] = useState(false);
+  const [topUpLoading, setTopUpLoading] = useState(false);
+  const [topUpSuccess, setTopUpSuccess] = useState<{ message: string; data: any } | null>(null);
+  const [topUpError, setTopUpError] = useState<string | null>(null);
   const [referralCode, setReferralCode] = useState(initialDraft?.data?.referralCode ?? user.referral_code_used ?? '');
   const [createdInvestment, setCreatedInvestment] = useState<any>(null);
+  const tdAccount = incomingDraft?.data?.cba_td_account_number ?? null;
+
+  // Fetch CASA balance when entering top-up mode
+  React.useEffect(() => {
+    if (!isTopUp) return;
+    const casa = incomingDraft?.data?.casa_account_number ?? user.profile?.casa;
+    if (!casa) return;
+    setCasaBalanceLoading(true);
+    axios.get(`${import.meta.env.VITE_API_URL || ''}/api/profile/balance`, { withCredentials: true })
+      .then(res => {
+        if (res.data?.success && res.data?.balance !== null) {
+          setCasaBalance(res.data.balance);
+        }
+      })
+      .catch(() => {})
+      .finally(() => setCasaBalanceLoading(false));
+  }, [isTopUp]);
 
   // Documents & Progress
   const [uploadedDocs, setUploadedDocs] = useState<Record<string, { name: string, size: string, url?: string } | null>>(
@@ -1057,6 +1107,69 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
   // Render Logic
   return (
     <div className="max-w-6xl mx-auto px-6 py-12 md:py-16 relative">
+
+      {/* ─── TOP-UP SUCCESS MODAL ──────────────────────────────── */}
+      {topUpSuccess && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 animate-in fade-in duration-500">
+          {/* Backdrop */}
+          <div className="absolute inset-0 bg-slate-900/80 backdrop-blur-md" />
+
+          {/* Card */}
+          <div className="relative w-full max-w-md bg-white dark:bg-slate-900 rounded-[3rem] shadow-2xl border border-emerald-500/20 p-10 flex flex-col items-center text-center gap-6 animate-in zoom-in-95 duration-500">
+            {/* Glow ring */}
+            <div className="absolute -inset-1 rounded-[3.2rem] bg-gradient-to-br from-emerald-400/20 to-transparent blur-xl pointer-events-none" />
+
+            {/* Animated check */}
+            <div className="relative size-28">
+              <div className="absolute inset-0 rounded-full bg-emerald-500/10 animate-ping" />
+              <div className="relative size-28 rounded-full bg-emerald-500/15 border-4 border-emerald-500/30 flex items-center justify-center">
+                <span className="material-symbols-outlined text-6xl text-emerald-500 filled">check_circle</span>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <h2 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight">Top-Up Successful!</h2>
+              <p className="text-slate-500 dark:text-slate-400 font-medium text-sm leading-relaxed">{topUpSuccess.message}</p>
+            </div>
+
+            {/* Receipt summary */}
+            {topUpSuccess.data && (
+              <div className="w-full bg-slate-50 dark:bg-slate-800 rounded-2xl p-5 space-y-3 text-left">
+                {topUpSuccess.data.TDAccount && (
+                  <div className="flex justify-between items-center">
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">TD Account</span>
+                    <span className="font-black text-slate-900 dark:text-white font-mono">{topUpSuccess.data.TDAccount}</span>
+                  </div>
+                )}
+                {topUpSuccess.data.TopUpAmount && (
+                  <div className="flex justify-between items-center">
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Amount Added</span>
+                    <span className="font-black text-emerald-600 text-lg">₦{Number(topUpSuccess.data.TopUpAmount).toLocaleString()}</span>
+                  </div>
+                )}
+                {topUpSuccess.data.SettlementAcct && (
+                  <div className="flex justify-between items-center">
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Settlement Acct</span>
+                    <span className="font-black text-slate-900 dark:text-white font-mono">{topUpSuccess.data.SettlementAcct}</span>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Auto-redirect countdown */}
+            <TopUpCountdown onDone={() => navigate('DASHBOARD')} />
+
+            <button
+              onClick={() => navigate('DASHBOARD')}
+              className="w-full py-5 bg-primary text-white font-black text-base rounded-2xl shadow-xl shadow-primary/30 hover:-translate-y-1 active:scale-95 transition-all flex items-center justify-center gap-3"
+            >
+              <span className="material-symbols-outlined">home</span>
+              Go to Dashboard
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Product Pill */}
       <div className="absolute top-6 right-6 z-50">
         <div className="flex items-center gap-2 bg-white dark:bg-slate-800 px-4 py-2 rounded-full shadow-lg border border-slate-100 dark:border-slate-700">
@@ -1067,7 +1180,7 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
         </div>
       </div>
 
-      {subStep < 12 && (
+      {subStep < 12 && !isTopUp && (
         <div className="flex flex-col gap-3 mb-12 animate-in fade-in duration-700">
           <div className="flex gap-6 justify-between items-end">
             <p className="text-slate-900 dark:text-white text-base font-black uppercase tracking-widest">
@@ -1084,78 +1197,102 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
       {subStep === 0 && (
         <div className="space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-500">
           {isTopUp ? (
-            <div className="max-w-2xl mx-auto text-center space-y-10 py-10">
+            <div className="max-w-xl mx-auto text-center space-y-8 py-10 animate-in fade-in slide-in-from-bottom-4 duration-500">
               <div className="size-24 bg-emerald-500/10 rounded-[2.5rem] flex items-center justify-center text-emerald-500 mx-auto border-2 border-emerald-500/20 shadow-xl shadow-emerald-500/5">
                 <span className="material-symbols-outlined text-5xl font-black">add_circle</span>
               </div>
-              <div className="space-y-4">
+              <div className="space-y-3">
                 <h1 className="text-4xl md:text-5xl font-black text-slate-900 dark:text-white tracking-tight">Investment Top-Up</h1>
-                <p className="text-lg text-slate-500 dark:text-slate-400 font-medium leading-relaxed">
-                  You are adding funds to an existing <span className="text-primary font-black">NOLT {selectedPlan}</span> portfolio.
-                  Please confirm the settlement account below.
+                <p className="text-slate-500 dark:text-slate-400 font-medium leading-relaxed">
+                  Adding funds to your <span className="text-primary font-black">NOLT {selectedPlan}</span> portfolio.
                 </p>
               </div>
 
-              <div className="space-y-6 text-left">
-                <div className="space-y-3">
-                  <label className="text-xs font-black text-slate-400 uppercase tracking-widest px-1">CASA Account Number</label>
-                  <div className="relative">
-                    <span className="absolute left-6 top-1/2 -translate-y-1/2 material-symbols-outlined text-slate-400">account_balance</span>
-                    <input
-                      type="text"
-                      placeholder="Enter CASA Number..."
-                      value={casaNumber}
-                      onChange={(e) => setCasaNumber(e.target.value)}
-                      className="w-full h-20 pl-16 pr-6 rounded-3xl bg-white dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 text-2xl font-black text-slate-900 dark:text-white focus:ring-2 focus:ring-primary focus:border-primary focus:shadow-lg focus:shadow-primary/10 outline-none transition-all placeholder:text-slate-300"
-                    />
-                  </div>
-                  <p className="text-[10px] text-slate-400 italic px-1 font-bold">This is the account where your top-up principal and returns will be managed.</p>
+              {/* CASA balance display */}
+              <div className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-3xl p-5 text-left flex items-center justify-between gap-4">
+                <div className="space-y-1">
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Settlement Account (CASA)</p>
+                  <p className="font-black text-slate-900 dark:text-white font-mono tracking-wide">{casaNumber || '—'}</p>
                 </div>
-
-                <button
-                  disabled={isValidatingCasa}
-                  onClick={async () => {
-                    if (!casaNumber || casaNumber.length < 5) return alert("Please enter a valid CASA number.");
-
-                    setIsValidatingCasa(true);
-                    try {
-                      if (!originalInvestmentId) {
-                        alert("The ID of the investment you are topping up is missing. Please start the Top-Up flow again from the dashboard.");
-                        setIsValidatingCasa(false);
-                        return;
-                      }
-
-                      // Fetch original investment to verify its CASA
-                      const response = await axios.get(`/api/staff/investments/${originalInvestmentId}`);
-                      const original = response.data;
-
-                      if (!original.casa_account_number) {
-                        alert("The original investment does not have a registered CASA number. Please update the original investment first.");
-                        return;
-                      }
-
-                      if (original.casa_account_number !== casaNumber) {
-                        alert(`Invalid CASA Number. The number you entered does not match the account on record for INV-${originalInvestmentId}.`);
-                        return;
-                      }
-
-                      // If matches, proceed
-                      handleSaveDraft(10);
-                      setSubStep(10);
-                    } catch (err) {
-                      console.error("Validation error:", err);
-                      alert("Failed to verify CASA number. Please try again or contact system administrator.");
-                    } finally {
-                      setIsValidatingCasa(false);
-                    }
-                  }}
-                  className={`w-full py-6 bg-primary text-white font-black text-xl rounded-3xl shadow-2xl shadow-primary/30 hover:-translate-y-1 transition-all flex items-center justify-center gap-3 active:scale-95 ${isValidatingCasa ? 'opacity-70 animate-pulse' : ''}`}
-                >
-                  {isValidatingCasa ? 'Validating...' : 'Proceed to Config'}
-                  <span className="material-symbols-outlined">arrow_forward</span>
-                </button>
-                <button onClick={handleBack} className="w-full py-4 text-slate-400 font-black uppercase tracking-widest text-xs hover:text-slate-600 transition-colors">Cancel Top-Up</button>
+                <div className="text-right space-y-1">
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Available Balance</p>
+                  {casaBalanceLoading ? (
+                    <div className="h-5 w-28 bg-slate-200 dark:bg-slate-700 rounded animate-pulse" />
+                  ) : (
+                    <p className="font-black text-emerald-600 dark:text-emerald-400">
+                      {casaBalance !== null ? `₦${casaBalance.toLocaleString()}` : '—'}
+                    </p>
+                  )}
+                </div>
               </div>
+
+              <div className="space-y-3 text-left">
+                <label className="text-xs font-black text-slate-400 uppercase tracking-widest px-1">Top-Up Amount (₦)</label>
+                <div className="relative">
+                  <span className="absolute left-6 top-1/2 -translate-y-1/2 font-black text-slate-400 text-xl">₦</span>
+                  <input
+                    type="number"
+                    min="1"
+                    placeholder="Enter amount..."
+                    value={topUpAmount}
+                    onChange={(e) => setTopUpAmount(e.target.value)}
+                    className="w-full h-20 pl-14 pr-6 rounded-3xl bg-white dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 text-2xl font-black text-slate-900 dark:text-white focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all placeholder:text-slate-300"
+                  />
+                </div>
+                {/* Warning: amount exceeds balance */}
+                {topUpAmount && casaBalance !== null && Number(topUpAmount) > casaBalance && (
+                  <div className="flex items-center gap-2 px-4 py-3 bg-amber-500/10 border border-amber-500/30 rounded-2xl">
+                    <span className="material-symbols-outlined text-amber-500 text-sm">warning</span>
+                    <p className="text-xs font-black text-amber-600 dark:text-amber-400">
+                      Amount exceeds your available CASA balance of ₦{casaBalance.toLocaleString()}. Please enter a lower amount.
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* Inline error */}
+              {topUpError && (
+                <div className="flex items-start gap-3 px-5 py-4 bg-red-500/10 border border-red-500/30 rounded-2xl">
+                  <span className="material-symbols-outlined text-red-500 text-base mt-0.5 shrink-0">error</span>
+                  <p className="text-sm font-bold text-red-600 dark:text-red-400 leading-relaxed">{topUpError}</p>
+                </div>
+              )}
+
+              <button
+                disabled={topUpLoading || !topUpAmount || Number(topUpAmount) <= 0 || (casaBalance !== null && Number(topUpAmount) > casaBalance) || !casaNumber}
+                onClick={async () => {
+                  setTopUpError(null);
+                  if (!casaNumber) {
+                    setTopUpError('Your CASA account is not linked to your profile. Please contact support.');
+                    return;
+                  }
+                  setTopUpLoading(true);
+                  try {
+                    const res = await axios.post(
+                      `${import.meta.env.VITE_API_URL || ''}/api/investments/cba-topup`,
+                      { tdAccount: tdAccount || '', topUpAmount: Number(topUpAmount), settlementAcct: casaNumber },
+                      { withCredentials: true }
+                    );
+                    console.log('[TopUp] CBA Response:', res.data);
+                    // Show modal — even if data is sparse
+                    setTopUpSuccess({
+                      message: res.data.message || 'Top-up posted successfully.',
+                      data: res.data.data || res.data
+                    });
+                  } catch (err: any) {
+                    const msg = err?.response?.data?.message || 'Top-up failed. Please try again.';
+                    console.error('[TopUp] Error:', err?.response?.data);
+                    setTopUpError(msg);
+                  } finally {
+                    setTopUpLoading(false);
+                  }
+                }}
+                className={`w-full py-6 bg-primary text-white font-black text-xl rounded-3xl shadow-2xl shadow-primary/30 hover:-translate-y-1 transition-all flex items-center justify-center gap-3 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 ${topUpLoading ? 'animate-pulse' : ''}`}
+              >
+                {topUpLoading ? 'Processing...' : 'Top Up Now'}
+                {!topUpLoading && <span className="material-symbols-outlined">arrow_forward</span>}
+              </button>
+              <button onClick={handleBack} className="w-full py-4 text-slate-400 font-black uppercase tracking-widest text-xs hover:text-slate-600 transition-colors">Cancel Top-Up</button>
             </div>
           ) : (
             <>
