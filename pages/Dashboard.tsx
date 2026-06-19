@@ -126,7 +126,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, navigate }) => {
             <div className="flex items-center rounded-t-[2rem] overflow-hidden border border-b-0 border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
               {(
                 [
-                  { view: 'balance' as CardView, label: 'CASA Balance', icon: 'account_balance_wallet' },
+                  { view: 'balance' as CardView, label: 'Account Balance', icon: 'account_balance_wallet' },
                   { view: 'investment' as CardView, label: 'Investments', icon: 'trending_up', badge: investmentCount || null },
                 ] as { view: CardView; label: string; icon: string; badge?: number | null }[]
               ).map((tab, idx) => (

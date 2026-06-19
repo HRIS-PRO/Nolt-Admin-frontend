@@ -1214,7 +1214,7 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
               {/* CASA balance display */}
               <div className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-3xl p-5 text-left flex items-center justify-between gap-4">
                 <div className="space-y-1">
-                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Settlement Account (CASA)</p>
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Account Number</p>
                   <p className="font-black text-slate-900 dark:text-white font-mono tracking-wide">{casaNumber || '—'}</p>
                 </div>
                 <div className="text-right space-y-1">
@@ -1247,7 +1247,7 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
                   <div className="flex items-center gap-2 px-4 py-3 bg-amber-500/10 border border-amber-500/30 rounded-2xl">
                     <span className="material-symbols-outlined text-amber-500 text-sm">warning</span>
                     <p className="text-xs font-black text-amber-600 dark:text-amber-400">
-                      Amount exceeds your available CASA balance of ₦{casaBalance.toLocaleString()}. Please enter a lower amount.
+                      Amount exceeds your available balance of ₦{casaBalance.toLocaleString()}. Please enter a lower amount.
                     </p>
                   </div>
                 )}

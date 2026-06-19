@@ -265,7 +265,7 @@ const StaffInvestmentsPage: React.FC<StaffInvestmentsPageProps> = ({ user, onLog
     const fetchOfficers = async () => {
         if (['sales_manager', 'admin', 'super_admin', 'superadmin', 'customer_experience'].includes(user.role || '')) {
             try {
-                const response = await axios.get(`/api/staff/users?role=sales_officer&limit=200`, { withCredentials: true });
+                const response = await axios.get(`/api/staff/users?role=sales_officer,sales_public_sector,sales_private_sector&limit=200`, { withCredentials: true });
                 setOfficers(response.data.users.filter((u: any) => u.is_active));
             } catch (error) {
                 console.error("Failed to fetch officers", error);
@@ -1591,6 +1591,13 @@ const StaffInvestmentsPage: React.FC<StaffInvestmentsPageProps> = ({ user, onLog
                                                                             <span className="flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-purple-600 text-white text-[8px] font-black uppercase tracking-tighter shadow-sm leading-none">
                                                                                 <span className="material-symbols-outlined text-[8px]">add_circle</span>
                                                                                 TOP-UP
+                                                                            </span>
+                                                                        )}
+                                                                        {/* Promotion Source Badge */}
+                                                                        {inv.promotion_source && (
+                                                                            <span className="flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-amber-500/15 border border-amber-500/30 text-amber-600 dark:text-amber-400 text-[8px] font-black uppercase tracking-tighter leading-none">
+                                                                                <span className="material-symbols-outlined text-[8px]">campaign</span>
+                                                                                {inv.promotion_source}
                                                                             </span>
                                                                         )}
                                                                     </div>

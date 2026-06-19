@@ -182,7 +182,7 @@ const StaffInvestmentDetailsPage: React.FC<StaffInvestmentDetailsPageProps> = ({
     const fetchOfficers = async () => {
         if (['sales_manager', 'admin', 'super_admin', 'superadmin', 'customer_experience', 'marketing'].includes(user.role || '')) {
             try {
-                const response = await axios.get(`/api/staff/users?role=sales_officer&limit=200`, { withCredentials: true });
+                const response = await axios.get(`/api/staff/users?role=sales_officer,sales_public_sector,sales_private_sector&limit=200`, { withCredentials: true });
                 setOfficers(response.data.users.filter((u: any) => u.is_active));
             } catch (error) {
                 console.error("Failed to fetch officers", error);
@@ -540,9 +540,13 @@ const StaffInvestmentDetailsPage: React.FC<StaffInvestmentDetailsPageProps> = ({
                             )}
                         </h1>
                         {investment.promotion_source && (
-                            <p className="mt-2 text-xs font-black uppercase tracking-wider text-red-500">
-                                Promotions: {investment.promotion_source}
-                            </p>
+                            <div className="flex items-center gap-2 mt-2">
+                                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-600 dark:text-amber-400 text-xs font-black uppercase tracking-wider">
+                                    <span className="material-symbols-outlined text-sm leading-none">campaign</span>
+                                    Via {investment.promotion_source}
+                                    {investment.promotion_campaign && <span className="opacity-60 font-bold normal-case">· {investment.promotion_campaign}</span>}
+                                </span>
+                            </div>
                         )}
                     </div>
                 </div>
@@ -597,6 +601,26 @@ const StaffInvestmentDetailsPage: React.FC<StaffInvestmentDetailsPageProps> = ({
 
             {/* System Priority Warnings */}
             <div className="space-y-4 mb-8">
+                {/* Promotion Source Banner */}
+                {investment.promotion_source && (
+                    <div className="p-5 rounded-[24px] bg-amber-50 dark:bg-amber-500/10 border-2 border-amber-200 dark:border-amber-500/20 flex items-center gap-5 animate-in fade-in slide-in-from-top-4 duration-500">
+                        <div className="size-12 rounded-2xl bg-amber-500 text-white flex items-center justify-center shrink-0 shadow-lg shadow-amber-500/30">
+                            <span className="material-symbols-outlined text-2xl">campaign</span>
+                        </div>
+                        <div>
+                            <p className="text-[10px] font-black text-amber-600 dark:text-amber-400 uppercase tracking-widest mb-0.5">Promotion Source</p>
+                            <p className="text-base font-black text-amber-900 dark:text-amber-200 uppercase tracking-tight">
+                                {investment.promotion_source}
+                                {investment.promotion_campaign && (
+                                    <span className="ml-2 text-sm font-bold text-amber-700 dark:text-amber-300 normal-case">· {investment.promotion_campaign}</span>
+                                )}
+                            </p>
+                            {investment.promotion_medium && (
+                                <p className="text-xs font-bold text-amber-600/70 dark:text-amber-400/70 mt-0.5">Medium: {investment.promotion_medium}</p>
+                            )}
+                        </div>
+                    </div>
+                )}
                 {/* CASA missing warning — commented out: CASA is now auto-filled from user_profiles on Finance approval
                 {!investment.casa_account_number && investment.status === 'active' && (
                     <div className="p-6 rounded-[24px] bg-orange-50 dark:bg-orange-500/10 border-2 border-orange-200 dark:border-orange-500/20 flex items-start gap-4 animate-in fade-in slide-in-from-top-4 duration-500">

@@ -68,7 +68,7 @@ const LoanQueuePage: React.FC<LoanQueuePageProps> = ({ user, onLogout, toggleThe
         if (['sales_manager', 'admin', 'super_admin', 'superadmin', 'customer_experience', 'marketing'].includes(user.role || '')) {
             try {
                 // Fetch specifically sales officers with a high limit to ensure we get them all
-                const response = await axios.get(`${''}/api/staff/users?role=sales_officer&limit=200`, { withCredentials: true });
+                const response = await axios.get(`${''}/api/staff/users?role=sales_officer,sales_public_sector,sales_private_sector&limit=200`, { withCredentials: true });
                 setOfficers(response.data.users.filter((u: any) => u.is_active));
             } catch (error) {
                 console.error("Failed to fetch officers", error);
@@ -276,7 +276,8 @@ const LoanQueuePage: React.FC<LoanQueuePageProps> = ({ user, onLogout, toggleThe
                         </p>
                     </div>
                     <div className="flex flex-wrap gap-3">
-                        {(user.role === 'sales_officer' || user.role === 'admin' || user.role === 'super_admin') && (
+                        {(['sales_officer', 'sales_public_sector', 'sales_private_sector'].includes(user.role) ||
+ user.role === 'admin' || user.role === 'super_admin') && (
                             <motion.button
                                 whileHover={{ scale: 1.02 }}
                                 whileTap={{ scale: 0.98 }}
@@ -565,6 +566,13 @@ const LoanQueuePage: React.FC<LoanQueuePageProps> = ({ user, onLogout, toggleThe
                                                                     </>
                                                                 )}
                                                             </div>
+                                                            {/* Promotion Source Badge */}
+                                                            {loan.promotion_source && (
+                                                                <div className="flex items-center gap-1.5 mt-1.5 px-2 py-1 rounded-lg bg-amber-500/10 border border-amber-500/25 w-fit">
+                                                                    <span className="material-symbols-outlined text-amber-500 text-[11px] leading-none">campaign</span>
+                                                                    <span className="text-[9px] font-black uppercase tracking-widest text-amber-600 dark:text-amber-400 leading-none">via {loan.promotion_source}</span>
+                                                                </div>
+                                                            )}
                                                         </div>
                                                     </div>
                                                 </td>
