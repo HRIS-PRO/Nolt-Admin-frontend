@@ -10,8 +10,184 @@ interface ApplicationsListProps {
   user: UserState;
 }
 
+
+// ── CompletedCard ──────────────────────────────────────────────────────────
+interface CompletedCardProps {
+  item: any;
+  idx: number;
+  uploadedReceipts: Record<string, boolean>;
+  openDropdownId: string | null;
+  setOpenDropdownId: (id: string | null) => void;
+  handleShowDetails: (app: any) => void;
+  handleLiquidate: (app: any) => void;
+  navigate: (step: AppStep, draft?: SavedDraft | null) => void;
+  formatMoney: (amount: number) => string;
+}
+
+const statusConfig: Record<string, { label: string; cls: string; dot: string }> = {
+  ACTIVE:           { label: 'Active',           cls: 'bg-emerald-500/15 text-emerald-600 border-emerald-500/20', dot: 'bg-emerald-500' },
+  APPROVED:         { label: 'Approved',          cls: 'bg-blue-500/15 text-blue-600 border-blue-500/20',         dot: 'bg-blue-500' },
+  DISBURSED:        { label: 'Disbursed',         cls: 'bg-blue-500/15 text-blue-600 border-blue-500/20',         dot: 'bg-blue-500' },
+  COMPLETED:        { label: 'Completed',         cls: 'bg-emerald-500/15 text-emerald-600 border-emerald-500/20', dot: 'bg-emerald-500' },
+  MATURED:          { label: 'Matured',           cls: 'bg-violet-500/15 text-violet-600 border-violet-500/20',   dot: 'bg-violet-500' },
+  LIQUIDATED:       { label: 'Liquidated',        cls: 'bg-slate-500/15 text-slate-500 border-slate-500/20',      dot: 'bg-slate-400' },
+  REJECTED:         { label: 'Rejected',          cls: 'bg-red-500/15 text-red-500 border-red-500/20',            dot: 'bg-red-500' },
+  PENDING_PAYMENT:  { label: 'Pending Payment',   cls: 'bg-amber-500/15 text-amber-600 border-amber-500/20',      dot: 'bg-amber-500 animate-pulse' },
+  REPAYMENT_STARTED:{ label: 'Repayment',         cls: 'bg-sky-500/15 text-sky-600 border-sky-500/20',            dot: 'bg-sky-500' },
+  CLOSED:           { label: 'Closed',            cls: 'bg-slate-500/15 text-slate-500 border-slate-500/20',      dot: 'bg-slate-400' },
+};
+
+const CompletedCard: React.FC<CompletedCardProps> = ({
+  item, idx, uploadedReceipts, openDropdownId, setOpenDropdownId,
+  handleShowDetails, handleLiquidate, navigate, formatMoney
+}) => {
+  const isLoan = item.type.toLowerCase().includes('loan');
+  const statusKey = (item.uploadedReceipts ? 'PAYMENT_VERIFYING' : item.status) as string;
+  const s = statusConfig[statusKey] || { label: statusKey.replace(/_/g, ' '), cls: 'bg-slate-100 text-slate-500 border-slate-200', dot: 'bg-slate-400' };
+  const displayLabel = uploadedReceipts[item.id] ? 'Payment Verifying' : s.label;
+  const displayCls   = uploadedReceipts[item.id] ? statusConfig['PENDING_PAYMENT'].cls : s.cls;
+  const displayDot   = uploadedReceipts[item.id] ? 'bg-amber-500 animate-pulse' : s.dot;
+
+  return (
+    <div
+      style={{ animationDelay: `${idx * 50}ms` }}
+      className={`group relative bg-white dark:bg-slate-800/80 backdrop-blur border rounded-[2rem] p-6 md:p-8 flex flex-col md:flex-row items-center gap-6 shadow-lg shadow-slate-100/80 dark:shadow-none hover:-translate-y-0.5 hover:shadow-xl transition-all duration-300 animate-in fade-in slide-in-from-bottom-2 ${
+        openDropdownId === item.id ? 'z-50 border-primary/30 shadow-primary/5' : 'z-10 border-slate-100 dark:border-slate-700/60 hover:border-primary/20'
+      }`}
+    >
+      {/* Subtle top accent line */}
+      <div className={`absolute top-0 left-8 right-8 h-px ${isLoan ? 'bg-gradient-to-r from-transparent via-violet-300/40 to-transparent' : 'bg-gradient-to-r from-transparent via-primary/30 to-transparent'} rounded-full`} />
+
+      {/* Icon */}
+      <div className={`relative size-14 md:size-16 rounded-2xl flex items-center justify-center shrink-0 shadow-lg ${
+        isLoan ? 'bg-violet-500/10 text-violet-500 shadow-violet-500/10' : 'bg-primary/10 text-primary shadow-primary/10'
+      }`}>
+        <span className="material-symbols-outlined text-2xl md:text-3xl filled">{item.icon}</span>
+        {/* Active pulse ring */}
+        {item.status === 'ACTIVE' && (
+          <span className="absolute inset-0 rounded-2xl ring-2 ring-emerald-400/30 animate-ping" />
+        )}
+      </div>
+
+      {/* Info */}
+      <div className="flex-1 space-y-2 text-center md:text-left min-w-0">
+        <div className="flex flex-wrap items-center justify-center md:justify-start gap-2.5">
+          <h3 className="text-base md:text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight truncate">{item.type}</h3>
+          <span className={`inline-flex items-center gap-1.5 px-3 py-1 text-[10px] font-black rounded-full uppercase tracking-widest border ${displayCls}`}>
+            <span className={`size-1.5 rounded-full ${displayDot}`} />
+            {displayLabel}
+          </span>
+        </div>
+
+        {item.data?.isOnBehalf && (
+          <div className="flex items-center justify-center md:justify-start gap-1.5 text-primary font-bold text-[10px] bg-primary/5 w-fit px-3 py-1 rounded-lg border border-primary/10">
+            <span className="material-symbols-outlined text-xs">person</span>
+            <span>For: {item.data.fullName}</span>
+          </div>
+        )}
+
+        <div className="flex flex-wrap items-center justify-center md:justify-start gap-4">
+          <span className="text-lg font-black text-slate-800 dark:text-slate-100">{formatMoney(item.amount)}</span>
+          <span className="text-xs text-slate-400 font-medium">Submitted {item.submittedAt}</span>
+        </div>
+      </div>
+
+      {/* Actions dropdown */}
+      <div className="relative z-30 shrink-0">
+        <button
+          onClick={(e) => { e.stopPropagation(); setOpenDropdownId(openDropdownId === item.id ? null : item.id); }}
+          className={`flex items-center gap-2 px-6 py-3 rounded-xl font-black text-xs uppercase tracking-widest transition-all active:scale-95 shadow-md ${
+            openDropdownId === item.id
+              ? 'bg-primary text-white shadow-primary/20'
+              : 'bg-slate-50 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-primary hover:text-white hover:shadow-primary/20 shadow-slate-200/80 dark:shadow-none'
+          }`}
+        >
+          Actions
+          <span className={`material-symbols-outlined text-sm transition-transform duration-300 ${openDropdownId === item.id ? 'rotate-180' : ''}`}>expand_more</span>
+        </button>
+
+        {openDropdownId === item.id && (
+          <div
+            className="absolute right-0 mt-3 w-64 bg-white dark:bg-slate-800 rounded-[1.5rem] shadow-[0_20px_60px_rgba(0,0,0,0.15)] dark:shadow-[0_20px_60px_rgba(0,0,0,0.6)] border border-slate-100 dark:border-slate-700 py-3 animate-in fade-in slide-in-from-top-3 duration-200 z-[100]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="absolute -top-1.5 right-6 size-3 bg-white dark:bg-slate-800 rotate-45 border-l border-t border-slate-100 dark:border-slate-700" />
+            <div className="px-4 py-2 mb-1 border-b border-slate-50 dark:border-slate-700/50">
+              <p className="text-[9px] font-black text-slate-300 dark:text-slate-600 uppercase tracking-[0.2em]">{isLoan ? 'Loan Management' : 'Investment Management'}</p>
+            </div>
+
+            {!isLoan && (
+              <>
+                {item.data?.is_liquidating ? (
+                  <div className="flex items-center gap-3 px-4 py-3 text-xs font-black text-amber-500 uppercase tracking-widest">
+                    <span className="material-symbols-outlined text-base animate-pulse">pending</span>
+                    Liquidation Processing
+                  </div>
+                ) : (
+                  <>
+                    {item.status !== 'PENDING_PAYMENT' && (
+                      <button
+                        onClick={() => { setOpenDropdownId(null); navigate('INVESTMENT_FLOW', { id: `T-${Math.floor(Math.random() * 9000) + 1000}`, type: 'INVESTMENT', subStep: 0, label: item.type, data: { isTopUp: true, originalInvestmentId: item.id.replace('INV-', ''), selectedPlan: item.type.includes('VAULT') ? 'VAULT' : item.type.includes('SURGE') ? 'SURGE' : 'RISE', cba_td_account_number: item.data?.cba_td_account_number, casa_account_number: item.data?.casa_account_number }, updatedAt: Date.now() }); }}
+                        className="w-full flex items-center gap-3 px-4 py-3 text-xs font-black text-slate-600 dark:text-slate-300 hover:bg-emerald-50 dark:hover:bg-emerald-500/10 hover:text-emerald-600 transition-all uppercase tracking-widest group"
+                      >
+                        <span className="size-7 rounded-lg bg-emerald-500/10 flex items-center justify-center group-hover:bg-emerald-500 group-hover:text-white transition-colors">
+                          <span className="material-symbols-outlined text-sm">add_circle</span>
+                        </span>
+                        Top-Up
+                      </button>
+                    )}
+                    <button
+                      onClick={() => { setOpenDropdownId(null); handleLiquidate(item); }}
+                      className="w-full flex items-center gap-3 px-4 py-3 text-xs font-black text-slate-600 dark:text-slate-300 hover:bg-red-50 dark:hover:bg-red-500/10 hover:text-red-500 transition-all uppercase tracking-widest group"
+                    >
+                      <span className="size-7 rounded-lg bg-red-500/10 flex items-center justify-center group-hover:bg-red-500 group-hover:text-white transition-colors">
+                        <span className="material-symbols-outlined text-sm">account_balance_wallet</span>
+                      </span>
+                      Liquidate
+                    </button>
+                  </>
+                )}
+              </>
+            )}
+
+            {item.status === 'PENDING_PAYMENT' && !uploadedReceipts[item.id] && (
+              <button
+                onClick={() => { setOpenDropdownId(null); }}
+                className="w-full flex items-center gap-3 px-4 py-3 text-xs font-black text-primary hover:bg-primary/5 transition-all uppercase tracking-widest group"
+              >
+                <span className="size-7 rounded-lg bg-primary/10 flex items-center justify-center group-hover:bg-primary group-hover:text-white transition-colors">
+                  <span className="material-symbols-outlined text-sm">payments</span>
+                </span>
+                Complete Payment
+              </button>
+            )}
+
+            {uploadedReceipts[item.id] && (
+              <div className="flex items-center gap-3 px-4 py-3 text-xs font-black text-emerald-500 uppercase tracking-widest">
+                <span className="material-symbols-outlined text-base">check_circle</span>
+                Receipt Uploaded
+              </div>
+            )}
+
+            <button
+              onClick={() => { setOpenDropdownId(null); handleShowDetails(item); }}
+              className="w-full flex items-center gap-3 px-4 py-3 text-xs font-black text-slate-600 dark:text-slate-300 hover:bg-primary/5 hover:text-primary transition-all uppercase tracking-widest group"
+            >
+              <span className="size-7 rounded-lg bg-primary/10 flex items-center justify-center group-hover:bg-primary group-hover:text-white transition-colors">
+                <span className="material-symbols-outlined text-sm">verified</span>
+              </span>
+              Certificate
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
 const ApplicationsList: React.FC<ApplicationsListProps> = ({ navigate, formatMoney, user }) => {
-  const [activeTab, setActiveTab] = useState<'DRAFTS' | 'COMPLETED'>('DRAFTS');
+
+  const [activeTab, setActiveTab] = useState<'DRAFTS' | 'COMPLETED'>('COMPLETED');
   const [uploadingReceiptId, setUploadingReceiptId] = useState<string | null>(null);
   const [uploadedReceipts, setUploadedReceipts] = useState<Record<string, boolean>>({});
   const [drafts, setDrafts] = useState<SavedDraft[]>(storageService.getDrafts());
@@ -58,7 +234,13 @@ const ApplicationsList: React.FC<ApplicationsListProps> = ({ navigate, formatMon
   const [processingMessage, setProcessingMessage] = useState<string | null>(null);
 
   useEffect(() => {
-    const handleClickOutside = () => setOpenDropdownId(null);
+    const handleClickOutside = (e: MouseEvent) => {
+      // Only close if the click was NOT on the Actions button area
+      const target = e.target as HTMLElement;
+      if (!target.closest('[data-dropdown-trigger]') && !target.closest('[data-dropdown-menu]')) {
+        setOpenDropdownId(null);
+      }
+    };
     window.addEventListener('click', handleClickOutside);
     return () => window.removeEventListener('click', handleClickOutside);
   }, []);
@@ -254,6 +436,7 @@ const ApplicationsList: React.FC<ApplicationsListProps> = ({ navigate, formatMon
 
   const handleDeleteDraft = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
+    e.nativeEvent.stopImmediatePropagation(); // stops the window 'click' listener too
     storageService.deleteDraft(id);
     setDrafts(storageService.getDrafts());
   };
@@ -270,34 +453,63 @@ const ApplicationsList: React.FC<ApplicationsListProps> = ({ navigate, formatMon
   return (
     <div className="max-w-5xl mx-auto px-6 py-12 md:py-20 animate-in fade-in duration-500 print:p-0 print:max-w-none">
       <div className="print:hidden">
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12">
-        <div className="space-y-2">
+        {/* ── Header ────────────────────────────────────────────── */}
+        <div className="relative mb-14">
+          {/* Ambient glow */}
+          <div className="absolute -top-10 -left-10 size-64 bg-primary/5 rounded-full blur-3xl pointer-events-none" />
+
           <button
             onClick={() => navigate('DASHBOARD')}
-            className="flex items-center gap-2 text-sm font-bold text-slate-400 hover:text-primary transition-colors mb-4 uppercase tracking-widest"
+            className="flex items-center gap-2 text-xs font-black text-slate-400 hover:text-primary transition-colors mb-6 uppercase tracking-widest group"
           >
-            <span className="material-symbols-outlined text-base">arrow_back</span>
+            <span className="material-symbols-outlined text-base group-hover:-translate-x-1 transition-transform">arrow_back</span>
             Dashboard
           </button>
-          <h1 className="text-4xl md:text-5xl font-black text-slate-900 dark:text-white tracking-tight">My Applications</h1>
-          <p className="text-slate-500 dark:text-slate-400 font-medium">Manage your ongoing drafts and track submission status.</p>
-        </div>
 
-        <div className="bg-slate-100 dark:bg-slate-800 p-1.5 rounded-2xl flex gap-1 shadow-inner">
-          <button
-            onClick={() => setActiveTab('DRAFTS')}
-            className={`px-8 py-3 rounded-xl font-black text-sm transition-all ${activeTab === 'DRAFTS' ? 'bg-white dark:bg-slate-700 text-primary shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
-          >
-            Drafts ({drafts.length})
-          </button>
-          <button
-            onClick={() => setActiveTab('COMPLETED')}
-            className={`px-8 py-3 rounded-xl font-black text-sm transition-all ${activeTab === 'COMPLETED' ? 'bg-white dark:bg-slate-700 text-primary shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
-          >
-            Completed ({completedApps.length})
-          </button>
+          <div className="flex flex-col md:flex-row md:items-end justify-between gap-8">
+            <div className="space-y-2">
+              <h1 className="text-5xl md:text-6xl font-black text-slate-900 dark:text-white tracking-tight leading-none">
+                My Applications
+              </h1>
+              <p className="text-slate-400 dark:text-slate-500 font-medium">Track submissions, manage active plans, resume drafts.</p>
+            </div>
+
+            {/* ── Tabs ── */}
+            <div className="relative flex bg-slate-100 dark:bg-slate-800/80 backdrop-blur p-1.5 rounded-2xl gap-1 shadow-inner shrink-0">
+              {/* Sliding active pill */}
+              <button
+                onClick={() => setActiveTab('COMPLETED')}
+                className={`relative px-7 py-3 rounded-xl font-black text-sm transition-all duration-300 flex items-center gap-2 ${
+                  activeTab === 'COMPLETED'
+                    ? 'bg-white dark:bg-slate-700 text-primary shadow-md shadow-primary/10 scale-[1.02]'
+                    : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'
+                }`}
+              >
+                <span className="material-symbols-outlined text-sm">verified</span>
+                Completed
+                <span className={`ml-1 px-2 py-0.5 rounded-lg text-[10px] font-black ${
+                  activeTab === 'COMPLETED' ? 'bg-primary/10 text-primary' : 'bg-slate-200 dark:bg-slate-700 text-slate-400'
+                }`}>{completedApps.length}</span>
+              </button>
+              <button
+                onClick={() => setActiveTab('DRAFTS')}
+                className={`relative px-7 py-3 rounded-xl font-black text-sm transition-all duration-300 flex items-center gap-2 ${
+                  activeTab === 'DRAFTS'
+                    ? 'bg-white dark:bg-slate-700 text-primary shadow-md shadow-primary/10 scale-[1.02]'
+                    : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'
+                }`}
+              >
+                <span className="material-symbols-outlined text-sm">edit_document</span>
+                Drafts
+                {drafts.length > 0 && (
+                  <span className={`ml-1 px-2 py-0.5 rounded-lg text-[10px] font-black ${
+                    activeTab === 'DRAFTS' ? 'bg-primary/10 text-primary' : 'bg-amber-500/20 text-amber-500'
+                  }`}>{drafts.length}</span>
+                )}
+              </button>
+            </div>
+          </div>
         </div>
-      </div>
 
       {activeTab === 'COMPLETED' && completedApps.some((i: any) => i.status === 'PENDING_PAYMENT' && !uploadedReceipts[i.id]) && (
         <div className="mb-8 p-6 bg-primary/10 border-2 border-primary/20 rounded-3xl flex flex-col md:flex-row items-center justify-between gap-6 animate-in slide-in-from-top-4 duration-500 print:hidden">
@@ -313,241 +525,187 @@ const ApplicationsList: React.FC<ApplicationsListProps> = ({ navigate, formatMon
         </div>
       )}
 
-      <div className="grid grid-cols-1 gap-6 print:hidden">
+      <div className="grid grid-cols-1 gap-5 print:hidden">
         {activeTab === 'DRAFTS' ? (
           <>
-            {/* Surfaced Pending Gift Block */}
+            {/* Pending Gift Banner */}
             {pendingGift && (
-              <div className="mb-8 p-8 rounded-[3rem] bg-gradient-to-br from-rose-500/10 via-pink-500/5 to-transparent border-2 border-rose-500/20 shadow-2xl shadow-rose-500/10 flex flex-col md:flex-row items-center gap-8 animate-in slide-in-from-top-4 duration-700 relative overflow-hidden group">
-                   <div className="absolute -top-10 -right-10 size-40 bg-rose-500/10 rounded-full blur-3xl group-hover:bg-rose-500/20 transition-all"></div>
-                   <div className="size-20 bg-rose-500 text-white rounded-3xl flex items-center justify-center shadow-xl shadow-rose-500/40 shrink-0 transform -rotate-6 group-hover:rotate-0 transition-transform">
-                     <span className="material-symbols-outlined text-4xl">redeem</span>
-                   </div>
-                   <div className="flex-1 space-y-2 text-center md:text-left">
-                     <div className="flex items-center justify-center md:justify-start gap-3">
-                       <h3 className="text-2xl font-black text-slate-900 dark:text-white uppercase tracking-tight">Incoming Gift Ready! 🎁</h3>
-                       <span className="px-3 py-1 bg-rose-500 text-white text-[10px] font-black rounded-full uppercase tracking-widest animate-pulse">Claim Now</span>
-                     </div>
-                     <p className="text-slate-600 dark:text-slate-400 font-medium">You have a pending gift investment of <span className="text-rose-600 dark:text-rose-400 font-black">{formatMoney(parseFloat(pendingGift.amount))}</span> waiting for you.</p>
-                   </div>
-                   <div className="flex items-center gap-4">
-                     <button onClick={() => { localStorage.setItem('pending_gift_token', pendingGift.token); navigate('INVESTMENT_FLOW'); }} className="px-10 py-5 bg-rose-500 text-white font-black rounded-2xl shadow-xl shadow-rose-500/30 hover:scale-[1.02] active:scale-95 transition-all flex items-center gap-3">
-                       Claim Investment
-                       <span className="material-symbols-outlined">arrow_forward</span>
-                     </button>
-                   </div>
+              <div className="mb-6 p-8 rounded-[2.5rem] bg-gradient-to-br from-rose-500/10 via-pink-500/5 to-transparent border-2 border-rose-500/20 shadow-2xl shadow-rose-500/10 flex flex-col md:flex-row items-center gap-8 animate-in slide-in-from-top-4 duration-700 relative overflow-hidden group">
+                <div className="absolute -top-10 -right-10 size-40 bg-rose-500/10 rounded-full blur-3xl group-hover:bg-rose-500/20 transition-all" />
+                <div className="size-20 bg-rose-500 text-white rounded-3xl flex items-center justify-center shadow-xl shadow-rose-500/40 shrink-0 transform -rotate-6 group-hover:rotate-0 transition-transform">
+                  <span className="material-symbols-outlined text-4xl">redeem</span>
+                </div>
+                <div className="flex-1 space-y-2 text-center md:text-left">
+                  <div className="flex items-center justify-center md:justify-start gap-3">
+                    <h3 className="text-2xl font-black text-slate-900 dark:text-white uppercase tracking-tight">Incoming Gift Ready! 🎁</h3>
+                    <span className="px-3 py-1 bg-rose-500 text-white text-[10px] font-black rounded-full uppercase tracking-widest animate-pulse">Claim Now</span>
+                  </div>
+                  <p className="text-slate-600 dark:text-slate-400 font-medium">You have a pending gift investment of <span className="text-rose-600 dark:text-rose-400 font-black">{formatMoney(parseFloat(pendingGift.amount))}</span> waiting for you.</p>
+                </div>
+                <button onClick={() => { localStorage.setItem('pending_gift_token', pendingGift.token); navigate('INVESTMENT_FLOW'); }} className="px-10 py-5 bg-rose-500 text-white font-black rounded-2xl shadow-xl shadow-rose-500/30 hover:scale-[1.02] active:scale-95 transition-all flex items-center gap-3">
+                  Claim Investment
+                  <span className="material-symbols-outlined">arrow_forward</span>
+                </button>
               </div>
             )}
 
-            {drafts.length > 0 ? (
-            drafts.map((draft) => (
-              <div
-                key={draft.id}
-                className="group bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 rounded-[2.5rem] p-8 flex flex-col md:flex-row items-center gap-8 shadow-xl shadow-slate-200/40 dark:shadow-none hover:border-primary transition-all relative overflow-hidden"
-              >
-                <div className={`size-16 rounded-2xl bg-primary/10 text-primary flex items-center justify-center shrink-0`}>
-                  <span className="material-symbols-outlined text-3xl filled">{draft.type === 'LOAN' ? 'payments' : 'trending_up'}</span>
-                </div>
+            {drafts.length > 0 ? drafts.map((draft, idx) => {
+              const totalSteps = draft.type === 'LOAN' ? 12 : 11;
+              const pct = Math.min(Math.round(((draft.subStep + 1) / totalSteps) * 100), 100);
+              const isLoan = draft.type === 'LOAN';
+              return (
+                <div
+                  key={draft.id}
+                  style={{ animationDelay: `${idx * 60}ms` }}
+                  className="group bg-white dark:bg-slate-800/80 backdrop-blur border border-slate-100 dark:border-slate-700/60 rounded-[2rem] p-6 md:p-8 flex flex-col md:flex-row items-center gap-6 shadow-lg shadow-slate-200/50 dark:shadow-none hover:shadow-xl hover:shadow-primary/5 hover:border-primary/30 hover:-translate-y-0.5 transition-all duration-300 animate-in fade-in slide-in-from-bottom-2 relative overflow-hidden"
+                >
+                  {/* Hover gradient - must be pointer-events-none or it blocks all card clicks */}
+                  <div className="absolute inset-0 pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-500 bg-gradient-to-r from-primary/[0.02] to-transparent rounded-[2rem]" />
 
-                <div className="flex-1 space-y-1 text-center md:text-left">
-                  <div className="flex flex-wrap items-center justify-center md:justify-start gap-3">
-                    <h3 className="text-xl font-black text-slate-900 dark:text-white uppercase tracking-tight">
-                      {draft.label || (draft.type === 'LOAN' ? 'Business Loan' : (draft.data?.isGift ? 'Gift Investment 🎁' : (draft.data?.isTopUp ? 'Investment Top-Up' : 'NOLT Investment')))}
-                    </h3>
-                    <span className="px-3 py-1 bg-slate-100 dark:bg-slate-700 text-slate-500 text-[10px] font-black rounded-full uppercase tracking-widest">#{draft.id}</span>
+
+                  {/* Icon */}
+                  <div className={`relative size-14 md:size-16 rounded-2xl flex items-center justify-center shrink-0 shadow-lg ${
+                    isLoan ? 'bg-violet-500/10 text-violet-500 shadow-violet-500/10' : 'bg-primary/10 text-primary shadow-primary/10'
+                  }`}>
+                    <span className="material-symbols-outlined text-2xl md:text-3xl filled">{isLoan ? 'payments' : (draft.data?.isGift ? 'card_giftcard' : draft.data?.isTopUp ? 'add_circle' : 'trending_up')}</span>
                   </div>
 
-                  {/* On Behalf Indicator */}
-                  {draft.data?.isOnBehalf && (
-                    <div className="flex items-center justify-center md:justify-start gap-2 text-primary font-bold text-xs bg-primary/5 w-fit px-3 py-1.5 rounded-lg border border-primary/10">
-                      <span className="material-symbols-outlined text-sm">person</span>
-                      <span>Applied for: <span className="uppercase">{draft.data.fullName}</span></span>
+                  {/* Info */}
+                  <div className="flex-1 space-y-1.5 text-center md:text-left min-w-0">
+                    <div className="flex flex-wrap items-center justify-center md:justify-start gap-2.5">
+                      <h3 className="text-base md:text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight truncate">
+                        {draft.label || (draft.type === 'LOAN' ? 'Business Loan' : (draft.data?.isGift ? 'Gift Investment 🎁' : (draft.data?.isTopUp ? 'Investment Top-Up' : 'NOLT Investment')))}
+                      </h3>
+                      <span className="px-2.5 py-0.5 bg-slate-100 dark:bg-slate-700 text-slate-400 text-[10px] font-black rounded-lg uppercase tracking-widest shrink-0">#{draft.id}</span>
                     </div>
-                  )}
-
-                  <p className="text-slate-500 font-bold">Step {draft.subStep + 1} of {draft.type === 'LOAN' ? 12 : 11}</p>
-                  <p className="text-xs text-slate-400 font-medium">Modified {formatDate(draft.updatedAt)}</p>
-                </div>
-
-                <div className="w-full md:w-48 space-y-2">
-                  <div className="flex justify-between text-[10px] font-black uppercase tracking-widest text-primary">
-                    <span>Progress</span>
-                    <span>{Math.round(((draft.subStep + 1) / (draft.type === 'LOAN' ? 12 : 11)) * 100)}%</span>
+                    {draft.data?.isOnBehalf && (
+                      <div className="flex items-center justify-center md:justify-start gap-1.5 text-primary font-bold text-[10px] bg-primary/5 w-fit px-3 py-1 rounded-lg border border-primary/10">
+                        <span className="material-symbols-outlined text-xs">person</span>
+                        <span>For: <span className="uppercase">{draft.data.fullName}</span></span>
+                      </div>
+                    )}
+                    <p className="text-slate-400 text-sm font-medium">Step {draft.subStep + 1} of {totalSteps} &middot; Modified {formatDate(draft.updatedAt)}</p>
                   </div>
-                  <div className="h-2 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden shadow-inner">
-                    <div className="h-full bg-primary transition-all duration-1000" style={{ width: `${((draft.subStep + 1) / (draft.type === 'LOAN' ? 12 : 11)) * 100}%` }}></div>
+
+                  {/* Progress */}
+                  <div className="w-full md:w-40 space-y-2 shrink-0">
+                    <div className="flex justify-between text-[10px] font-black uppercase tracking-widest">
+                      <span className="text-slate-400">Progress</span>
+                      <span className={pct >= 80 ? 'text-emerald-500' : 'text-primary'}>{pct}%</span>
+                    </div>
+                    <div className="h-2 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
+                      <div
+                        className={`h-full rounded-full transition-all duration-1000 ${
+                          pct >= 80 ? 'bg-gradient-to-r from-emerald-400 to-emerald-500' : 'bg-gradient-to-r from-primary/80 to-primary'
+                        }`}
+                        style={{ width: `${pct}%` }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      onClick={(e) => handleDeleteDraft(draft.id, e)}
+                      className="p-3 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-xl transition-all"
+                      title="Delete draft"
+                    >
+                      <span className="material-symbols-outlined text-xl">delete</span>
+                    </button>
+                    <button
+                      onClick={() => handleResume(draft)}
+                      className="px-6 py-3.5 bg-primary text-white font-black text-sm rounded-xl shadow-lg shadow-primary/25 hover:-translate-y-0.5 hover:shadow-primary/40 active:scale-95 transition-all flex items-center gap-2"
+                    >
+                      Resume
+                      <span className="material-symbols-outlined text-base">play_arrow</span>
+                    </button>
                   </div>
                 </div>
-
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={(e) => handleDeleteDraft(draft.id, e)}
-                    className="p-4 text-slate-400 hover:text-red-500 transition-colors"
-                  >
-                    <span className="material-symbols-outlined">delete</span>
-                  </button>
-                  <button
-                    onClick={() => handleResume(draft)}
-                    className="w-full md:w-auto px-10 py-4 bg-primary text-white font-black rounded-full shadow-lg shadow-primary/20 hover:-translate-y-1 transition-all flex items-center justify-center gap-2 active:scale-95"
-                  >
-                    Resume
-                    <span className="material-symbols-outlined">play_arrow</span>
-                  </button>
+              );
+            }) : (
+              <div className="py-24 text-center space-y-5 animate-in fade-in duration-500">
+                <div className="size-20 bg-slate-100 dark:bg-slate-800 rounded-3xl flex items-center justify-center mx-auto">
+                  <span className="material-symbols-outlined text-4xl text-slate-300">folder_open</span>
                 </div>
+                <div className="space-y-2">
+                  <p className="text-lg font-black text-slate-300 dark:text-slate-600">No saved drafts</p>
+                  <p className="text-sm text-slate-400">Your in-progress applications will appear here.</p>
+                </div>
+                <button onClick={() => navigate('PRODUCT_SELECT')} className="inline-flex items-center gap-2 px-6 py-3 bg-primary text-white font-black text-sm rounded-xl shadow-lg shadow-primary/20 hover:-translate-y-0.5 transition-all">
+                  <span className="material-symbols-outlined text-base">add</span>
+                  Start a new application
+                </button>
               </div>
-            ))
-          ) : (
-            <div className="py-20 text-center space-y-4">
-              <span className="material-symbols-outlined text-6xl text-slate-200">folder_open</span>
-              <p className="text-slate-400 font-bold">No saved drafts found.</p>
-              <button onClick={() => navigate('PRODUCT_SELECT')} className="text-primary font-black uppercase tracking-widest text-sm hover:underline">Start a new one</button>
-            </div>
             )}
           </>
         ) : (
-          completedApps.map((item: any) => (
-            <div
-              key={item.id}
-              className={`bg-slate-900 dark:bg-slate-950 text-white rounded-[2.5rem] p-8 flex flex-col md:flex-row items-center gap-8 shadow-2xl relative transition-all duration-300 ${openDropdownId === item.id ? 'z-50 ring-2 ring-primary/20' : 'z-10'}`}
-            >
-              <div className="absolute top-0 right-0 w-64 h-64 bg-primary/10 rounded-full blur-3xl -mr-32 -mt-32 pointer-events-none"></div>
-
-              <div className="size-16 rounded-2xl bg-white/10 text-primary flex items-center justify-center shrink-0">
-                <span className="material-symbols-outlined text-3xl filled">{item.icon}</span>
-              </div>
-
-              <div className="flex-1 space-y-2 text-center md:text-left relative z-10">
-                <div className="flex flex-wrap items-center justify-center md:justify-start gap-3">
-                  <h3 className="text-xl font-black uppercase tracking-tight">{item.type}</h3>
-                  <span className={`px-3 py-1 text-[10px] font-black rounded-full uppercase tracking-widest ${item.status === 'PENDING_PAYMENT' ? 'bg-amber-500/20 text-amber-500 border border-amber-500/30' : 'bg-primary text-white'}`}>
-                    {uploadedReceipts[item.id] ? 'PAYMENT VERIFYING' : item.status.replace('_', ' ')}
-                  </span>
+          /* ── COMPLETED TAB ─────────────────────────────────────── */
+          <>
+            {/* Pending payment alert */}
+            {completedApps.some((i: any) => i.status === 'PENDING_PAYMENT' && !uploadedReceipts[i.id]) && (
+              <div className="mb-6 p-6 bg-amber-500/10 border-2 border-amber-500/20 rounded-2xl flex items-center gap-5 animate-in slide-in-from-top-2 duration-500">
+                <div className="size-12 rounded-2xl bg-amber-500 text-white flex items-center justify-center shadow-lg shadow-amber-500/30 shrink-0">
+                  <span className="material-symbols-outlined text-2xl filled">receipt_long</span>
                 </div>
+                <div>
+                  <h3 className="text-base font-black text-slate-900 dark:text-white">Action Required: Upload Proof of Payment</h3>
+                  <p className="text-sm text-slate-500 font-medium">Your investment is pending confirmation — upload your transfer receipt to activate.</p>
+                </div>
+              </div>
+            )}
 
-                {/* On Behalf Indicator for Completed Applications */}
-                {item.data?.isOnBehalf && (
-                  <div className="flex items-center justify-center md:justify-start gap-2 text-primary font-bold text-[10px] bg-primary/10 w-fit px-3 py-1.5 rounded-full border border-primary/20 uppercase tracking-widest">
-                    <span className="material-symbols-outlined text-sm">person</span>
-                    <span>Representative for: {item.data.fullName}</span>
+            {completedApps.length === 0 ? (
+              <div className="py-24 text-center space-y-5 animate-in fade-in duration-500">
+                <div className="size-20 bg-slate-100 dark:bg-slate-800 rounded-3xl flex items-center justify-center mx-auto">
+                  <span className="material-symbols-outlined text-4xl text-slate-300">inbox</span>
+                </div>
+                <div className="space-y-2">
+                  <p className="text-lg font-black text-slate-300 dark:text-slate-600">No completed applications</p>
+                  <p className="text-sm text-slate-400">Submitted loans and active investments will appear here.</p>
+                </div>
+              </div>
+            ) : (
+              <>
+                {/* ── Completed Investments ── */}
+                {completedApps.filter(a => !a.type.toLowerCase().includes('loan')).length > 0 && (
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-3 px-1">
+                      <div className="size-8 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                        <span className="material-symbols-outlined text-base">trending_up</span>
+                      </div>
+                      <h2 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em]">Investments</h2>
+                      <div className="flex-1 h-px bg-slate-100 dark:bg-slate-800" />
+                      <span className="text-[10px] font-black text-slate-300 dark:text-slate-600">{completedApps.filter(a => !a.type.toLowerCase().includes('loan')).length} record{completedApps.filter(a => !a.type.toLowerCase().includes('loan')).length !== 1 ? 's' : ''}</span>
+                    </div>
+                    {completedApps.filter(a => !a.type.toLowerCase().includes('loan')).map((item: any, idx: number) => (
+                      <CompletedCard key={item.id} item={item} idx={idx} uploadedReceipts={uploadedReceipts} openDropdownId={openDropdownId} setOpenDropdownId={setOpenDropdownId} handleShowDetails={handleShowDetails} handleLiquidate={handleLiquidate} navigate={navigate} formatMoney={formatMoney} />
+                    ))}
                   </div>
                 )}
 
-                <p className="text-slate-300 font-bold">{formatMoney(item.amount)}</p>
-                <p className="text-xs text-slate-400 font-medium">Submitted on {item.submittedAt}</p>
-              </div>
-
-                            <div className="relative z-30">
-                <button 
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setOpenDropdownId(openDropdownId === item.id ? null : item.id);
-                  }}
-                  className={`flex items-center gap-2 px-8 py-4 rounded-2xl font-black text-xs uppercase tracking-widest transition-all active:scale-95 shadow-xl ${openDropdownId === item.id ? 'bg-white text-primary shadow-white/10' : 'bg-primary text-white shadow-primary/20 hover:bg-primary/90 hover:-translate-y-0.5'}`}
-                >
-                  Actions
-                  <span className={`material-symbols-outlined text-sm transition-transform duration-300 ${openDropdownId === item.id ? 'rotate-180' : ''}`}>expand_more</span>
-                </button>
-
-                {openDropdownId === item.id && (
-                  <div 
-                    className="absolute right-0 mt-4 w-72 bg-white dark:bg-slate-800 rounded-[2.5rem] shadow-[0_20px_50px_rgba(0,0,0,0.5)] border border-slate-100 dark:border-slate-700 py-4 animate-in fade-in slide-in-from-top-4 duration-300 z-[100] opacity-100"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    {/* Dropdown Arrow */}
-                    <div className="absolute -top-2 right-8 size-4 bg-white dark:bg-slate-800 rotate-45 border-l border-t border-slate-100 dark:border-slate-700"></div>
-
-                    <div className="px-6 py-2 mb-2 border-b border-slate-50 dark:border-slate-700/50 relative z-10">
-                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{!item.type.toLowerCase().includes('loan') ? 'Investment Management' : 'Loan Management'}</p>
+                {/* ── Completed Loans ── */}
+                {completedApps.filter(a => a.type.toLowerCase().includes('loan')).length > 0 && (
+                  <div className="space-y-4 mt-8">
+                    <div className="flex items-center gap-3 px-1">
+                      <div className="size-8 rounded-xl bg-violet-500/10 text-violet-500 flex items-center justify-center shrink-0">
+                        <span className="material-symbols-outlined text-base">payments</span>
+                      </div>
+                      <h2 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em]">Loans</h2>
+                      <div className="flex-1 h-px bg-slate-100 dark:bg-slate-800" />
+                      <span className="text-[10px] font-black text-slate-300 dark:text-slate-600">{completedApps.filter(a => a.type.toLowerCase().includes('loan')).length} record{completedApps.filter(a => a.type.toLowerCase().includes('loan')).length !== 1 ? 's' : ''}</span>
                     </div>
-                    <div className="relative z-10">
-                      {!item.type.toLowerCase().includes('loan') && (
-                        <>
-                          {item.data?.is_liquidating ? (
-                            <div className="w-full flex items-center gap-4 px-6 py-4 text-xs font-black text-orange-500 bg-orange-500/5 transition-all uppercase tracking-widest group">
-                              <div className="size-8 rounded-xl flex items-center justify-center">
-                                <span className="material-symbols-outlined text-lg animate-pulse">pending</span>
-                              </div>
-                              Liquidation Processing
-                            </div>
-                          ) : (
-                            <>
-                              {item.status !== 'PENDING_PAYMENT' && (
-                              <button 
-                                onClick={() => {
-                                  setOpenDropdownId(null);
-                                  navigate('INVESTMENT_FLOW', { id: `T-${Math.floor(Math.random() * 9000) + 1000}`, type: 'INVESTMENT', subStep: 0, label: item.type, data: { isTopUp: true, originalInvestmentId: item.id.replace('INV-', ''), selectedPlan: item.type.includes('VAULT') ? 'VAULT' : item.type.includes('SURGE') ? 'SURGE' : 'RISE', cba_td_account_number: item.data?.cba_td_account_number, casa_account_number: item.data?.casa_account_number }, updatedAt: Date.now() });
-                                }}
-                                className="w-full flex items-center gap-4 px-6 py-4 text-xs font-black text-slate-600 dark:text-slate-300 hover:bg-emerald-500/10 hover:text-emerald-500 transition-all uppercase tracking-widest group"
-                              >
-                                <div className="size-8 rounded-xl bg-emerald-500/10 flex items-center justify-center group-hover:bg-emerald-500 group-hover:text-white transition-colors">
-                                  <span className="material-symbols-outlined text-lg">add_circle</span>
-                                </div>
-                                Top-Up
-                              </button>
-                              )}
-                              <button 
-                                onClick={() => {
-                                  setOpenDropdownId(null);
-                                  handleLiquidate(item);
-                                }}
-                                className="w-full flex items-center gap-4 px-6 py-4 text-xs font-black text-slate-600 dark:text-slate-300 hover:bg-red-500/10 hover:text-red-500 transition-all uppercase tracking-widest group"
-                              >
-                                <div className="size-8 rounded-xl bg-red-500/10 flex items-center justify-center group-hover:bg-red-500 group-hover:text-white transition-colors">
-                                  <span className="material-symbols-outlined text-lg">account_balance_wallet</span>
-                                </div>
-                                Liquidate
-                              </button>
-                            </>
-                          )}
-                        </>
-                      )}
-
-                      {item.status === 'PENDING_PAYMENT' && !uploadedReceipts[item.id] && (
-                        <button 
-                          onClick={() => {
-                            setOpenDropdownId(null);
-                            handleUploadReceipt(item.id);
-                          }}
-                          disabled={uploadingReceiptId === item.id}
-                          className="w-full flex items-center gap-4 px-6 py-4 text-xs font-black text-primary hover:bg-primary/10 transition-all uppercase tracking-widest disabled:opacity-50 group"
-                        >
-                          <div className="size-8 rounded-xl bg-primary/10 flex items-center justify-center group-hover:bg-primary group-hover:text-white transition-colors">
-                            <span className="material-symbols-outlined text-lg">payments</span>
-                          </div>
-                          {uploadingReceiptId === item.id ? 'Verifying...' : 'Complete Payment'}
-                        </button>
-                      )}
-                      {uploadedReceipts[item.id] && (
-                        <div className="w-full flex items-center gap-4 px-6 py-4 text-xs font-black text-green-500 bg-green-500/5 transition-all uppercase tracking-widest disabled:opacity-50 group">
-                          <div className="size-8 rounded-xl flex items-center justify-center">
-                            <span className="material-symbols-outlined text-lg">check_circle</span>
-                          </div>
-                          Receipt Uploaded
-                        </div>
-                      )}
-
-                      <button 
-                        onClick={() => {
-                          setOpenDropdownId(null);
-                          handleShowDetails(item);
-                        }}
-                        className="w-full flex items-center gap-4 px-6 py-4 text-xs font-black text-slate-600 dark:text-slate-300 hover:bg-primary/10 hover:text-primary transition-all uppercase tracking-widest group"
-                      >
-                        <div className="size-8 rounded-xl bg-primary/10 flex items-center justify-center group-hover:bg-primary group-hover:text-white transition-colors">
-                          <span className="material-symbols-outlined text-lg">verified</span>
-                        </div>
-                        Certificate
-                      </button>
-                    </div>
+                    {completedApps.filter(a => a.type.toLowerCase().includes('loan')).map((item: any, idx: number) => (
+                      <CompletedCard key={item.id} item={item} idx={idx} uploadedReceipts={uploadedReceipts} openDropdownId={openDropdownId} setOpenDropdownId={setOpenDropdownId} handleShowDetails={handleShowDetails} handleLiquidate={handleLiquidate} navigate={navigate} formatMoney={formatMoney} />
+                    ))}
                   </div>
                 )}
-              </div>
-            </div>
-          ))
+              </>
+            )}
+          </>
         )}
       </div>
 
-      
+
       {processingMessage && (
         <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-[150] w-full max-w-md px-6 animate-in slide-in-from-bottom-8 duration-500">
           <div className="bg-slate-900 text-white p-6 rounded-[2rem] shadow-2xl border border-white/10 flex items-start gap-4">

@@ -95,8 +95,8 @@ const ActionCard = ({ loan, userRole, onActionComplete }: { loan: any, userRole:
     }, [loan.product_type]);
 
     // Disbursement Logic State
-    const [applyManagementFee, setApplyManagementFee] = useState(loan.apply_management_fee || false);
-    const [applyInsuranceFee, setApplyInsuranceFee] = useState(loan.apply_insurance_fee || false);
+    const [applyManagementFee, setApplyManagementFee] = useState(true);
+    const [applyInsuranceFee, setApplyInsuranceFee] = useState(true);
 
     // Check if loan is a special type (Top-Up, Add-On, Re-App)
     // Initial flags moved to top of component
@@ -276,7 +276,7 @@ const ActionCard = ({ loan, userRole, onActionComplete }: { loan: any, userRole:
 
         switch (stage) {
             case 'submitted':
-            case 'sales': return ['sales_officer', 'sales_manager'].includes(userRole);
+            case 'sales': return ['sales_officer', 'sales_public_sector', 'sales_private_sector', 'sales_manager'].includes(userRole);
             case 'customer_experience': return ['customer_experience', 'customer_service'].includes(userRole);
             case 'credit_check_1': return userRole === 'credit_officer';
             case 'credit_check_2': return userRole === 'credit_manager';
@@ -566,7 +566,7 @@ const ActionCard = ({ loan, userRole, onActionComplete }: { loan: any, userRole:
                 {/* Upload Section */}
                 {(() => {
                     const canUpload = (
-                        (stage === 'sales' && ['sales_officer', 'sales_manager', 'super_admin', 'superadmin'].includes(userRole)) ||
+                        (stage === 'sales' && ['sales_officer', 'sales_public_sector', 'sales_private_sector', 'sales_manager', 'super_admin', 'superadmin'].includes(userRole)) ||
                         (stage === 'customer_experience' && ['customer_experience', 'customer_service', 'super_admin', 'superadmin'].includes(userRole)) ||
                         (stage === 'credit_check_1' && ['credit_officer', 'super_admin', 'superadmin'].includes(userRole))
                     );
@@ -966,7 +966,7 @@ const LoanDetailsPage: React.FC<LoanDetailsPageProps> = ({ user, onLogout, toggl
     const fetchOfficers = async () => {
         if (['sales_manager', 'admin', 'super_admin', 'superadmin', 'customer_experience'].includes(user.role || '')) {
             try {
-                const response = await axios.get(`/api/staff/users?role=sales_officer&limit=200`, { withCredentials: true });
+                const response = await axios.get(`/api/staff/users?role=sales_officer,sales_public_sector,sales_private_sector&limit=200`, { withCredentials: true });
                 setOfficers(response.data.users.filter((u: any) => u.is_active));
             } catch (error) {
                 console.error("Failed to fetch officers", error);
@@ -1142,7 +1142,7 @@ const LoanDetailsPage: React.FC<LoanDetailsPageProps> = ({ user, onLogout, toggl
 
                         {/* Edit Button Logic */}
                         {((loan.stage === 'sales' || loan.stage === 'submitted') &&
-                            (['sales_officer', 'sales_manager', 'super_admin', 'superadmin'].includes(user.role || ''))) ||
+                            (['sales_officer', 'sales_public_sector', 'sales_private_sector', 'sales_manager', 'super_admin', 'superadmin'].includes(user.role || ''))) ||
                             ((loan.stage === 'customer_experience') &&
                                 (['customer_experience', 'customer_service', 'super_admin', 'superadmin'].includes(user.role || ''))) ? (
                             <button
@@ -1182,6 +1182,50 @@ const LoanDetailsPage: React.FC<LoanDetailsPageProps> = ({ user, onLogout, toggl
                     </button>
                 </div>
             )}
+
+            {/* Promotion Source Banner */}
+            {loan.promotion_source && (
+                <div className="mb-6 p-5 rounded-[24px] bg-amber-50 dark:bg-amber-500/10 border-2 border-amber-200 dark:border-amber-500/20 flex items-center gap-5 animate-in fade-in slide-in-from-top-4 duration-500">
+                    <div className="size-12 rounded-2xl bg-amber-500 text-white flex items-center justify-center shrink-0 shadow-lg shadow-amber-500/30">
+                        <span className="material-symbols-outlined text-2xl">campaign</span>
+                    </div>
+                    <div>
+                        <p className="text-[10px] font-black text-amber-600 dark:text-amber-400 uppercase tracking-widest mb-0.5">Promotion Source</p>
+                        <p className="text-base font-black text-amber-900 dark:text-amber-200 uppercase tracking-tight">
+                            {loan.promotion_source}
+                            {loan.promotion_campaign && (
+                                <span className="ml-2 text-sm font-bold text-amber-700 dark:text-amber-300 normal-case">· {loan.promotion_campaign}</span>
+                            )}
+                        </p>
+                        {loan.promotion_medium && (
+                            <p className="text-xs font-bold text-amber-600/70 dark:text-amber-400/70 mt-0.5">Medium: {loan.promotion_medium}</p>
+                        )}
+                    </div>
+                </div>
+            )}
+
+            {/* ⚠️ Manual Identity Verification Warning Banner */}
+            {!loan.selfie_verification_url && (
+                <div className="mb-6 p-5 rounded-[24px] bg-orange-50 dark:bg-orange-500/10 border-2 border-orange-300 dark:border-orange-500/30 flex items-start gap-5 animate-in fade-in slide-in-from-top-4 duration-500">
+                    <div className="size-12 rounded-2xl bg-orange-500 text-white flex items-center justify-center shrink-0 shadow-lg shadow-orange-500/30 mt-0.5">
+                        <span className="material-symbols-outlined text-2xl">face_retouching_off</span>
+                    </div>
+                    <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                            <p className="text-[10px] font-black text-orange-600 dark:text-orange-400 uppercase tracking-widest">Identity Verification Required</p>
+                            <span className="px-2 py-0.5 rounded-full text-[9px] font-black bg-orange-200 dark:bg-orange-900/40 text-orange-700 dark:text-orange-300 uppercase tracking-wider border border-orange-300 dark:border-orange-700">Face Verification Not Completed</span>
+                        </div>
+                        <p className="text-sm font-black text-orange-900 dark:text-orange-200">
+                            BVN face-match was not completed for this application. The customer may have bypassed verification or submitted via a staff-assisted channel.
+                        </p>
+                        <p className="text-xs font-bold text-orange-700/80 dark:text-orange-300/80 mt-1">
+                            A <span className="font-black underline">manual identity verification</span> must be completed before this loan is advanced beyond the Sales stage.
+                            Request a valid government ID with a live photo from the customer.
+                        </p>
+                    </div>
+                </div>
+            )}
+
 
             <div className="bg-white dark:bg-[#0f172a] rounded-[24px] p-8 mb-8 shadow-sm border border-slate-200 dark:border-slate-800 relative overflow-hidden">
                 <div className="flex justify-between items-center relative z-10 overflow-x-auto pb-4">
@@ -1318,7 +1362,7 @@ const LoanDetailsPage: React.FC<LoanDetailsPageProps> = ({ user, onLogout, toggl
                                 <Field label="Phone" value={loan.mobile_number} />
                                 <Field label="Email" value={loan.personal_email} />
                                 <Field label="Address" value={loan.primary_home_address} />
-                                <SensitiveDataField loanId={loan.id} field="bvn" label="BVN" verified={loan.is_identity_verified} />
+                                <SensitiveDataField loanId={loan.id} field="bvn" label="BVN" verified={!!loan.selfie_verification_url} />
                                 <SensitiveDataField loanId={loan.id} field="nin" label="NIN" />
                             </div>
 

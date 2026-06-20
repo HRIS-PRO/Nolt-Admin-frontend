@@ -1,11 +1,13 @@
 import React from 'react';
 import { InvestmentPlan, Currency, PayoutFrequency } from '../../types';
+import { InvestmentProduct } from '../../services/productService';
 
 interface GiftInvestmentFlowProps {
     subStep: number;
     setSubStep: (step: number) => void;
     selectedPlan: InvestmentPlan;
     setSelectedPlan: (plan: InvestmentPlan) => void;
+    setSelectedCbaCode: (code: string) => void;
     recipientName: string;
     setRecipientName: (name: string) => void;
     recipientEmail: string;
@@ -41,12 +43,14 @@ interface GiftInvestmentFlowProps {
     setShowRolloverInfo: (val: boolean) => void;
     minAmount: number;
     rateLoading: boolean;
+    investmentProducts: InvestmentProduct[];
+    productsLoading: boolean;
 }
 
 const GiftInvestmentFlow: React.FC<GiftInvestmentFlowProps> = (props) => {
     const {
         subStep, setSubStep,
-        selectedPlan, setSelectedPlan,
+        selectedPlan, setSelectedPlan, setSelectedCbaCode,
         recipientName, setRecipientName,
         recipientEmail, setRecipientEmail,
         recipientPhone, setRecipientPhone,
@@ -63,7 +67,8 @@ const GiftInvestmentFlow: React.FC<GiftInvestmentFlowProps> = (props) => {
         formatMoney, handleNext, handleBack, handleGiftSubmit,
         showProductInfo, setShowProductInfo,
         showRolloverInfo, setShowRolloverInfo,
-        minAmount, rateLoading
+        minAmount, rateLoading,
+        investmentProducts, productsLoading
     } = props;
 
     const NavActions = ({ nextLabel = "Continue", onNext = handleNext, isNextDisabled = false }: { nextLabel?: string, onNext?: () => void, isNextDisabled?: boolean }) => (
@@ -222,21 +227,97 @@ const GiftInvestmentFlow: React.FC<GiftInvestmentFlowProps> = (props) => {
                     </div>
                     <h2 className="text-5xl font-black text-slate-900 dark:text-white tracking-tight">Select a Gift Plan</h2>
                     <p className="text-xl text-slate-500 dark:text-slate-400 font-medium">Choose the perfect investment product for {recipientName}.</p>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mt-12 text-left">
-                        {['RISE', 'SURGE', 'VAULT'].map((plan) => (
-                            <button key={plan} onClick={() => { setSelectedPlan(plan as any); handleNext(); }} className={`group relative p-10 rounded-[3rem] border-2 transition-all overflow-hidden ${selectedPlan === plan ? 'border-rose-500 bg-rose-50/50 dark:bg-rose-500/10 scale-[1.02]' : 'border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-800 hover:border-rose-300'}`}>
-                                <div className={`size-16 rounded-2xl flex items-center justify-center mb-8 transition-all ${plan === 'RISE' ? 'bg-emerald-500 text-white shadow-lg' : plan === 'SURGE' ? 'bg-amber-500 text-white shadow-lg' : 'bg-blue-600 text-white shadow-lg'}`}>
-                                    <span className="material-symbols-outlined text-3xl">{plan === 'RISE' ? 'rocket_launch' : plan === 'SURGE' ? 'bolt' : 'lock'}</span>
+
+                    {productsLoading ? (
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mt-12">
+                            {[1, 2, 3].map(i => (
+                                <div key={i} className="rounded-[3rem] border-2 border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-800 p-10 space-y-6 animate-pulse">
+                                    <div className="size-16 rounded-2xl bg-slate-200 dark:bg-slate-700" />
+                                    <div className="h-6 bg-slate-200 dark:bg-slate-700 rounded-xl w-2/3" />
+                                    <div className="h-4 bg-slate-100 dark:bg-slate-700 rounded-xl w-full" />
+                                    <div className="h-4 bg-slate-100 dark:bg-slate-700 rounded-xl w-5/6" />
+                                    <div className="h-10 bg-slate-100 dark:bg-slate-700 rounded-xl mt-6" />
                                 </div>
-                                <h3 className="font-black text-2xl dark:text-white">NOLT {plan}</h3>
-                                <p className="text-slate-500 font-bold uppercase text-[10px] tracking-[0.2em]">{plan === 'RISE' ? 'Recurring Wealth Builder' : plan === 'SURGE' ? 'Flexible Compounding' : 'Fixed-Term Lump Sum'}</p>
-                                <div className="mt-8 pt-8 border-t border-slate-100 dark:border-slate-700 flex items-center justify-between">
-                                    <span className="text-xs font-black text-slate-400 uppercase tracking-widest">Select Plan</span>
-                                    <span className="material-symbols-outlined text-rose-500">arrow_forward</span>
-                                </div>
-                            </button>
-                        ))}
-                    </div>
+                            ))}
+                        </div>
+                    ) : investmentProducts.length === 0 ? (
+                        <div className="flex flex-col items-center gap-4 py-20 text-slate-400">
+                            <span className="material-symbols-outlined text-5xl">inventory_2</span>
+                            <p className="font-bold">No investment products available right now.</p>
+                        </div>
+                    ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mt-12 text-left">
+                            {investmentProducts.map((product) => {
+                                // cba_product_name holds the plan key e.g. "RISE", "SURGE", "VAULT"
+                                const planKey = product.cba_product_name?.toUpperCase() || '';
+                                const isSelected = selectedPlan === planKey;
+                                const iconMap: Record<string, string> = {
+                                    RISE: 'rocket_launch', SURGE: 'bolt', VAULT: 'lock'
+                                };
+                                const colorMap: Record<string, string> = {
+                                    RISE: 'bg-emerald-500', SURGE: 'bg-amber-500', VAULT: 'bg-blue-600'
+                                };
+                                const icon = iconMap[planKey] || 'savings';
+                                const color = colorMap[planKey] || 'bg-primary';
+
+                                return (
+                                    <button
+                                        key={product.id}
+                                        onClick={() => {
+                                            setSelectedPlan(planKey as InvestmentPlan);
+                                            setSelectedCbaCode(product.cba_product_code || '');
+                                            handleNext();
+                                        }}
+                                        className={`group relative p-10 rounded-[3rem] border-2 transition-all overflow-hidden text-left ${
+                                            isSelected
+                                                ? 'border-rose-500 bg-rose-50/50 dark:bg-rose-500/10 scale-[1.02]'
+                                                : 'border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-800 hover:border-rose-300'
+                                        }`}
+                                    >
+                                        {/* Glow on hover */}
+                                        <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity bg-gradient-to-br from-rose-50 to-pink-50 dark:from-rose-500/5 dark:to-pink-500/5 rounded-[3rem]" />
+
+                                        <div className={`relative size-16 rounded-2xl flex items-center justify-center mb-8 text-white shadow-lg ${color}`}>
+                                            <span className="material-symbols-outlined text-3xl">{icon}</span>
+                                        </div>
+
+                                        <h3 className="relative font-black text-2xl dark:text-white">{product.custom_name || `NOLT ${planKey}`}</h3>
+                                        <p className="relative text-slate-500 font-bold uppercase text-[10px] tracking-[0.2em] mt-1">{product.cba_product_name}</p>
+
+                                        <div className="relative mt-6 space-y-2">
+                                            {product.min_amount !== undefined && (
+                                                <div className="flex justify-between text-xs">
+                                                    <span className="text-slate-400 font-bold uppercase tracking-widest">Min. Amount</span>
+                                                    <span className="font-black text-slate-700 dark:text-slate-300">
+                                                        {product.currency === 'USD' ? '$' : '₦'}{Number(product.min_amount).toLocaleString()}
+                                                    </span>
+                                                </div>
+                                            )}
+                                            {product.min_term !== undefined && (
+                                                <div className="flex justify-between text-xs">
+                                                    <span className="text-slate-400 font-bold uppercase tracking-widest">Min. Tenure</span>
+                                                    <span className="font-black text-slate-700 dark:text-slate-300">{product.min_term} days</span>
+                                                </div>
+                                            )}
+                                            {product.interest_rate !== undefined && (
+                                                <div className="flex justify-between text-xs">
+                                                    <span className="text-slate-400 font-bold uppercase tracking-widest">Base Rate</span>
+                                                    <span className="font-black text-emerald-600">{product.interest_rate}% p.a.</span>
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        <div className="relative mt-8 pt-8 border-t border-slate-100 dark:border-slate-700 flex items-center justify-between">
+                                            <span className="text-xs font-black text-slate-400 uppercase tracking-widest">Gift this plan</span>
+                                            <span className="material-symbols-outlined text-rose-500">arrow_forward</span>
+                                        </div>
+                                    </button>
+                                );
+                            })}
+                        </div>
+
+                    )}
+
                     <div className="flex justify-start pt-6">
                         <button onClick={() => setSubStep(0)} className="flex items-center gap-2 text-slate-500 font-black uppercase tracking-widest hover:text-slate-900 transition-colors">
                             <span className="material-symbols-outlined">arrow_back</span>

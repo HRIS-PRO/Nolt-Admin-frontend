@@ -6,6 +6,9 @@ import { storageService } from '../services/storageService';
 import SuccessScreen from './SuccessScreen';
 import { useNavigate } from 'react-router-dom';
 import MdaTertiarySelect, { TERTIARY_LIST } from '../components/MdaTertiarySelect';
+import CameraCapture from '../components/CameraCapture';
+import { AnimatePresence } from 'motion/react';
+import { investmentService } from '../services/investmentService';
 
 interface LoanFlowProps {
   initialStep: 'TYPE' | 'IDENTITY';
@@ -124,6 +127,17 @@ const LoanFlow: React.FC<LoanFlowProps> = ({ initialStep, onComplete, navigate, 
   } | null>(null);
   const [bankVerificationError, setBankVerificationError] = useState<string | null>(null);
 
+  // Selfie / Identity Verification
+  const [showCamera, setShowCamera] = useState(false);
+  const [isVerifyingIdentity, setIsVerifyingIdentity] = useState(false);
+
+  const isIdentityVerifiedWithin6Months = useMemo(() => {
+    if (!user.profile?.is_identity_verified || !user.profile?.last_selfie_verified_at) return false;
+    const lastVerified = new Date(user.profile.last_selfie_verified_at).getTime();
+    const sixMonthsAgo = new Date().getTime() - (180 * 24 * 60 * 60 * 1000);
+    return lastVerified > sixMonthsAgo;
+  }, [user.profile]);
+
 
   const categories = [
     // {
@@ -228,6 +242,7 @@ const LoanFlow: React.FC<LoanFlowProps> = ({ initialStep, onComplete, navigate, 
         account_number: bankDetails.accountNumber,
         account_name: bankDetails.accountName,
         loan_type: currentLoanLabel,
+        product_type: currentLoanLabel,
 
         // Next of Kin
         nok_name: nokName,
@@ -807,16 +822,25 @@ const LoanFlow: React.FC<LoanFlowProps> = ({ initialStep, onComplete, navigate, 
                 )}
 
                 <div className="space-y-2">
-                  <label className="text-sm font-black text-slate-500 uppercase">{isOnBehalf ? 'Applicant Surname' : 'Your Surname'}</label>
-                  <input className="w-full h-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-6 text-lg font-bold dark:text-white focus:border-primary outline-none transition-all" value={surname} onChange={e => setSurname(e.target.value)} placeholder="Surname" />
+                  <div className="flex items-center justify-between">
+                    <label className="text-sm font-black text-slate-500 uppercase">{isOnBehalf ? 'Applicant Surname' : 'Your Surname'}</label>
+                    {!isOnBehalf && !!user.profile?.surname && <span className="flex items-center gap-1 text-[10px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-wider"><span className="material-symbols-outlined text-sm">lock</span>From Profile</span>}
+                  </div>
+                  <input className="w-full h-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-6 text-lg font-bold dark:text-white focus:border-primary outline-none transition-all disabled:opacity-60 disabled:cursor-not-allowed" value={surname} onChange={e => setSurname(e.target.value)} placeholder="Surname" disabled={!isOnBehalf && !!user.profile?.surname} />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-black text-slate-500 uppercase">{isOnBehalf ? 'Applicant First Name' : 'Your First Name'}</label>
-                  <input className="w-full h-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-6 text-lg font-bold dark:text-white focus:border-primary outline-none transition-all" value={firstName} onChange={e => setFirstName(e.target.value)} placeholder="First Name" />
+                  <div className="flex items-center justify-between">
+                    <label className="text-sm font-black text-slate-500 uppercase">{isOnBehalf ? 'Applicant First Name' : 'Your First Name'}</label>
+                    {!isOnBehalf && !!user.profile?.first_name && <span className="flex items-center gap-1 text-[10px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-wider"><span className="material-symbols-outlined text-sm">lock</span>From Profile</span>}
+                  </div>
+                  <input className="w-full h-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-6 text-lg font-bold dark:text-white focus:border-primary outline-none transition-all disabled:opacity-60 disabled:cursor-not-allowed" value={firstName} onChange={e => setFirstName(e.target.value)} placeholder="First Name" disabled={!isOnBehalf && !!user.profile?.first_name} />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-black text-slate-500 uppercase">{isOnBehalf ? 'Applicant Middle Name' : 'Your Middle Name'} (Optional)</label>
-                  <input className="w-full h-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-6 text-lg font-bold dark:text-white focus:border-primary outline-none transition-all" value={middleName} onChange={e => setMiddleName(e.target.value)} placeholder="Middle Name" />
+                  <div className="flex items-center justify-between">
+                    <label className="text-sm font-black text-slate-500 uppercase">{isOnBehalf ? 'Applicant Middle Name' : 'Your Middle Name'} (Optional)</label>
+                    {!isOnBehalf && !!user.profile?.middle_name && <span className="flex items-center gap-1 text-[10px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-wider"><span className="material-symbols-outlined text-sm">lock</span>From Profile</span>}
+                  </div>
+                  <input className="w-full h-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-6 text-lg font-bold dark:text-white focus:border-primary outline-none transition-all disabled:opacity-60 disabled:cursor-not-allowed" value={middleName} onChange={e => setMiddleName(e.target.value)} placeholder="Middle Name" disabled={!isOnBehalf && !!user.profile?.middle_name} />
                 </div>
 
                 <div className="space-y-2">
@@ -856,8 +880,11 @@ const LoanFlow: React.FC<LoanFlowProps> = ({ initialStep, onComplete, navigate, 
               <h2 className="text-3xl font-black dark:text-white">Personal Details</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
-                  <label className="text-sm font-black text-slate-500 uppercase">Gender</label>
-                  <select className="w-full h-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-6 text-lg font-bold dark:text-white focus:border-primary outline-none" value={gender} onChange={e => setGender(e.target.value)}>
+                  <div className="flex items-center justify-between">
+                    <label className="text-sm font-black text-slate-500 uppercase">Gender</label>
+                    {!!user.profile?.gender && <span className="flex items-center gap-1 text-[10px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-wider"><span className="material-symbols-outlined text-sm">lock</span>From Profile</span>}
+                  </div>
+                  <select className="w-full h-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-6 text-lg font-bold dark:text-white focus:border-primary outline-none disabled:opacity-60 disabled:cursor-not-allowed" value={gender} onChange={e => setGender(e.target.value)} disabled={!!user.profile?.gender}>
                     <option value="">Select Gender</option>
                     <option value="Male">Male</option>
                     <option value="Female">Female</option>
@@ -865,8 +892,11 @@ const LoanFlow: React.FC<LoanFlowProps> = ({ initialStep, onComplete, navigate, 
                   </select>
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-black text-slate-500 uppercase">Date of Birth</label>
-                  <input type="date" className="w-full h-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-6 text-lg font-bold dark:text-white focus:border-primary outline-none" value={dob} onChange={e => setDob(e.target.value)} />
+                  <div className="flex items-center justify-between">
+                    <label className="text-sm font-black text-slate-500 uppercase">Date of Birth</label>
+                    {!!user.profile?.date_of_birth && <span className="flex items-center gap-1 text-[10px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-wider"><span className="material-symbols-outlined text-sm">lock</span>From Profile</span>}
+                  </div>
+                  <input type="date" className="w-full h-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-6 text-lg font-bold dark:text-white focus:border-primary outline-none disabled:opacity-60 disabled:cursor-not-allowed" value={dob} onChange={e => setDob(e.target.value)} disabled={!!user.profile?.date_of_birth} />
                 </div>
               </div>
               <NavActions isNextDisabled={!gender || !dob} />
@@ -915,16 +945,22 @@ const LoanFlow: React.FC<LoanFlowProps> = ({ initialStep, onComplete, navigate, 
                 <div className="flex gap-4">
                   <div className="w-32 space-y-2">
                     <label className="text-sm font-black text-slate-500 uppercase">Code</label>
-                    <input className="w-full h-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-4 text-lg font-bold dark:text-white focus:border-primary outline-none" value={countryCode} onChange={e => setCountryCode(e.target.value)} />
+                    <input className="w-full h-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-4 text-lg font-bold dark:text-white focus:border-primary outline-none disabled:opacity-60 disabled:cursor-not-allowed" value={countryCode} onChange={e => setCountryCode(e.target.value)} disabled={!!user.profile?.phone_number} />
                   </div>
                   <div className="flex-1 space-y-2">
-                    <label className="text-sm font-black text-slate-500 uppercase">Mobile Number</label>
-                    <input type="tel" className="w-full h-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-6 text-lg font-bold dark:text-white focus:border-primary outline-none" value={mobileNumber} onChange={e => setMobileNumber(e.target.value.replace(/[^0-9]/g, ''))} placeholder="08000000000" maxLength={11} />
+                    <div className="flex items-center justify-between">
+                      <label className="text-sm font-black text-slate-500 uppercase">Mobile Number</label>
+                      {!!user.profile?.phone_number && <span className="flex items-center gap-1 text-[10px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-wider"><span className="material-symbols-outlined text-sm">lock</span>From Profile</span>}
+                    </div>
+                    <input type="tel" className="w-full h-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-6 text-lg font-bold dark:text-white focus:border-primary outline-none disabled:opacity-60 disabled:cursor-not-allowed" value={mobileNumber} onChange={e => setMobileNumber(e.target.value.replace(/[^0-9]/g, ''))} placeholder="08000000000" maxLength={11} disabled={!!user.profile?.phone_number} />
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-black text-slate-500 uppercase">Personal Email Address</label>
-                  <input type="email" className="w-full h-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-6 text-lg font-bold dark:text-white focus:border-primary outline-none" value={contactEmail} onChange={e => setContactEmail(e.target.value)} placeholder="name@example.com" />
+                  <div className="flex items-center justify-between">
+                    <label className="text-sm font-black text-slate-500 uppercase">Personal Email Address</label>
+                    {!!user.profile?.personal_email && <span className="flex items-center gap-1 text-[10px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-wider"><span className="material-symbols-outlined text-sm">lock</span>From Profile</span>}
+                  </div>
+                  <input type="email" className="w-full h-16 rounded-2xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 px-6 text-lg font-bold dark:text-white focus:border-primary outline-none disabled:opacity-60 disabled:cursor-not-allowed" value={contactEmail} onChange={e => setContactEmail(e.target.value)} placeholder="name@example.com" disabled={!!user.profile?.personal_email} />
                 </div>
               </div>
               <NavActions isNextDisabled={!isValidPhone(mobileNumber) || !isValidEmail(contactEmail)} />
@@ -1082,35 +1118,135 @@ const LoanFlow: React.FC<LoanFlowProps> = ({ initialStep, onComplete, navigate, 
                   { id: 'payslip', label: 'Recent Payslip', icon: 'receipt', required: true },
                   { id: 'bank_statement', label: 'Last 3 Mo. Statements', icon: 'account_balance' },
                   { id: 'proof_address', label: 'Proof of Residence', icon: 'home_pin' },
-                  { id: 'selfie', label: 'Selfie Verification', icon: 'add_a_photo' },
-                ].map(doc => (
-                  <div key={doc.id} onClick={() => handleFileSelect(doc.id)} className={`relative group p-6 rounded-3xl border-2 border-dashed transition-all cursor-pointer flex flex-col items-center gap-4 text-center ${uploadedDocs[doc.id] ? 'border-green-500 bg-green-500/5' : 'border-slate-200 dark:border-slate-700 hover:border-primary'}`}>
-                    {uploadedDocs[doc.id] ? (
-                      <div className="size-12 rounded-full bg-green-500 text-white flex items-center justify-center shadow-lg shadow-green-500/20"><span className="material-symbols-outlined">check</span></div>
-                    ) : (
-                      <div className="size-12 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-400 group-hover:bg-primary group-hover:text-white transition-all flex items-center justify-center"><span className="material-symbols-outlined">{doc.icon}</span></div>
-                    )}
-                    <div>
-                      <p className="font-bold dark:text-white text-sm">
-                        {doc.label}
-                        {(doc.required || (doc.id === 'bank_statement' && (parseFloat(desiredAmount.replace(/[^0-9.]/g, '')) || 0) > 500000)) && <span className="text-red-500 ml-1">*</span>}
-                      </p>
-                      {uploadedDocs[doc.id] ? <p className="text-[10px] text-green-500 font-black uppercase tracking-widest mt-1">Uploaded</p> : <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest mt-1">Click to upload</p>}
-                    </div>
-                    {uploadProgress[doc.id] > 0 && uploadProgress[doc.id] < 100 && (
-                      <div className="absolute bottom-4 left-6 right-6 h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-                        <div className="h-full bg-primary transition-all duration-300" style={{ width: `${uploadProgress[doc.id]}%` }}></div>
+                  { id: 'selfie', label: 'Selfie Verification', icon: 'add_a_photo', required: true },
+                ].map(doc => {
+                  const isSelfie = doc.id === 'selfie';
+
+                  // If selfie already verified within 6 months, show verified badge
+                  if (isSelfie && isIdentityVerifiedWithin6Months) {
+                    return (
+                      <div key={doc.id} className="p-6 rounded-3xl border-2 border-green-500 bg-green-500/5 flex flex-col items-center gap-4 text-center justify-center min-h-[150px]">
+                        <div className="size-12 rounded-full bg-green-500 text-white flex items-center justify-center shadow-lg shadow-green-500/20">
+                          <span className="material-symbols-outlined">verified</span>
+                        </div>
+                        <div>
+                          <p className="font-black text-sm uppercase tracking-tight dark:text-white">Identity Verified</p>
+                          <p className="text-[10px] text-green-600 dark:text-green-400 font-black uppercase tracking-widest mt-1">Valid for 6 Months</p>
+                        </div>
                       </div>
-                    )}
-                    {uploadedDocs[doc.id] && (
-                      <button onClick={(e) => removeDoc(doc.id, e)} className="absolute top-4 right-4 text-red-500 hover:bg-red-500/10 rounded-full p-1 transition-all"><span className="material-symbols-outlined text-sm">cancel</span></button>
-                    )}
-                  </div>
-                ))}
+                    );
+                  }
+
+                  return (
+                    <div
+                      key={doc.id}
+                      onClick={() => {
+                        if (isSelfie) {
+                          if (!bvn) return alert('Please provide your BVN in the verification section before taking a selfie.');
+                          setShowCamera(true);
+                        } else {
+                          handleFileSelect(doc.id);
+                        }
+                      }}
+                      className={`relative group p-6 rounded-3xl border-2 border-dashed transition-all cursor-pointer flex flex-col items-center gap-4 text-center ${
+                        uploadedDocs[doc.id] ? 'border-green-500 bg-green-500/5' : 'border-slate-200 dark:border-slate-700 hover:border-primary'
+                      }`}
+                    >
+                      {uploadedDocs[doc.id] ? (
+                        <div className="size-12 rounded-full bg-green-500 text-white flex items-center justify-center shadow-lg shadow-green-500/20 animate-in zoom-in">
+                          <span className="material-symbols-outlined">task_alt</span>
+                        </div>
+                      ) : (isVerifyingIdentity && isSelfie) ? (
+                        <div className="flex flex-col items-center gap-3">
+                          <div className="size-12 border-4 border-primary/20 border-t-primary rounded-full animate-spin"></div>
+                          <p className="text-[10px] font-black text-primary animate-pulse">VERIFYING FACE...</p>
+                        </div>
+                      ) : (
+                        <div className="size-12 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-400 group-hover:bg-primary group-hover:text-white transition-all flex items-center justify-center">
+                          <span className="material-symbols-outlined">{isSelfie ? 'face' : doc.icon}</span>
+                        </div>
+                      )}
+                      <div>
+                        <p className="font-bold dark:text-white text-sm">
+                          {isSelfie ? 'Real-Time Identity Verify' : doc.label}
+                          {(doc as any).required && <span className="text-red-500 ml-1">*</span>}
+                          {(doc.id === 'bank_statement' && (parseFloat(desiredAmount.replace(/[^0-9.]/g, '')) || 0) > 500000) && <span className="text-red-500 ml-1">*</span>}
+                        </p>
+                        <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest mt-1">
+                          {isSelfie ? 'BVN Face Match' : uploadedDocs[doc.id] ? 'Uploaded' : 'Click to upload'}
+                        </p>
+                        {uploadedDocs[doc.id] && !isSelfie && (
+                          <p className="text-[10px] text-primary font-black truncate max-w-[150px] mx-auto bg-primary/10 px-3 py-1 rounded-full mt-1">{uploadedDocs[doc.id]?.name}</p>
+                        )}
+                      </div>
+                      {uploadProgress[doc.id] > 0 && uploadProgress[doc.id] < 100 && (
+                        <div className="absolute bottom-4 left-6 right-6 h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                          <div className="h-full bg-primary transition-all duration-300" style={{ width: `${uploadProgress[doc.id]}%` }}></div>
+                        </div>
+                      )}
+                      {uploadedDocs[doc.id] && !isSelfie && (
+                        <button onClick={(e) => removeDoc(doc.id, e)} className="absolute top-4 right-4 text-red-500 hover:bg-red-500/10 rounded-full p-1 transition-all">
+                          <span className="material-symbols-outlined text-sm">cancel</span>
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
-              <NavActions isNextDisabled={!uploadedDocs.national_id || !uploadedDocs.work_id || !uploadedDocs.payslip || ((parseFloat(desiredAmount.replace(/[^0-9.]/g, '')) || 0) > 500000 && !uploadedDocs.bank_statement)} />
+              <NavActions isNextDisabled={
+                !uploadedDocs.national_id ||
+                !uploadedDocs.work_id ||
+                !uploadedDocs.payslip ||
+                (!uploadedDocs.selfie && !isIdentityVerifiedWithin6Months) ||
+                ((parseFloat(desiredAmount.replace(/[^0-9.]/g, '')) || 0) > 500000 && !uploadedDocs.bank_statement)
+              } />
             </div>
           )}
+
+          {/* Camera Modal for Selfie Verification */}
+          <AnimatePresence>
+            {showCamera && (
+              <CameraCapture
+                onCapture={async (file) => {
+                  setShowCamera(false);
+                  setIsVerifyingIdentity(true);
+                  try {
+                    // 1. Upload selfie using the loan upload endpoint
+                    const formData = new FormData();
+                    formData.append('file', file);
+                    formData.append('loan_id', draftId);
+                    formData.append('document_type', 'selfie_verification');
+                    const uploadRes = await axios.post('/api/upload', formData, {
+                      headers: { 'Content-Type': 'multipart/form-data' },
+                      withCredentials: true,
+                    });
+                    const selfieUrl = uploadRes.data.document.file_url;
+
+                    // 2. BVN face-match verification
+                    const verifyRes = await investmentService.verifyIdentity(bvn, selfieUrl);
+
+                    if (verifyRes.success) {
+                      setUploadedDocs(prev => ({
+                        ...prev,
+                        selfie: { name: file.name, size: `${(file.size / 1024).toFixed(1)} KB`, url: selfieUrl }
+                      }));
+                      // Update profile state so the 6-month memo recalculates
+                      if (user.profile) {
+                        user.profile.is_identity_verified = true;
+                        user.profile.last_selfie_verified_at = new Date().toISOString();
+                      }
+                      alert('Identity Verified! Face match successful.');
+                    }
+                  } catch (err: any) {
+                    alert(err.message || 'Face Verification Failed. Please try again.');
+                  } finally {
+                    setIsVerifyingIdentity(false);
+                  }
+                }}
+                onClose={() => setShowCamera(false)}
+              />
+            )}
+          </AnimatePresence>
 
           {/* Step 10: Disbursement Details (New Step) */}
           {subStep === 10 && (

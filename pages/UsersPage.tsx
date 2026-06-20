@@ -185,6 +185,8 @@ const UsersPage: React.FC<UsersPageProps> = ({ user, onLogout, toggleTheme, them
             credit_manager: "text-indigo-600 bg-indigo-100 dark:bg-indigo-500/10 dark:text-indigo-400 border-indigo-200 dark:border-indigo-500/20",
             credit_officer: "text-indigo-600 bg-indigo-100 dark:bg-indigo-500/10 dark:text-indigo-400 border-indigo-200 dark:border-indigo-500/20",
             sales_officer: "text-emerald-600 bg-emerald-100 dark:bg-emerald-500/10 dark:text-emerald-400 border-emerald-200 dark:border-emerald-500/20",
+            sales_public_sector: "text-emerald-600 bg-emerald-100 dark:bg-emerald-500/10 dark:text-emerald-400 border-emerald-200 dark:border-emerald-500/20",
+            sales_private_sector: "text-green-600 bg-green-100 dark:bg-green-500/10 dark:text-green-400 border-green-200 dark:border-green-500/20",
             customer_experience: "text-sky-600 bg-sky-100 dark:bg-sky-500/10 dark:text-sky-400 border-sky-200 dark:border-sky-500/20",
             compliance: "text-teal-600 bg-teal-100 dark:bg-teal-500/10 dark:text-teal-400 border-teal-200 dark:border-teal-500/20",
             ed: "text-amber-600 bg-amber-100 dark:bg-amber-500/10 dark:text-amber-400 border-amber-200 dark:border-amber-500/20",
@@ -315,7 +317,8 @@ const UsersPage: React.FC<UsersPageProps> = ({ user, onLogout, toggleTheme, them
                                                 <option value="md">MD</option>
                                                 <option value="credit_manager">Credit Manager</option>
                                                 <option value="credit_officer">Credit Officer</option>
-                                                <option value="sales_officer">Sales Officer</option>
+                                                <option value="sales_public_sector">Sales — Public Sector</option>
+                                                <option value="sales_private_sector">Sales — Private Sector</option>
                                                 <option value="sales_manager">Sales Manager</option>
                                                 <option value="customer_experience">Customer Experience</option>
                                                 <option value="internal_audit">Internal Audit</option>
@@ -576,8 +579,8 @@ const UsersPage: React.FC<UsersPageProps> = ({ user, onLogout, toggleTheme, them
                             <div>
                                 <label className="block text-xs font-black uppercase tracking-widest text-slate-500 mb-2">Role</label>
                                 <select value={inviteForm.role} onChange={e => setInviteForm({ ...inviteForm, role: e.target.value })} className="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border-none outline-none font-bold text-slate-900 dark:text-white cursor-pointer">
-                                    <option value="customer_experience">Customer Experience</option>
-                                    <option value="sales_officer">Sales Officer</option>
+                                    <option value="sales_public_sector">Sales — Public Sector</option>
+                                    <option value="sales_private_sector">Sales — Private Sector</option>
                                     <option value="sales_manager">Sales Manager</option>
                                     <option value="credit_manager">Credit Manager</option>
                                     <option value="credit_officer">Credit Officer</option>
