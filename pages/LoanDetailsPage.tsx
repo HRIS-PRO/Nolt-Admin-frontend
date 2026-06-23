@@ -83,12 +83,18 @@ const ActionCard = ({ loan, userRole, onActionComplete }: { loan: any, userRole:
     const effectiveLoanAmount = Math.max(requestedAmount, dbApprovedAmount, dbDisbursedAmount);
     const tierLimitExceeded = (loan.stage || 'submitted') === 'customer_experience' && effectiveLoanAmount > TIER_LIMITS[selectedTier];
 
-    // Fetch matching product so we can show its default interest rate
+    // Fetch matching product so we can show its default interest rate.
+    // Uses fuzzy includes() match because customer-originated loans store the full label
+    // e.g. "Public Sector Loan (IPPIS)" while the DB product custom_name is "Public Sector Loan".
     useEffect(() => {
         if (!loan.product_type) return;
         axios.get('/api/staff/products/loans/active', { withCredentials: true })
             .then(res => {
-                const match = res.data.find((p: any) => p.custom_name.toLowerCase() === loan.product_type.toLowerCase());
+                const type = loan.product_type.toLowerCase();
+                const match = res.data.find((p: any) => {
+                    const name = p.custom_name.toLowerCase();
+                    return name === type || type.includes(name) || name.includes(type);
+                });
                 setProduct(match || null);
             })
             .catch(() => setProduct(null));
