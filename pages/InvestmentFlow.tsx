@@ -1339,10 +1339,9 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
                         </div>
                         <div>
                           <h3 className="text-2xl font-black mb-2 uppercase tracking-tight dark:text-white">{product.custom_name}</h3>
-                          <p className="text-slate-500 font-bold leading-relaxed text-sm">
-                            {product.interest_rate != null ? `${product.interest_rate}% p.a.` : 'Competitive returns'}
-                            {product.min_amount ? ` · Min ₦${product.min_amount.toLocaleString()}` : ''}
-                          </p>
+                          {product.note && (
+                            <p className="text-slate-400 dark:text-slate-500 text-sm font-medium leading-snug mt-2">{product.note}</p>
+                          )}
                         </div>
                       </button>
                     );

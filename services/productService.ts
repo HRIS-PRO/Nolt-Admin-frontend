@@ -5,6 +5,7 @@ const API_URL = import.meta.env.VITE_API_URL || '';
 export interface InvestmentProduct {
   id: number;
   custom_name: string;
+  note?: string | null;
   cba_product_name: string;
   cba_product_code: string;
   interest_rate?: number;

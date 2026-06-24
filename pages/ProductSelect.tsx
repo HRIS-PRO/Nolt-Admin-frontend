@@ -135,15 +135,7 @@ const ProductSelect: React.FC<ProductSelectProps> = ({ navigate }) => {
                       <span className="material-symbols-outlined text-primary text-base shrink-0">
                         {PLAN_ICONS[i % PLAN_ICONS.length]}
                       </span>
-                      <div>
-                        <span className="text-sm font-black text-slate-900 dark:text-white">{plan.custom_name}</span>
-                        {plan.interest_rate != null && (
-                          <>
-                            <span className="mx-2 text-slate-300 dark:text-slate-700">·</span>
-                            <span className="text-xs font-semibold text-slate-400 dark:text-slate-500">{plan.interest_rate}% p.a.</span>
-                          </>
-                        )}
-                      </div>
+                      <span className="text-sm font-black text-slate-900 dark:text-white">{plan.custom_name}</span>
                     </div>
                   ))
                 ) : (

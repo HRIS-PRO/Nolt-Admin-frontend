@@ -6,6 +6,7 @@ interface Product {
     id: number;
     category: 'loan' | 'investment';
     custom_name: string;
+    note: string | null;
     cba_product_code: string;
     cba_product_name: string;
     interest_rate: number;
@@ -41,6 +42,7 @@ const ProductsPage: React.FC<any> = ({ user, onLogout, toggleTheme, theme }) => 
     // Form State
     const [selectedCbaCode, setSelectedCbaCode] = useState('');
     const [customName, setCustomName] = useState('');
+    const [note, setNote] = useState('');
 
     useEffect(() => {
         fetchOurProducts();
@@ -86,12 +88,14 @@ const ProductsPage: React.FC<any> = ({ user, onLogout, toggleTheme, theme }) => 
         setShowCreateWizard(true);
         setSelectedCbaCode('');
         setCustomName('');
+        setNote('');
     };
 
     const handleEditProduct = (product: Product) => {
         setEditingProduct(product);
         setSelectedCbaCode(product.cba_product_code);
         setCustomName(product.custom_name);
+        setNote(product.note || '');
         setWizardStep(2);
         setShowCreateWizard(true);
     };
@@ -134,6 +138,7 @@ const ProductsPage: React.FC<any> = ({ user, onLogout, toggleTheme, theme }) => 
             if (editingProduct) {
                 await axios.put(`${API_BASE}/products/${editingProduct.id}`, {
                     custom_name: customName,
+                    note: note || null,
                     is_active: editingProduct.is_active
                 }, { withCredentials: true });
             } else {
@@ -141,6 +146,7 @@ const ProductsPage: React.FC<any> = ({ user, onLogout, toggleTheme, theme }) => 
                 await axios.post(`${API_BASE}/products`, {
                     category: activeTab,
                     custom_name: customName,
+                    note: note || null,
                     cba_product_code: selectedCBA.productCode.trim(),
                     cba_product_name: selectedCBA.productName,
                     interest_rate: selectedCBA.interestRate,
@@ -276,7 +282,10 @@ const ProductsPage: React.FC<any> = ({ user, onLogout, toggleTheme, theme }) => 
                                                 </div>
                                                 <div>
                                                     <p className="font-black text-slate-900 dark:text-white text-base mb-0.5">{product.custom_name}</p>
-                                                    <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">Added {new Date(product.created_at).toLocaleDateString()}</p>
+                                                    {product.note && (
+                                                        <p className="text-xs text-slate-500 dark:text-slate-400 font-medium max-w-xs leading-tight mt-0.5 line-clamp-2">{product.note}</p>
+                                                    )}
+                                                    <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest mt-1">Added {new Date(product.created_at).toLocaleDateString()}</p>
                                                 </div>
                                             </div>
                                         </td>
@@ -445,6 +454,18 @@ const ProductsPage: React.FC<any> = ({ user, onLogout, toggleTheme, theme }) => 
                                             className="w-full h-18 px-8 p-4 rounded-2xl bg-slate-50 dark:bg-slate-800 border-2 border-transparent focus:border-blue-500/50 outline-none font-black text-base shadow-inner transition-all" 
                                         />
                                         <p className="text-[10px] text-slate-400 font-medium px-1">This name will be the primary identifier for customers.</p>
+                                    </div>
+
+                                    <div className="space-y-3">
+                                        <label className="text-[10px] font-black uppercase text-slate-400 px-1 tracking-widest">Product Note / Description <span className="text-slate-300 dark:text-slate-600 normal-case font-medium">(optional)</span></label>
+                                        <textarea
+                                            value={note}
+                                            onChange={(e) => setNote(e.target.value)}
+                                            placeholder="e.g. Best suited for long-term savers looking for competitive returns with flexible exit options."
+                                            rows={3}
+                                            className="w-full px-8 py-4 rounded-2xl bg-slate-50 dark:bg-slate-800 border-2 border-transparent focus:border-blue-500/50 outline-none font-medium text-sm shadow-inner transition-all resize-none"
+                                        />
+                                        <p className="text-[10px] text-slate-400 font-medium px-1">This note will be visible to customers when they browse investment products.</p>
                                     </div>
 
                                     <div className="p-10 rounded-[2.5rem] bg-slate-900 text-white relative overflow-hidden group shadow-2xl">
