@@ -7,6 +7,7 @@ import SuccessScreen from './SuccessScreen';
 import { useNavigate } from 'react-router-dom';
 import MdaTertiarySelect, { TERTIARY_LIST } from '../components/MdaTertiarySelect';
 import CameraCapture from '../components/CameraCapture';
+import DojahWidgetModal from '../components/DojahWidgetModal';
 import { AnimatePresence } from 'motion/react';
 import { investmentService } from '../services/investmentService';
 
@@ -129,6 +130,7 @@ const LoanFlow: React.FC<LoanFlowProps> = ({ initialStep, onComplete, navigate, 
 
   // Selfie / Identity Verification
   const [showCamera, setShowCamera] = useState(false);
+  const [showDojah, setShowDojah] = useState(false);
   const [isVerifyingIdentity, setIsVerifyingIdentity] = useState(false);
 
   const isIdentityVerifiedWithin6Months = useMemo(() => {
@@ -1143,7 +1145,7 @@ const LoanFlow: React.FC<LoanFlowProps> = ({ initialStep, onComplete, navigate, 
                       onClick={() => {
                         if (isSelfie) {
                           if (!bvn) return alert('Please provide your BVN in the verification section before taking a selfie.');
-                          setShowCamera(true);
+                          setShowDojah(true);
                         } else {
                           handleFileSelect(doc.id);
                         }
@@ -1244,6 +1246,44 @@ const LoanFlow: React.FC<LoanFlowProps> = ({ initialStep, onComplete, navigate, 
                   }
                 }}
                 onClose={() => setShowCamera(false)}
+              />
+            )}
+          </AnimatePresence>
+
+          {/* Dojah Widget Modal for Selfie Verification */}
+          <AnimatePresence>
+            {showDojah && (
+              <DojahWidgetModal
+                widgetId="6a3b8ecfacf58b308aa6b3a2"
+                onSuccess={async (refId) => {
+                  setShowDojah(false);
+                  setIsVerifyingIdentity(true);
+                  try {
+                    // Put a dummy URL as their selfie verification URL
+                    const dummySelfieUrl = 'https://identity.dojah.io/widget/selfie_dummy.jpg';
+
+                    // Call backend verifyIdentity with is_dojah_widget_success set to true
+                    const verifyRes = await investmentService.verifyIdentity(bvn, dummySelfieUrl, true);
+
+                    if (verifyRes.success) {
+                      setUploadedDocs(prev => ({
+                        ...prev,
+                        selfie: { name: 'Dojah Verified Selfie', size: 'Verified', url: dummySelfieUrl }
+                      }));
+                      // Update profile state so the 6-month memo recalculates
+                      if (user.profile) {
+                        user.profile.is_identity_verified = true;
+                        user.profile.last_selfie_verified_at = new Date().toISOString();
+                      }
+                      alert('Identity Verified successfully via Dojah Widget!');
+                    }
+                  } catch (err: any) {
+                    alert(err.message || 'Dojah Face Verification Failed. Please try again.');
+                  } finally {
+                    setIsVerifyingIdentity(false);
+                  }
+                }}
+                onClose={() => setShowDojah(false)}
               />
             )}
           </AnimatePresence>
@@ -1627,10 +1667,10 @@ const LoanFlow: React.FC<LoanFlowProps> = ({ initialStep, onComplete, navigate, 
                       </div>
                     )}
                     <div className="absolute top-4 right-4 flex gap-2">
-                      <button onClick={() => signatureInputRef.current?.click()} className="text-[9px] font-black uppercase text-primary hover:text-white hover:bg-primary border border-primary/20 px-3 py-1 rounded-full transition-all bg-white/80 dark:bg-slate-800/80 flex items-center gap-1">
+                      {/*<button onClick={() => signatureInputRef.current?.click()} className="text-[9px] font-black uppercase text-primary hover:text-white hover:bg-primary border border-primary/20 px-3 py-1 rounded-full transition-all bg-white/80 dark:bg-slate-800/80 flex items-center gap-1">
                         <span className="material-symbols-outlined text-[10px]">photo_camera</span>
                         Snap/Upload
-                      </button>
+                      </button>*/}
                       <button
                         onClick={clearSignature}
                         className="text-[9px] font-black uppercase text-red-500 hover:text-white hover:bg-red-500 border border-red-500/20 px-3 py-1 rounded-full transition-all bg-white/80 dark:bg-slate-800/80"
