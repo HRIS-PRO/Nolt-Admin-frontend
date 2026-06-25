@@ -122,11 +122,15 @@ export const investmentService = {
         return response.json();
     },
 
-    verifyIdentity: async (bvn: string, selfieUrl: string) => {
+    verifyIdentity: async (bvn: string, selfieUrl: string, isDojahWidgetSuccess?: boolean) => {
         const response = await fetch(`${API_BASE_URL}/customer/verify-identity`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ bvn, selfie_url: selfieUrl }),
+            body: JSON.stringify({ 
+                bvn, 
+                selfie_url: selfieUrl,
+                is_dojah_widget_success: isDojahWidgetSuccess 
+            }),
         });
 
         const data = await response.json();
