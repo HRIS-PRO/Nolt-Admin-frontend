@@ -4,6 +4,7 @@ import { profileService, UserProfile } from '../services/profileService';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { maskValue } from '../utils/maskHelper';
+import CameraCapture from '../components/CameraCapture';
 
 const NIGERIAN_STATES = [
     "Abia", "Adamawa", "Akwa Ibom", "Anambra", "Bauchi", "Bayelsa", "Benue", "Borno", 
@@ -13,7 +14,7 @@ const NIGERIAN_STATES = [
     "Taraba", "Yobe", "Zamfara"
 ];
 
-type TabType = 'security' | 'personal' | 'residential' | 'bank';
+type TabType = 'security' | 'personal' | 'residential' | 'bank' | 'selfie';
 
 const ProfilePage: React.FC = () => {
     const navigate = useNavigate();
@@ -41,6 +42,13 @@ const ProfilePage: React.FC = () => {
     const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
     const [banks, setBanks] = useState<{ name: string; code: string }[]>([]);
     const formRef = useRef<HTMLDivElement>(null);
+
+    // Selfie state
+    const [showCamera, setShowCamera] = useState(false);
+    const [selfieVerified, setSelfieVerified] = useState(false);
+    const [selfieLoading, setSelfieLoading] = useState(false);
+    const [selfieError, setSelfieError] = useState<string | null>(null);
+    const [selfieConfidence, setSelfieConfidence] = useState<number | null>(null);
 
     const goToTab = (tab: TabType) => {
         setActiveTab(tab);
@@ -74,6 +82,9 @@ const ProfilePage: React.FC = () => {
                     p.date_of_birth = p.date_of_birth.split('T')[0];
                 }
                 setProfile(p);
+                if (p.selfie_url) {
+                    setSelfieVerified(true);
+                }
             }
         } catch (err) {
             console.error("Failed to fetch profile:", err);
@@ -206,6 +217,44 @@ const ProfilePage: React.FC = () => {
         }
     };
 
+    const handleSelfieCapture = async (file: File) => {
+        setShowCamera(false);
+        setSelfieLoading(true);
+        setSelfieError(null);
+        setSelfieConfidence(null);
+        try {
+            const res = await profileService.verifySelfie(file, profile.bvn || undefined);
+            if (res.success) {
+                setSelfieVerified(true);
+                setSelfieConfidence(res.confidence ?? null);
+                setProfile(prev => ({ ...prev, selfie_url: res.selfie_url }));
+            } else {
+                setSelfieError(res.message || 'Face does not match. Please try again.');
+                setSelfieConfidence(res.confidence ?? null);
+            }
+        } catch (err: any) {
+            setSelfieError(err.response?.data?.message || 'Verification failed. Please try again.');
+        } finally {
+            setSelfieLoading(false);
+        }
+    };
+
+    const handleNextToSelfie = () => {
+        const requiredFields = ['bank_name', 'account_number'];
+        for (const field of requiredFields) {
+            if (!profile[field as keyof UserProfile] || profile[field as keyof UserProfile] === '') {
+                setMessage({ type: 'error', text: `Please complete your bank details before continuing (Missing: ${field.replace(/_/g, ' ')})` });
+                return;
+            }
+        }
+        if (!profile.bank_verified && !profile.bank_statement_url) {
+            setMessage({ type: 'error', text: 'Please verify your bank account or upload a bank statement before continuing.' });
+            return;
+        }
+        setMessage(null);
+        goToTab('selfie');
+    };
+
     const handleSave = async (e: React.FormEvent) => {
         e.preventDefault();
         
@@ -295,6 +344,7 @@ const ProfilePage: React.FC = () => {
     };
 
     return (
+        <>
         <div className="min-h-screen bg-[#F8FAFC] dark:bg-[#020617] pb-20 overflow-hidden">
             {/* Ambient Background Elements */}
             <div className="fixed inset-0 overflow-hidden pointer-events-none">
@@ -342,19 +392,24 @@ const ProfilePage: React.FC = () => {
 
                 {/* Tab Navigation */}
                 <div className="flex flex-wrap gap-2 mb-10 bg-slate-100 dark:bg-slate-900/50 p-2 rounded-2xl w-fit">
-                    {(['security', 'personal', 'residential', 'bank'] as TabType[]).map((tab) => (
+                    {(['security', 'personal', 'residential', 'bank', 'selfie'] as TabType[]).map((tab) => (
                         <button
                             key={tab}
                             onClick={() => setActiveTab(tab)}
                             className={`relative px-8 py-3 rounded-xl font-black text-xs uppercase tracking-widest transition-all ${activeTab === tab ? 'text-white' : 'text-slate-500 hover:text-slate-900 dark:hover:text-slate-200'}`}
                         >
                             {activeTab === tab && (
-                                <motion.div 
+                                <motion.div
                                     layoutId="activeTab"
                                     className="absolute inset-0 bg-primary rounded-xl shadow-lg shadow-primary/20"
                                 />
                             )}
-                            <span className="relative z-10">{tab}</span>
+                            <span className="relative z-10 flex items-center gap-1.5">
+                                {tab}
+                                {tab === 'selfie' && selfieVerified && (
+                                    <span className="material-symbols-outlined text-[12px]">check_circle</span>
+                                )}
+                            </span>
                         </button>
                     ))}
                 </div>
@@ -712,6 +767,111 @@ const ProfilePage: React.FC = () => {
                                         </div>
                                     </motion.div>
                                 )}
+                                {activeTab === 'selfie' && (
+                                    <motion.div
+                                        key="selfie"
+                                        variants={tabVariants}
+                                        initial="hidden"
+                                        animate="visible"
+                                        exit="exit"
+                                        className="space-y-8"
+                                    >
+                                        <div className="bg-white dark:bg-slate-900/50 backdrop-blur-md p-10 rounded-[2.5rem] shadow-sm border border-slate-100 dark:border-white/5 space-y-10">
+                                            <div className="flex items-center gap-4">
+                                                <div className="size-12 rounded-2xl bg-emerald-500/10 flex items-center justify-center text-emerald-500">
+                                                    <span className="material-symbols-outlined font-black">face</span>
+                                                </div>
+                                                <div>
+                                                    <h3 className="text-xl font-black text-slate-900 dark:text-white">Selfie Verification</h3>
+                                                    <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">Match your face to your BVN record</p>
+                                                </div>
+                                            </div>
+
+                                            {selfieVerified ? (
+                                                <motion.div
+                                                    initial={{ opacity: 0, scale: 0.95 }}
+                                                    animate={{ opacity: 1, scale: 1 }}
+                                                    className="flex flex-col items-center gap-6 py-8"
+                                                >
+                                                    <div className="size-24 rounded-full bg-emerald-500/10 flex items-center justify-center">
+                                                        <span className="material-symbols-outlined text-5xl text-emerald-500">verified_user</span>
+                                                    </div>
+                                                    <div className="text-center">
+                                                        <p className="text-xl font-black text-slate-900 dark:text-white mb-2">Identity Confirmed</p>
+                                                        <p className="text-sm font-bold text-slate-500 uppercase tracking-widest">
+                                                            Your face has been matched to your BVN record
+                                                            {selfieConfidence !== null && ` (${selfieConfidence.toFixed(0)}% confidence)`}
+                                                        </p>
+                                                    </div>
+                                                    {profile.selfie_url && (
+                                                        <div className="size-28 rounded-3xl overflow-hidden border-4 border-emerald-500/20 shadow-xl">
+                                                            <img src={profile.selfie_url} alt="Verified selfie" className="w-full h-full object-cover" />
+                                                        </div>
+                                                    )}
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => { setSelfieVerified(false); setSelfieError(null); setShowCamera(true); }}
+                                                        className="text-xs font-black text-slate-400 hover:text-slate-600 uppercase tracking-widest underline transition-colors"
+                                                    >
+                                                        Retake Photo
+                                                    </button>
+                                                </motion.div>
+                                            ) : (
+                                                <div className="space-y-8">
+                                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+                                                        {[
+                                                            { icon: 'light_mode', text: 'Ensure your face is well-lit' },
+                                                            { icon: 'face', text: 'Remove glasses or face coverings' },
+                                                            { icon: 'center_focus_strong', text: 'Look directly at the camera' }
+                                                        ].map(item => (
+                                                            <div key={item.icon} className="flex flex-col items-center gap-3 p-6 bg-slate-50 dark:bg-slate-800/50 rounded-3xl text-center">
+                                                                <span className="material-symbols-outlined text-3xl text-primary">{item.icon}</span>
+                                                                <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest leading-relaxed">{item.text}</p>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+
+                                                    {selfieError && (
+                                                        <motion.div
+                                                            initial={{ opacity: 0, scale: 0.95 }}
+                                                            animate={{ opacity: 1, scale: 1 }}
+                                                            className="p-6 rounded-3xl bg-red-500/5 border border-red-500/10 flex items-start gap-4"
+                                                        >
+                                                            <span className="material-symbols-outlined text-red-500 font-black shrink-0">error</span>
+                                                            <div>
+                                                                <p className="text-sm font-black text-red-600 dark:text-red-400 uppercase tracking-tight">{selfieError}</p>
+                                                                {selfieConfidence !== null && selfieConfidence > 0 && (
+                                                                    <p className="text-xs font-bold text-red-400 mt-1">Confidence: {selfieConfidence.toFixed(0)}%</p>
+                                                                )}
+                                                            </div>
+                                                        </motion.div>
+                                                    )}
+
+                                                    <div className="flex justify-center">
+                                                        <button
+                                                            type="button"
+                                                            disabled={selfieLoading}
+                                                            onClick={() => { setSelfieError(null); setShowCamera(true); }}
+                                                            className="h-16 px-12 rounded-2xl font-black text-white uppercase tracking-[0.2em] text-xs transition-all active:scale-95 flex items-center gap-4 bg-primary shadow-xl shadow-primary/30 hover:-translate-y-1 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0"
+                                                        >
+                                                            {selfieLoading ? (
+                                                                <>
+                                                                    <div className="size-4 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+                                                                    Verifying...
+                                                                </>
+                                                            ) : (
+                                                                <>
+                                                                    <span className="material-symbols-outlined text-sm">photo_camera</span>
+                                                                    {selfieError ? 'Try Again' : 'Open Camera'}
+                                                                </>
+                                                            )}
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </motion.div>
+                                )}
                             </AnimatePresence>
 
                             <div className="flex justify-end pt-4">
@@ -728,7 +888,7 @@ const ProfilePage: React.FC = () => {
                                 )}
                                 
                                 {activeTab === 'residential' && (
-                                    <button 
+                                    <button
                                         type="button"
                                         onClick={handleNextToBank}
                                         disabled={saving}
@@ -738,9 +898,21 @@ const ProfilePage: React.FC = () => {
                                         <span className="material-symbols-outlined text-sm">arrow_forward</span>
                                     </button>
                                 )}
-                                
+
                                 {activeTab === 'bank' && (
-                                    <button 
+                                    <button
+                                        type="button"
+                                        onClick={handleNextToSelfie}
+                                        disabled={saving}
+                                        className="h-16 px-12 rounded-2xl font-black text-white uppercase tracking-[0.2em] text-xs transition-all active:scale-95 flex items-center gap-4 bg-slate-800 dark:bg-white/10 shadow-xl shadow-slate-900/20 hover:-translate-y-1"
+                                    >
+                                        Next: Selfie Verification
+                                        <span className="material-symbols-outlined text-sm">arrow_forward</span>
+                                    </button>
+                                )}
+
+                                {activeTab === 'selfie' && selfieVerified && (
+                                    <button
                                         type="submit"
                                         disabled={saving}
                                         className={`h-16 px-12 rounded-2xl font-black text-white uppercase tracking-[0.2em] text-xs transition-all active:scale-95 flex items-center gap-4 ${saving ? 'bg-slate-300 dark:bg-slate-800 cursor-not-allowed opacity-50' : 'bg-primary shadow-xl shadow-primary/30 hover:-translate-y-1'}`}
@@ -807,6 +979,17 @@ const ProfilePage: React.FC = () => {
                 </div>
             </div>
         </div>
+
+        <AnimatePresence>
+            {showCamera && (
+                <CameraCapture
+                    label="Selfie Verification"
+                    onCapture={handleSelfieCapture}
+                    onClose={() => setShowCamera(false)}
+                />
+            )}
+        </AnimatePresence>
+        </>
     );
 };
 

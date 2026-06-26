@@ -111,11 +111,11 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, user, isLoadi
     return <Navigate to="/staff-dashboard" replace />;
   }
 
-  // CASA gate: customers who haven't completed CBA registration must go to /profile
-  // Exception: skip this gate if they are already on the profile page (prevents infinite redirect loop)
-  if (user.role === 'customer' && !user.profile?.casa) {
-    const isOnProfilePage = window.location.pathname === '/profile';
-    if (!isOnProfilePage) {
+  // Profile completion gate: customers must have selfie_url and casa before accessing the app.
+  // Exception: skip if already on /profile to prevent an infinite redirect loop.
+  if (user.role === 'customer') {
+    const isProfileComplete = user.profile?.selfie_url && user.profile?.casa;
+    if (!isProfileComplete && window.location.pathname !== '/profile') {
       return <Navigate to="/profile" replace />;
     }
   }
