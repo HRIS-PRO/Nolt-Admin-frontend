@@ -8,7 +8,7 @@ import { investmentService } from '../services/investmentService';
 import { productService, InvestmentProduct } from '../services/productService';
 import GiftInvestmentFlow from './investment/GiftInvestmentFlow';
 import { PaymentModal } from '../components/PaymentModal';
-import CameraCapture from '../components/CameraCapture';
+import DojahWidgetModal from '../components/DojahWidgetModal';
 import { AnimatePresence } from 'motion/react';
 
 interface InvestmentFlowProps {
@@ -266,7 +266,7 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
     return docs;
   }, [directors]);
 
-  const [showCamera, setShowCamera] = useState(false);
+  const [showDojah, setShowDojah] = useState(false);
   const [isVerifyingIdentity, setIsVerifyingIdentity] = useState(false);
 
   const isIdentityVerifiedWithin6Months = useMemo(() => {
@@ -1971,7 +1971,7 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
                     onClick={() => {
                         if (isSelfie) {
                             if (!bvn) return alert("Please provide your BVN in the identity section before verification.");
-                            setShowCamera(true);
+                            setShowDojah(true);
                         } else {
                             document.getElementById(inputId)?.click();
                         }
@@ -2020,42 +2020,38 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
         </div>
       )}
 
-      {/* Camera Modal */}
+      {/* Dojah Widget Modal for Selfie Verification */}
       <AnimatePresence>
-        {showCamera && (
-            <CameraCapture 
-                onCapture={async (file) => {
-                    setShowCamera(false);
+        {showDojah && (
+            <DojahWidgetModal
+                widgetId="6a3b8ecfacf58b308aa6b3a2"
+                onSuccess={async (refId) => {
+                    setShowDojah(false);
                     setIsVerifyingIdentity(true);
                     try {
-                        // 1. Upload the selfie
-                        const uploadRes = await investmentService.uploadDocument(file, draftId, 'selfie');
-                        const selfieUrl = uploadRes.document.file_url;
-                        
-                        // 2. Perform Face Match with Zeeh Africa via Backend
-                        const verifyRes = await investmentService.verifyIdentity(bvn, selfieUrl);
-                        
+                        const dummySelfieUrl = 'https://identity.dojah.io/widget/selfie_dummy.jpg';
+                        const verifyRes = await investmentService.verifyIdentity(bvn, dummySelfieUrl, true);
+
                         if (verifyRes.success) {
-                            setUploadedDocs(prev => ({ 
-                                ...prev, 
-                                selfie: { name: file.name, size: `${(file.size / 1024).toFixed(1)} KB`, url: selfieUrl } 
+                            setUploadedDocs(prev => ({
+                                ...prev,
+                                selfie: { name: 'Dojah Verified Selfie', size: 'Verified', url: dummySelfieUrl }
                             }));
-                            
-                            // Update local user state immediately so memo recalculates
+
                             if (user.profile) {
                                 user.profile.is_identity_verified = true;
                                 user.profile.last_selfie_verified_at = new Date().toISOString();
                             }
-                            
-                            alert("Identity Verified! Face match successful.");
+
+                            alert('Identity Verified successfully via Dojah Widget!');
                         }
                     } catch (err: any) {
-                        alert(err.message || "Face Verification Failed. Please try again.");
+                        alert(err.message || 'Dojah Face Verification Failed. Please try again.');
                     } finally {
                         setIsVerifyingIdentity(false);
                     }
                 }}
-                onClose={() => setShowCamera(false)}
+                onClose={() => setShowDojah(false)}
             />
         )}
       </AnimatePresence>

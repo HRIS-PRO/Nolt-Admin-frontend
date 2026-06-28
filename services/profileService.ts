@@ -18,6 +18,7 @@ export interface UserProfile {
   nin: string;
   date_of_birth: string;
   is_identity_verified: boolean;
+  selfie_url?: string;
   verification_ref?: string;
   updated_at?: string;
   title?: string;
@@ -111,6 +112,17 @@ export const profileService = {
 
   getTotalInvestment: async (): Promise<{ success: boolean; investment_total: number | null; investment_count: number; message?: string }> => {
     const response = await axios.get(`${API_URL}/api/profile/investment-total`, { withCredentials: true });
+    return response.data;
+  },
+
+  verifySelfie: async (file: File, bvn?: string): Promise<{ success: boolean; message: string; selfie_url?: string; confidence?: number }> => {
+    const formData = new FormData();
+    formData.append('file', file);
+    if (bvn) formData.append('bvn', bvn);
+    const response = await axios.post(`${API_URL}/api/profile/selfie-verify`, formData, {
+      withCredentials: true,
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
     return response.data;
   }
 };
