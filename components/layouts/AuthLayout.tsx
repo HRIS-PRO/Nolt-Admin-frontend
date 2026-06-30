@@ -24,7 +24,7 @@ const AuthLayout: React.FC<AuthLayoutProps> = ({ children }) => {
                 <Link to="/" className="relative z-20 flex items-center gap-4 cursor-pointer mb-12">
                     <div className="w-16 h-16 rounded-2xl flex items-center justify-center overflow-hidden">
                         <img
-                            src="https://isswlcllytiltgjbysjv.supabase.co/storage/v1/object/public/template-images/logo%20file-02%20(1).png"
+                            src="https://pub-74b956e78e404291a932f28ada63b70c.r2.dev/logo%20updated%20white.png"
                             alt="NOLT Finance Logo"
                             className="w-full h-full object-contain p-1"
                         />
