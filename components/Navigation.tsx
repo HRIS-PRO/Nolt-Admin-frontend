@@ -37,7 +37,7 @@ const Navigation: React.FC<NavigationProps> = ({
         <div className="flex items-center gap-8">
         <Link to="/" className="flex items-center gap-3 cursor-pointer">
             <img 
-              src="https://noltfinance.s3.us-east-1.amazonaws.com/logo+updated+white.png" 
+              src="https://pub-74b956e78e404291a932f28ada63b70c.r2.dev/logo%20updated%20white.png"
               alt="NOLT Finance" 
               className="h-8 w-auto dark:brightness-100 [filter:invert(38%)_sepia(98%)_saturate(2136%)_hue-rotate(187deg)_brightness(101%)_contrast(101%)] dark:[filter:none] transition-all duration-300"
               referrerPolicy="no-referrer"

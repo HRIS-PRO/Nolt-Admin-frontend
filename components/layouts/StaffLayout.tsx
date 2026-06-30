@@ -73,7 +73,7 @@ const StaffLayout: React.FC<StaffLayoutProps> = ({ children, user, onLogout, tog
                     <Link to="/" className="flex items-center gap-3 cursor-pointer">
                         <div className="w-50 h-10 rounded-xl flex items-center justify-center overflow-hidden">
                             <img
-                                src="https://noltfinance.s3.us-east-1.amazonaws.com/logo+updated+white.png"
+                                src="https://pub-74b956e78e404291a932f28ada63b70c.r2.dev/logo%20updated%20white.png"
                                 alt="NOLT Finance Logo"
                                 className="w-full h-full object-contain"
                             />

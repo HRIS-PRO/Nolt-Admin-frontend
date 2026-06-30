@@ -957,7 +957,7 @@ const ApplicationsList: React.FC<ApplicationsListProps> = ({ navigate, formatMon
                   <div className="bg-[#028ff5] p-8 pb-4 text-white relative flex justify-between items-end min-h-[140px] rounded-t-[14px] print:rounded-none">
                     <div className="space-y-3">
                       <img 
-                        src="https://pub-74b956e78e404291a932f28ada63b70c.r2.dev/NF-Logo-White%20(2).png" 
+                        src="https://pub-74b956e78e404291a932f28ada63b70c.r2.dev/logo%20updated%20white.png"
                         alt="NOLT Finance" 
                         className="h-10 w-auto object-contain"
                       />
@@ -1123,7 +1123,7 @@ const ApplicationsList: React.FC<ApplicationsListProps> = ({ navigate, formatMon
                     <div className="space-y-6">
                       <div className="flex items-center gap-2 text-primary mb-2">
                          <img 
-                          src="https://noltfinance.s3.us-east-1.amazonaws.com/logo+updated+white.png" 
+                          src="https://pub-74b956e78e404291a932f28ada63b70c.r2.dev/logo%20updated%20white.png"
                           className="h-12 w-auto object-contain [filter:invert(38%)_sepia(98%)_saturate(2136%)_hue-rotate(187deg)_brightness(101%)_contrast(101%)] dark:[filter:none]" 
                           alt="NOLT" 
                         />
