@@ -41,6 +41,7 @@ import LogoutWarningModal from './components/modals/LogoutWarningModal';
 import JointAcceptancePage from './pages/investment/JointAcceptancePage';
 import CustomerDetailsPage from './pages/CustomerDetailsPage';
 import CbaMigrationPage from './pages/CbaMigrationPage';
+import PayrollUploadPage from './pages/PayrollUploadPage';
 
 // Setup Global Axios Interceptor for GPS Tracking
 axios.interceptors.request.use((config) => {
@@ -724,6 +725,15 @@ const AppContent: React.FC = () => {
               productType={lastProduct}
             />
           </ProtectedRoute>
+        } />
+
+        <Route path="/payroll-upload" element={
+          <PayrollUploadPage
+            user={user.isLoggedIn ? user : undefined}
+            onLogout={handleLogoutRequest}
+            toggleTheme={toggleTheme}
+            theme={theme}
+          />
         } />
 
         {/* Default Redirect */}
