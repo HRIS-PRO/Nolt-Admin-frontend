@@ -940,7 +940,7 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
         rep_house_number: '', // Add if needed, using empty for now
         draft_id: draftId,
         // Map URLs from uploadedDocs
-        rep_selfie_url: uploadedDocs.selfie?.url || null,
+        rep_selfie_url: uploadedDocs.selfie?.url || user.profile?.selfie_url || null,
         rep_id_url: uploadedDocs.gov_id?.url || null,
         secondary_id_url: uploadedDocs.secondary_id?.url || null,
         utility_bill_url: uploadedDocs.utility_bill?.url || null,
@@ -2029,13 +2029,13 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
                     setShowDojah(false);
                     setIsVerifyingIdentity(true);
                     try {
-                        const dummySelfieUrl = 'https://identity.dojah.io/widget/selfie_dummy.jpg';
-                        const verifyRes = await investmentService.verifyIdentity(bvn, dummySelfieUrl, true);
+                        const selfieUrl = user.profile?.selfie_url || 'https://identity.dojah.io/widget/selfie_dummy.jpg';
+                        const verifyRes = await investmentService.verifyIdentity(bvn, selfieUrl, true);
 
                         if (verifyRes.success) {
                             setUploadedDocs(prev => ({
                                 ...prev,
-                                selfie: { name: 'Dojah Verified Selfie', size: 'Verified', url: dummySelfieUrl }
+                                selfie: { name: 'Dojah Verified Selfie', size: 'Verified', url: selfieUrl }
                             }));
 
                             if (user.profile) {
@@ -2354,10 +2354,10 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
                   </div>
                 )}
                 <div className="absolute top-4 right-4 flex gap-2">
-                  <button onClick={() => signatureInputRef.current?.click()} className="text-[9px] font-black uppercase text-primary hover:text-white hover:bg-primary border border-primary/20 px-3 py-1 rounded-full transition-all bg-white/80 dark:bg-slate-800/80 flex items-center gap-1">
+                  {/* <button onClick={() => signatureInputRef.current?.click()} className="text-[9px] font-black uppercase text-primary hover:text-white hover:bg-primary border border-primary/20 px-3 py-1 rounded-full transition-all bg-white/80 dark:bg-slate-800/80 flex items-center gap-1">
                     <span className="material-symbols-outlined text-[10px]">photo_camera</span>
                     Snap/Upload
-                  </button>
+                  </button> */}
                   <button
                     onClick={clearSignature}
                     className="text-[9px] font-black uppercase text-red-500 hover:text-white hover:bg-red-500 border border-red-500/20 px-3 py-1 rounded-full transition-all bg-white/80 dark:bg-slate-800/80"

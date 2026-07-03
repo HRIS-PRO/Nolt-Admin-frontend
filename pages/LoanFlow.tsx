@@ -218,7 +218,7 @@ const LoanFlow: React.FC<LoanFlowProps> = ({ initialStep, onComplete, navigate, 
         govt_id_url: uploadedDocs.national_id?.url || null,
         statement_of_account_url: uploadedDocs.bank_statement?.url || null,
         proof_of_residence_url: uploadedDocs.proof_address?.url || null,
-        selfie_verification_url: uploadedDocs.selfie?.url || null,
+        selfie_verification_url: uploadedDocs.selfie?.url || user.profile?.selfie_url || null,
         work_id_url: uploadedDocs.work_id?.url || null,
         payslip_url: uploadedDocs.payslip?.url || null,
 
@@ -1259,16 +1259,16 @@ const LoanFlow: React.FC<LoanFlowProps> = ({ initialStep, onComplete, navigate, 
                   setShowDojah(false);
                   setIsVerifyingIdentity(true);
                   try {
-                    // Put a dummy URL as their selfie verification URL
-                    const dummySelfieUrl = 'https://identity.dojah.io/widget/selfie_dummy.jpg';
+                    // Prefer the customer's real profile selfie; fall back to a placeholder only if none exists
+                    const selfieUrl = user.profile?.selfie_url || 'https://identity.dojah.io/widget/selfie_dummy.jpg';
 
                     // Call backend verifyIdentity with is_dojah_widget_success set to true
-                    const verifyRes = await investmentService.verifyIdentity(bvn, dummySelfieUrl, true);
+                    const verifyRes = await investmentService.verifyIdentity(bvn, selfieUrl, true);
 
                     if (verifyRes.success) {
                       setUploadedDocs(prev => ({
                         ...prev,
-                        selfie: { name: 'Dojah Verified Selfie', size: 'Verified', url: dummySelfieUrl }
+                        selfie: { name: 'Dojah Verified Selfie', size: 'Verified', url: selfieUrl }
                       }));
                       // Update profile state so the 6-month memo recalculates
                       if (user.profile) {
