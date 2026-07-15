@@ -719,7 +719,7 @@ const ActionCard = ({ loan, userRole, onActionComplete }: { loan: any, userRole:
                         <button
                             onClick={() => {
                                 const stage = loan.stage || 'submitted';
-                                if (stage === 'customer_experience' || stage === 'submitted') {
+                                if (stage === 'customer_experience' || stage === 'submitted' || stage === 'sales') {
                                     setShowCXRejectModal(true);
                                 } else {
                                     handleAction('reject');
@@ -822,7 +822,7 @@ const ActionCard = ({ loan, userRole, onActionComplete }: { loan: any, userRole:
                                 {/* Header */}
                                 <div className="bg-red-600 px-6 py-5 flex items-start justify-between">
                                     <div>
-                                        <p className="text-[10px] font-black uppercase tracking-widest text-red-200 mb-1">Customer Experience Node</p>
+                                        <p className="text-[10px] font-black uppercase tracking-widest text-red-200 mb-1">{stage === 'sales' ? 'Sales Node' : 'Customer Experience Node'}</p>
                                         <h3 className="text-xl font-black text-white">Reject Application</h3>
                                         <p className="text-sm text-red-200 mt-1">Select the official rejection reason. An email will be sent to the customer.</p>
                                     </div>
