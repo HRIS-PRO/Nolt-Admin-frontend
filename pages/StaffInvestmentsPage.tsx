@@ -26,7 +26,7 @@ const TENURE_VALUES = [30, 60, 90, 120, 150, 180, 210, 240, 270, 300, 330, 365];
 
 const StaffInvestmentsPage: React.FC<StaffInvestmentsPageProps> = ({ user, onLogout, toggleTheme, theme }) => {
     const navigate = useNavigate();
-    const [activeTab, setActiveTab] = useState<'applications' | 'rate_guide'>('applications');
+    const [activeTab, setActiveTab] = useState<'applications' | 'mobile' | 'rate_guide'>('applications');
     const [showAddRateForm, setShowAddRateForm] = useState(false);
     const [isInfinity, setIsInfinity] = useState(false);
     const [rates, setRates] = useState<any[]>([]);
@@ -260,6 +260,38 @@ const StaffInvestmentsPage: React.FC<StaffInvestmentsPageProps> = ({ user, onLog
         }
     };
 
+    // Mobile instant investments (created via the mobile app + CBA — read-only)
+    const [mobileInvestments, setMobileInvestments] = useState<any[]>([]);
+    const [mobileSearchQuery, setMobileSearchQuery] = useState('');
+    const [mobileStatusFilter, setMobileStatusFilter] = useState('all');
+    const [selectedMobileInvestment, setSelectedMobileInvestment] = useState<any>(null);
+    const [mobileDetailLoading, setMobileDetailLoading] = useState(false);
+
+    const fetchMobileInvestments = async () => {
+        try {
+            setLoading(true);
+            const response = await axios.get('/api/staff/investments/mobile', { withCredentials: true });
+            setMobileInvestments(response.data);
+        } catch (error) {
+            console.error('Error fetching mobile investments:', error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const openMobileInvestmentDetail = async (id: number) => {
+        try {
+            setMobileDetailLoading(true);
+            const response = await axios.get(`/api/staff/investments/mobile/${id}`, { withCredentials: true });
+            setSelectedMobileInvestment(response.data);
+        } catch (error) {
+            console.error('Error fetching mobile investment detail:', error);
+            alert('Could not load mobile investment details.');
+        } finally {
+            setMobileDetailLoading(false);
+        }
+    };
+
     const [officers, setOfficers] = useState<any[]>([]);
 
     const fetchOfficers = async () => {
@@ -313,6 +345,8 @@ const StaffInvestmentsPage: React.FC<StaffInvestmentsPageProps> = ({ user, onLog
     useEffect(() => {
         if (activeTab === 'rate_guide') {
             fetchRates();
+        } else if (activeTab === 'mobile') {
+            fetchMobileInvestments();
         } else {
             fetchInvestments();
             fetchOfficers();
@@ -1409,6 +1443,15 @@ const StaffInvestmentsPage: React.FC<StaffInvestmentsPageProps> = ({ user, onLog
                             >
                                 APPLICATIONS
                             </button>
+                            <button
+                                onClick={() => { setActiveTab('mobile'); handleCloseForm(); }}
+                                className={`px-6 py-2 rounded-xl text-xs font-black transition-all uppercase tracking-widest ${activeTab === 'mobile'
+                                    ? 'bg-white dark:bg-slate-700 text-purple-600 shadow-sm'
+                                    : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+                                    }`}
+                            >
+                                MOBILE INVESTMENTS
+                            </button>
                             {/* <button
                                 onClick={() => { setActiveTab('rate_guide'); handleCloseForm(); }}
                                 className={`px-6 py-2 rounded-xl text-xs font-black transition-all uppercase tracking-widest ${activeTab === 'rate_guide'
@@ -1767,6 +1810,140 @@ const StaffInvestmentsPage: React.FC<StaffInvestmentsPageProps> = ({ user, onLog
                                 </div>
                             </div>
                         );
+                    })() : activeTab === 'mobile' ? (() => {
+                        const filteredMobile = mobileInvestments.filter(inv => {
+                            const matchesSearch = !mobileSearchQuery ||
+                                (inv.customer_name && inv.customer_name.toLowerCase().includes(mobileSearchQuery.toLowerCase())) ||
+                                (inv.cba_td_account_number && inv.cba_td_account_number.includes(mobileSearchQuery)) ||
+                                (inv.id && inv.id.toString().includes(mobileSearchQuery));
+                            const matchesStatus = mobileStatusFilter === 'all' || (inv.status || '').toLowerCase() === mobileStatusFilter;
+                            return matchesSearch && matchesStatus;
+                        });
+
+                        return (
+                            <div className="bg-white dark:bg-[#1e293b] rounded-[32px] border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm">
+                                <div className="p-6 border-b border-slate-200 dark:border-slate-800 flex flex-col md:flex-row justify-between items-center bg-slate-50 dark:bg-[#0f172a]/50 gap-4">
+                                    <div>
+                                        <h3 className="font-black text-lg text-slate-900 dark:text-white">Mobile Investments</h3>
+                                        <p className="text-slate-500 text-xs font-medium">
+                                            Created instantly from the mobile app via core banking — record only, no approval required. Total: {filteredMobile.length}
+                                        </p>
+                                    </div>
+                                    <div className="flex items-center gap-4 flex-wrap">
+                                        <div className="relative">
+                                            <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">search</span>
+                                            <input
+                                                type="text"
+                                                placeholder="Search name, TD account..."
+                                                value={mobileSearchQuery}
+                                                onChange={(e) => setMobileSearchQuery(e.target.value)}
+                                                className="pl-10 pr-4 py-2 bg-white dark:bg-[#1e293b] border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-bold w-56 focus:outline-none focus:border-purple-500"
+                                            />
+                                        </div>
+                                        <select
+                                            value={mobileStatusFilter}
+                                            onChange={(e) => setMobileStatusFilter(e.target.value)}
+                                            className="px-4 py-2 bg-white dark:bg-[#1e293b] border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300 outline-none"
+                                        >
+                                            <option value="all">All Status</option>
+                                            <option value="active">Active</option>
+                                            <option value="liquidated">Liquidated</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-left">
+                                        <thead className="bg-slate-50/50 dark:bg-[#0f172a]/30 text-[10px] uppercase text-slate-500 font-black tracking-widest">
+                                            <tr>
+                                                <th className="px-6 py-4">Customer</th>
+                                                <th className="px-6 py-4">TD Account</th>
+                                                <th className="px-6 py-4">Product</th>
+                                                <th className="px-6 py-4 text-right">Amount</th>
+                                                <th className="px-6 py-4 text-center">Rate</th>
+                                                <th className="px-6 py-4 text-center">Tenure</th>
+                                                <th className="px-6 py-4 text-center">Top-ups</th>
+                                                <th className="px-6 py-4">Branch</th>
+                                                <th className="px-6 py-4 text-center">Status</th>
+                                                <th className="px-6 py-4">Created</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-100 dark:divide-slate-800/50">
+                                            {loading ? (
+                                                <tr>
+                                                    <td colSpan={10} className="px-8 py-20 text-center text-slate-400 text-[10px] font-black uppercase tracking-widest">
+                                                        Loading mobile investments...
+                                                    </td>
+                                                </tr>
+                                            ) : filteredMobile.length > 0 ? (
+                                                filteredMobile.map((inv) => (
+                                                    <tr
+                                                        key={inv.id}
+                                                        className="group hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-all cursor-pointer"
+                                                        onClick={() => openMobileInvestmentDetail(inv.id)}
+                                                    >
+                                                        <td className="px-6 py-5">
+                                                            <p className="font-black text-slate-900 dark:text-white text-sm">{inv.customer_name || '—'}</p>
+                                                            <p className="text-[11px] text-slate-400 font-medium">{inv.customer_email || inv.customer_phone || ''}</p>
+                                                        </td>
+                                                        <td className="px-6 py-5 font-mono text-xs font-bold text-slate-600 dark:text-slate-300">
+                                                            {inv.cba_td_account_number || '—'}
+                                                        </td>
+                                                        <td className="px-6 py-5">
+                                                            <span className="text-xs font-bold text-slate-700 dark:text-slate-200">
+                                                                {inv.product_name || inv.investment_type?.replace('NOLT_', 'NOLT ') || '—'}
+                                                            </span>
+                                                        </td>
+                                                        <td className="px-6 py-5 text-right font-black text-slate-900 dark:text-white text-sm">
+                                                            ₦{Number(inv.investment_amount || 0).toLocaleString()}
+                                                        </td>
+                                                        <td className="px-6 py-5 text-center text-xs font-bold text-slate-600 dark:text-slate-300">
+                                                            {inv.interest_rate ? `${Number(inv.interest_rate)}%` : '—'}
+                                                        </td>
+                                                        <td className="px-6 py-5 text-center text-xs font-bold text-slate-600 dark:text-slate-300">
+                                                            {inv.tenure_days ? `${inv.tenure_days}d` : '—'}
+                                                        </td>
+                                                        <td className="px-6 py-5 text-center">
+                                                            {Number(inv.top_up_count) > 0 ? (
+                                                                <span className="px-2.5 py-1 rounded-lg bg-blue-500/10 border border-blue-500/30 text-blue-500 text-[10px] font-black">
+                                                                    {inv.top_up_count} · ₦{Number(inv.top_up_total || 0).toLocaleString()}
+                                                                </span>
+                                                            ) : (
+                                                                <span className="text-slate-300 dark:text-slate-600 text-xs">—</span>
+                                                            )}
+                                                        </td>
+                                                        <td className="px-6 py-5 text-xs font-bold text-slate-600 dark:text-slate-300">
+                                                            {inv.branch || '—'}
+                                                        </td>
+                                                        <td className="px-6 py-5 text-center">
+                                                            <span className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest border ${
+                                                                (inv.status || '').toLowerCase() === 'liquidated'
+                                                                    ? 'bg-orange-500/10 border-orange-500/30 text-orange-500'
+                                                                    : 'bg-green-500/10 border-green-500/30 text-green-500'
+                                                            }`}>
+                                                                {inv.status || 'active'}
+                                                            </span>
+                                                        </td>
+                                                        <td className="px-6 py-5 text-xs font-bold text-slate-500 dark:text-slate-400">
+                                                            {inv.created_at ? new Date(inv.created_at).toLocaleDateString('en-NG', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}
+                                                        </td>
+                                                    </tr>
+                                                ))
+                                            ) : (
+                                                <tr>
+                                                    <td colSpan={10} className="px-8 py-20 text-center">
+                                                        <div className="flex flex-col items-center gap-3 text-slate-400">
+                                                            <span className="material-symbols-outlined text-4xl">smartphone</span>
+                                                            <p className="text-[10px] font-black uppercase tracking-[0.2em]">No mobile investments yet</p>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            )}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        );
                     })() : (
                         <div className="flex flex-col lg:flex-row gap-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
                             {/* Left Side: Rates Table */}
@@ -1885,6 +2062,151 @@ const StaffInvestmentsPage: React.FC<StaffInvestmentsPageProps> = ({ user, onLog
                                         </div>
                                     </div>
                                 </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {(selectedMobileInvestment || mobileDetailLoading) && (
+                        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+                            <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setSelectedMobileInvestment(null)} />
+                            <div className="relative bg-white dark:bg-[#1e293b] rounded-[32px] border border-slate-200 dark:border-slate-800 shadow-2xl w-full max-w-2xl max-h-[85vh] overflow-y-auto">
+                                {mobileDetailLoading ? (
+                                    <div className="p-16 text-center text-slate-400 text-[10px] font-black uppercase tracking-widest">
+                                        Loading details...
+                                    </div>
+                                ) : selectedMobileInvestment && (
+                                    <>
+                                        <div className="p-8 border-b border-slate-100 dark:border-slate-800 flex justify-between items-start">
+                                            <div>
+                                                <div className="flex items-center gap-3">
+                                                    <span className="material-symbols-outlined text-purple-500">smartphone</span>
+                                                    <h3 className="text-xl font-black text-slate-900 dark:text-white">
+                                                        Mobile Investment INV-{selectedMobileInvestment.id}
+                                                    </h3>
+                                                </div>
+                                                <p className="text-slate-500 text-xs font-medium mt-1">
+                                                    Created from the mobile app via core banking. Read-only — no staff action required.
+                                                </p>
+                                            </div>
+                                            <button
+                                                onClick={() => setSelectedMobileInvestment(null)}
+                                                className="size-9 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors flex items-center justify-center"
+                                            >
+                                                <span className="material-symbols-outlined text-lg">close</span>
+                                            </button>
+                                        </div>
+
+                                        <div className="p-8 grid grid-cols-2 gap-x-8 gap-y-5">
+                                            <div>
+                                                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Customer</p>
+                                                <p className="font-bold text-slate-900 dark:text-white text-sm mt-1">{selectedMobileInvestment.customer_name || '—'}</p>
+                                                <p className="text-xs text-slate-400">{selectedMobileInvestment.customer_email || selectedMobileInvestment.customer_phone || ''}</p>
+                                            </div>
+                                            <div>
+                                                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">TD Account</p>
+                                                <p className="font-mono font-bold text-slate-900 dark:text-white text-sm mt-1">{selectedMobileInvestment.cba_td_account_number || '—'}</p>
+                                            </div>
+                                            <div>
+                                                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Product</p>
+                                                <p className="font-bold text-slate-900 dark:text-white text-sm mt-1">
+                                                    {selectedMobileInvestment.product_name || selectedMobileInvestment.investment_type?.replace('NOLT_', 'NOLT ') || '—'}
+                                                </p>
+                                            </div>
+                                            <div>
+                                                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Principal</p>
+                                                <p className="font-black text-slate-900 dark:text-white text-sm mt-1">₦{Number(selectedMobileInvestment.investment_amount || 0).toLocaleString()}</p>
+                                            </div>
+                                            <div>
+                                                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Rate / Tenure</p>
+                                                <p className="font-bold text-slate-900 dark:text-white text-sm mt-1">
+                                                    {selectedMobileInvestment.interest_rate ? `${Number(selectedMobileInvestment.interest_rate)}% P.A` : '—'} · {selectedMobileInvestment.tenure_days || '—'} days
+                                                </p>
+                                            </div>
+                                            <div>
+                                                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Status</p>
+                                                <span className={`inline-block mt-1 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest border ${
+                                                    (selectedMobileInvestment.status || '').toLowerCase() === 'liquidated'
+                                                        ? 'bg-orange-500/10 border-orange-500/30 text-orange-500'
+                                                        : 'bg-green-500/10 border-green-500/30 text-green-500'
+                                                }`}>
+                                                    {selectedMobileInvestment.status || 'active'}
+                                                </span>
+                                            </div>
+                                            <div>
+                                                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Start Date</p>
+                                                <p className="font-bold text-slate-900 dark:text-white text-sm mt-1">
+                                                    {selectedMobileInvestment.start_date ? new Date(selectedMobileInvestment.start_date).toLocaleDateString('en-NG', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}
+                                                </p>
+                                            </div>
+                                            <div>
+                                                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Maturity Date</p>
+                                                <p className="font-bold text-slate-900 dark:text-white text-sm mt-1">
+                                                    {selectedMobileInvestment.maturity_date ? new Date(selectedMobileInvestment.maturity_date).toLocaleDateString('en-NG', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}
+                                                </p>
+                                            </div>
+                                            <div>
+                                                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Settlement Account</p>
+                                                <p className="font-mono font-bold text-slate-900 dark:text-white text-sm mt-1">{selectedMobileInvestment.casa_account_number || '—'}</p>
+                                            </div>
+                                            <div>
+                                                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Branch</p>
+                                                <p className="font-bold text-slate-900 dark:text-white text-sm mt-1">{selectedMobileInvestment.branch || '—'}</p>
+                                            </div>
+                                        </div>
+
+                                        {(selectedMobileInvestment.status || '').toLowerCase() === 'liquidated' && (
+                                            <div className="mx-8 mb-6 p-5 rounded-2xl bg-orange-500/5 border border-orange-500/20">
+                                                <p className="text-[10px] font-black uppercase tracking-widest text-orange-500 mb-3">Liquidation</p>
+                                                <div className="grid grid-cols-2 gap-4 text-sm">
+                                                    <div>
+                                                        <p className="text-xs text-slate-400 font-medium">Requested amount</p>
+                                                        <p className="font-bold text-slate-900 dark:text-white">₦{Number(selectedMobileInvestment.liquidation_requested_amount || 0).toLocaleString()}</p>
+                                                    </div>
+                                                    <div>
+                                                        <p className="text-xs text-slate-400 font-medium">Penalty</p>
+                                                        <p className="font-bold text-slate-900 dark:text-white">₦{Number(selectedMobileInvestment.liquidation_penalty_amount || 0).toLocaleString()}</p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        <div className="px-8 pb-8">
+                                            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-3">
+                                                Top-up history ({(selectedMobileInvestment.top_ups || []).length})
+                                            </p>
+                                            {(selectedMobileInvestment.top_ups || []).length > 0 ? (
+                                                <div className="rounded-2xl border border-slate-100 dark:border-slate-800 overflow-hidden">
+                                                    <table className="w-full text-left">
+                                                        <thead className="bg-slate-50 dark:bg-[#0f172a]/40 text-[10px] uppercase text-slate-400 font-black tracking-widest">
+                                                            <tr>
+                                                                <th className="px-5 py-3">Date</th>
+                                                                <th className="px-5 py-3 text-right">Amount</th>
+                                                                <th className="px-5 py-3">Settlement Acct</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody className="divide-y divide-slate-50 dark:divide-slate-800/50">
+                                                            {selectedMobileInvestment.top_ups.map((t: any) => (
+                                                                <tr key={t.id}>
+                                                                    <td className="px-5 py-3 text-xs font-bold text-slate-600 dark:text-slate-300">
+                                                                        {t.created_at ? new Date(t.created_at).toLocaleString('en-NG', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'}
+                                                                    </td>
+                                                                    <td className="px-5 py-3 text-right font-black text-slate-900 dark:text-white text-sm">
+                                                                        ₦{Number(t.amount || 0).toLocaleString()}
+                                                                    </td>
+                                                                    <td className="px-5 py-3 font-mono text-xs font-bold text-slate-600 dark:text-slate-300">
+                                                                        {t.settlement_acct || '—'}
+                                                                    </td>
+                                                                </tr>
+                                                            ))}
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            ) : (
+                                                <p className="text-xs text-slate-400 font-medium">No top-ups recorded for this investment.</p>
+                                            )}
+                                        </div>
+                                    </>
+                                )}
                             </div>
                         </div>
                     )}
