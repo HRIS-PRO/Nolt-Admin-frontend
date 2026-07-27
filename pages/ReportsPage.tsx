@@ -72,6 +72,69 @@ const ReportsPage: React.FC<ReportsPageProps> = ({ user, onLogout, toggleTheme, 
         fetchReports();
     };
 
+    // Static mapping from common Nigerian Bank Names to 3-digit CBN Sort Codes
+    const BANK_CODE_MAP: Record<string, string> = {
+        'first bank of nigeria': '011',
+        'first bank': '011',
+        'guaranty trust bank': '058',
+        'gtbank': '058',
+        'gtb': '058',
+        'first city monument bank': '214',
+        'fcmb': '214',
+        'united bank for africa': '033',
+        'uba': '033',
+        'access bank': '044',
+        'access bank (diamond)': '063',
+        'diamond bank': '063',
+        'zenith bank': '057',
+        'zenith': '057',
+        'ecobank nigeria': '050',
+        'ecobank': '050',
+        'union bank of nigeria': '032',
+        'union bank': '032',
+        'stanbic ibtc bank': '221',
+        'stanbic ibtc': '221',
+        'stanbic': '221',
+        'fidelity bank': '070',
+        'fidelity': '070',
+        'polaris bank': '076',
+        'polaris': '076',
+        'keystone bank': '082',
+        'keystone': '082',
+        'wema bank': '035',
+        'wema': '035',
+        'jaiz bank': '301',
+        'jaiz': '301',
+        'sterling bank': '232',
+        'sterling': '232',
+        'unity bank': '215',
+        'unity': '215',
+        'opay digital services limited (opay)': '304',
+        'opay': '304',
+        'providus bank': '101',
+        'providus': '101',
+        'suntrust bank': '100',
+        'suntrust': '100',
+        'fcmb mfb': '214',
+        'standard chartered bank': '068',
+        'standard chartered': '068',
+        'fairmoney microfinance bank': '51318',
+        'fairmoney': '51318',
+        'moniepoint mfb': '50515',
+        'moniepoint': '50515',
+        'npf microfinance bank': '50629',
+        'ahmadu bello university microfinance bank': '50036',
+        'kuda bank': '50211',
+        'kuda': '50211',
+        'palmpay': '999991',
+        'taj bank': '302',
+        'globus bank': '103',
+        'titan trust bank': '102',
+        'lotus bank': '303',
+        'parallex bank': '526',
+        'premiumtrust bank': '105'
+    };
+
     // Helper: Format record for Zenith Bank Payout Report
     const formatZenithRecord = (r: any) => {
         const verifiedName = r.verified_bank_name || r.account_name || r.applicant_full_name || '';
@@ -100,8 +163,12 @@ const ReportsPage: React.FC<ReportsPageProps> = ({ user, onLogout, toggleTheme, 
         // 6. BENEFICIARY ACCOUNT NUMBER: account number provided at verification (preserve starting 0)
         const beneficiaryAccount = r.account_number ? String(r.account_number) : '';
 
-        // 7. BENEFICIARY BANK SORT CODE: bank code from Paystack enquiry endpoint (preserve starting 0)
+        // 7. BENEFICIARY BANK SORT CODE: bank code from profile or mapped from bank_name (preserve starting 0)
         let bankSortCode = r.bank_code ? String(r.bank_code) : '';
+        if (!bankSortCode && r.bank_name) {
+            const normalizedName = String(r.bank_name).trim().toLowerCase();
+            bankSortCode = BANK_CODE_MAP[normalizedName] || '';
+        }
         if (bankSortCode.length > 0 && bankSortCode.length < 3 && /^\d+$/.test(bankSortCode)) {
             bankSortCode = bankSortCode.padStart(3, '0');
         }
