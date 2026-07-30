@@ -4,7 +4,7 @@ import { profileService, UserProfile } from '../services/profileService';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { maskValue } from '../utils/maskHelper';
-import ProfileDojahVerification, { type ProfileDojahSdkSession } from '../components/ProfileDojahVerification';
+import ProfileDojahVerification from '../components/ProfileDojahVerification';
 
 const NIGERIAN_STATES = [
     "Abia", "Adamawa", "Akwa Ibom", "Anambra", "Bauchi", "Bayelsa", "Benue", "Borno", 
@@ -45,7 +45,7 @@ const ProfilePage: React.FC = () => {
 
     // Dojah liveness state
     const [showDojah, setShowDojah] = useState(false);
-    const [dojahSession, setDojahSession] = useState<ProfileDojahSdkSession | null>(null);
+    const [dojahWidgetUrl, setDojahWidgetUrl] = useState<string | null>(null);
     const [dojahReferenceId, setDojahReferenceId] = useState<string | null>(null);
     const [selfieVerified, setSelfieVerified] = useState(false);
     const [selfieLoading, setSelfieLoading] = useState(false);
@@ -239,14 +239,11 @@ const ProfilePage: React.FC = () => {
                 date_of_birth: profile.date_of_birth,
             });
 
-            if (!session.success || !session.reference_id || !session.sdk) {
+            if (!session.success || !session.reference_id || !session.widget_url) {
                 throw new Error(session.message || 'Could not start Dojah verification session.');
             }
 
-            setDojahSession({
-                reference_id: session.reference_id,
-                ...session.sdk,
-            });
+            setDojahWidgetUrl(session.widget_url);
             setDojahReferenceId(session.reference_id);
             setShowDojah(true);
         } catch (err: any) {
@@ -266,7 +263,7 @@ const ProfilePage: React.FC = () => {
         dojahReferenceId?: string;
     }) => {
         setShowDojah(false);
-        setDojahSession(null);
+        setDojahWidgetUrl(null);
         setSelfieLoading(true);
         setSelfieError(null);
 
@@ -1062,17 +1059,18 @@ const ProfilePage: React.FC = () => {
         </div>
 
         <AnimatePresence>
-            {showDojah && dojahSession && (
+            {showDojah && dojahWidgetUrl && dojahReferenceId && (
                 <ProfileDojahVerification
-                    session={dojahSession}
+                    widgetUrl={dojahWidgetUrl}
+                    expectedReferenceId={dojahReferenceId}
                     onSuccess={handleDojahSuccess}
                     onClose={() => {
                         setShowDojah(false);
-                        setDojahSession(null);
+                        setDojahWidgetUrl(null);
                     }}
                     onError={(message) => {
                         setShowDojah(false);
-                        setDojahSession(null);
+                        setDojahWidgetUrl(null);
                         setSelfieError(message);
                     }}
                 />

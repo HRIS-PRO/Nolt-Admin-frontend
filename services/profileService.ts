@@ -138,16 +138,8 @@ export const profileService = {
     success: boolean;
     message?: string;
     reference_id: string;
-    widget_url?: string;
+    widget_url: string;
     webhook_url: string;
-    sdk: {
-      app_id: string;
-      public_key: string;
-      widget_id: string;
-      user_data: Record<string, string>;
-      gov_data: Record<string, string>;
-      metadata: Record<string, string | number>;
-    };
   }> => {
     const response = await axios.post(`${API_URL}/api/profile/dojah-session`, profile, { withCredentials: true });
     return response.data;

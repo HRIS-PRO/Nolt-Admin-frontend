@@ -139,9 +139,9 @@ const ReportsPage: React.FC<ReportsPageProps> = ({ user, onLogout, toggleTheme, 
     const formatZenithRecord = (r: any) => {
         const verifiedName = r.verified_bank_name || r.account_name || r.applicant_full_name || '';
 
-        // 1. TRANSACTION REFERENCE NUMBER: static 'LOAN - ' concatenated with customer verified bank name. NO spaces. Max 30 chars.
-        const cleanName = String(verifiedName).replace(/\s+/g, '');
-        const transactionRef = `LOAN-${cleanName}`.slice(0, 30);
+        // 1. TRANSACTION REFERENCE NUMBER: "LOAN - FIRST MIDDLE LAST" (spaces kept). Max 30 chars.
+        const spacedName = String(verifiedName).trim().replace(/\s+/g, ' ').toUpperCase();
+        const transactionRef = spacedName ? `LOAN - ${spacedName}`.slice(0, 30) : 'LOAN';
 
         // 2. BENEFICIARY NAME: verified bank name. Max 100 characters.
         const beneficiaryName = String(verifiedName).slice(0, 100);
