@@ -158,7 +158,12 @@ export const profileService = {
     return response.data;
   },
 
-  completeDojahVerification: async (referenceId: string): Promise<{
+  completeDojahVerification: async (input: {
+    reference_id: string;
+    dojah_reference_id?: string;
+    selfie_url?: string;
+    widget_completed?: boolean;
+  }): Promise<{
     success: boolean;
     message: string;
     selfie_url?: string;
@@ -167,10 +172,13 @@ export const profileService = {
     last_selfie_verified_at?: string;
     pending?: boolean;
     verification_status?: string;
+    webhook_received?: boolean;
+    webhook_url?: string;
+    source?: string;
   }> => {
     const response = await axios.post(
       `${API_URL}/api/profile/complete-dojah-verification`,
-      { reference_id: referenceId },
+      input,
       { withCredentials: true },
     );
     return response.data;
