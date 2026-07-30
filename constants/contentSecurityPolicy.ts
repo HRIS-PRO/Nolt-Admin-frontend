@@ -1,7 +1,7 @@
 /** Shared CSP — keep in sync with vercel.json production headers. */
 export const CONTENT_SECURITY_POLICY =
   "default-src 'self'; base-uri 'self'; object-src 'none'; " +
-  "script-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com https://www.googletagmanager.com " +
+  "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.tailwindcss.com https://www.googletagmanager.com " +
   "https://js.paystack.co https://paystack.co https://*.paystack.co https://paystack.com https://*.paystack.com " +
   "https://esm.sh https://static.zdassets.com https://ekr.zdassets.com https://zendesk.com https://*.zendesk.com " +
   "https://connect.facebook.net https://doubleclick.net https://*.doubleclick.net https://googleadservices.com " +
