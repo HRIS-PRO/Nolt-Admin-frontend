@@ -1255,7 +1255,7 @@ const LoanFlow: React.FC<LoanFlowProps> = ({ initialStep, onComplete, navigate, 
             {showDojah && (
               <DojahWidgetModal
                 widgetId="6a3b8ecfacf58b308aa6b3a2"
-                onSuccess={async (refId) => {
+                onSuccess={async ({ referenceId: refId }) => {
                   setShowDojah(false);
                   setIsVerifyingIdentity(true);
                   try {

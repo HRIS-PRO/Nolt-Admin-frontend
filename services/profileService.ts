@@ -18,6 +18,7 @@ export interface UserProfile {
   nin: string;
   date_of_birth: string;
   is_identity_verified: boolean;
+  last_selfie_verified_at?: string;
   selfie_url?: string;
   verification_ref?: string;
   updated_at?: string;
@@ -115,7 +116,14 @@ export const profileService = {
     return response.data;
   },
 
-  verifySelfie: async (file: File, bvn?: string): Promise<{ success: boolean; message: string; selfie_url?: string; confidence?: number }> => {
+  verifySelfie: async (file: File, bvn?: string): Promise<{
+    success: boolean;
+    message: string;
+    selfie_url?: string;
+    confidence?: number;
+    is_identity_verified?: boolean;
+    last_selfie_verified_at?: string;
+  }> => {
     const formData = new FormData();
     formData.append('file', file);
     if (bvn) formData.append('bvn', bvn);
@@ -124,5 +132,47 @@ export const profileService = {
       headers: { 'Content-Type': 'multipart/form-data' }
     });
     return response.data;
-  }
+  },
+
+  startDojahSession: async (profile: Partial<UserProfile>): Promise<{
+    success: boolean;
+    reference_id: string;
+    widget_url: string;
+    webhook_url: string;
+  }> => {
+    const response = await axios.post(`${API_URL}/api/profile/dojah-session`, profile, { withCredentials: true });
+    return response.data;
+  },
+
+  getDojahVerificationStatus: async (referenceId: string): Promise<{
+    success: boolean;
+    completed?: boolean;
+    pending?: boolean;
+    selfie_url?: string;
+    verification_status?: string;
+    message?: string;
+  }> => {
+    const response = await axios.get(`${API_URL}/api/profile/dojah-verification/${encodeURIComponent(referenceId)}`, {
+      withCredentials: true,
+    });
+    return response.data;
+  },
+
+  completeDojahVerification: async (referenceId: string): Promise<{
+    success: boolean;
+    message: string;
+    selfie_url?: string;
+    confidence?: number;
+    is_identity_verified?: boolean;
+    last_selfie_verified_at?: string;
+    pending?: boolean;
+    verification_status?: string;
+  }> => {
+    const response = await axios.post(
+      `${API_URL}/api/profile/complete-dojah-verification`,
+      { reference_id: referenceId },
+      { withCredentials: true },
+    );
+    return response.data;
+  },
 };
