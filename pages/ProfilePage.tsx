@@ -4,7 +4,7 @@ import { profileService, UserProfile } from '../services/profileService';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { maskValue } from '../utils/maskHelper';
-import CameraCapture from '../components/CameraCapture';
+import DojahWidgetModal from '../components/DojahWidgetModal';
 
 const NIGERIAN_STATES = [
     "Abia", "Adamawa", "Akwa Ibom", "Anambra", "Bauchi", "Bayelsa", "Benue", "Borno", 
@@ -43,8 +43,10 @@ const ProfilePage: React.FC = () => {
     const [banks, setBanks] = useState<{ name: string; code: string }[]>([]);
     const formRef = useRef<HTMLDivElement>(null);
 
-    // Selfie state
-    const [showCamera, setShowCamera] = useState(false);
+    // Dojah liveness state
+    const [showDojah, setShowDojah] = useState(false);
+    const [dojahWidgetUrl, setDojahWidgetUrl] = useState<string | null>(null);
+    const [dojahReferenceId, setDojahReferenceId] = useState<string | null>(null);
     const [selfieVerified, setSelfieVerified] = useState(false);
     const [selfieLoading, setSelfieLoading] = useState(false);
     const [selfieError, setSelfieError] = useState<string | null>(null);
@@ -82,7 +84,7 @@ const ProfilePage: React.FC = () => {
                     p.date_of_birth = p.date_of_birth.split('T')[0];
                 }
                 setProfile(p);
-                if (p.selfie_url) {
+                if (p.is_identity_verified || p.selfie_url) {
                     setSelfieVerified(true);
                 }
             }
@@ -217,23 +219,78 @@ const ProfilePage: React.FC = () => {
         }
     };
 
-    const handleSelfieCapture = async (file: File) => {
-        setShowCamera(false);
+    const handleStartDojahVerification = async () => {
+        if (!profile.bvn || profile.bvn.length !== 11) {
+            setSelfieError('Please enter and verify your BVN in the Identity tab first.');
+            return;
+        }
+
         setSelfieLoading(true);
         setSelfieError(null);
         setSelfieConfidence(null);
+
         try {
-            const res = await profileService.verifySelfie(file, profile.bvn || undefined);
-            if (res.success) {
+            const session = await profileService.startDojahSession({
+                bvn: profile.bvn,
+                first_name: profile.first_name,
+                middle_name: profile.middle_name,
+                surname: profile.surname,
+                personal_email: profile.personal_email,
+                date_of_birth: profile.date_of_birth,
+            });
+
+            if (!session.success || !session.widget_url || !session.reference_id) {
+                throw new Error('Could not start Dojah verification session.');
+            }
+
+            setDojahWidgetUrl(session.widget_url);
+            setDojahReferenceId(session.reference_id);
+            setShowDojah(true);
+        } catch (err: any) {
+            setSelfieError(err.response?.data?.message || err.message || 'Could not open Dojah verification.');
+        } finally {
+            setSelfieLoading(false);
+        }
+    };
+
+    const handleDojahSuccess = async ({ referenceId }: { referenceId: string; selfieUrl?: string }) => {
+        setShowDojah(false);
+        setSelfieLoading(true);
+        setSelfieError(null);
+
+        try {
+            let res = null;
+            for (let attempt = 0; attempt < 10; attempt += 1) {
+                try {
+                    res = await profileService.completeDojahVerification(referenceId);
+                    if (res.success) break;
+                } catch (err: any) {
+                    const pending = err.response?.status === 409;
+                    if (!pending || attempt === 9) throw err;
+                }
+                await new Promise((resolve) => setTimeout(resolve, 1500));
+            }
+
+            if (res?.success) {
                 setSelfieVerified(true);
-                setSelfieConfidence(res.confidence ?? null);
-                setProfile(prev => ({ ...prev, selfie_url: res.selfie_url }));
+                setSelfieConfidence(res.confidence ?? 100);
+                setProfile(prev => ({
+                    ...prev,
+                    selfie_url: res.selfie_url,
+                    is_identity_verified: true,
+                    last_selfie_verified_at: res.last_selfie_verified_at || new Date().toISOString(),
+                }));
+                window.dispatchEvent(new Event('user-profile-updated'));
             } else {
-                setSelfieError(res.message || 'Face does not match. Please try again.');
-                setSelfieConfidence(res.confidence ?? null);
+                setSelfieError(res?.message || 'Verification could not be confirmed. Please try again.');
             }
         } catch (err: any) {
-            setSelfieError(err.response?.data?.message || 'Verification failed. Please try again.');
+            const pending = err.response?.status === 409;
+            setSelfieError(
+                pending
+                    ? 'Verification is still processing. Wait a few seconds and tap Try Again.'
+                    : err.response?.data?.message || err.message || 'Verification failed. Please try again.',
+            );
         } finally {
             setSelfieLoading(false);
         }
@@ -782,8 +839,8 @@ const ProfilePage: React.FC = () => {
                                                     <span className="material-symbols-outlined font-black">face</span>
                                                 </div>
                                                 <div>
-                                                    <h3 className="text-xl font-black text-slate-900 dark:text-white">Selfie Verification</h3>
-                                                    <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">Match your face to your BVN record</p>
+                                                    <h3 className="text-xl font-black text-slate-900 dark:text-white">Identity Verification</h3>
+                                                    <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">Secure liveness check via Dojah</p>
                                                 </div>
                                             </div>
 
@@ -810,10 +867,10 @@ const ProfilePage: React.FC = () => {
                                                     )}
                                                     <button
                                                         type="button"
-                                                        onClick={() => { setSelfieVerified(false); setSelfieError(null); setShowCamera(true); }}
+                                                        onClick={() => { setSelfieVerified(false); setSelfieError(null); void handleStartDojahVerification(); }}
                                                         className="text-xs font-black text-slate-400 hover:text-slate-600 uppercase tracking-widest underline transition-colors"
                                                     >
-                                                        Retake Photo
+                                                        Verify Again
                                                     </button>
                                                 </motion.div>
                                             ) : (
@@ -851,18 +908,18 @@ const ProfilePage: React.FC = () => {
                                                         <button
                                                             type="button"
                                                             disabled={selfieLoading}
-                                                            onClick={() => { setSelfieError(null); setShowCamera(true); }}
+                                                            onClick={() => { setSelfieError(null); void handleStartDojahVerification(); }}
                                                             className="h-16 px-12 rounded-2xl font-black text-white uppercase tracking-[0.2em] text-xs transition-all active:scale-95 flex items-center gap-4 bg-primary shadow-xl shadow-primary/30 hover:-translate-y-1 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0"
                                                         >
                                                             {selfieLoading ? (
                                                                 <>
                                                                     <div className="size-4 border-2 border-white/20 border-t-white rounded-full animate-spin" />
-                                                                    Verifying...
+                                                                    Starting verification...
                                                                 </>
                                                             ) : (
                                                                 <>
-                                                                    <span className="material-symbols-outlined text-sm">photo_camera</span>
-                                                                    {selfieError ? 'Try Again' : 'Open Camera'}
+                                                                    <span className="material-symbols-outlined text-sm">verified_user</span>
+                                                                    {selfieError ? 'Try Again' : 'Start Identity Verification'}
                                                                 </>
                                                             )}
                                                         </button>
@@ -981,11 +1038,12 @@ const ProfilePage: React.FC = () => {
         </div>
 
         <AnimatePresence>
-            {showCamera && (
-                <CameraCapture
-                    label="Selfie Verification"
-                    onCapture={handleSelfieCapture}
-                    onClose={() => setShowCamera(false)}
+            {showDojah && dojahWidgetUrl && dojahReferenceId && (
+                <DojahWidgetModal
+                    widgetUrl={dojahWidgetUrl}
+                    expectedReferenceId={dojahReferenceId}
+                    onSuccess={handleDojahSuccess}
+                    onClose={() => setShowDojah(false)}
                 />
             )}
         </AnimatePresence>
