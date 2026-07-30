@@ -72,7 +72,8 @@ const ProfileDojahVerification: React.FC<ProfileDojahVerificationProps> = ({
         const message =
           (data && typeof data === 'object' && 'message' in data && typeof (data as { message: unknown }).message === 'string'
             ? (data as { message: string }).message
-            : null) || 'Dojah verification failed. Please try again.';
+            : null) ||
+          'Dojah could not load. If you use an ad blocker, disable it for this site and try again.';
         finish(() => onError(message));
         return;
       }
