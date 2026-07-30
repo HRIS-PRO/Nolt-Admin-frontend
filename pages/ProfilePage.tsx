@@ -253,16 +253,28 @@ const ProfilePage: React.FC = () => {
         }
     };
 
-    const handleDojahSuccess = async ({ referenceId }: { referenceId: string; selfieUrl?: string }) => {
+    const handleDojahSuccess = async ({ referenceId, selfieUrl }: { referenceId: string; selfieUrl?: string }) => {
         setShowDojah(false);
         setSelfieLoading(true);
         setSelfieError(null);
+
+        const sessionRef = dojahReferenceId;
+        if (!sessionRef) {
+            setSelfieError('Verification session expired. Please start again.');
+            setSelfieLoading(false);
+            return;
+        }
 
         try {
             let res = null;
             for (let attempt = 0; attempt < 10; attempt += 1) {
                 try {
-                    res = await profileService.completeDojahVerification(referenceId);
+                    res = await profileService.completeDojahVerification({
+                        reference_id: sessionRef,
+                        dojah_reference_id: referenceId !== sessionRef ? referenceId : undefined,
+                        selfie_url: selfieUrl,
+                        widget_completed: true,
+                    });
                     if (res.success) break;
                 } catch (err: any) {
                     const pending = err.response?.status === 409;

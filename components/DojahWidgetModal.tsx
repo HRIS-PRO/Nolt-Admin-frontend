@@ -61,11 +61,8 @@ const DojahWidgetModal: React.FC<DojahWidgetModalProps> = ({
       if (message.selfieUrl) latestSelfieUrl.current = message.selfieUrl;
 
       if (message.kind === 'success') {
-        const refId =
-          message.referenceId ||
-          latestReferenceId.current ||
-          expectedReferenceId ||
-          `dojah_ref_${Date.now()}`;
+        const refId = message.referenceId || latestReferenceId.current || expectedReferenceId;
+        if (!refId) return;
         triggerSuccess(refId, message.selfieUrl || latestSelfieUrl.current);
         return;
       }
@@ -176,12 +173,10 @@ const DojahWidgetModal: React.FC<DojahWidgetModalProps> = ({
                 exit={{ opacity: 0, x: 20 }}
                 transition={{ type: 'spring', stiffness: 300, damping: 25 }}
                 onClick={() => {
-                  const refId =
-                    latestReferenceId.current ||
-                    expectedReferenceId ||
-                    `dojah_manual_ref_${Date.now()}`;
-                  triggerSuccess(refId, latestSelfieUrl.current);
+                  if (!expectedReferenceId) return;
+                  triggerSuccess(expectedReferenceId, latestSelfieUrl.current);
                 }}
+                disabled={!expectedReferenceId}
                 className="px-5 py-3 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-slate-950 rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-lg shadow-emerald-500/10 active:scale-95 transition-all flex items-center gap-2"
               >
                 <span className="material-symbols-outlined text-sm">check_circle</span>
