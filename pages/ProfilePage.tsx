@@ -4,7 +4,7 @@ import { profileService, UserProfile } from '../services/profileService';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { maskValue } from '../utils/maskHelper';
-import DojahWidgetModal from '../components/DojahWidgetModal';
+import ProfileDojahVerification, { type ProfileDojahSdkSession } from '../components/ProfileDojahVerification';
 
 const NIGERIAN_STATES = [
     "Abia", "Adamawa", "Akwa Ibom", "Anambra", "Bauchi", "Bayelsa", "Benue", "Borno", 
@@ -45,7 +45,7 @@ const ProfilePage: React.FC = () => {
 
     // Dojah liveness state
     const [showDojah, setShowDojah] = useState(false);
-    const [dojahWidgetUrl, setDojahWidgetUrl] = useState<string | null>(null);
+    const [dojahSession, setDojahSession] = useState<ProfileDojahSdkSession | null>(null);
     const [dojahReferenceId, setDojahReferenceId] = useState<string | null>(null);
     const [selfieVerified, setSelfieVerified] = useState(false);
     const [selfieLoading, setSelfieLoading] = useState(false);
@@ -239,11 +239,14 @@ const ProfilePage: React.FC = () => {
                 date_of_birth: profile.date_of_birth,
             });
 
-            if (!session.success || !session.widget_url || !session.reference_id) {
-                throw new Error('Could not start Dojah verification session.');
+            if (!session.success || !session.reference_id || !session.sdk) {
+                throw new Error(session.message || 'Could not start Dojah verification session.');
             }
 
-            setDojahWidgetUrl(session.widget_url);
+            setDojahSession({
+                reference_id: session.reference_id,
+                ...session.sdk,
+            });
             setDojahReferenceId(session.reference_id);
             setShowDojah(true);
         } catch (err: any) {
@@ -253,12 +256,21 @@ const ProfilePage: React.FC = () => {
         }
     };
 
-    const handleDojahSuccess = async ({ referenceId, selfieUrl }: { referenceId: string; selfieUrl?: string }) => {
+    const handleDojahSuccess = async ({
+        referenceId,
+        selfieUrl,
+        dojahReferenceId: dojahRefFromSdk,
+    }: {
+        referenceId: string;
+        selfieUrl?: string;
+        dojahReferenceId?: string;
+    }) => {
         setShowDojah(false);
+        setDojahSession(null);
         setSelfieLoading(true);
         setSelfieError(null);
 
-        const sessionRef = dojahReferenceId;
+        const sessionRef = dojahReferenceId || referenceId;
         if (!sessionRef) {
             setSelfieError('Verification session expired. Please start again.');
             setSelfieLoading(false);
@@ -267,20 +279,20 @@ const ProfilePage: React.FC = () => {
 
         try {
             let res = null;
-            for (let attempt = 0; attempt < 10; attempt += 1) {
+            for (let attempt = 0; attempt < 12; attempt += 1) {
                 try {
                     res = await profileService.completeDojahVerification({
                         reference_id: sessionRef,
-                        dojah_reference_id: referenceId !== sessionRef ? referenceId : undefined,
+                        dojah_reference_id: dojahRefFromSdk,
                         selfie_url: selfieUrl,
-                        widget_completed: true,
+                        widget_completed: Boolean(selfieUrl),
                     });
                     if (res.success) break;
                 } catch (err: any) {
                     const pending = err.response?.status === 409;
-                    if (!pending || attempt === 9) throw err;
+                    if (!pending || attempt === 11) throw err;
                 }
-                await new Promise((resolve) => setTimeout(resolve, 1500));
+                await new Promise((resolve) => setTimeout(resolve, 2000));
             }
 
             if (res?.success) {
@@ -1050,12 +1062,19 @@ const ProfilePage: React.FC = () => {
         </div>
 
         <AnimatePresence>
-            {showDojah && dojahWidgetUrl && dojahReferenceId && (
-                <DojahWidgetModal
-                    widgetUrl={dojahWidgetUrl}
-                    expectedReferenceId={dojahReferenceId}
+            {showDojah && dojahSession && (
+                <ProfileDojahVerification
+                    session={dojahSession}
                     onSuccess={handleDojahSuccess}
-                    onClose={() => setShowDojah(false)}
+                    onClose={() => {
+                        setShowDojah(false);
+                        setDojahSession(null);
+                    }}
+                    onError={(message) => {
+                        setShowDojah(false);
+                        setDojahSession(null);
+                        setSelfieError(message);
+                    }}
                 />
             )}
         </AnimatePresence>
