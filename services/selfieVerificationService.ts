@@ -18,11 +18,18 @@ export const selfieVerificationService = {
     selfieImage: string,
     context: 'profile' | 'vault' = 'vault',
   ): Promise<SelfieVerificationResponse> => {
-    const response = await axios.post(
-      `${API_URL}/api/customer/verify-selfie`,
-      { bvn, selfie_image: selfieImage, context },
-      { withCredentials: true },
-    );
-    return response.data;
+    try {
+      const response = await axios.post(
+        `${API_URL}/api/customer/verify-selfie`,
+        { bvn, selfie_image: selfieImage, context },
+        { withCredentials: true },
+      );
+      return response.data;
+    } catch (err: unknown) {
+      if (axios.isAxiosError(err) && err.response?.data) {
+        return err.response.data as SelfieVerificationResponse;
+      }
+      throw err;
+    }
   },
 };

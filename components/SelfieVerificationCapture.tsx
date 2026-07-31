@@ -116,13 +116,18 @@ const SelfieVerificationCapture: React.FC<SelfieVerificationCaptureProps> = ({
 
       setVerificationStep('success');
       setVerificationMessage('Identity verified successfully');
+      stopCamera();
       await new Promise((r) => setTimeout(r, 600));
 
-      onSuccess({
-        selfieUrl: result.selfie_url || capturedImage,
-        confidence: result.confidence ?? 0,
-        lastSelfieVerifiedAt: result.last_selfie_verified_at,
-      });
+      try {
+        onSuccess({
+          selfieUrl: result.selfie_url || capturedImage,
+          confidence: result.confidence ?? 0,
+          lastSelfieVerifiedAt: result.last_selfie_verified_at,
+        });
+      } finally {
+        onClose();
+      }
     } catch (err: unknown) {
       window.clearTimeout(stepTimer);
       const message =
