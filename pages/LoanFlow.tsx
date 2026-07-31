@@ -6,11 +6,8 @@ import { storageService } from '../services/storageService';
 import SuccessScreen from './SuccessScreen';
 import { useNavigate } from 'react-router-dom';
 import MdaTertiarySelect, { TERTIARY_LIST } from '../components/MdaTertiarySelect';
-import CameraCapture from '../components/CameraCapture';
-import DojahWidgetModal from '../components/DojahWidgetModal';
+import SelfieVerificationCapture, { type SelfieVerificationSuccess } from '../components/SelfieVerificationCapture';
 import { AnimatePresence } from 'motion/react';
-import { investmentService } from '../services/investmentService';
-
 interface LoanFlowProps {
   initialStep: 'TYPE' | 'IDENTITY';
   onComplete: () => void;
@@ -129,10 +126,7 @@ const LoanFlow: React.FC<LoanFlowProps> = ({ initialStep, onComplete, navigate, 
   const [bankVerificationError, setBankVerificationError] = useState<string | null>(null);
 
   // Selfie / Identity Verification
-  const [showCamera, setShowCamera] = useState(false);
-  const [showDojah, setShowDojah] = useState(false);
-  const [isVerifyingIdentity, setIsVerifyingIdentity] = useState(false);
-
+  const [showSelfieCapture, setShowSelfieCapture] = useState(false);
   const isIdentityVerifiedWithin6Months = useMemo(() => {
     if (!user.profile?.is_identity_verified || !user.profile?.last_selfie_verified_at) return false;
     const lastVerified = new Date(user.profile.last_selfie_verified_at).getTime();
@@ -1145,7 +1139,7 @@ const LoanFlow: React.FC<LoanFlowProps> = ({ initialStep, onComplete, navigate, 
                       onClick={() => {
                         if (isSelfie) {
                           if (!bvn) return alert('Please provide your BVN in the verification section before taking a selfie.');
-                          setShowDojah(true);
+                          setShowSelfieCapture(true);
                         } else {
                           handleFileSelect(doc.id);
                         }
@@ -1157,11 +1151,6 @@ const LoanFlow: React.FC<LoanFlowProps> = ({ initialStep, onComplete, navigate, 
                       {uploadedDocs[doc.id] ? (
                         <div className="size-12 rounded-full bg-green-500 text-white flex items-center justify-center shadow-lg shadow-green-500/20 animate-in zoom-in">
                           <span className="material-symbols-outlined">task_alt</span>
-                        </div>
-                      ) : (isVerifyingIdentity && isSelfie) ? (
-                        <div className="flex flex-col items-center gap-3">
-                          <div className="size-12 border-4 border-primary/20 border-t-primary rounded-full animate-spin"></div>
-                          <p className="text-[10px] font-black text-primary animate-pulse">VERIFYING FACE...</p>
                         </div>
                       ) : (
                         <div className="size-12 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-400 group-hover:bg-primary group-hover:text-white transition-all flex items-center justify-center">
@@ -1205,85 +1194,29 @@ const LoanFlow: React.FC<LoanFlowProps> = ({ initialStep, onComplete, navigate, 
             </div>
           )}
 
-          {/* Camera Modal for Selfie Verification */}
           <AnimatePresence>
-            {showCamera && (
-              <CameraCapture
-                onCapture={async (file) => {
-                  setShowCamera(false);
-                  setIsVerifyingIdentity(true);
-                  try {
-                    // 1. Upload selfie using the loan upload endpoint
-                    const formData = new FormData();
-                    formData.append('file', file);
-                    formData.append('loan_id', draftId);
-                    formData.append('document_type', 'selfie_verification');
-                    const uploadRes = await axios.post('/api/upload', formData, {
-                      headers: { 'Content-Type': 'multipart/form-data' },
-                      withCredentials: true,
-                    });
-                    const selfieUrl = uploadRes.data.document.file_url;
-
-                    // 2. BVN face-match verification
-                    const verifyRes = await investmentService.verifyIdentity(bvn, selfieUrl);
-
-                    if (verifyRes.success) {
-                      setUploadedDocs(prev => ({
-                        ...prev,
-                        selfie: { name: file.name, size: `${(file.size / 1024).toFixed(1)} KB`, url: selfieUrl }
-                      }));
-                      // Update profile state so the 6-month memo recalculates
-                      if (user.profile) {
-                        user.profile.is_identity_verified = true;
-                        user.profile.last_selfie_verified_at = new Date().toISOString();
-                      }
-                      alert('Identity Verified! Face match successful.');
-                    }
-                  } catch (err: any) {
-                    alert(err.message || 'Face Verification Failed. Please try again.');
-                  } finally {
-                    setIsVerifyingIdentity(false);
+            {showSelfieCapture && bvn && (
+              <SelfieVerificationCapture
+                bvn={bvn}
+                context="vault"
+                onSuccess={(result: SelfieVerificationSuccess) => {
+                  setShowSelfieCapture(false);
+                  setUploadedDocs(prev => ({
+                    ...prev,
+                    selfie: {
+                      name: 'Prembly Verified Selfie',
+                      size: 'Verified',
+                      url: result.selfieUrl,
+                    },
+                  }));
+                  if (user.profile) {
+                    user.profile.is_identity_verified = true;
+                    user.profile.selfie_url = result.selfieUrl;
+                    user.profile.last_selfie_verified_at = result.lastSelfieVerifiedAt || new Date().toISOString();
                   }
+                  window.dispatchEvent(new Event('user-profile-updated'));
                 }}
-                onClose={() => setShowCamera(false)}
-              />
-            )}
-          </AnimatePresence>
-
-          {/* Dojah Widget Modal for Selfie Verification */}
-          <AnimatePresence>
-            {showDojah && (
-              <DojahWidgetModal
-                widgetId="6a3b8ecfacf58b308aa6b3a2"
-                onSuccess={async ({ referenceId: refId }) => {
-                  setShowDojah(false);
-                  setIsVerifyingIdentity(true);
-                  try {
-                    // Prefer the customer's real profile selfie; fall back to a placeholder only if none exists
-                    const selfieUrl = user.profile?.selfie_url || 'https://identity.dojah.io/widget/selfie_dummy.jpg';
-
-                    // Call backend verifyIdentity with is_dojah_widget_success set to true
-                    const verifyRes = await investmentService.verifyIdentity(bvn, selfieUrl, true);
-
-                    if (verifyRes.success) {
-                      setUploadedDocs(prev => ({
-                        ...prev,
-                        selfie: { name: 'Dojah Verified Selfie', size: 'Verified', url: selfieUrl }
-                      }));
-                      // Update profile state so the 6-month memo recalculates
-                      if (user.profile) {
-                        user.profile.is_identity_verified = true;
-                        user.profile.last_selfie_verified_at = new Date().toISOString();
-                      }
-                      alert('Identity Verified successfully via Dojah Widget!');
-                    }
-                  } catch (err: any) {
-                    alert(err.message || 'Dojah Face Verification Failed. Please try again.');
-                  } finally {
-                    setIsVerifyingIdentity(false);
-                  }
-                }}
-                onClose={() => setShowDojah(false)}
+                onClose={() => setShowSelfieCapture(false)}
               />
             )}
           </AnimatePresence>
