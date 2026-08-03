@@ -10,12 +10,12 @@ const AuthLayout: React.FC<AuthLayoutProps> = ({ children }) => {
     return (
         <div className="min-h-screen flex w-full bg-background-light dark:bg-background-dark font-display text-slate-900 dark:text-white antialiased transition-colors duration-300 overflow-x-hidden">
             {/* Left Branding Panel — wider, image full-bleed top-to-bottom */}
-            <div className="hidden md:flex md:w-[48%] lg:w-[52%] xl:w-[55%] relative min-h-screen overflow-hidden bg-slate-900 border-r border-slate-800">
+            <div className="hidden md:flex md:w-[54%] lg:w-[70%] xl:w-[68%] relative min-h-screen overflow-hidden bg-slate-900 border-r border-slate-800">
                 <img
                     src="https://pub-74b956e78e404291a932f28ada63b70c.r2.dev/MobileAppAssets/3%20(1).png"
                     alt=""
                     aria-hidden="true"
-                    className="absolute inset-0 w-full h-full object-cover object-top"
+                    className="absolute top-0 right-0 h-full w-auto min-w-full max-w-none select-none pointer-events-none"
                 />
                 {/* Light bottom fade only — keeps testimonial readable without washing out the image */}
                 <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-950/30 to-transparent pointer-events-none z-10" />
