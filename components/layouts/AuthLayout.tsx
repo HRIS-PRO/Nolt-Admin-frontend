@@ -9,33 +9,32 @@ interface AuthLayoutProps {
 const AuthLayout: React.FC<AuthLayoutProps> = ({ children }) => {
     return (
         <div className="min-h-screen flex w-full bg-background-light dark:bg-background-dark font-display text-slate-900 dark:text-white antialiased transition-colors duration-300 overflow-x-hidden">
-            {/* Left Branding Panel */}
-            <div className="hidden md:flex md:w-5/12 lg:w-1/2 relative flex-col justify-between p-8 lg:p-12 overflow-hidden bg-slate-900 border-r border-slate-800">
-                <div className="absolute inset-0 w-full h-full z-0">
-                    <div className="absolute inset-0 bg-gradient-to-b from-transparent via-slate-900/80 to-slate-900 z-10"></div>
-                    <div
-                        className="w-full h-full bg-cover bg-center opacity-40 grayscale brightness-[0.4] sepia-[0.3] hue-rotate-[180deg]"
-                        style={{
-                            backgroundImage: 'url("https://lh3.googleusercontent.com/aida-public/AB6AXuDB0RJs5vDneUNTwinXrTi7gJ6DLVoF9VZanKWoccy9AsSUastMTMqM7zYdhMjT7Y2HTJdV0PVUftDdzbdznYAILFUPmRvBOe-zQcdxMjnuybXASn2JANmWTsVrYYN7HxZ74Urr2tw_5PFP8Qs-ryFYp14sv8lePCeXKR0WNXCd1Wrhof8xZUYWYflEmdh7uEWPyqMBcg1An_csvxMHHgMMw_u_fS8zRJ4hE6Rb_tS_V3JOkQQIJEd_pvjK2CYPPU0h5269Imm-7w")',
-                        }}
-                    ></div>
-                </div>
+            {/* Left Branding Panel — wider, image full-bleed top-to-bottom */}
+            <div className="hidden md:flex md:w-[48%] lg:w-[52%] xl:w-[55%] relative min-h-screen overflow-hidden bg-slate-900 border-r border-slate-800">
+                <img
+                    src="https://pub-74b956e78e404291a932f28ada63b70c.r2.dev/MobileAppAssets/3%20(1).png"
+                    alt=""
+                    aria-hidden="true"
+                    className="absolute inset-0 w-full h-full object-cover object-top"
+                />
+                {/* Light bottom fade only — keeps testimonial readable without washing out the image */}
+                <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-950/30 to-transparent pointer-events-none z-10" />
 
-                <Link to="/" className="relative z-20 flex items-center gap-4 cursor-pointer mb-12">
-                    <div className="w-16 h-16 rounded-2xl flex items-center justify-center overflow-hidden">
+                <Link
+                    to="/"
+                    className="absolute top-8 lg:top-10 left-8 lg:left-12 z-20 flex items-center cursor-pointer"
+                >
+                    <div className="h-16 w-28 lg:h-20 lg:w-32 flex items-center justify-center">
                         <img
                             src="https://pub-74b956e78e404291a932f28ada63b70c.r2.dev/logo%20updated%20white.png"
                             alt="NOLT Finance Logo"
-                            className="w-full h-full object-contain p-1"
+                            className="w-full h-full object-contain drop-shadow-lg"
                         />
                     </div>
-                    <h1 className="text-2xl font-black tracking-tighter text-white uppercase drop-shadow-md">
-                        NOLT Finance
-                    </h1>
                 </Link>
 
-                <div className="relative z-20 mt-auto max-w-md">
-                    <div className="glass-effect p-8 rounded-3xl border border-white/5 shadow-2xl">
+                <div className="absolute bottom-8 lg:bottom-12 left-8 lg:left-12 right-8 lg:right-12 z-20 max-w-md">
+                    <div className="glass-effect p-8 rounded-3xl border border-white/10 shadow-2xl backdrop-blur-sm bg-slate-900/40">
                         <div className="flex gap-1 mb-4 text-primary">
                             <span className="material-symbols-outlined text-sm filled">star</span>
                             <span className="material-symbols-outlined text-sm filled">star</span>
@@ -58,7 +57,7 @@ const AuthLayout: React.FC<AuthLayoutProps> = ({ children }) => {
             </div>
 
             {/* Right Form Panel */}
-            <div className="flex-1 flex flex-col relative w-full md:w-7/12 lg:w-1/2">
+            <div className="flex-1 flex flex-col relative w-full min-h-screen">
                 <header className="md:hidden flex items-center justify-between p-6 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 sticky top-0 z-30">
                     <div className="flex items-center gap-3">
                         <div className="flex items-center justify-center size-8 rounded-lg bg-primary text-white">

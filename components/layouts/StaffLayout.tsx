@@ -69,7 +69,7 @@ const StaffLayout: React.FC<StaffLayoutProps> = ({ children, user, onLogout, tog
                 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
             `}>
                 {/* Brand */}
-                <div className="flex items-center justify-between p-8">
+                <div className="flex items-center justify-between pt-4 pl-8 pb-4">
                     <Link to="/" className="flex items-center gap-3 cursor-pointer">
                         <div className="w-50 h-10 rounded-xl flex items-center justify-center overflow-hidden">
                             <img
@@ -78,10 +78,8 @@ const StaffLayout: React.FC<StaffLayoutProps> = ({ children, user, onLogout, tog
                                 className="w-full h-full object-contain"
                             />
                         </div>
-                        {/* <h1 className="text-xl font-black tracking-tighter text-slate-900 text-white uppercase">
-                            NOLT Finance
-                        </h1> */}
                     </Link>
+
                     {/* Mobile Close Button */}
                     <button
                         onClick={() => setIsSidebarOpen(false)}
@@ -90,6 +88,11 @@ const StaffLayout: React.FC<StaffLayoutProps> = ({ children, user, onLogout, tog
                         <span className="material-symbols-outlined">close</span>
                     </button>
                 </div>
+
+
+                <h1 className="text-sm pl-8 pb-10 font-black font-bold text-slate-900 text-white uppercase">
+                    NOLT MANAGEMENT SYSTEM  
+                </h1> 
 
                 {/* Navigation */}
                 <nav className="flex-1 px-4 flex flex-col gap-8 overflow-y-auto">
