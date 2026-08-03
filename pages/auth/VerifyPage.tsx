@@ -2,6 +2,9 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import { createEmptyOtp, handleOtpPaste } from '../../utils/otpInput';
+
+const OTP_LENGTH = 6;
 
 interface VerifyPageProps {
     onLogin: (email: string, userData?: any) => void;
@@ -12,7 +15,7 @@ const VerifyPage: React.FC<VerifyPageProps> = ({ onLogin }) => {
     const location = useLocation();
     const email = location.state?.email || 'your email';
 
-    const [code, setCode] = useState(['', '', '', '', '', '']); // 6 digits
+    const [code, setCode] = useState(() => createEmptyOtp(OTP_LENGTH));
     const [resendTimer, setResendTimer] = useState(30);
     const [isResending, setIsResending] = useState(false);
 
@@ -67,7 +70,7 @@ const VerifyPage: React.FC<VerifyPageProps> = ({ onLogin }) => {
 
         setResendTimer(30);
         setIsResending(false);
-        setCode(['', '', '', '', '', '']);
+        setCode(createEmptyOtp(OTP_LENGTH));
         codeInputs.current[0]?.focus();
     };
 
@@ -77,7 +80,7 @@ const VerifyPage: React.FC<VerifyPageProps> = ({ onLogin }) => {
         newCode[index] = value.slice(-1);
         setCode(newCode);
 
-        if (value && index < 5) {
+        if (value && index < OTP_LENGTH - 1) {
             codeInputs.current[index + 1]?.focus();
         }
     };
@@ -127,7 +130,10 @@ const VerifyPage: React.FC<VerifyPageProps> = ({ onLogin }) => {
                         maxLength={1}
                         value={digit}
                         onChange={(e) => handleCodeChange(idx, e.target.value)}
+                        onPaste={(e) => handleOtpPaste(e, OTP_LENGTH, setCode, codeInputs)}
                         onKeyDown={(e) => handleKeyDown(idx, e)}
+                        inputMode="numeric"
+                        autoComplete={idx === 0 ? 'one-time-code' : 'off'}
                         className="size-14 text-center text-2xl font-bold bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all"
                     />
                 ))}

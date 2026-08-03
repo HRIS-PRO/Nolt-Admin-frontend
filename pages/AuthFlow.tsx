@@ -3,6 +3,9 @@ import React, { useState, useRef, useEffect } from 'react';
 
 // Add axios import at the top
 import axios from 'axios';
+import { createEmptyOtp, handleOtpPaste } from '../utils/otpInput';
+
+const OTP_LENGTH = 6;
 
 interface AuthFlowProps {
   onComplete: (email: string) => void;
@@ -14,7 +17,7 @@ const AuthFlow: React.FC<AuthFlowProps> = ({ onComplete }) => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isLogin, setIsLogin] = useState(false);
   const [authStep, setAuthStep] = useState(1); // 1: Registration Form, 2: Verification (OTP), 3: Acquisition
-  const [code, setCode] = useState(['', '', '', '']);
+  const [code, setCode] = useState(() => createEmptyOtp(OTP_LENGTH));
   const [source, setSource] = useState('');
   const [officerName, setOfficerName] = useState('');
   const [referralCode, setReferralCode] = useState('');
@@ -76,7 +79,7 @@ const AuthFlow: React.FC<AuthFlowProps> = ({ onComplete }) => {
     setResendTimer(30);
     setIsResending(false);
     // Clear existing code for a fresh start
-    setCode(['', '', '', '']);
+    setCode(createEmptyOtp(OTP_LENGTH));
     codeInputs.current[0]?.focus();
   };
 
@@ -91,7 +94,7 @@ const AuthFlow: React.FC<AuthFlowProps> = ({ onComplete }) => {
     newCode[index] = value.slice(-1);
     setCode(newCode);
 
-    if (value && index < 3) {
+    if (value && index < OTP_LENGTH - 1) {
       codeInputs.current[index + 1]?.focus();
     }
   };
@@ -289,7 +292,10 @@ const AuthFlow: React.FC<AuthFlowProps> = ({ onComplete }) => {
                       maxLength={1}
                       value={digit}
                       onChange={(e) => handleCodeChange(idx, e.target.value)}
+                      onPaste={(e) => handleOtpPaste(e, OTP_LENGTH, setCode, codeInputs)}
                       onKeyDown={(e) => handleKeyDown(idx, e)}
+                      inputMode="numeric"
+                      autoComplete={idx === 0 ? 'one-time-code' : 'off'}
                       className="size-14 text-center text-2xl font-bold bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all"
                     />
                   ))}
