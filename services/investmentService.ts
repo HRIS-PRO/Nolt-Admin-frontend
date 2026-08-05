@@ -1,7 +1,8 @@
 
 import { SavedDraft } from '../types';
 
-const API_BASE_URL = '/api'; // Assuming proxy is set up or relative path works
+const baseHost = import.meta.env.VITE_BACKEND_URL || import.meta.env.VITE_API_URL || '';
+const API_BASE_URL = baseHost ? `${baseHost}/api` : '/api';
 
 export const investmentService = {
     createInvestment: async (data: any) => {
