@@ -105,7 +105,7 @@ const SelfieVerificationCapture: React.FC<SelfieVerificationCaptureProps> = ({
     }, 1800);
 
     try {
-      const result = await selfieVerificationService.verifySelfie(bvn, capturedImage, context);
+      const result = await selfieVerificationService.verifySelfie(bvn, capturedImage, (context as 'profile' | 'vault') || 'vault');
       window.clearTimeout(stepTimer);
 
       if (!result.success) {
