@@ -4,7 +4,7 @@ import { profileService, UserProfile } from '../services/profileService';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { maskValue } from '../utils/maskHelper';
-import CameraCapture from '../components/CameraCapture';
+import SelfieVerificationCapture, { type SelfieVerificationSuccess } from '../components/SelfieVerificationCapture';
 
 const NIGERIAN_STATES = [
     "Abia", "Adamawa", "Akwa Ibom", "Anambra", "Bauchi", "Bayelsa", "Benue", "Borno", 
@@ -43,10 +43,9 @@ const ProfilePage: React.FC = () => {
     const [banks, setBanks] = useState<{ name: string; code: string }[]>([]);
     const formRef = useRef<HTMLDivElement>(null);
 
-    // Selfie state
-    const [showCamera, setShowCamera] = useState(false);
+    // Prembly selfie verification
+    const [showSelfieCapture, setShowSelfieCapture] = useState(false);
     const [selfieVerified, setSelfieVerified] = useState(false);
-    const [selfieLoading, setSelfieLoading] = useState(false);
     const [selfieError, setSelfieError] = useState<string | null>(null);
     const [selfieConfidence, setSelfieConfidence] = useState<number | null>(null);
 
@@ -82,7 +81,7 @@ const ProfilePage: React.FC = () => {
                     p.date_of_birth = p.date_of_birth.split('T')[0];
                 }
                 setProfile(p);
-                if (p.selfie_url) {
+                if (p.is_identity_verified || p.selfie_url) {
                     setSelfieVerified(true);
                 }
             }
@@ -217,26 +216,27 @@ const ProfilePage: React.FC = () => {
         }
     };
 
-    const handleSelfieCapture = async (file: File) => {
-        setShowCamera(false);
-        setSelfieLoading(true);
+    const handleStartSelfieVerification = () => {
+        if (!profile.bvn || profile.bvn.length !== 11) {
+            setSelfieError('Please enter and verify your BVN in the Identity tab first.');
+            return;
+        }
         setSelfieError(null);
         setSelfieConfidence(null);
-        try {
-            const res = await profileService.verifySelfie(file, profile.bvn || undefined);
-            if (res.success) {
-                setSelfieVerified(true);
-                setSelfieConfidence(res.confidence ?? null);
-                setProfile(prev => ({ ...prev, selfie_url: res.selfie_url }));
-            } else {
-                setSelfieError(res.message || 'Face does not match. Please try again.');
-                setSelfieConfidence(res.confidence ?? null);
-            }
-        } catch (err: any) {
-            setSelfieError(err.response?.data?.message || 'Verification failed. Please try again.');
-        } finally {
-            setSelfieLoading(false);
-        }
+        setShowSelfieCapture(true);
+    };
+
+    const handleSelfieSuccess = (result: SelfieVerificationSuccess) => {
+        setShowSelfieCapture(false);
+        setSelfieVerified(true);
+        setSelfieConfidence(result.confidence ?? 100);
+        setProfile(prev => ({
+            ...prev,
+            selfie_url: result.selfieUrl,
+            is_identity_verified: true,
+            last_selfie_verified_at: result.lastSelfieVerifiedAt || new Date().toISOString(),
+        }));
+        window.dispatchEvent(new Event('user-profile-updated'));
     };
 
     const handleNextToSelfie = () => {
@@ -782,8 +782,8 @@ const ProfilePage: React.FC = () => {
                                                     <span className="material-symbols-outlined font-black">face</span>
                                                 </div>
                                                 <div>
-                                                    <h3 className="text-xl font-black text-slate-900 dark:text-white">Selfie Verification</h3>
-                                                    <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">Match your face to your BVN record</p>
+                                                    <h3 className="text-xl font-black text-slate-900 dark:text-white">Identity Verification</h3>
+                                                    <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">Secure liveness check via Prembly</p>
                                                 </div>
                                             </div>
 
@@ -810,10 +810,10 @@ const ProfilePage: React.FC = () => {
                                                     )}
                                                     <button
                                                         type="button"
-                                                        onClick={() => { setSelfieVerified(false); setSelfieError(null); setShowCamera(true); }}
+                                                        onClick={() => { setSelfieVerified(false); setSelfieError(null); handleStartSelfieVerification(); }}
                                                         className="text-xs font-black text-slate-400 hover:text-slate-600 uppercase tracking-widest underline transition-colors"
                                                     >
-                                                        Retake Photo
+                                                        Verify Again
                                                     </button>
                                                 </motion.div>
                                             ) : (
@@ -850,21 +850,11 @@ const ProfilePage: React.FC = () => {
                                                     <div className="flex justify-center">
                                                         <button
                                                             type="button"
-                                                            disabled={selfieLoading}
-                                                            onClick={() => { setSelfieError(null); setShowCamera(true); }}
-                                                            className="h-16 px-12 rounded-2xl font-black text-white uppercase tracking-[0.2em] text-xs transition-all active:scale-95 flex items-center gap-4 bg-primary shadow-xl shadow-primary/30 hover:-translate-y-1 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0"
+                                                            onClick={() => { setSelfieError(null); handleStartSelfieVerification(); }}
+                                                            className="h-16 px-12 rounded-2xl font-black text-white uppercase tracking-[0.2em] text-xs transition-all active:scale-95 flex items-center gap-4 bg-primary shadow-xl shadow-primary/30 hover:-translate-y-1"
                                                         >
-                                                            {selfieLoading ? (
-                                                                <>
-                                                                    <div className="size-4 border-2 border-white/20 border-t-white rounded-full animate-spin" />
-                                                                    Verifying...
-                                                                </>
-                                                            ) : (
-                                                                <>
-                                                                    <span className="material-symbols-outlined text-sm">photo_camera</span>
-                                                                    {selfieError ? 'Try Again' : 'Open Camera'}
-                                                                </>
-                                                            )}
+                                                            <span className="material-symbols-outlined text-sm">verified_user</span>
+                                                            {selfieError ? 'Try Again' : 'Start Identity Verification'}
                                                         </button>
                                                     </div>
                                                 </div>
@@ -981,11 +971,12 @@ const ProfilePage: React.FC = () => {
         </div>
 
         <AnimatePresence>
-            {showCamera && (
-                <CameraCapture
-                    label="Selfie Verification"
-                    onCapture={handleSelfieCapture}
-                    onClose={() => setShowCamera(false)}
+            {showSelfieCapture && profile.bvn && (
+                <SelfieVerificationCapture
+                    bvn={profile.bvn}
+                    context="profile"
+                    onSuccess={handleSelfieSuccess}
+                    onClose={() => setShowSelfieCapture(false)}
                 />
             )}
         </AnimatePresence>

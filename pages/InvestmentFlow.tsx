@@ -8,7 +8,7 @@ import { investmentService } from '../services/investmentService';
 import { productService, InvestmentProduct } from '../services/productService';
 import GiftInvestmentFlow from './investment/GiftInvestmentFlow';
 import { PaymentModal } from '../components/PaymentModal';
-import DojahWidgetModal from '../components/DojahWidgetModal';
+import SelfieVerificationCapture, { type SelfieVerificationSuccess } from '../components/SelfieVerificationCapture';
 import { AnimatePresence } from 'motion/react';
 
 interface InvestmentFlowProps {
@@ -266,9 +266,7 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
     return docs;
   }, [directors]);
 
-  const [showDojah, setShowDojah] = useState(false);
-  const [isVerifyingIdentity, setIsVerifyingIdentity] = useState(false);
-
+  const [showSelfieCapture, setShowSelfieCapture] = useState(false);
   const isIdentityVerifiedWithin6Months = useMemo(() => {
     if (!user.profile?.is_identity_verified || !user.profile?.last_selfie_verified_at) return false;
     const lastVerified = new Date(user.profile.last_selfie_verified_at).getTime();
@@ -1971,7 +1969,7 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
                     onClick={() => {
                         if (isSelfie) {
                             if (!bvn) return alert("Please provide your BVN in the identity section before verification.");
-                            setShowDojah(true);
+                            setShowSelfieCapture(true);
                         } else {
                             document.getElementById(inputId)?.click();
                         }
@@ -1980,10 +1978,10 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
                   >
                     {uploadedDocs[doc.id] ? (
                       <div className="size-16 rounded-full bg-green-500 text-white flex items-center justify-center shadow-lg shadow-green-500/20 animate-in zoom-in"><span className="material-symbols-outlined text-3xl">task_alt</span></div>
-                    ) : (isUploading[doc.id] || (isSelfie && isVerifyingIdentity)) ? (
+                    ) : isUploading[doc.id] ? (
                       <div className="flex flex-col items-center gap-4">
                         <div className="size-16 border-4 border-primary/20 border-t-primary rounded-full animate-spin"></div>
-                        <p className="text-[10px] font-black text-primary animate-pulse">{isVerifyingIdentity ? 'VERIFYING FACE...' : 'UPDATING VAULT...'}</p>
+                        <p className="text-[10px] font-black text-primary animate-pulse">UPDATING VAULT...</p>
                       </div>
                     ) : (
                       <div className="size-16 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-400 group-hover:bg-primary group-hover:text-white transition-all transform group-hover:scale-110"><span className="material-symbols-outlined text-3xl">{isSelfie ? 'face' : doc.icon}</span></div>
@@ -2020,39 +2018,30 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
         </div>
       )}
 
-      {/* Dojah Widget Modal for Selfie Verification */}
       <AnimatePresence>
-        {showDojah && (
-            <DojahWidgetModal
-                widgetId="6a3b8ecfacf58b308aa6b3a2"
-                onSuccess={async (refId) => {
-                    setShowDojah(false);
-                    setIsVerifyingIdentity(true);
-                    try {
-                        const selfieUrl = user.profile?.selfie_url || 'https://identity.dojah.io/widget/selfie_dummy.jpg';
-                        const verifyRes = await investmentService.verifyIdentity(bvn, selfieUrl, true);
-
-                        if (verifyRes.success) {
-                            setUploadedDocs(prev => ({
-                                ...prev,
-                                selfie: { name: 'Dojah Verified Selfie', size: 'Verified', url: selfieUrl }
-                            }));
-
-                            if (user.profile) {
-                                user.profile.is_identity_verified = true;
-                                user.profile.last_selfie_verified_at = new Date().toISOString();
-                            }
-
-                            alert('Identity Verified successfully via Dojah Widget!');
-                        }
-                    } catch (err: any) {
-                        alert(err.message || 'Dojah Face Verification Failed. Please try again.');
-                    } finally {
-                        setIsVerifyingIdentity(false);
-                    }
-                }}
-                onClose={() => setShowDojah(false)}
-            />
+        {showSelfieCapture && bvn && (
+          <SelfieVerificationCapture
+            bvn={bvn}
+            context="vault"
+            onSuccess={(result: SelfieVerificationSuccess) => {
+              setShowSelfieCapture(false);
+              setUploadedDocs(prev => ({
+                ...prev,
+                selfie: {
+                  name: 'Prembly Verified Selfie',
+                  size: 'Verified',
+                  url: result.selfieUrl,
+                },
+              }));
+              if (user.profile) {
+                user.profile.is_identity_verified = true;
+                user.profile.selfie_url = result.selfieUrl;
+                user.profile.last_selfie_verified_at = result.lastSelfieVerifiedAt || new Date().toISOString();
+              }
+              window.dispatchEvent(new Event('user-profile-updated'));
+            }}
+            onClose={() => setShowSelfieCapture(false)}
+          />
         )}
       </AnimatePresence>
 
