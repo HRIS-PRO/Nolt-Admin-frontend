@@ -249,7 +249,7 @@ const LoanFlow: React.FC<LoanFlowProps> = ({ initialStep, onComplete, navigate, 
 
       console.log("Submitting Loan Payload:", payload);
 
-      const backendUrl = ''; // Use proxy
+      const backendUrl = import.meta.env.VITE_BACKEND_URL || import.meta.env.VITE_API_URL || ''; // Use proxy
       const response = await axios.post(`${backendUrl}/api/loans`, payload, { withCredentials: true });
 
       if (response.data && response.data.indemnity_document_url) {
@@ -272,7 +272,7 @@ const LoanFlow: React.FC<LoanFlowProps> = ({ initialStep, onComplete, navigate, 
     // Fetch banks
     const fetchBanks = async () => {
       try {
-        const backendUrl = '';
+        const backendUrl = import.meta.env.VITE_BACKEND_URL || import.meta.env.VITE_API_URL || '';
         const response = await axios.get(`${backendUrl}/api/misc/banks`);
         if (response.data && response.data.data) {
           setBankList(response.data.data);
@@ -302,7 +302,7 @@ const LoanFlow: React.FC<LoanFlowProps> = ({ initialStep, onComplete, navigate, 
       setBankDetails(prev => ({ ...prev, accountName: '' }));
 
       try {
-        const backendUrl = '';
+        const backendUrl = import.meta.env.VITE_BACKEND_URL || import.meta.env.VITE_API_URL || '';
         const response = await axios.post(`${backendUrl}/api/misc/resolve-account`, {
           account_number: bankDetails.accountNumber,
           bank_code: selectedBank.code,
@@ -366,7 +366,7 @@ const LoanFlow: React.FC<LoanFlowProps> = ({ initialStep, onComplete, navigate, 
 
       // 2. Fetch Latest Loan for non-profile fields & documents
       try {
-        const backendUrl = '';
+        const backendUrl = import.meta.env.VITE_BACKEND_URL || import.meta.env.VITE_API_URL || '';
         const response = await axios.get(`${backendUrl}/api/loans`, { withCredentials: true });
 
         if (response.data && Array.isArray(response.data) && response.data.length > 0) {
@@ -609,7 +609,7 @@ const LoanFlow: React.FC<LoanFlowProps> = ({ initialStep, onComplete, navigate, 
 
     try {
       setUploadProgress(prev => ({ ...prev, [id]: 30 }));
-      const backendUrl = ''; // Use proxy
+      const backendUrl = import.meta.env.VITE_BACKEND_URL || import.meta.env.VITE_API_URL || ''; // Use proxy
 
       const response = await axios.post(`${backendUrl}/api/upload`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' },

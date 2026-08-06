@@ -44,7 +44,7 @@ const VerifyPage: React.FC<VerifyPageProps> = ({ onLogin }) => {
         setError('');
 
         try {
-            const backendUrl = ''; // Use proxy
+            const backendUrl = import.meta.env.VITE_BACKEND_URL || import.meta.env.VITE_API_URL || '';
             console.log("DEBUG VerifyPage: Using Backend URL:", backendUrl);
             const { data } = await axios.post(`${backendUrl}/auth/verify-email-otp`, {
                 email,

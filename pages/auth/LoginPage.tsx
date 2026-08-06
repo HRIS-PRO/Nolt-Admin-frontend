@@ -30,7 +30,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
         setError('');
 
         try {
-            const backendUrl = '';
+            const backendUrl = import.meta.env.VITE_BACKEND_URL || import.meta.env.VITE_API_URL || '';
             const { data } = await axios.post(`${backendUrl}/auth/login`, {
                 email,
                 password
@@ -52,8 +52,8 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
     const handleGoogleLogin = () => {
         // Use relative path for proxy (dev & prod) or fallback to env/localhost
         // Use relative path for proxy (dev & prod)
-        const backendUrl = '';
-        window.location.href = `/auth/google`;
+        const backendUrl = import.meta.env.VITE_BACKEND_URL || import.meta.env.VITE_API_URL || '';
+        window.location.href = `${backendUrl}/auth/google`;
     };
 
     return (

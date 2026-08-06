@@ -41,7 +41,7 @@ const ResetPasswordPage: React.FC = () => {
         setMessage('');
 
         try {
-            const backendUrl = '';
+            const backendUrl = import.meta.env.VITE_BACKEND_URL || import.meta.env.VITE_API_URL || '';
             await axios.post(`${backendUrl}/auth/reset-password`, {
                 token,
                 email,
