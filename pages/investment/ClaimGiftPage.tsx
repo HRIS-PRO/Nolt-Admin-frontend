@@ -17,7 +17,8 @@ const ClaimGiftPage: React.FC = () => {
 
         const fetchDetails = async () => {
             try {
-                const response = await fetch(`/api/investments/claim-gift/${token}`);
+                const backendUrl = import.meta.env.VITE_BACKEND_URL || import.meta.env.VITE_API_URL || '';
+                const response = await fetch(`${backendUrl}/api/investments/claim-gift/${token}`);
                 if (response.ok) {
                     const data = await response.json();
                     setGiftDetails(data);

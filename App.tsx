@@ -43,6 +43,12 @@ import CustomerDetailsPage from './pages/CustomerDetailsPage';
 import CbaMigrationPage from './pages/CbaMigrationPage';
 import PayrollUploadPage from './pages/PayrollUploadPage';
 
+// Set Global Axios Base URL from Environment Variable
+const globalBackendUrl = import.meta.env.VITE_BACKEND_URL || import.meta.env.VITE_API_URL || '';
+if (globalBackendUrl) {
+  axios.defaults.baseURL = globalBackendUrl;
+}
+
 // Setup Global Axios Interceptor for GPS Tracking
 axios.interceptors.request.use((config) => {
   const gpsLocation = localStorage.getItem('user_gps_location');
