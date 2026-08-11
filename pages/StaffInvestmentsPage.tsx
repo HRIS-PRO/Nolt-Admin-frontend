@@ -165,7 +165,8 @@ const StaffInvestmentsPage: React.FC<StaffInvestmentsPageProps> = ({ user, onLog
     useEffect(() => {
         const fetchInvestmentProducts = async () => {
             try {
-                const res = await fetch('/api/staff/products/investments/active');
+                const backendUrl = import.meta.env.VITE_BACKEND_URL || import.meta.env.VITE_API_URL || '';
+                const res = await fetch(`${backendUrl}/api/staff/products/investments/active`);
                 if (!res.ok) return;
                 const data = await res.json();
                 setInvestmentProducts(data);
@@ -193,8 +194,9 @@ const StaffInvestmentsPage: React.FC<StaffInvestmentsPageProps> = ({ user, onLog
 
             setRateLoading(true);
             try {
+                const backendUrl = import.meta.env.VITE_BACKEND_URL || import.meta.env.VITE_API_URL || '';
                 const res = await fetch(
-                    `/api/staff/investments/cba-rate?productCode=${productCode}&amount=${numericAmount}&duration=${numericDuration}`
+                    `${backendUrl}/api/staff/investments/cba-rate?productCode=${productCode}&amount=${numericAmount}&duration=${numericDuration}`
                 );
                 if (!res.ok) throw new Error('Rate fetch failed');
                 const data = await res.json();

@@ -43,6 +43,12 @@ import CustomerDetailsPage from './pages/CustomerDetailsPage';
 import CbaMigrationPage from './pages/CbaMigrationPage';
 import PayrollUploadPage from './pages/PayrollUploadPage';
 
+// Set Global Axios Base URL from Environment Variable
+const globalBackendUrl = import.meta.env.VITE_BACKEND_URL || import.meta.env.VITE_API_URL || '';
+if (globalBackendUrl) {
+  axios.defaults.baseURL = globalBackendUrl;
+}
+
 // Setup Global Axios Interceptor for GPS Tracking
 axios.interceptors.request.use((config) => {
   const gpsLocation = localStorage.getItem('user_gps_location');
@@ -158,7 +164,7 @@ const AppContent: React.FC = () => {
   const [resumeDraft, setResumeDraft] = useState<SavedDraft | null>(null);
   // Use relative path (proxy) by default for First-Party Cookies on Vercel
   // Only use VITE_BACKEND_URL if explicitly set (e.g. for local dev without proxy)
-  const backendUrl = ''; // Force relative path to use Vercel Rewrites
+  const backendUrl = import.meta.env.VITE_BACKEND_URL || import.meta.env.VITE_API_URL || ''; // Force relative path to use Vercel Rewrites
   const [isLoading, setIsLoading] = useState(true);
   const [user, setUser] = useState<UserState>({
     email: '',
@@ -290,7 +296,7 @@ const AppContent: React.FC = () => {
 
   const performLogout = useCallback(async () => {
     try {
-      const backendUrl = ''; // Use proxy
+      const backendUrl = import.meta.env.VITE_BACKEND_URL || import.meta.env.VITE_API_URL || ''; // Use proxy
       // If backendUrl is empty, it means we are using proxy (relative path)
       const url = backendUrl ? `${backendUrl}/auth/logout` : '/auth/logout';
       await fetch(url, {
@@ -466,7 +472,7 @@ const AppContent: React.FC = () => {
               <OnboardingPage onComplete={async () => {
                 // Call backend to complete onboarding
                 try {
-                  const backendUrl = ''; // Use proxy
+                  const backendUrl = import.meta.env.VITE_BACKEND_URL || import.meta.env.VITE_API_URL || ''; // Use proxy
                   await axios.put(`${backendUrl}/api/onboarding-complete`, {}, { withCredentials: true });
                   // Update local state by refetching from backend to get referral code
                   await refreshUser();

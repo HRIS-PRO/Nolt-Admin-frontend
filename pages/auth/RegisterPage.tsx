@@ -35,7 +35,7 @@ const RegisterPage: React.FC = () => {
         setError('');
 
         try {
-            const backendUrl = ''; // Use proxy
+            const backendUrl = import.meta.env.VITE_BACKEND_URL || import.meta.env.VITE_API_URL || '';
             const { data } = await axios.post(`${backendUrl}/auth/register`, {
                 email,
                 password,
@@ -53,7 +53,7 @@ const RegisterPage: React.FC = () => {
     };
 
     const handleGoogleLogin = () => {
-        const backendUrl = ''; // Use proxy
+        const backendUrl = import.meta.env.VITE_BACKEND_URL || import.meta.env.VITE_API_URL || '';
         window.location.href = `${backendUrl}/auth/google`;
     };
 

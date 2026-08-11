@@ -55,7 +55,7 @@ const AuthFlow: React.FC<AuthFlowProps> = ({ onComplete }) => {
     if (otpToken.length !== 4 && otpToken.length !== 6) return;
 
     try {
-      const backendUrl = ''; // Use proxy
+      const backendUrl = import.meta.env.VITE_BACKEND_URL || import.meta.env.VITE_API_URL || '';
       const { data } = await axios.post(`${backendUrl}/auth/verify-email-otp`, {
         email,
         otp: otpToken
@@ -116,7 +116,7 @@ const AuthFlow: React.FC<AuthFlowProps> = ({ onComplete }) => {
 
 
   const handleGoogleLogin = () => {
-    const backendUrl = ''; // Use proxy
+    const backendUrl = import.meta.env.VITE_BACKEND_URL || import.meta.env.VITE_API_URL || '';
     window.location.href = `${backendUrl}/auth/google`;
   };
 

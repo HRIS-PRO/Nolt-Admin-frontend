@@ -6,7 +6,12 @@ interface AuthLayoutProps {
     children: React.ReactNode;
 }
 
-const TESTIMONIALS = [
+const TESTIMONIALS: Array<{
+    quote: string;
+    name: string;
+    role: string;
+    avatarSeed: string;
+}> = [
     {
         quote: 'NOLT made getting a business loan incredibly simple. The process was transparent, fast, and secure.',
         name: 'Anonymous User',
@@ -19,7 +24,7 @@ const TESTIMONIALS = [
         role: 'Fixed Deposit Investor',
         avatarSeed: 'user456',
     },
-] as const;
+];
 
 function TestimonialCard({
     quote,
@@ -27,6 +32,7 @@ function TestimonialCard({
     role,
     avatarSeed,
 }: {
+    key?: React.Key;
     quote: string;
     name: string;
     role: string;
@@ -87,7 +93,13 @@ const AuthLayout: React.FC<AuthLayoutProps> = ({ children }) => {
 
                 <div className="absolute bottom-8 lg:bottom-12 left-8 lg:left-12 right-8 lg:right-12 z-20 grid grid-cols-1 lg:grid-cols-2 gap-4">
                     {TESTIMONIALS.map((item) => (
-                        <TestimonialCard key={item.name} {...item} />
+                        <TestimonialCard
+                            key={item.name}
+                            quote={item.quote}
+                            name={item.name}
+                            role={item.role}
+                            avatarSeed={item.avatarSeed}
+                        />
                     ))}
                 </div>
             </div>
