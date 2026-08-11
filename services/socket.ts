@@ -1,6 +1,7 @@
 import { io, Socket } from 'socket.io-client';
+import { apiBase } from '@/lib/api-config';
 
-const URL = import.meta.env.VITE_BACKEND_URL || import.meta.env.VITE_API_URL || undefined;
+const URL = apiBase() || undefined;
 
 export const socket: Socket = io(URL as any, {
     withCredentials: true,

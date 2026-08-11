@@ -1,8 +1,8 @@
 
 import { SavedDraft } from '../types';
+import { apiUrl } from '@/lib/api-config';
 
-const baseHost = import.meta.env.VITE_BACKEND_URL || import.meta.env.VITE_API_URL || '';
-const API_BASE_URL = baseHost ? `${baseHost}/api` : '/api';
+const API_BASE_URL = apiUrl('/api');
 
 export const investmentService = {
     createInvestment: async (data: any) => {

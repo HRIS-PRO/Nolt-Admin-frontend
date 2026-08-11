@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
+import { apiUrl } from '@/lib/api-config';
 import AuthLayout from '../../components/layouts/AuthLayout';
 
 const ForgotPasswordPage: React.FC = () => {
@@ -15,8 +16,7 @@ const ForgotPasswordPage: React.FC = () => {
 
         try {
             // Use relative path for proxy
-            const backendUrl = import.meta.env.VITE_BACKEND_URL || import.meta.env.VITE_API_URL || '';
-            await axios.post(`${backendUrl}/auth/forgot-password`, { email });
+            await axios.post(apiUrl('/auth/forgot-password'), { email });
             setStatus('success');
             setMessage('If an account exists with this email, you will receive a password reset link shortly.');
         } catch (error: any) {
