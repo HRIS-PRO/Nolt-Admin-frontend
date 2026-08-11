@@ -3,6 +3,7 @@ import React, { useState, useRef, useEffect } from 'react';
 
 // Add axios import at the top
 import axios from 'axios';
+import { apiUrl } from '@/lib/api-config';
 import { createEmptyOtp, handleOtpPaste } from '../utils/otpInput';
 
 const OTP_LENGTH = 6;
@@ -55,8 +56,7 @@ const AuthFlow: React.FC<AuthFlowProps> = ({ onComplete }) => {
     if (otpToken.length !== 4 && otpToken.length !== 6) return;
 
     try {
-      const backendUrl = import.meta.env.VITE_BACKEND_URL || import.meta.env.VITE_API_URL || '';
-      const { data } = await axios.post(`${backendUrl}/auth/verify-email-otp`, {
+      const { data } = await axios.post(apiUrl('/auth/verify-email-otp'), {
         email,
         otp: otpToken
       }, { withCredentials: true });
@@ -116,8 +116,7 @@ const AuthFlow: React.FC<AuthFlowProps> = ({ onComplete }) => {
 
 
   const handleGoogleLogin = () => {
-    const backendUrl = import.meta.env.VITE_BACKEND_URL || import.meta.env.VITE_API_URL || '';
-    window.location.href = `${backendUrl}/auth/google`;
+    window.location.href = apiUrl('/auth/google');
   };
 
   return (

@@ -42,9 +42,10 @@ import JointAcceptancePage from './pages/investment/JointAcceptancePage';
 import CustomerDetailsPage from './pages/CustomerDetailsPage';
 import CbaMigrationPage from './pages/CbaMigrationPage';
 import PayrollUploadPage from './pages/PayrollUploadPage';
+import { apiBase, apiUrl } from './lib/api-config';
 
-// Set Global Axios Base URL from Environment Variable
-const globalBackendUrl = import.meta.env.VITE_BACKEND_URL || import.meta.env.VITE_API_URL || '';
+// Set global axios base URL (empty in local proxy mode → relative /api, /auth)
+const globalBackendUrl = apiBase();
 if (globalBackendUrl) {
   axios.defaults.baseURL = globalBackendUrl;
 }
@@ -164,7 +165,7 @@ const AppContent: React.FC = () => {
   const [resumeDraft, setResumeDraft] = useState<SavedDraft | null>(null);
   // Use relative path (proxy) by default for First-Party Cookies on Vercel
   // Only use VITE_BACKEND_URL if explicitly set (e.g. for local dev without proxy)
-  const backendUrl = import.meta.env.VITE_BACKEND_URL || import.meta.env.VITE_API_URL || ''; // Force relative path to use Vercel Rewrites
+  const backendUrl = apiBase(); // empty → Vite proxy in local dev
   const [isLoading, setIsLoading] = useState(true);
   const [user, setUser] = useState<UserState>({
     email: '',
@@ -296,10 +297,7 @@ const AppContent: React.FC = () => {
 
   const performLogout = useCallback(async () => {
     try {
-      const backendUrl = import.meta.env.VITE_BACKEND_URL || import.meta.env.VITE_API_URL || ''; // Use proxy
-      // If backendUrl is empty, it means we are using proxy (relative path)
-      const url = backendUrl ? `${backendUrl}/auth/logout` : '/auth/logout';
-      await fetch(url, {
+      await fetch(apiUrl('/auth/logout'), {
         credentials: 'include'
       });
     } catch (e) {
@@ -472,8 +470,8 @@ const AppContent: React.FC = () => {
               <OnboardingPage onComplete={async () => {
                 // Call backend to complete onboarding
                 try {
-                  const backendUrl = import.meta.env.VITE_BACKEND_URL || import.meta.env.VITE_API_URL || ''; // Use proxy
-                  await axios.put(`${backendUrl}/api/onboarding-complete`, {}, { withCredentials: true });
+                  const backendUrl = apiBase();
+                  await axios.put(apiUrl('/api/onboarding-complete'), {}, { withCredentials: true });
                   // Update local state by refetching from backend to get referral code
                   await refreshUser();
                   navigateRouter('/dashboard');
