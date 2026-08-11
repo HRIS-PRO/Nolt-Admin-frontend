@@ -29,15 +29,15 @@
     "rewrites": [
         {
             "source": "/api/:path*",
-            "destination": "https://apim.noltfinance.com/api/nms/api/:path*"
+            "destination": "https://apim.noltfinance.com/api/admin/api/:path*"
         },
         {
             "source": "/auth/:path*",
-            "destination": "https://apim.noltfinance.com/api/nms/auth/:path*"
+            "destination": "https://apim.noltfinance.com/api/admin/auth/:path*"
         },
         {
             "source": "/socket.io/:path*",
-            "destination": "https://apim.noltfinance.com/api/nms/socket.io/:path*"
+            "destination": "https://apim.noltfinance.com/api/admin/socket.io/:path*"
         },
         {
             "source": "/(.*)",
