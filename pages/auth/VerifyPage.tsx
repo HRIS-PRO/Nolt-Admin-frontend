@@ -2,6 +2,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import { apiUrl } from '@/lib/api-config';
 import { createEmptyOtp, handleOtpPaste } from '../../utils/otpInput';
 
 const OTP_LENGTH = 6;
@@ -44,9 +45,7 @@ const VerifyPage: React.FC<VerifyPageProps> = ({ onLogin }) => {
         setError('');
 
         try {
-            const backendUrl = import.meta.env.VITE_BACKEND_URL || import.meta.env.VITE_API_URL || '';
-            console.log("DEBUG VerifyPage: Using Backend URL:", backendUrl);
-            const { data } = await axios.post(`${backendUrl}/auth/verify-email-otp`, {
+            const { data } = await axios.post(apiUrl('/auth/verify-email-otp'), {
                 email,
                 otp: otpToken
             }, { withCredentials: true });
