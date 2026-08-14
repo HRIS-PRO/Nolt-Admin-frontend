@@ -6,9 +6,9 @@ frontend:
         - npm ci
     build:
       commands:
-        - export VITE_USE_LOCAL_PROXY=true
-        - export VITE_BACKEND_URL=
-        - export VITE_API_URL=
+        - export VITE_USE_LOCAL_PROXY=false
+        - export VITE_BACKEND_URL=https://apim.noltfinance.com/api/admin
+        - export VITE_API_URL=https://apim.noltfinance.com/api/admin
         - npm run build
   artifacts:
     baseDirectory: dist
