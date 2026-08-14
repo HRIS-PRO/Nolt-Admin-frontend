@@ -32,12 +32,12 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
 
         try {
             const { data } = await axios.post(apiUrl('/auth/login'), {
-                email,
+                email: email.trim().toLowerCase(),
                 password
             }, { withCredentials: true });
 
             if (data.requireOtp) {
-                navigate('/verify', { state: { email } });
+                navigate('/verify', { state: { email: email.trim().toLowerCase() } });
             } else {
                 // Fallback if no OTP required (though our backend enforces it)
                 onLogin(email);
