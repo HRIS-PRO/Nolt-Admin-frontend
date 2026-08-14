@@ -1,6 +1,10 @@
+/** Production admin API gateway (AWS EB behind APIM). */
+export const APIM_ADMIN_URL = 'https://apim.noltfinance.com/api/admin';
+
 /**
  * API base for browser requests.
- * Empty string → same-origin `/api` and `/auth` (hosting rewrites → APIM).
+ * Local dev with VITE_USE_LOCAL_PROXY=true → same-origin /api and /auth (Vite proxy).
+ * Production on Amplify → APIM directly (hosting rewrites do not proxy /auth reliably).
  */
 export function apiBase(): string {
   const configured = (import.meta.env.VITE_BACKEND_URL || import.meta.env.VITE_API_URL || '').trim();
@@ -9,18 +13,16 @@ export function apiBase(): string {
     return '';
   }
 
-  // Retired Railway URL left in Amplify/Vercel env — ignore and use hosting proxy.
   if (configured.includes('railway.app')) {
-    return '';
+    return APIM_ADMIN_URL;
   }
 
   if (configured) {
     return configured.replace(/\/$/, '');
   }
 
-  // Production builds with no explicit backend use same-origin rewrites (Amplify/Vercel).
   if (import.meta.env.PROD) {
-    return '';
+    return APIM_ADMIN_URL;
   }
 
   return '';
