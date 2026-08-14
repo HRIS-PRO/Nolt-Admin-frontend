@@ -1,4 +1,4 @@
-/** Shared CSP — keep in sync with vercel.json production headers. */
+/** Shared CSP — keep in sync with amplify.yml and vercel.json production headers. */
 export const CONTENT_SECURITY_POLICY =
   "default-src 'self'; base-uri 'self'; object-src 'none'; " +
   "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.tailwindcss.com https://www.googletagmanager.com " +
@@ -10,7 +10,7 @@ export const CONTENT_SECURITY_POLICY =
   "https://paystack.com https://*.paystack.com https://paystack.co https://*.paystack.co; " +
   "font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: https: blob:; " +
   "connect-src 'self' https://api.dojah.io https://identity.dojah.io https://widget.dojah.io https://dojah.io https://*.dojah.io " +
-  "https://nolt-admin-backend-production-7761.up.railway.app wss://nolt-admin-backend-production-7761.up.railway.app " +
+  "https://apim.noltfinance.com wss://apim.noltfinance.com " +
   "https://api.paystack.co https://paystack.co https://*.paystack.co https://paystack.com https://*.paystack.com " +
   "https://api.ng.termii.com https://api.usezeeh.com https://google-analytics.com https://www.google-analytics.com " +
   "https://*.google-analytics.com https://analytics.google.com https://*.analytics.google.com https://doubleclick.net " +
