@@ -281,19 +281,14 @@ const AppContent: React.FC = () => {
     }));
   }, []);
 
-  // Handle Google Login Callback
+  // Handle Google Login Callback — load session from cookie, then route client-side
   useEffect(() => {
-    if (searchParams.get('login') === 'success') {
-      const pendingToken = localStorage.getItem('pending_gift_token');
-      const pendingJointToken = localStorage.getItem('pending_joint_token');
-      if (pendingToken || pendingJointToken) {
-          console.log("Google login success with pending action, redirection will be handled by auth effect");
-          // Redirection is handled by the useEffect above that watches user.isLoggedIn
-      } else {
-          navigateRouter('/dashboard', { replace: true });
-      }
-    }
-  }, [searchParams, navigateRouter]);
+    if (searchParams.get('login') !== 'success') return;
+
+    refreshUser().finally(() => {
+      navigateRouter('/dashboard', { replace: true });
+    });
+  }, [searchParams, navigateRouter, refreshUser]);
 
   const performLogout = useCallback(async () => {
     try {
