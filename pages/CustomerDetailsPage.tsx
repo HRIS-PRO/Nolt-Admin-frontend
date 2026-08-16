@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import StaffLayout from '../components/layouts/StaffLayout';
 import { UserState, Theme } from '../types';
+import { apiUrl } from '@/lib/api-config';
 
 interface CustomerDetailsPageProps {
   user: UserState;
@@ -11,7 +12,7 @@ interface CustomerDetailsPageProps {
   theme: Theme;
 }
 
-const API = (path: string) => `${import.meta.env.VITE_BACKEND_URL || ''}${path}`;
+const API = (path: string) => apiUrl(path);
 
 const CustomerDetailsPage: React.FC<CustomerDetailsPageProps> = ({ user, onLogout, toggleTheme, theme }) => {
   const { id } = useParams<{ id: string }>();
