@@ -10,6 +10,7 @@ import GiftInvestmentFlow from './investment/GiftInvestmentFlow';
 import { PaymentModal } from '../components/PaymentModal';
 import SelfieVerificationCapture, { type SelfieVerificationSuccess } from '../components/SelfieVerificationCapture';
 import { AnimatePresence } from 'motion/react';
+import { apiUrl } from '@/lib/api-config';
 
 interface InvestmentFlowProps {
   navigate: (step: AppStep) => void;
@@ -207,7 +208,7 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
     const casa = incomingDraft?.data?.casa_account_number ?? user.profile?.casa;
     if (!casa) return;
     setCasaBalanceLoading(true);
-    axios.get(`${import.meta.env.VITE_API_URL || ''}/api/profile/balance`, { withCredentials: true })
+    axios.get(apiUrl('/api/profile/balance'), { withCredentials: true })
       .then(res => {
         if (res.data?.success && res.data?.balance !== null) {
           setCasaBalance(res.data.balance);
@@ -1270,7 +1271,7 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
                   setTopUpLoading(true);
                   try {
                     const res = await axios.post(
-                      `${import.meta.env.VITE_API_URL || ''}/api/investments/cba-topup`,
+                      apiUrl('/api/investments/cba-topup'),
                       { tdAccount: tdAccount || '', topUpAmount: Number(topUpAmount), settlementAcct: casaNumber },
                       { withCredentials: true }
                     );

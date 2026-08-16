@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
+import { apiUrl } from '@/lib/api-config';
 
 const ClaimGiftPage: React.FC = () => {
     const [searchParams] = useSearchParams();
@@ -17,8 +18,7 @@ const ClaimGiftPage: React.FC = () => {
 
         const fetchDetails = async () => {
             try {
-                const backendUrl = import.meta.env.VITE_BACKEND_URL || import.meta.env.VITE_API_URL || '';
-                const response = await fetch(`${backendUrl}/api/investments/claim-gift/${token}`);
+                const response = await fetch(apiUrl(`/api/investments/claim-gift/${token}`));
                 if (response.ok) {
                     const data = await response.json();
                     setGiftDetails(data);

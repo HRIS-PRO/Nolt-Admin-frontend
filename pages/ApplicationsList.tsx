@@ -3,6 +3,7 @@ import { AppStep, SavedDraft, UserState } from '../types';
 import { storageService } from '../services/storageService';
 import axios from 'axios';
 import { formatDate } from '../utils/dateFormatter';
+import { apiUrl } from '@/lib/api-config';
 
 interface ApplicationsListProps {
   navigate: (step: AppStep, draft?: SavedDraft | null) => void;
@@ -288,7 +289,7 @@ const ApplicationsList: React.FC<ApplicationsListProps> = ({ navigate, formatMon
       // Extract numeric ID from e.g. "INV-42"
       const realId = selectedApp?.id?.replace('INV-', '');
 
-      await axios.post(`${import.meta.env.VITE_API_URL || ''}/api/investments/${realId}/liquidate`, {
+      await axios.post(apiUrl(`/api/investments/${realId}/liquidate`), {
         liquidation_type: liquidationType,
         amount: amountToLiquidate
       }, { withCredentials: true });
@@ -318,8 +319,8 @@ const ApplicationsList: React.FC<ApplicationsListProps> = ({ navigate, formatMon
     const fetchApplications = async () => {
       try {
         const [loansRes, investmentsRes] = await Promise.all([
-          axios.get(`${import.meta.env.VITE_API_URL || ''}/api/loans`, { withCredentials: true }).catch(() => ({ data: [] })),
-          axios.get(`${import.meta.env.VITE_API_URL || ''}/api/investments`, { withCredentials: true }).catch(() => ({ data: [] }))
+          axios.get(apiUrl('/api/loans'), { withCredentials: true }).catch(() => ({ data: [] })),
+          axios.get(apiUrl('/api/investments'), { withCredentials: true }).catch(() => ({ data: [] }))
         ]);
         
         console.log("DEBUG: Fetched Completed Loans:", loansRes.data);
@@ -407,7 +408,7 @@ const ApplicationsList: React.FC<ApplicationsListProps> = ({ navigate, formatMon
       const token = localStorage.getItem('pending_gift_token');
       if (token) {
         try {
-          const { data } = await axios.get(`${import.meta.env.VITE_API_URL || ''}/api/investments/claim-gift/${token}`);
+          const { data } = await axios.get(apiUrl(`/api/investments/claim-gift/${token}`));
           setPendingGift({ ...data, token });
         } catch (e) {
           console.error("Failed to fetch pending gift matching token", e);
