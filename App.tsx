@@ -45,6 +45,9 @@ import PayrollUploadPage from './pages/PayrollUploadPage';
 import { apiBase, apiUrl } from './lib/api-config';
 import { scheduleDeferredScripts } from './lib/deferred-scripts';
 
+// Same-origin proxy: always send session cookies on API/auth requests.
+axios.defaults.withCredentials = true;
+
 // Set global axios base URL (empty in local proxy mode → relative /api, /auth)
 const globalBackendUrl = apiBase();
 if (globalBackendUrl) {
