@@ -1,7 +1,9 @@
 
 import axios from 'axios';
 
-const API_URL = import.meta.env.VITE_BACKEND_URL || import.meta.env.VITE_API_URL || '';
+import { apiBase } from '@/lib/api-config';
+
+const API_URL = apiBase();
 
 export interface UserProfile {
   id?: string;

@@ -13,6 +13,9 @@ interface StaffDashboardProps {
 
 const StaffDashboard: React.FC<StaffDashboardProps> = ({ user, onLogout, toggleTheme, theme }) => {
     const [copied, setCopied] = useState(false);
+    const referralUrl = user.referral_code
+        ? `${window.location.origin}/join?ref=${user.referral_code}`
+        : '';
     const [stats, setStats] = useState({
         totalLoans: 0,
         totalUsers: 0,
@@ -165,13 +168,14 @@ const StaffDashboard: React.FC<StaffDashboardProps> = ({ user, onLogout, toggleT
 
                         <div className="flex w-full md:w-auto items-center gap-3 bg-[#1e293b] dark:bg-slate-800/80 rounded-[1.2rem] p-2 border border-slate-700/50">
                             <div className="flex items-center gap-3 px-4 font-mono text-sm text-slate-300 overflow-hidden flex-1 md:w-64">
-                                <span className="opacity-50 select-none">nolt.finance/join?ref=</span>
+                                <span className="opacity-50 select-none">{window.location.host}/join?ref=</span>
                                 <span className="text-white font-bold truncate select-all">{user.referral_code}</span>
                                 <span className="material-symbols-outlined text-sm text-slate-500">link</span>
                             </div>
                             <button 
                                 onClick={() => {
-                                    navigator.clipboard.writeText(`https://lms.noltfinance.com/join?ref=${user.referral_code}`);
+                                    if (!referralUrl) return;
+                                    navigator.clipboard.writeText(referralUrl);
                                     setCopied(true);
                                     setTimeout(() => setCopied(false), 2000);
                                 }}

@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
+import { apiUrl } from '@/lib/api-config';
 
 interface LoginPageProps {
     onLogin: (email: string) => void;
@@ -30,14 +31,13 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
         setError('');
 
         try {
-            const backendUrl = import.meta.env.VITE_BACKEND_URL || import.meta.env.VITE_API_URL || '';
-            const { data } = await axios.post(`${backendUrl}/auth/login`, {
-                email,
+            const { data } = await axios.post(apiUrl('/auth/login'), {
+                email: email.trim().toLowerCase(),
                 password
             }, { withCredentials: true });
 
             if (data.requireOtp) {
-                navigate('/verify', { state: { email } });
+                navigate('/verify', { state: { email: email.trim().toLowerCase() } });
             } else {
                 // Fallback if no OTP required (though our backend enforces it)
                 onLogin(email);
@@ -52,8 +52,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
     const handleGoogleLogin = () => {
         // Use relative path for proxy (dev & prod) or fallback to env/localhost
         // Use relative path for proxy (dev & prod)
-        const backendUrl = import.meta.env.VITE_BACKEND_URL || import.meta.env.VITE_API_URL || '';
-        window.location.href = `${backendUrl}/auth/google`;
+        window.location.href = apiUrl('/auth/google');
     };
 
     return (

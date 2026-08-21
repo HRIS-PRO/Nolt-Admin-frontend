@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
+import { apiUrl } from '@/lib/api-config';
 
 const RegisterPage: React.FC = () => {
     const [email, setEmail] = useState('');
@@ -35,8 +36,7 @@ const RegisterPage: React.FC = () => {
         setError('');
 
         try {
-            const backendUrl = import.meta.env.VITE_BACKEND_URL || import.meta.env.VITE_API_URL || '';
-            const { data } = await axios.post(`${backendUrl}/auth/register`, {
+            const { data } = await axios.post(apiUrl('/auth/register'), {
                 email,
                 password,
                 full_name: fullName
@@ -53,8 +53,7 @@ const RegisterPage: React.FC = () => {
     };
 
     const handleGoogleLogin = () => {
-        const backendUrl = import.meta.env.VITE_BACKEND_URL || import.meta.env.VITE_API_URL || '';
-        window.location.href = `${backendUrl}/auth/google`;
+        window.location.href = apiUrl('/auth/google');
     };
 
     return (
