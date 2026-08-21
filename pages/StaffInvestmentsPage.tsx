@@ -6,7 +6,7 @@ import { SavedDraft, UserState, Currency, InvestmentPlan } from '../types';
 import { investmentService } from '../services/investmentService';
 import { profileService } from '../services/profileService';
 import NewInvestmentLookupFlow from '../components/NewInvestmentLookupFlow';
-import { apiUrl } from '../lib/api-config';
+import { apiUrl } from '@/lib/api-config';
 
 interface StaffInvestmentsPageProps {
     user: { name: string; email: string; avatar_url?: string; role?: string };
