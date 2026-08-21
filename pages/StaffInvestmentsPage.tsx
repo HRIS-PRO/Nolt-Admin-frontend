@@ -812,7 +812,7 @@ const StaffInvestmentsPage: React.FC<StaffInvestmentsPageProps> = ({ user, onLog
                                                 onClick={() => {
                                                     setShowStaffApplicationFlow(false);
                                                     // Navigate to customer profile edit — adjust route as needed
-                                                    window.open(`/customers/${c?.id || c?.user_id}`, '_blank');
+                                                    window.open(`/staff/customers/${c?.id || c?.user_id}`, '_blank');
                                                 }}
                                                 className="w-full h-14 rounded-2xl bg-rose-600 hover:bg-rose-700 text-white font-black uppercase tracking-widest text-xs transition-all flex items-center justify-center gap-2 shadow-lg shadow-rose-600/20"
                                             >
