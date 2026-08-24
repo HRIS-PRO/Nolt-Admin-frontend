@@ -501,7 +501,6 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
 
         try {
             const response = await axios.post('/api/upload', formData, {
-                headers: { 'Content-Type': 'multipart/form-data' },
                 timeout: 120_000,
                 onUploadProgress: (progressEvent) => {
                     const total = progressEvent.total;
