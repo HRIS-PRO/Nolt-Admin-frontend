@@ -103,7 +103,7 @@ const NewLoanApplicationFlow: React.FC<NewLoanApplicationFlowProps> = ({ isOpen,
         const hasActiveLoan = activeLoans.length > 0;
         const isLoanTypeLocked = hasActiveLoan && ['topup', 're-app', 'add_on'].includes(selectedLoanType);
 
-        const enrichedInitialData = React.useMemo(() => ({ ...customerData, loan_type: selectedLoanType }), [customerData, selectedLoanType]);
+        const enrichedInitialData = { ...customerData, loan_type: selectedLoanType };
         return (
             <StaffLoanForm
                 onClose={resetFlow}
