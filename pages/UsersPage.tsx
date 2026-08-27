@@ -24,7 +24,7 @@ const UsersPage: React.FC<UsersPageProps> = ({ user, onLogout, toggleTheme, them
     // Actions State
     const [showInviteModal, setShowInviteModal] = useState(false);
     const [showBulkModal, setShowBulkModal] = useState(false);
-    const [inviteForm, setInviteForm] = useState({ full_name: '', email: '', role: 'staff', password: '', officer_code: '', officer_name: '' });
+    const [inviteForm, setInviteForm] = useState({ full_name: '', email: '', role: 'staff', password: '', officer_code: '', officer_name: '', organization: 'nolt_finance' });
     const [recruiting, setRecruiting] = useState(false);
     const [bulkFile, setBulkFile] = useState<File | null>(null);
     const [bulking, setBulking] = useState(false);
@@ -36,6 +36,31 @@ const UsersPage: React.FC<UsersPageProps> = ({ user, onLogout, toggleTheme, them
     const [editingOfficerId, setEditingOfficerId] = useState<number | null>(null);
     const [officerListSearch, setOfficerListSearch] = useState('');
     const [assigningOfficerForId, setAssigningOfficerForId] = useState<number | null>(null);
+
+    // Referral Code Generation State
+    const [generatingReferralForId, setGeneratingReferralForId] = useState<number | null>(null);
+    const [pendingOrgMap, setPendingOrgMap] = useState<Record<number, 'NT' | 'NI'>>({});
+
+    const handleGenerateReferralCode = async (userId: number, prefix: 'NT' | 'NI') => {
+        setGeneratingReferralForId(userId);
+        try {
+            const res = await axios.post(`${''}/api/staff/referral-code`, {
+                userId,
+                prefix
+            }, { withCredentials: true });
+            setUsers(prev => prev.map(u =>
+                u.id === userId
+                    ? { ...u, referral_code: res.data.referral_code, organization: res.data.organization }
+                    : u
+            ));
+            // Clear pending selection
+            setPendingOrgMap(prev => { const n = { ...prev }; delete n[userId]; return n; });
+        } catch (error: any) {
+            alert(error.response?.data?.message || "Failed to generate referral code");
+        } finally {
+            setGeneratingReferralForId(null);
+        }
+    };
 
     const fetchUsers = async () => {
         setIsLoading(true);
@@ -276,6 +301,7 @@ const UsersPage: React.FC<UsersPageProps> = ({ user, onLogout, toggleTheme, them
                         <thead className="text-[10px] uppercase text-slate-500 font-black tracking-widest bg-slate-50 dark:bg-slate-900/30">
                             <tr>
                                 <th className="p-6 pl-8">Administrator</th>
+                                <th className="p-6 py-4">Organization</th>
                                 <th className="p-6 py-4">Role & Permissions</th>
 
                                 <th className="p-6 py-4">Referral Code</th>
@@ -287,7 +313,7 @@ const UsersPage: React.FC<UsersPageProps> = ({ user, onLogout, toggleTheme, them
                         <tbody className="text-sm divide-y divide-slate-100 dark:divide-slate-800">
                             {isLoading ? (
                                 <tr>
-                                    <td colSpan={6} className="p-8 text-center text-slate-500">Loading users...</td>
+                                    <td colSpan={7} className="p-8 text-center text-slate-500">Loading users...</td>
                                 </tr>
                             ) : users.map((u) => (
                                 <tr key={u.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/30 transition-colors group">
@@ -301,6 +327,39 @@ const UsersPage: React.FC<UsersPageProps> = ({ user, onLogout, toggleTheme, them
                                                 <p className="text-xs text-slate-500 font-medium">{u.email}</p>
                                             </div>
                                         </div>
+                                    </td>
+
+                                    <td className="p-6 py-4">
+                                        {u.organization === 'nolt_investment' || u.referral_code?.startsWith('NI') ? (
+                                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-purple-200 dark:border-purple-500/20 bg-purple-50 dark:bg-purple-500/10 text-purple-700 dark:text-purple-300 text-[11px] font-bold">
+                                                <span className="material-symbols-outlined text-xs">trending_up</span>
+                                                Nolt Investment
+                                            </span>
+                                        ) : u.organization === 'nolt_finance' || u.referral_code?.startsWith('NT') ? (
+                                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-blue-200 dark:border-blue-500/20 bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-300 text-[11px] font-bold">
+                                                <span className="material-symbols-outlined text-xs">account_balance</span>
+                                                Nolt Finance
+                                            </span>
+                                        ) : (
+                                            <div className="relative">
+                                                <select
+                                                    value={pendingOrgMap[u.id] || ''}
+                                                    onChange={(e) => {
+                                                        const val = e.target.value as 'NT' | 'NI' | '';
+                                                        if (val) {
+                                                            setPendingOrgMap(prev => ({ ...prev, [u.id]: val }));
+                                                        } else {
+                                                            setPendingOrgMap(prev => { const n = { ...prev }; delete n[u.id]; return n; });
+                                                        }
+                                                    }}
+                                                    className="appearance-none bg-white dark:bg-slate-800/80 border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-xl px-3 py-2 text-xs font-bold text-slate-500 dark:text-slate-400 outline-none cursor-pointer hover:border-blue-400 hover:text-blue-600 dark:hover:border-blue-500 dark:hover:text-blue-400 transition-all"
+                                                >
+                                                    <option value="">- Select Org -</option>
+                                                    <option value="NT">Nolt Finance (NT)</option>
+                                                    <option value="NI">Nolt Investment (NI)</option>
+                                                </select>
+                                            </div>
+                                        )}
                                     </td>
                                     <td className="p-6 py-4">
                                         {editingRoleId === u.id ? (
@@ -339,7 +398,7 @@ const UsersPage: React.FC<UsersPageProps> = ({ user, onLogout, toggleTheme, them
                                                 <span className="font-mono text-xs text-blue-600 dark:text-blue-400 font-bold bg-blue-50 dark:bg-blue-500/10 px-2 py-1 rounded border border-blue-200 dark:border-blue-500/20">{u.referral_code}</span>
                                                 <button
                                                     onClick={() => {
-                                                        const url = `${window.location.origin}/register?ref=${u.referral_code}`;
+                                                        const url = `${window.location.origin}/register?${u.referral_code}`;
                                                         navigator.clipboard.writeText(url);
                                                         alert("Referral link copied!");
                                                     }}
@@ -349,10 +408,24 @@ const UsersPage: React.FC<UsersPageProps> = ({ user, onLogout, toggleTheme, them
                                                     <span className="material-symbols-outlined text-sm">content_copy</span>
                                                 </button>
                                             </div>
+                                        ) : generatingReferralForId === u.id ? (
+                                            <span className="inline-flex items-center gap-1.5 text-xs text-slate-400 font-medium">
+                                                <span className="material-symbols-outlined text-sm animate-spin">progress_activity</span>
+                                                Generating...
+                                            </span>
                                         ) : (
                                             <button
-                                                onClick={() => handleGenerateReferral(u.id)}
-                                                className="flex items-center gap-1 text-slate-400 hover:text-blue-500 transition-colors text-xs font-bold"
+                                                disabled={!pendingOrgMap[u.id]}
+                                                onClick={() => {
+                                                    const prefix = pendingOrgMap[u.id];
+                                                    if (prefix) handleGenerateReferralCode(u.id, prefix);
+                                                }}
+                                                title={pendingOrgMap[u.id] ? `Generate code for ${pendingOrgMap[u.id] === 'NT' ? 'Nolt Finance' : 'Nolt Investment'}` : 'Select an organization first'}
+                                                className={`flex items-center gap-1.5 text-xs font-bold transition-colors ${
+                                                    pendingOrgMap[u.id]
+                                                        ? 'text-blue-500 hover:text-blue-700 cursor-pointer'
+                                                        : 'text-slate-300 dark:text-slate-600 cursor-not-allowed'
+                                                }`}
                                             >
                                                 <span className="material-symbols-outlined text-sm">autorenew</span>
                                                 Generate
@@ -592,6 +665,18 @@ const UsersPage: React.FC<UsersPageProps> = ({ user, onLogout, toggleTheme, them
                                     <option value="ed">ED</option>
                                     <option value="hr">HR</option>
                                     <option value="super_admin">Super Admin</option>
+                                </select>
+                            </div>
+
+                            <div>
+                                <label className="block text-xs font-black uppercase tracking-widest text-slate-500 mb-2">Organization</label>
+                                <select
+                                    value={inviteForm.organization || 'nolt_finance'}
+                                    onChange={e => setInviteForm({ ...inviteForm, organization: e.target.value })}
+                                    className="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border-none outline-none font-bold text-slate-900 dark:text-white cursor-pointer"
+                                >
+                                    <option value="nolt_finance">Nolt Finance (NT)</option>
+                                    <option value="nolt_investment">Nolt Investment (NI)</option>
                                 </select>
                             </div>
 

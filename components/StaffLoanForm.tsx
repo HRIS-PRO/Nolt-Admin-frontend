@@ -492,6 +492,17 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
 
     // File Upload Logic
     const uploadFile = async (id: string, file: File) => {
+        // Prevent uploading the exact same file in multiple document slots within this application
+        const isDuplicate = Object.entries(uploadedDocs).some(([slotId, doc]) => {
+            if (slotId === id || !doc) return false;
+            return (doc as any)?.name?.toLowerCase() === file.name.toLowerCase();
+        });
+
+        if (isDuplicate) {
+            alert(`The file "${file.name}" is already attached to another document field in this application. Please select a distinct file.`);
+            return;
+        }
+
         setUploadProgress(prev => ({ ...prev, [id]: 5 }));
         setUploadProcessing(prev => ({ ...prev, [id]: false }));
         const formData = new FormData();
