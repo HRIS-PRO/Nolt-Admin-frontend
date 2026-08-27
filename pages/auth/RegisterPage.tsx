@@ -18,7 +18,13 @@ const RegisterPage: React.FC = () => {
     const [searchParams] = useSearchParams();
 
     useEffect(() => {
-        const ref = searchParams.get('ref');
+        let ref = searchParams.get('ref');
+        if (!ref) {
+            const rawSearch = window.location.search.replace(/^\?/, '').trim();
+            if (rawSearch && !rawSearch.includes('=')) {
+                ref = rawSearch;
+            }
+        }
         if (ref) {
             localStorage.setItem('nolt_referral_code', ref);
         }

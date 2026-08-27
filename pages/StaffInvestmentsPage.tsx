@@ -707,6 +707,17 @@ const StaffInvestmentsPage: React.FC<StaffInvestmentsPageProps> = ({ user, onLog
         const file = e.target.files?.[0];
         if (!file) return;
 
+        // Prevent uploading the exact same file in multiple document slots within this application
+        const isDuplicate = Object.entries(wizardData.uploadedDocs || {}).some(([slotId, doc]) => {
+            if (slotId === fieldId || !doc) return false;
+            return typeof doc === 'string' ? false : (doc as any)?.name?.toLowerCase() === file.name.toLowerCase();
+        });
+
+        if (isDuplicate) {
+            alert(`The file "${file.name}" is already attached to another document field in this application. Please select a distinct file.`);
+            return;
+        }
+
         try {
             setWizardData(prev => ({ ...prev, uploadedDocs: { ...prev.uploadedDocs, [fieldId]: 'uploading...' } }));
             const uploadResult = await investmentService.uploadDocument(file, `STAFF-${wizardData.email || Date.now()}`, fieldId);
