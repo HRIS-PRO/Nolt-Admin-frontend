@@ -29,12 +29,15 @@ const RegisterPage: React.FC = () => {
         if (!ref) {
             const pathParts = window.location.pathname.split('/').filter(Boolean);
             const lastPart = pathParts[pathParts.length - 1];
-            if (lastPart && lastPart !== 'register' && /^(NT|NI)[0-9]+$/i.test(lastPart)) {
+            if (lastPart && lastPart !== 'register') {
                 ref = lastPart;
             }
         }
         if (ref) {
-            localStorage.setItem('nolt_referral_code', ref);
+            const cleaned = ref.replace(/[\.\s]+$/, '').trim();
+            if (cleaned) {
+                localStorage.setItem('nolt_referral_code', cleaned);
+            }
         }
     }, [searchParams, refCode]);
 
