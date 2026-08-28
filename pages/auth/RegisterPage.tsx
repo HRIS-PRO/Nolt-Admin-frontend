@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams, useParams } from 'react-router-dom';
 import axios from 'axios';
 import { apiUrl } from '@/lib/api-config';
 
@@ -16,19 +16,27 @@ const RegisterPage: React.FC = () => {
     const [error, setError] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [searchParams] = useSearchParams();
+    const { refCode } = useParams<{ refCode?: string }>();
 
     useEffect(() => {
-        let ref = searchParams.get('ref');
+        let ref = refCode || searchParams.get('ref');
         if (!ref) {
             const rawSearch = window.location.search.replace(/^\?/, '').trim();
             if (rawSearch && !rawSearch.includes('=')) {
                 ref = rawSearch;
             }
         }
+        if (!ref) {
+            const pathParts = window.location.pathname.split('/').filter(Boolean);
+            const lastPart = pathParts[pathParts.length - 1];
+            if (lastPart && lastPart !== 'register' && /^(NT|NI)[0-9]+$/i.test(lastPart)) {
+                ref = lastPart;
+            }
+        }
         if (ref) {
             localStorage.setItem('nolt_referral_code', ref);
         }
-    }, [searchParams]);
+    }, [searchParams, refCode]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -45,7 +53,8 @@ const RegisterPage: React.FC = () => {
             const { data } = await axios.post(apiUrl('/auth/register'), {
                 email,
                 password,
-                full_name: fullName
+                full_name: fullName,
+                referral_code: localStorage.getItem('nolt_referral_code') || undefined
             }, { withCredentials: true });
 
             if (data.requireOtp) {
