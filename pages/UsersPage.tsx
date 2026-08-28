@@ -393,12 +393,29 @@ const UsersPage: React.FC<UsersPageProps> = ({ user, onLogout, toggleTheme, them
                                     </td>
 
                                     <td className="p-6 py-4">
-                                        {u.referral_code ? (
+                                        {generatingReferralForId === u.id ? (
+                                            <span className="inline-flex items-center gap-1.5 text-xs text-slate-400 font-medium">
+                                                <span className="material-symbols-outlined text-sm animate-spin">progress_activity</span>
+                                                Generating...
+                                            </span>
+                                        ) : pendingOrgMap[u.id] ? (
+                                            <button
+                                                onClick={() => {
+                                                    const prefix = pendingOrgMap[u.id];
+                                                    if (prefix) handleGenerateReferralCode(u.id, prefix);
+                                                }}
+                                                title={`Generate code for ${pendingOrgMap[u.id] === 'NT' ? 'Nolt Finance' : 'Nolt Investment'}`}
+                                                className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-blue-600 hover:bg-blue-700 active:scale-95 text-white text-xs font-bold transition-all shadow-md shadow-blue-500/20 cursor-pointer animate-in fade-in"
+                                            >
+                                                <span className="material-symbols-outlined text-sm">autorenew</span>
+                                                Generate Code ({pendingOrgMap[u.id]})
+                                            </button>
+                                        ) : u.referral_code ? (
                                             <div className="flex items-center gap-2">
                                                 <span className="font-mono text-xs text-blue-600 dark:text-blue-400 font-bold bg-blue-50 dark:bg-blue-500/10 px-2 py-1 rounded border border-blue-200 dark:border-blue-500/20">{u.referral_code}</span>
                                                 <button
                                                     onClick={() => {
-                                                        const url = `${window.location.origin}/register?${u.referral_code}`;
+                                                        const url = `${window.location.origin}/register/${u.referral_code}`;
                                                         navigator.clipboard.writeText(url);
                                                         alert("Referral link copied!");
                                                     }}
@@ -408,28 +425,8 @@ const UsersPage: React.FC<UsersPageProps> = ({ user, onLogout, toggleTheme, them
                                                     <span className="material-symbols-outlined text-sm">content_copy</span>
                                                 </button>
                                             </div>
-                                        ) : generatingReferralForId === u.id ? (
-                                            <span className="inline-flex items-center gap-1.5 text-xs text-slate-400 font-medium">
-                                                <span className="material-symbols-outlined text-sm animate-spin">progress_activity</span>
-                                                Generating...
-                                            </span>
                                         ) : (
-                                            <button
-                                                disabled={!pendingOrgMap[u.id]}
-                                                onClick={() => {
-                                                    const prefix = pendingOrgMap[u.id];
-                                                    if (prefix) handleGenerateReferralCode(u.id, prefix);
-                                                }}
-                                                title={pendingOrgMap[u.id] ? `Generate code for ${pendingOrgMap[u.id] === 'NT' ? 'Nolt Finance' : 'Nolt Investment'}` : 'Select an organization first'}
-                                                className={`flex items-center gap-1.5 text-xs font-bold transition-colors ${
-                                                    pendingOrgMap[u.id]
-                                                        ? 'text-blue-500 hover:text-blue-700 cursor-pointer'
-                                                        : 'text-slate-300 dark:text-slate-600 cursor-not-allowed'
-                                                }`}
-                                            >
-                                                <span className="material-symbols-outlined text-sm">autorenew</span>
-                                                Generate
-                                            </button>
+                                            <span className="text-xs text-slate-400 font-medium">-</span>
                                         )}
                                     </td>
                                     {/* Account Officer Column */}
