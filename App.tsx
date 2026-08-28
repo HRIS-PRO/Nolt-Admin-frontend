@@ -181,7 +181,7 @@ const AppContent: React.FC = () => {
       const pendingJointToken = localStorage.getItem('pending_joint_token');
       
       const currentPath = window.location.pathname;
-      const isAuthPath = ['/login', '/register', '/verify', '/dashboard'].includes(currentPath);
+      const isAuthPath = ['/login', '/register', '/verify', '/dashboard'].includes(currentPath) || currentPath.startsWith('/register');
       
       if (isAuthPath || searchParams.get('login') === 'success') {
         if (pendingToken) {
@@ -438,6 +438,20 @@ const AppContent: React.FC = () => {
           )
         } />
         <Route path="/register" element={
+          (!isLoading && user.isLoggedIn) ? <Navigate to="/dashboard" /> : (
+            <AuthLayout>
+              <RegisterPage />
+            </AuthLayout>
+          )
+        } />
+        <Route path="/register/:refCode" element={
+          (!isLoading && user.isLoggedIn) ? <Navigate to="/dashboard" /> : (
+            <AuthLayout>
+              <RegisterPage />
+            </AuthLayout>
+          )
+        } />
+        <Route path="/register/*" element={
           (!isLoading && user.isLoggedIn) ? <Navigate to="/dashboard" /> : (
             <AuthLayout>
               <RegisterPage />
