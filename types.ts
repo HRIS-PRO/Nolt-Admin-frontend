@@ -83,3 +83,24 @@ export interface SavedDraft {
   label: string;
   data: any;
 }
+
+export interface StaffLoanDraft {
+  id: string;
+  officerEmail?: string;
+  customerName: string;
+  customerBvn?: string;
+  customerCasa?: string;
+  customerData?: any;
+  cbaLoans?: any[];
+  loanHistory?: any[];
+  currentState?: 'LOOKUP' | 'CUSTOMER_CARD' | 'LOAN_FORM';
+  step: number;
+  stepLabel: string;
+  selectedProductOption?: any;
+  lockedLoanType?: string;
+  formData: Record<string, any>;
+  updatedAt: number;
+  hasFailureError?: boolean;
+  failureReason?: string;
+}
+
