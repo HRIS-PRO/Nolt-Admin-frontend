@@ -35,6 +35,8 @@ import VerifyGiftPage from './pages/investment/VerifyGiftPage';
 import ClaimGiftPage from './pages/investment/ClaimGiftPage';
 import ProfilePage from './pages/ProfilePage';
 import StaffPromotionsPage from './pages/StaffPromotionsPage';
+import StaffMobileNotificationsPage from './pages/StaffMobileNotificationsPage';
+import StaffTransfersPage from './pages/StaffTransfersPage';
 import StaffCalculatorPage from './pages/StaffCalculatorPage';
 import ProductsPage from './pages/ProductsPage';
 import LogoutWarningModal from './components/modals/LogoutWarningModal';
@@ -90,6 +92,8 @@ const ALLOWED_BI_AND_REPORTS_ROLES = [
   'admin',
   'customer_experience'
 ];
+
+const isSuperAdmin = (role?: string) => role === 'super_admin' || role === 'superadmin';
 
 // ProtectedRoute Component extracted to prevent re-renders
 interface ProtectedRouteProps {
@@ -501,6 +505,16 @@ const AppContent: React.FC = () => {
             />
           ) : <Navigate to="/login" />)
         } />
+        <Route path="/staff/transfers" element={
+          isLoading ? null : (user.isLoggedIn && isSuperAdmin(user.role) ? (
+            <StaffTransfersPage
+              user={user}
+              onLogout={handleLogoutRequest}
+              toggleTheme={toggleTheme}
+              theme={theme}
+            />
+          ) : user.isLoggedIn ? <Navigate to="/staff-dashboard" /> : <Navigate to="/login" />)
+        } />
         <Route path="/staff/investments" element={
           isLoading ? null : (user.isLoggedIn && user.role !== 'customer' ? (
             <StaffInvestmentsPage
@@ -530,6 +544,16 @@ const AppContent: React.FC = () => {
               theme={theme}
             />
           ) : <Navigate to="/login" />)
+        } />
+        <Route path="/staff/mobile-notifications" element={
+          isLoading ? null : (user.isLoggedIn && isSuperAdmin(user.role) ? (
+            <StaffMobileNotificationsPage
+              user={user}
+              onLogout={handleLogoutRequest}
+              toggleTheme={toggleTheme}
+              theme={theme}
+            />
+          ) : user.isLoggedIn ? <Navigate to="/staff-dashboard" /> : <Navigate to="/login" />)
         } />
         <Route path="/staff/products" element={
           isLoading ? null : (user.isLoggedIn && user.role !== 'customer' ? (
