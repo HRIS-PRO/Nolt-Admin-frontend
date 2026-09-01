@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { maskValue } from '../utils/maskHelper';
 import SelfieVerificationCapture, { type SelfieVerificationSuccess } from '../components/SelfieVerificationCapture';
+import { apiUrl } from '@/lib/api-config';
 
 const NIGERIAN_STATES = [
     "Abia", "Adamawa", "Akwa Ibom", "Anambra", "Bauchi", "Bayelsa", "Benue", "Borno", 
@@ -738,7 +739,7 @@ const ProfilePage: React.FC = () => {
                                                                 const formData = new FormData();
                                                                 formData.append('document', file);
                                                                 try {
-                                                                    const res = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/upload`, {
+                                                                    const res = await fetch(apiUrl('/api/upload'), {
                                                                         method: 'POST',
                                                                         body: formData
                                                                     });

@@ -52,7 +52,8 @@ const VerifyPage: React.FC<VerifyPageProps> = ({ onLogin }) => {
 
             console.log("Verify Response:", data);
             onLogin(email, data.user);
-            navigate('/dashboard'); // App.tsx will redirect based on state, but we help it along
+            // Client-side navigation avoids Amplify S3 404 on /dashboard full-page loads
+            navigate('/dashboard', { replace: true });
         } catch (err: any) {
             setError(err.response?.data?.message || 'Invalid verification code.');
         } finally {

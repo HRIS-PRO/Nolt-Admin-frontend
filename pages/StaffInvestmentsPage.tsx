@@ -6,6 +6,7 @@ import { SavedDraft, UserState, Currency, InvestmentPlan } from '../types';
 import { investmentService } from '../services/investmentService';
 import { profileService } from '../services/profileService';
 import NewInvestmentLookupFlow from '../components/NewInvestmentLookupFlow';
+import { apiUrl } from '@/lib/api-config';
 
 interface StaffInvestmentsPageProps {
     user: { name: string; email: string; avatar_url?: string; role?: string };
@@ -165,8 +166,7 @@ const StaffInvestmentsPage: React.FC<StaffInvestmentsPageProps> = ({ user, onLog
     useEffect(() => {
         const fetchInvestmentProducts = async () => {
             try {
-                const backendUrl = import.meta.env.VITE_BACKEND_URL || import.meta.env.VITE_API_URL || '';
-                const res = await fetch(`${backendUrl}/api/staff/products/investments/active`);
+                const res = await fetch(apiUrl('/api/staff/products/investments/active'));
                 if (!res.ok) return;
                 const data = await res.json();
                 setInvestmentProducts(data);
@@ -194,9 +194,8 @@ const StaffInvestmentsPage: React.FC<StaffInvestmentsPageProps> = ({ user, onLog
 
             setRateLoading(true);
             try {
-                const backendUrl = import.meta.env.VITE_BACKEND_URL || import.meta.env.VITE_API_URL || '';
                 const res = await fetch(
-                    `${backendUrl}/api/staff/investments/cba-rate?productCode=${productCode}&amount=${numericAmount}&duration=${numericDuration}`
+                    apiUrl(`/api/staff/investments/cba-rate?productCode=${productCode}&amount=${numericAmount}&duration=${numericDuration}`)
                 );
                 if (!res.ok) throw new Error('Rate fetch failed');
                 const data = await res.json();
@@ -813,7 +812,7 @@ const StaffInvestmentsPage: React.FC<StaffInvestmentsPageProps> = ({ user, onLog
                                                 onClick={() => {
                                                     setShowStaffApplicationFlow(false);
                                                     // Navigate to customer profile edit — adjust route as needed
-                                                    window.open(`/customers/${c?.id || c?.user_id}`, '_blank');
+                                                    window.open(`/staff/customers/${c?.user_id || c?.id}`, '_blank');
                                                 }}
                                                 className="w-full h-14 rounded-2xl bg-rose-600 hover:bg-rose-700 text-white font-black uppercase tracking-widest text-xs transition-all flex items-center justify-center gap-2 shadow-lg shadow-rose-600/20"
                                             >

@@ -49,6 +49,7 @@ const FileUpload = ({
     required = false,
     doc,
     progress,
+    processing = false,
     error,
     onSelect,
     onRemove
@@ -59,10 +60,16 @@ const FileUpload = ({
     required?: boolean,
     doc: any,
     progress: number | undefined,
+    processing?: boolean,
     error?: string,
     onSelect: (id: string) => void,
     onRemove: (id: string, e: React.MouseEvent) => void
 }) => {
+    const showOverlay = Boolean((progress && progress > 0) || processing) && !doc;
+    const statusLabel = processing || progress === 100
+        ? 'Saving document…'
+        : `${Math.min(progress ?? 0, 99)}% uploading`;
+
     return (
         <div className="relative">
             {error && <span className="absolute -top-6 right-2 text-[10px] font-bold text-red-500 animate-in slide-in-from-left-2 z-10">{error}</span>}
@@ -76,10 +83,10 @@ const FileUpload = ({
                     }
                 `}
             >
-                {progress && !doc ? (
+                {showOverlay ? (
                     <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-white/95 dark:bg-slate-900/95 backdrop-blur-sm z-10">
                         <div className="size-8 rounded-full border-4 border-slate-200 border-t-[#0084FF] animate-spin" />
-                        <span className="text-[10px] font-black text-[#0084FF] uppercase tracking-wider">{progress}% UPLOADING</span>
+                        <span className="text-[10px] font-black text-[#0084FF] uppercase tracking-wider">{statusLabel}</span>
                     </div>
                 ) : null}
 
@@ -123,6 +130,7 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
     const [step, setStep] = useState(0);
     const [loading, setLoading] = useState(false);
     const [uploadProgress, setUploadProgress] = useState<Record<string, number>>({});
+    const [uploadProcessing, setUploadProcessing] = useState<Record<string, boolean>>({});
     const [draftId] = useState(() => `L-DRAFT-${Date.now()}`); // Generate Draft ID for uploads
     const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -484,19 +492,28 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
 
     // File Upload Logic
     const uploadFile = async (id: string, file: File) => {
-        setUploadProgress(prev => ({ ...prev, [id]: 10 }));
+        setUploadProgress(prev => ({ ...prev, [id]: 5 }));
+        setUploadProcessing(prev => ({ ...prev, [id]: false }));
         const formData = new FormData();
         formData.append('file', file);
         formData.append('document_type', id);
         formData.append('loan_id', loanId || draftId); // Pass real loan ID in edit mode, or draft ID
 
         try {
-            setUploadProgress(prev => ({ ...prev, [id]: 30 }));
             const response = await axios.post('/api/upload', formData, {
-                headers: { 'Content-Type': 'multipart/form-data' },
+                timeout: 120_000,
                 onUploadProgress: (progressEvent) => {
-                    const percentCompleted = Math.round((progressEvent.loaded * 100) / (progressEvent.total || 100));
-                    setUploadProgress(prev => ({ ...prev, [id]: percentCompleted }));
+                    const total = progressEvent.total;
+                    if (!total || total <= 0) return;
+
+                    const raw = Math.round((progressEvent.loaded * 100) / total);
+                    if (raw >= 100 || progressEvent.loaded >= total) {
+                        setUploadProgress(prev => ({ ...prev, [id]: 100 }));
+                        setUploadProcessing(prev => ({ ...prev, [id]: true }));
+                        return;
+                    }
+
+                    setUploadProgress(prev => ({ ...prev, [id]: Math.max(5, Math.min(raw, 99)) }));
                 }
             });
 
@@ -511,10 +528,13 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
 
             if (errors[id]) clearError(id);
 
-        } catch (error) {
+        } catch (error: any) {
             console.error("Upload failed", error);
-            alert("Upload failed. Please try again.");
+            const message = error?.response?.data?.message || 'Upload failed. Please try again.';
+            alert(message);
+        } finally {
             setUploadProgress(prev => { const next = { ...prev }; delete next[id]; return next; });
+            setUploadProcessing(prev => { const next = { ...prev }; delete next[id]; return next; });
         }
     };
 
@@ -533,6 +553,7 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
         e.stopPropagation();
         setUploadedDocs(prev => ({ ...prev, [id]: null }));
         setUploadProgress(prev => { const next = { ...prev }; delete next[id]; return next; });
+        setUploadProcessing(prev => { const next = { ...prev }; delete next[id]; return next; });
     };
 
     const validateStep = (stepToCheck = step) => {
@@ -1170,6 +1191,7 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
                                     required
                                     doc={uploadedDocs.payslip}
                                     progress={uploadProgress.payslip}
+                                    processing={uploadProcessing.payslip}
                                     error={errors.payslip}
                                     onSelect={handleFileSelect}
                                     onRemove={removeDoc}
@@ -1713,6 +1735,7 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
                                             required
                                             doc={uploadedDocs.govt_id}
                                             progress={uploadProgress.govt_id}
+                                            processing={uploadProcessing.govt_id}
                                             error={errors.govt_id}
                                             onSelect={handleFileSelect}
                                             onRemove={removeDoc}
@@ -1724,6 +1747,7 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
                                             required
                                             doc={uploadedDocs.work_id}
                                             progress={uploadProgress.work_id}
+                                            processing={uploadProcessing.work_id}
                                             error={errors.work_id}
                                             onSelect={handleFileSelect}
                                             onRemove={removeDoc}
@@ -1735,6 +1759,7 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
                                             required
                                             doc={uploadedDocs.payslip}
                                             progress={uploadProgress.payslip}
+                                            processing={uploadProcessing.payslip}
                                             error={errors.payslip}
                                             onSelect={handleFileSelect}
                                             onRemove={removeDoc}
@@ -1746,6 +1771,7 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
                                             required
                                             doc={uploadedDocs.selfie}
                                             progress={uploadProgress.selfie}
+                                            processing={uploadProcessing.selfie}
                                             error={errors.selfie}
                                             onSelect={handleFileSelect}
                                             onRemove={removeDoc}
@@ -1757,6 +1783,7 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
                                             required={(parseFloat(amount) || 0) > 500000}
                                             doc={uploadedDocs.bank_statement}
                                             progress={uploadProgress.bank_statement}
+                                            processing={uploadProcessing.bank_statement}
                                             error={errors.bank_statement}
                                             onSelect={handleFileSelect}
                                             onRemove={removeDoc}
@@ -1767,6 +1794,7 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
                                             subtitle="UTILITY BILL OR RENT RECEIPT"
                                             doc={uploadedDocs.proof_address}
                                             progress={uploadProgress.proof_address}
+                                            processing={uploadProcessing.proof_address}
                                             onSelect={handleFileSelect}
                                             onRemove={removeDoc}
                                         />
