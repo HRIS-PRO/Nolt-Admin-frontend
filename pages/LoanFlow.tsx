@@ -43,6 +43,7 @@ const LoanFlow: React.FC<LoanFlowProps> = ({ initialStep, onComplete, navigate, 
 
   // Form State
   const [draftId] = useState(initialDraft?.id ?? `L-${Math.floor(Math.random() * 9000) + 1000}`);
+  const [dbLoanId, setDbLoanId] = useState<number | null>(initialDraft?.data?.dbLoanId ?? null);
   const [selectedLoanId, setSelectedLoanId] = useState<string | null>(initialDraft?.data?.selectedLoanId ?? null);
 
   // Signature & Acceptance State
@@ -184,6 +185,7 @@ const LoanFlow: React.FC<LoanFlowProps> = ({ initialStep, onComplete, navigate, 
       const signatureUrl = canvas ? canvas.toDataURL() : '';
       setSubmitting(true)
       const payload = {
+        id: dbLoanId || undefined,
         applying_for_others: isOnBehalf,
         relationship_to_applicant: isOnBehalf ? representativeRelation : null,
         surname,
@@ -374,6 +376,10 @@ const LoanFlow: React.FC<LoanFlowProps> = ({ initialStep, onComplete, navigate, 
           const latestLoan = response.data[0];
           console.log("Hydrating from previous loan:", latestLoan);
 
+          if (latestLoan.status === 'draft') {
+            setDbLoanId(latestLoan.id);
+          }
+
           // Only fill if not already set by profile (profile is priority)
           if (!user.profile?.surname && latestLoan.surname) setSurname(latestLoan.surname);
           if (!user.profile?.first_name && latestLoan.first_name) setFirstName(latestLoan.first_name);
@@ -484,27 +490,71 @@ const LoanFlow: React.FC<LoanFlowProps> = ({ initialStep, onComplete, navigate, 
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const saveDraft = () => {
+  const saveDraft = async () => {
     setIsSaving(true);
-    console.log("Saving draft...");
-    const draft: SavedDraft = {
-      id: draftId,
-      type: 'LOAN',
-      updatedAt: Date.now(),
-      subStep,
-      label: currentLoanLabel,
-      data: {
-        selectedLoanId, title, surname, firstName, middleName, isOnBehalf, representativeRelation, isPep, gender, dob, maidenName, maritalStatus, religion,
-        countryCode, mobileNumber, contactEmail, bvn, nin, stateOfOrigin, stateOfResidence,
-        homeAddress, residentialStatus, dependents, hasActiveLoans, monthlyIncome, uploadedDocs,
-        references, desiredAmount, repaymentPeriod, hasSigned, acceptedIndemnity,
-        mda, customMda, ippisNumber, staffId, referralCode,
-        nokName, nokRelationship, nokAddress, nokPhoneNumber, nokCountryCode,
-        bankDetails // Added bank details to draft
+    console.log("Saving draft to DB...");
+
+    try {
+      const backendUrl = apiBase();
+      const payload = {
+        id: dbLoanId || undefined,
+        status: 'draft',
+        applying_for_others: isOnBehalf,
+        relationship_to_applicant: isOnBehalf ? representativeRelation : null,
+        surname,
+        first_name: firstName,
+        middle_name: middleName,
+        title,
+        is_politically_exposed: isPep,
+        gender,
+        date_of_birth: dob,
+        religion,
+        marital_status: maritalStatus,
+        mothers_maiden_name: maidenName,
+        mobile_number: mobileNumber,
+        personal_email: contactEmail,
+        bvn,
+        nin,
+        state_of_origin: stateOfOrigin,
+        state_of_residence: stateOfResidence,
+        primary_home_address: homeAddress,
+        residential_status: residentialStatus,
+        number_of_dependents: dependents,
+        has_active_loans: hasActiveLoans === 'yes',
+        average_monthly_income: parseFloat(monthlyIncome.replace(/[^0-9.]/g, '')) || 0,
+        govt_id_url: uploadedDocs.national_id?.url || null,
+        statement_of_account_url: uploadedDocs.bank_statement?.url || null,
+        proof_of_residence_url: uploadedDocs.proof_address?.url || null,
+        selfie_verification_url: uploadedDocs.selfie?.url || user.profile?.selfie_url || null,
+        work_id_url: uploadedDocs.work_id?.url || null,
+        payslip_url: uploadedDocs.payslip?.url || null,
+        references: references.filter(r => r.name && r.phone).map(r => ({ fullName: r.name, phoneNumber: r.phone, relationship: r.relationship })),
+        requested_loan_amount: parseFloat(desiredAmount.replace(/[^0-9.]/g, '')) || 0,
+        loan_tenure_months: repaymentPeriod,
+        mda_tertiary: mda === 'Other' ? customMda : mda,
+        ippis_number: ippisNumber,
+        staff_id: staffId,
+        referral_code: referralCode,
+        bank_name: bankDetails.bankName,
+        account_number: bankDetails.accountNumber,
+        account_name: bankDetails.accountName,
+        loan_type: currentLoanLabel,
+        product_type: currentLoanLabel,
+        nok_name: nokName,
+        nok_relationship: nokRelationship,
+        nok_address: nokAddress,
+        nok_phone_number: `${nokCountryCode}${nokPhoneNumber}`
+      };
+
+      const res = await axios.post(`${backendUrl}/api/loans`, payload, { withCredentials: true });
+      if (res.data && res.data.loanId) {
+        setDbLoanId(res.data.loanId);
       }
-    };
-    storageService.saveDraft(draft);
-    return draft;
+    } catch (err) {
+      console.error("Failed to save draft to DB:", err);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleSaveAndExit = () => {

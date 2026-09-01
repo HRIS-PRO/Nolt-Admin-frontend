@@ -2,6 +2,9 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import MdaTertiarySelect, { TERTIARY_LIST } from './MdaTertiarySelect';
 
+import { StaffLoanDraft } from '../types';
+import { storageService } from '../services/storageService';
+
 const STATIC_PRODUCTS = [
     { name: "NOLT IPPIS", code: "314", rate: "4% PER MONTH", icon: "inventory_2" },
     { name: "WORKING CAPITAL LOAN", code: "301", rate: "5% PER MONTH", icon: "inventory_2" },
@@ -13,6 +16,7 @@ interface StaffLoanFormProps {
     onClose: () => void;
     onSuccess: () => void;
     initialData?: any;
+    initialDraft?: StaffLoanDraft;
     loanId?: string;
     user?: any;
     isCustomerVerified?: boolean;
@@ -20,6 +24,7 @@ interface StaffLoanFormProps {
      *  Used when a customer has an active loan and was forced to choose topup/add_on. */
     lockedLoanType?: string;
 }
+
 
 const NIGERIAN_STATES = [
     "Abia", "Adamawa", "Akwa Ibom", "Anambra", "Bauchi", "Bayelsa", "Benue", "Borno", "Cross River",
@@ -125,18 +130,30 @@ const FileUpload = ({
 // --- Main Component ---
 
 const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ 
-    onClose, onSuccess, initialData, loanId, user, isCustomerVerified, lockedLoanType 
+    onClose, onSuccess, initialData, initialDraft, loanId, user, isCustomerVerified, lockedLoanType 
 }) => {
-    const [step, setStep] = useState(0);
+    const [step, setStep] = useState(() => {
+        if (typeof initialDraft?.step === 'number') return initialDraft.step;
+        if (typeof initialData?.sub_step === 'number' && initialData.sub_step > 0) return initialData.sub_step;
+        return 0;
+    });
     const [loading, setLoading] = useState(false);
     const [uploadProgress, setUploadProgress] = useState<Record<string, number>>({});
     const [uploadProcessing, setUploadProcessing] = useState<Record<string, boolean>>({});
-    const [draftId] = useState(() => `L-DRAFT-${Date.now()}`); // Generate Draft ID for uploads
+    const [draftId] = useState(() => initialDraft?.id || `L-DRAFT-${Date.now()}`); // Generate or reuse Draft ID for uploads
     const [errors, setErrors] = useState<Record<string, string>>({});
+    const [draftToast, setDraftToast] = useState<string | null>(null);
 
-    const [showProductSelect, setShowProductSelect] = useState(!loanId);
-    const [selectedProductOption, setSelectedProductOption] = useState<any>(null);
+    const [showProductSelect, setShowProductSelect] = useState(() => {
+        if (initialDraft?.formData?.showProductSelect !== undefined) return initialDraft.formData.showProductSelect;
+        if (initialData?.sub_step && initialData.sub_step > 0) return false;
+        if (initialData?.product_type) return false;
+        if (loanId || initialData?.id || initialData?.loan_id) return false;
+        return true;
+    });
+    const [selectedProductOption, setSelectedProductOption] = useState<any>(initialDraft?.selectedProductOption || null);
     const [expandedSection, setExpandedSection] = useState<'identity' | 'address' | 'employment' | 'loan'>('loan');
+
 
     // Identity
     const [title, setTitle] = useState('Mr');
@@ -237,9 +254,177 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
         "References"
     ];
 
-    // Populate form if initialData exists (Edit Mode)
+    const [dbLoanId, setDbLoanId] = useState<number | null>(() => {
+        if (loanId && !isNaN(Number(loanId))) return Number(loanId);
+        if (typeof initialData?.loan_id === 'number') return initialData.loan_id;
+        return null;
+    });
+
+    const buildDraftPayload = (targetStep = step, hasError = false, errorMsg?: string): StaffLoanDraft => {
+        const customerName = `${preferredFirstName || firstName || surname || initialData?.full_name || 'Customer'}`.trim();
+        return {
+            id: draftId,
+            officerEmail: user?.email,
+            customerName: customerName || 'Customer',
+            customerBvn: bvn || initialData?.bvn,
+            customerCasa: casa || initialData?.casa,
+            customerData: initialData,
+            step: targetStep,
+            stepLabel: steps[targetStep] || 'Loan Details',
+            selectedProductOption,
+            lockedLoanType,
+            formData: {
+                loanType, productType, title, surname, firstName, middleName, gender, dob, religion,
+                maritalStatus, mothersMaidenName, mobileNumber, email, bvn, nin, preferredFirstName,
+                preferredSurname, preferredMiddleName, stateOfOrigin, stateOfResidence, residentialStatus,
+                address, mda, ippisNumber, staffId, monthlyIncome, amount, tenure, bankName, accountNumber,
+                accountName, casa, topUpAmount, buyOverAmount, buyOverCompanyName, buyOverAccountName,
+                buyOverAccountNumber, buyOverBankName, uploadedDocs, nokName, nokRelationship, nokAddress,
+                nokPhoneNumber, nokCountryCode, references, showProductSelect
+            },
+            updatedAt: Date.now(),
+            hasFailureError: hasError,
+            failureReason: errorMsg
+        };
+    };
+
+    const handleSaveDraft = async (showToast = false, hasError = false, errorMsg?: string, targetStepOverride?: number) => {
+        const targetStep = typeof targetStepOverride === 'number' ? targetStepOverride : step;
+
+        try {
+            const payload = {
+                id: dbLoanId || undefined,
+                status: 'draft',
+                sub_step: targetStep,
+                step: targetStep,
+                loan_type: loanType,
+                product_type: productType || selectedProductOption?.custom_name || 'Personal Loan',
+                surname,
+                first_name: firstName,
+                middle_name: middleName,
+                applicant_full_name: `${surname || ''} ${firstName || ''} ${middleName || ''}`.trim(),
+                title,
+                gender,
+                date_of_birth: dob,
+                religion,
+                marital_status: maritalStatus,
+                mothers_maiden_name: mothersMaidenName,
+                mobile_number: mobileNumber,
+                personal_email: email,
+                bvn,
+                nin,
+                state_of_origin: stateOfOrigin,
+                state_of_residence: stateOfResidence,
+                primary_home_address: address,
+                residential_status: residentialStatus,
+                mda_tertiary: mda,
+                ippis_number: ippisNumber,
+                staff_id: staffId,
+                average_monthly_income: parseFloat(monthlyIncome) || 0,
+                requested_loan_amount: parseFloat(amount) || 0,
+                loan_tenure_months: tenure,
+                bank_name: bankName,
+                account_number: accountNumber,
+                account_name: accountName,
+                casa,
+                topup_amount: parseFloat(topUpAmount) || 0,
+                govt_id_url: uploadedDocs.govt_id?.url || null,
+                work_id_url: uploadedDocs.work_id?.url || null,
+                payslip_url: uploadedDocs.payslip?.url || null,
+                selfie_verification_url: uploadedDocs.selfie?.url || null,
+                statement_of_account_url: uploadedDocs.bank_statement?.url || null,
+                proof_of_residence_url: uploadedDocs.proof_address?.url || null,
+                nok_name: nokName,
+                nok_relationship: nokRelationship,
+                nok_address: nokAddress,
+                nok_phone_number: `${nokCountryCode}${nokPhoneNumber}`,
+                references
+            };
+
+            const response = await axios.post('/api/loans', payload);
+            if (response.data && response.data.loanId) {
+                setDbLoanId(response.data.loanId);
+            }
+        } catch (err) {
+            console.error("Failed to save draft to DB:", err);
+        }
+
+        if (showToast) {
+            setDraftToast("Application draft saved successfully");
+            setTimeout(() => setDraftToast(null), 3000);
+        }
+    };
+
+    // Restore form from initialDraft if provided
     useEffect(() => {
-        if (initialData) {
+        if (initialDraft && initialDraft.formData) {
+            const fd = initialDraft.formData;
+            if (typeof initialDraft.step === 'number') setStep(initialDraft.step);
+            if (fd.showProductSelect !== undefined) setShowProductSelect(fd.showProductSelect);
+            if (fd.loanType) setLoanType(fd.loanType);
+            if (fd.productType) setProductType(fd.productType);
+            if (fd.selectedProductOption) setSelectedProductOption(fd.selectedProductOption);
+            if (fd.title) setTitle(fd.title);
+            if (fd.surname) setSurname(fd.surname);
+            if (fd.firstName) setFirstName(fd.firstName);
+            if (fd.middleName) setMiddleName(fd.middleName);
+            if (fd.gender) setGender(fd.gender);
+            if (fd.dob) setDob(fd.dob);
+            if (fd.religion) setReligion(fd.religion);
+            if (fd.maritalStatus) setMaritalStatus(fd.maritalStatus);
+            if (fd.mothersMaidenName) setMothersMaidenName(fd.mothersMaidenName);
+            if (fd.mobileNumber) setMobileNumber(fd.mobileNumber);
+            if (fd.email) setEmail(fd.email);
+            if (fd.bvn) setBvn(fd.bvn);
+            if (fd.nin) setNin(fd.nin);
+            if (fd.preferredFirstName) setPreferredFirstName(fd.preferredFirstName);
+            if (fd.preferredSurname) setPreferredSurname(fd.preferredSurname);
+            if (fd.preferredMiddleName) setPreferredMiddleName(fd.preferredMiddleName);
+
+            if (fd.stateOfOrigin) setStateOfOrigin(fd.stateOfOrigin);
+            if (fd.stateOfResidence) setStateOfResidence(fd.stateOfResidence);
+            if (fd.residentialStatus) setResidentialStatus(fd.residentialStatus);
+            if (fd.address) setAddress(fd.address);
+
+            if (fd.mda) setMda(fd.mda);
+            if (fd.ippisNumber) setIppisNumber(fd.ippisNumber);
+            if (fd.staffId) setStaffId(fd.staffId);
+            if (fd.monthlyIncome) setMonthlyIncome(fd.monthlyIncome);
+
+            if (fd.amount) setAmount(fd.amount);
+            if (fd.tenure) setTenure(fd.tenure);
+            if (fd.bankName) setBankName(fd.bankName);
+            if (fd.accountNumber) setAccountNumber(fd.accountNumber);
+            if (fd.accountName) setAccountName(fd.accountName);
+            if (fd.casa) setCasa(fd.casa);
+            if (fd.topUpAmount) setTopUpAmount(fd.topUpAmount);
+
+            if (fd.buyOverAmount) setBuyOverAmount(fd.buyOverAmount);
+            if (fd.buyOverCompanyName) setBuyOverCompanyName(fd.buyOverCompanyName);
+            if (fd.buyOverAccountName) setBuyOverAccountName(fd.buyOverAccountName);
+            if (fd.buyOverAccountNumber) setBuyOverAccountNumber(fd.buyOverAccountNumber);
+            if (fd.buyOverBankName) setBuyOverBankName(fd.buyOverBankName);
+
+            if (fd.uploadedDocs) setUploadedDocs(fd.uploadedDocs);
+            if (fd.nokName) setNokName(fd.nokName);
+            if (fd.nokRelationship) setNokRelationship(fd.nokRelationship);
+            if (fd.nokAddress) setNokAddress(fd.nokAddress);
+            if (fd.nokPhoneNumber) setNokPhoneNumber(fd.nokPhoneNumber);
+            if (fd.nokCountryCode) setNokCountryCode(fd.nokCountryCode);
+            if (fd.references) setReferences(fd.references);
+        }
+    }, [initialDraft]);
+
+    // Populate form if initialData exists (Edit Mode) & no initialDraft is restoring
+    useEffect(() => {
+        if (initialData && !initialDraft) {
+            if (typeof initialData.sub_step === 'number') {
+                setStep(initialData.sub_step);
+            }
+            if (initialData.sub_step > 0 || initialData.product_type || initialData.id || initialData.loan_id) {
+                setShowProductSelect(false);
+            }
+
             setProductType(initialData.product_type || '');
             setTitle(initialData.title || 'Mr');
             setSurname(initialData.surname || '');
@@ -735,6 +920,7 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
             }
             setShowProductSelect(false);
             setErrors({});
+            handleSaveDraft(false, false, undefined, 0);
             return;
         }
 
@@ -760,13 +946,16 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
             // All valid, clear and go to documents step (4)
             setStep(4);
             setErrors({});
+            handleSaveDraft(false, false, undefined, 4);
             return;
         }
 
         // Standard Validation for other steps
         if (validateStep(step)) {
-            setStep(prev => Math.min(prev + 1, 6)); // Support up to Summary Step (6)
+            const nextStep = Math.min(step + 1, 6);
+            setStep(nextStep);
             setErrors({});
+            handleSaveDraft(false, false, undefined, nextStep);
         }
     };
 
@@ -804,6 +993,7 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
         setLoading(true);
         try {
             let payload: any = {
+                id: dbLoanId || undefined,
                 loan_type: loanType,
                 // Common Identity
                 surname,
@@ -894,11 +1084,15 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
             onClose(); // Ensure we close the modal
         } catch (error: any) {
             console.error("Failed to save loan", error);
-            alert(error.response?.data?.message || "Failed to save loan");
+            const errMsg = error.response?.data?.message || "Failed to submit loan application";
+            // Save as failed draft to prevent data loss
+            handleSaveDraft(false, true, errMsg);
+            alert(`Submission Error: ${errMsg}. Your application progress has been automatically saved as a draft. You can resume it anytime.`);
         } finally {
             setLoading(false);
         }
     };
+
 
     const renderStepIndicator = () => {
         if (['topup', 're-app', 'add_on'].includes(loanType)) return null;
@@ -956,10 +1150,9 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-md p-4 overflow-y-auto">
             <div className="bg-white dark:bg-slate-900 w-full max-w-5xl rounded-[2.5rem] shadow-2xl shadow-black/50 flex flex-col max-h-[92vh] overflow-hidden border border-slate-100 dark:border-slate-800">
                 {/* Header */}
-                <div className="p-6 md:p-8 border-b border-slate-100 dark:border-slate-800 flex justify-between items-start bg-white dark:bg-slate-900 z-10">
+                <div className="p-6 md:p-8 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-white dark:bg-slate-900 z-10">
                     <div className="space-y-1">
                         <p className="text-xs font-black text-primary uppercase tracking-widest">New Application</p>
-                        {/* <h2 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight">Staff Loan</h2> */}
                     </div>
                     <button
                         onClick={onClose}
@@ -968,6 +1161,8 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
                         <span className="material-symbols-outlined text-slate-400 group-hover:text-slate-900 dark:group-hover:text-white transition-colors">close</span>
                     </button>
                 </div>
+
+
 
                 {/* Progress Indicator */}
                 {renderStepIndicator()}

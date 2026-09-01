@@ -24,6 +24,11 @@ export const getStatusStyles = (status: string) => {
                 container: 'border-red-500/20 bg-red-500/10 text-red-600 dark:text-red-500',
                 dot: 'bg-red-500'
             };
+        case 'draft':
+            return {
+                container: 'border-slate-500/20 bg-slate-500/10 text-slate-600 dark:text-slate-400',
+                dot: 'bg-slate-400'
+            };
         default:
             return {
                 container: 'border-slate-500/20 bg-slate-500/10 text-slate-600 dark:text-slate-500',

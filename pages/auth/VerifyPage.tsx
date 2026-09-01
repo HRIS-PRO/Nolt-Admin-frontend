@@ -50,7 +50,7 @@ const VerifyPage: React.FC<VerifyPageProps> = ({ onLogin }) => {
                 otp: otpToken
             }, { withCredentials: true });
 
-            console.log("Verify Response:", data);
+            console.log("🔑 [LOGIN VERIFICATION SUCCESS / AUTH TOKEN]:", data);
             onLogin(email, data.user);
             // Client-side navigation avoids Amplify S3 404 on /dashboard full-page loads
             navigate('/dashboard', { replace: true });

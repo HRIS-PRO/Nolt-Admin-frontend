@@ -35,6 +35,8 @@ import VerifyGiftPage from './pages/investment/VerifyGiftPage';
 import ClaimGiftPage from './pages/investment/ClaimGiftPage';
 import ProfilePage from './pages/ProfilePage';
 import StaffPromotionsPage from './pages/StaffPromotionsPage';
+import StaffMobileNotificationsPage from './pages/StaffMobileNotificationsPage';
+import StaffTransfersPage from './pages/StaffTransfersPage';
 import StaffCalculatorPage from './pages/StaffCalculatorPage';
 import ProductsPage from './pages/ProductsPage';
 import LogoutWarningModal from './components/modals/LogoutWarningModal';
@@ -44,6 +46,7 @@ import CbaMigrationPage from './pages/CbaMigrationPage';
 import PayrollUploadPage from './pages/PayrollUploadPage';
 import { apiBase, apiUrl } from './lib/api-config';
 import { scheduleDeferredScripts } from './lib/deferred-scripts';
+import { isSuperAdminRole, normalizeStaffRole } from './lib/staff-roles';
 
 // Same-origin proxy: always send session cookies on API/auth requests.
 axios.defaults.withCredentials = true;
@@ -217,7 +220,7 @@ const AppContent: React.FC = () => {
         name: data.full_name || data.name || 'User',
         isLoggedIn: true,
         avatar_url: data.avatar_url,
-        role: data.role,
+        role: normalizeStaffRole(data.role) || data.role,
         new_comer: data.new_comer,
         referral_code: data.referral_code,
         profile: profileRes.data?.profile || undefined
@@ -515,6 +518,16 @@ const AppContent: React.FC = () => {
             />
           ) : <Navigate to="/login" />)
         } />
+        <Route path="/staff/transfers" element={
+          isLoading ? null : (user.isLoggedIn && isSuperAdminRole(user.role) ? (
+            <StaffTransfersPage
+              user={user}
+              onLogout={handleLogoutRequest}
+              toggleTheme={toggleTheme}
+              theme={theme}
+            />
+          ) : user.isLoggedIn ? <Navigate to="/staff-dashboard" /> : <Navigate to="/login" />)
+        } />
         <Route path="/staff/investments" element={
           isLoading ? null : (user.isLoggedIn && user.role !== 'customer' ? (
             <StaffInvestmentsPage
@@ -544,6 +557,16 @@ const AppContent: React.FC = () => {
               theme={theme}
             />
           ) : <Navigate to="/login" />)
+        } />
+        <Route path="/staff/mobile-notifications" element={
+          isLoading ? null : (user.isLoggedIn && isSuperAdminRole(user.role) ? (
+            <StaffMobileNotificationsPage
+              user={user}
+              onLogout={handleLogoutRequest}
+              toggleTheme={toggleTheme}
+              theme={theme}
+            />
+          ) : user.isLoggedIn ? <Navigate to="/staff-dashboard" /> : <Navigate to="/login" />)
         } />
         <Route path="/staff/products" element={
           isLoading ? null : (user.isLoggedIn && user.role !== 'customer' ? (
@@ -651,7 +674,7 @@ const AppContent: React.FC = () => {
           ) : <Navigate to="/login" />)
         } />
         <Route path="/staff/cba-migration" element={
-          isLoading ? null : (user.isLoggedIn && (user.role === 'super_admin' || user.role === 'superadmin') ? (
+          isLoading ? null : (user.isLoggedIn && isSuperAdminRole(user.role) ? (
             <CbaMigrationPage
               user={user}
               onLogout={handleLogoutRequest}
