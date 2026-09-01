@@ -21,6 +21,7 @@ const ActionCard = ({ loan, userRole, onActionComplete }: { loan: any, userRole:
     const [actionLoading, setActionLoading] = useState(false);
     const isSpecialLoan = ['topup', 'add_on', 're-app', 're_app'].includes(loan.loan_type?.toLowerCase());
     const isBuyOver = loan.loan_type?.toLowerCase() === 'buy_over';
+    const isDraft = String(loan.status || '').toLowerCase() === 'draft';
 
     const [eligibleAmount, setEligibleAmount] = useState(
         isSpecialLoan 
@@ -684,18 +685,19 @@ const ActionCard = ({ loan, userRole, onActionComplete }: { loan: any, userRole:
                     <textarea
                         value={reason}
                         onChange={(e) => setReason(e.target.value)}
-                        className="w-full p-4 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white text-sm min-h-[100px]"
-                        placeholder="Provide a reason for approval, return, or rejection..."
+                        disabled={isDraft}
+                        className="w-full p-4 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white text-sm min-h-[100px] disabled:opacity-50 disabled:cursor-not-allowed"
+                        placeholder={isDraft ? "Application is in draft status..." : "Provide a reason for approval, return, or rejection..."}
                     />
                 </div>
 
                 <div className="space-y-3">
                     <button
                         onClick={() => handleAction('approve')}
-                        disabled={actionLoading || tierLimitExceeded}
-                        title={tierLimitExceeded ? `Tier ${selectedTier} limit exceeded. Upgrade tier to proceed.` : ''}
+                        disabled={actionLoading || tierLimitExceeded || isDraft}
+                        title={isDraft ? 'Draft applications cannot be approved until submitted' : tierLimitExceeded ? `Tier ${selectedTier} limit exceeded. Upgrade tier to proceed.` : ''}
                         className={`w-full py-4 rounded-xl text-white font-black text-sm uppercase tracking-wider transition-all shadow-lg flex items-center justify-center gap-2 ${
-                            tierLimitExceeded
+                            tierLimitExceeded || isDraft
                                 ? 'bg-slate-400 dark:bg-slate-600 cursor-not-allowed opacity-60'
                                 : 'bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed'
                         }`}
@@ -703,21 +705,22 @@ const ActionCard = ({ loan, userRole, onActionComplete }: { loan: any, userRole:
                         {actionLoading ? <span className="size-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : 'Approve & Proceed'}
                     </button>
 
-                    {/* Return Action with Modal */}
+                    {/* Return & Reject Actions */}
                     <div className="grid grid-cols-2 gap-3">
                         <button
                             onClick={() => {
-                                if (stage !== 'sales') setShowReturnModal(true);
+                                if (stage !== 'sales' && !isDraft) setShowReturnModal(true);
                             }}
-                            disabled={actionLoading || stage === 'sales'}
-                            className="w-full py-3 rounded-xl bg-amber-50 dark:bg-amber-900/10 text-amber-600 dark:text-amber-400 font-bold text-xs uppercase tracking-wider hover:bg-amber-100 dark:hover:bg-amber-900/20 transition-all border border-amber-200 dark:border-amber-900/30 flex items-center justify-center gap-2"
+                            disabled={actionLoading || stage === 'sales' || isDraft}
+                            className="w-full py-3 rounded-xl bg-amber-50 dark:bg-amber-900/10 text-amber-600 dark:text-amber-400 font-bold text-xs uppercase tracking-wider hover:bg-amber-100 dark:hover:bg-amber-900/20 transition-all border border-amber-200 dark:border-amber-900/30 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                             <span className="material-symbols-outlined text-sm">undo</span>
-                            {stage === 'sales' ? 'Disabled' : 'Return'}
+                            {stage === 'sales' || isDraft ? 'Disabled' : 'Return'}
                         </button>
 
                         <button
                             onClick={() => {
+                                if (isDraft) return;
                                 const stage = loan.stage || 'submitted';
                                 if (stage === 'customer_experience' || stage === 'submitted' || stage === 'sales') {
                                     setShowCXRejectModal(true);
@@ -725,12 +728,19 @@ const ActionCard = ({ loan, userRole, onActionComplete }: { loan: any, userRole:
                                     handleAction('reject');
                                 }
                             }}
-                            disabled={actionLoading}
-                            className="w-full py-3 rounded-xl bg-red-50 dark:bg-red-900/10 text-red-600 dark:text-red-400 font-bold text-xs uppercase tracking-wider hover:bg-red-100 transition-all border border-red-200"
+                            disabled={actionLoading || isDraft}
+                            className="w-full py-3 rounded-xl bg-red-50 dark:bg-red-900/10 text-red-600 dark:text-red-400 font-bold text-xs uppercase tracking-wider hover:bg-red-100 transition-all border border-red-200 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                             Reject
                         </button>
                     </div>
+
+                    {isDraft && (
+                        <p className="text-[11px] font-bold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 p-3 rounded-xl border border-amber-200 dark:border-amber-800/40 text-center leading-relaxed">
+                            ⚠️ Application is currently saved as a draft. Approval, return, and rejection actions are disabled until submitted.
+                        </p>
+                    )}
+                </div>
 
                     {/* Return Application Modal */}
                     {showReturnModal && (
@@ -888,7 +898,6 @@ const ActionCard = ({ loan, userRole, onActionComplete }: { loan: any, userRole:
                             </div>
                         </div>
                     )}
-                </div>
             </div>
         </div>
     );
@@ -1091,8 +1100,9 @@ const LoanDetailsPage: React.FC<LoanDetailsPageProps> = ({ user, onLogout, toggl
         { id: 'disbursed', label: 'Disbursed', icon: 'check_circle' }
     ];
 
-    const currentStageId = loan.stage || 'submitted';
-    const currentStageIndex = stages.findIndex(s => s.id === (currentStageId === 'credit_check' ? 'credit_check_1' : currentStageId));
+    const isDraft = loan.status === 'draft' || loan.stage === 'draft';
+    const currentStageId = isDraft ? 'submitted' : (loan.stage || 'submitted');
+    const currentStageIndex = isDraft ? 0 : stages.findIndex(s => s.id === (currentStageId === 'credit_check' ? 'credit_check_1' : currentStageId));
     const activeIndex = currentStageIndex === -1 ? 0 : currentStageIndex;
 
     const CollapsibleGroup = ({ title, icon, children, defaultOpen = false }: any) => {
@@ -1147,7 +1157,7 @@ const LoanDetailsPage: React.FC<LoanDetailsPageProps> = ({ user, onLogout, toggl
                         </h1>
 
                         {/* Edit Button Logic */}
-                        {((loan.stage === 'sales' || loan.stage === 'submitted') &&
+                        {(isDraft || (loan.stage === 'sales' || loan.stage === 'submitted') &&
                             (['sales_officer', 'sales_public_sector', 'sales_private_sector', 'sales_manager', 'super_admin', 'superadmin'].includes(user.role || ''))) ||
                             ((loan.stage === 'customer_experience') &&
                                 (['customer_experience', 'customer_service', 'super_admin', 'superadmin'].includes(user.role || ''))) ? (
@@ -1233,10 +1243,34 @@ const LoanDetailsPage: React.FC<LoanDetailsPageProps> = ({ user, onLogout, toggl
             )}
 
 
+            {/* 📝 Draft Status Banner */}
+            {isDraft && (
+                <div className="mb-6 p-5 rounded-[24px] bg-slate-100 dark:bg-slate-800/80 border-2 border-slate-300 dark:border-slate-700 flex flex-col md:flex-row md:items-center justify-between gap-5 animate-in fade-in duration-300">
+                    <div className="flex items-center gap-4">
+                        <div className="size-12 rounded-2xl bg-slate-600 text-white flex items-center justify-center shrink-0 shadow-md">
+                            <span className="material-symbols-outlined text-2xl">edit_note</span>
+                        </div>
+                        <div>
+                            <p className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-0.5">Application Status: DRAFT</p>
+                            <p className="text-sm font-black text-slate-900 dark:text-white">
+                                This application is currently saved as a draft and has not been submitted yet.
+                            </p>
+                        </div>
+                    </div>
+                    <button
+                        onClick={() => setShowEditModal(true)}
+                        className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs flex items-center gap-2 transition-all shrink-0 self-start md:self-auto cursor-pointer"
+                    >
+                        <span className="material-symbols-outlined text-base">edit</span>
+                        Continue & Submit Application
+                    </button>
+                </div>
+            )}
+
             <div className="bg-white dark:bg-[#0f172a] rounded-[24px] p-8 mb-8 shadow-sm border border-slate-200 dark:border-slate-800 relative overflow-hidden">
                 <div className="flex justify-between items-center relative z-10 overflow-x-auto pb-4">
                     {stages.map((stage, idx) => {
-                        const isCompleted = idx < activeIndex;
+                        const isCompleted = !isDraft && idx < activeIndex;
                         const isActive = idx === activeIndex;
                         return (
                             <div key={stage.id} className="flex flex-col items-center gap-3 min-w-[80px]">
