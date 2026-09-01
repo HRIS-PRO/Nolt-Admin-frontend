@@ -342,11 +342,12 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
             };
 
             const response = await axios.post('/api/loans', payload);
+            console.log(`💾 [STAFF FORM DRAFT SAVED - SUB_STEP ${targetStep} (${steps[targetStep] || 'Loan Details'})]:`, response.data);
             if (response.data && response.data.loanId) {
                 setDbLoanId(response.data.loanId);
             }
-        } catch (err) {
-            console.error("Failed to save draft to DB:", err);
+        } catch (err: any) {
+            console.error(`❌ [STAFF FORM DRAFT SAVE FAILED - SUB_STEP ${targetStep}]:`, err.response?.data || err.message);
         }
 
         if (showToast) {
@@ -918,6 +919,7 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
                 alert("Please select a product first.");
                 return;
             }
+            console.log("➡️ [STEP 0 TRANSITION]: Product Selected -> Opening Loan Details Accordion");
             setShowProductSelect(false);
             setErrors({});
             handleSaveDraft(false, false, undefined, 0);
@@ -928,22 +930,26 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
             // Validate Address (Step 1)
             const isAddressValid = validateStep(1);
             if (!isAddressValid) {
+                console.warn("⚠️ [STEP 0 VALIDATION FAILED]: Address section contains errors");
                 setExpandedSection('address');
                 return;
             }
             // Validate Employment (Step 2)
             const isEmploymentValid = validateStep(2);
             if (!isEmploymentValid) {
+                console.warn("⚠️ [STEP 0 VALIDATION FAILED]: Employment section contains errors");
                 setExpandedSection('employment');
                 return;
             }
             // Validate Loan (Step 3)
             const isLoanValid = validateStep(3);
             if (!isLoanValid) {
+                console.warn("⚠️ [STEP 0 VALIDATION FAILED]: Loan Details section contains errors");
                 setExpandedSection('loan');
                 return;
             }
             // All valid, clear and go to documents step (4)
+            console.log("➡️ [STEP TRANSITION]: Completed LOAN DETAILS -> Advancing to DOCUMENTS (sub_step: 4)");
             setStep(4);
             setErrors({});
             handleSaveDraft(false, false, undefined, 4);
@@ -953,9 +959,12 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
         // Standard Validation for other steps
         if (validateStep(step)) {
             const nextStep = Math.min(step + 1, 6);
+            console.log(`➡️ [STEP TRANSITION]: Completed Step ${step} (${steps[step] || 'Current'}) -> Advancing to Step ${nextStep} (${steps[nextStep] || 'Summary'}) [sub_step: ${nextStep}]`);
             setStep(nextStep);
             setErrors({});
             handleSaveDraft(false, false, undefined, nextStep);
+        } else {
+            console.warn(`⚠️ [STEP VALIDATION FAILED]: Validation errors at Step ${step} (${steps[step] || 'Current'})`);
         }
     };
 
@@ -993,7 +1002,9 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
         setLoading(true);
         try {
             let payload: any = {
-                id: dbLoanId || undefined,
+                id: dbLoanId || loanId || undefined,
+                status: 'pending',
+                sub_step: 6,
                 loan_type: loanType,
                 // Common Identity
                 surname,
@@ -1072,11 +1083,13 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
 
             if (loanId) {
                 // UPDATE Mode
-                await axios.put(`/api/staff/loans/${loanId}`, payload);
+                const res = await axios.put(`/api/staff/loans/${loanId}`, payload);
+                console.log("🚀 [FINAL LOAN APPLICATION UPDATE RESPONSE]:", res.data);
                 alert("Loan Application Updated Successfully!");
             } else {
                 // CREATE Mode
-                await axios.post('/api/staff/loans/application', payload);
+                const res = await axios.post('/api/staff/loans/application', payload);
+                console.log("🚀 [FINAL LOAN APPLICATION SUBMISSION RESPONSE]:", res.data);
                 alert("Loan Application Created Successfully!");
             }
 
