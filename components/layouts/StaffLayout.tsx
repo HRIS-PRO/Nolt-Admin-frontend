@@ -1,6 +1,8 @@
 import React, { useMemo, useState } from 'react';
 import { Link, NavLink, useLocation, useSearchParams } from 'react-router-dom';
 
+import { isSuperAdminRole, normalizeStaffRole } from '../../lib/staff-roles';
+
 type NavChild = { label: string; icon: string; path: string };
 type NavItem = { label: string; icon: string; path: string; children?: NavChild[] };
 
@@ -38,20 +40,10 @@ const StaffLayout: React.FC<StaffLayoutProps> = ({ children, user, onLogout, tog
                 { label: 'Dashboard', icon: 'grid_view', path: '/staff-dashboard' },
                 { label: 'Loans', icon: 'credit_card', path: '/staff/loans' },
                 { label: 'Transfers', icon: 'swap_horiz', path: '/staff/transfers' },
+                { label: 'Push Notifications', icon: 'notifications_active', path: '/staff/mobile-notifications' },
                 { label: 'Investments', icon: 'account_balance_wallet', path: '/staff/investments' },
                 { label: 'Products', icon: 'inventory_2', path: '/staff/products' },
-                {
-                    label: 'Promotions',
-                    icon: 'campaign',
-                    path: '/staff/promotions',
-                    children: [
-                        {
-                            label: 'Push Notifications',
-                            icon: 'notifications_active',
-                            path: '/staff/mobile-notifications',
-                        },
-                    ],
-                },
+                { label: 'Promotions', icon: 'campaign', path: '/staff/promotions' },
                 { label: 'Reports', icon: 'description', path: '/staff/reports' },
                 { label: 'BI Dashboard', icon: 'timeline', path: '/staff/timeline' },
                 { label: 'Calculator', icon: 'calculate', path: '/staff/calculator' },
@@ -70,7 +62,7 @@ const StaffLayout: React.FC<StaffLayoutProps> = ({ children, user, onLogout, tog
     ];
 
     const canSeeNavItem = useMemo(() => {
-        const role = user?.role || '';
+        const role = normalizeStaffRole(user?.role);
         const allowedBiAndReportsRoles = [
             'sales_manager', 'credit_manager', 'internal_audit', 'finance', 'compliance',
             'md', 'hr', 'super_admin', 'superadmin', 'admin', 'customer_experience',
@@ -84,16 +76,16 @@ const StaffLayout: React.FC<StaffLayoutProps> = ({ children, user, onLogout, tog
                 return role !== 'customer_experience';
             }
             if (label === 'Customers') {
-                return role === 'super_admin' || role === 'customer_experience';
+                return isSuperAdminRole(role) || role === 'customer_experience';
             }
             if (label === 'Users' || label === 'Audit Trail' || label === 'CBA Migration') {
-                return role === 'super_admin';
+                return isSuperAdminRole(role);
             }
             if (label === 'Promotions') {
-                return role === 'super_admin' || role === 'marketing';
+                return isSuperAdminRole(role) || role === 'marketing';
             }
             if (label === 'Push Notifications' || label === 'Transfers') {
-                return role === 'super_admin' || role === 'superadmin';
+                return isSuperAdminRole(role);
             }
             if (role === 'marketing') {
                 return ['Dashboard', 'Loans', 'Investments', 'Promotions'].includes(label);
