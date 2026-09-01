@@ -46,6 +46,7 @@ import CbaMigrationPage from './pages/CbaMigrationPage';
 import PayrollUploadPage from './pages/PayrollUploadPage';
 import { apiBase, apiUrl } from './lib/api-config';
 import { scheduleDeferredScripts } from './lib/deferred-scripts';
+import { isSuperAdminRole, normalizeStaffRole } from './lib/staff-roles';
 
 // Same-origin proxy: always send session cookies on API/auth requests.
 axios.defaults.withCredentials = true;
@@ -92,8 +93,6 @@ const ALLOWED_BI_AND_REPORTS_ROLES = [
   'admin',
   'customer_experience'
 ];
-
-const isSuperAdmin = (role?: string) => role === 'super_admin' || role === 'superadmin';
 
 // ProtectedRoute Component extracted to prevent re-renders
 interface ProtectedRouteProps {
@@ -221,7 +220,7 @@ const AppContent: React.FC = () => {
         name: data.full_name || data.name || 'User',
         isLoggedIn: true,
         avatar_url: data.avatar_url,
-        role: data.role,
+        role: normalizeStaffRole(data.role) || data.role,
         new_comer: data.new_comer,
         referral_code: data.referral_code,
         profile: profileRes.data?.profile || undefined
@@ -506,7 +505,7 @@ const AppContent: React.FC = () => {
           ) : <Navigate to="/login" />)
         } />
         <Route path="/staff/transfers" element={
-          isLoading ? null : (user.isLoggedIn && isSuperAdmin(user.role) ? (
+          isLoading ? null : (user.isLoggedIn && isSuperAdminRole(user.role) ? (
             <StaffTransfersPage
               user={user}
               onLogout={handleLogoutRequest}
@@ -546,7 +545,7 @@ const AppContent: React.FC = () => {
           ) : <Navigate to="/login" />)
         } />
         <Route path="/staff/mobile-notifications" element={
-          isLoading ? null : (user.isLoggedIn && isSuperAdmin(user.role) ? (
+          isLoading ? null : (user.isLoggedIn && isSuperAdminRole(user.role) ? (
             <StaffMobileNotificationsPage
               user={user}
               onLogout={handleLogoutRequest}
@@ -661,7 +660,7 @@ const AppContent: React.FC = () => {
           ) : <Navigate to="/login" />)
         } />
         <Route path="/staff/cba-migration" element={
-          isLoading ? null : (user.isLoggedIn && (user.role === 'super_admin' || user.role === 'superadmin') ? (
+          isLoading ? null : (user.isLoggedIn && isSuperAdminRole(user.role) ? (
             <CbaMigrationPage
               user={user}
               onLogout={handleLogoutRequest}
