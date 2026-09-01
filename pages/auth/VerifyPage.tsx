@@ -2,6 +2,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import { apiUrl } from '@/lib/api-config';
 import { createEmptyOtp, handleOtpPaste } from '../../utils/otpInput';
 
 const OTP_LENGTH = 6;
@@ -44,16 +45,15 @@ const VerifyPage: React.FC<VerifyPageProps> = ({ onLogin }) => {
         setError('');
 
         try {
-            const backendUrl = ''; // Use proxy
-            console.log("DEBUG VerifyPage: Using Backend URL:", backendUrl);
-            const { data } = await axios.post(`${backendUrl}/auth/verify-email-otp`, {
+            const { data } = await axios.post(apiUrl('/auth/verify-email-otp'), {
                 email,
                 otp: otpToken
             }, { withCredentials: true });
 
             console.log("Verify Response:", data);
             onLogin(email, data.user);
-            navigate('/dashboard'); // App.tsx will redirect based on state, but we help it along
+            // Client-side navigation avoids Amplify S3 404 on /dashboard full-page loads
+            navigate('/dashboard', { replace: true });
         } catch (err: any) {
             setError(err.response?.data?.message || 'Invalid verification code.');
         } finally {

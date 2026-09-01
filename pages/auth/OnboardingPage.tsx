@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import { apiUrl } from '@/lib/api-config';
 
 interface OnboardingPageProps {
     onComplete: (email: string) => void;
@@ -19,8 +20,6 @@ const OnboardingPage: React.FC<OnboardingPageProps> = ({ onComplete }) => {
     const [isValidating, setIsValidating] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
 
-    const backendUrl = ''; // Use proxy
-
     const handleReferralBlur = async () => {
         if (!referralCode.trim()) {
             setReferralError('');
@@ -33,7 +32,7 @@ const OnboardingPage: React.FC<OnboardingPageProps> = ({ onComplete }) => {
         setReferralError('');
 
         try {
-            const { data } = await axios.get(`${backendUrl}/api/referral/${referralCode}`);
+            const { data } = await axios.get(apiUrl(`/api/referral/${referralCode}`));
             setOfficerName(data.full_name);
             setIsOfficerDisabled(true);
         } catch (error) {
@@ -58,7 +57,7 @@ const OnboardingPage: React.FC<OnboardingPageProps> = ({ onComplete }) => {
 
         setIsSubmitting(true);
         try {
-            await axios.post(`${backendUrl}/api/marketing`, {
+            await axios.post(apiUrl('/api/marketing'), {
                 hear_about_us: source,
                 referral_code: referralCode,
                 officer_name: officerName

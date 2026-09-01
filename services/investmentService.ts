@@ -1,7 +1,8 @@
 
 import { SavedDraft } from '../types';
+import { apiUrl } from '@/lib/api-config';
 
-const API_BASE_URL = '/api'; // Assuming proxy is set up or relative path works
+const API_BASE_URL = apiUrl('/api');
 
 export const investmentService = {
     createInvestment: async (data: any) => {

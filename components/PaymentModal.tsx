@@ -70,13 +70,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-300">
       <div className="relative bg-white dark:bg-slate-800 w-full max-w-[560px] rounded-[3rem] shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-500 border border-white/20 dark:border-slate-700 max-h-[90vh] overflow-y-auto">
         
-        {/* Close Button */}
-        <button 
-          onClick={onClose}
-          className="absolute top-6 right-6 size-10 rounded-full bg-slate-100 dark:bg-slate-700 flex items-center justify-center text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors z-10"
-        >
-          <span className="material-symbols-outlined max-w-none">close</span>
-        </button>
+        {/* Close Button removed to ensure completion */}
 
         {!paymentMethod ? (
           <div className="pt-8 md:pt-10 pb-10 md:pb-12 px-6 md:px-12 flex flex-col items-center">
@@ -149,7 +143,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
             <div 
               className="w-full bg-slate-50 dark:bg-slate-900 p-6 md:p-8 rounded-[1.5rem] md:rounded-[2rem] border-2 border-primary/20 shadow-sm mb-6 md:mb-8 group cursor-copy active:scale-[0.98] transition-all relative overflow-hidden"
               onClick={() => {
-                navigator.clipboard.writeText('0123456789');
+                navigator.clipboard.writeText('5401329231');
               }}
             >
               <div className="absolute top-0 right-0 p-3 md:p-4 opacity-10 group-hover:opacity-100 transition-opacity">
@@ -164,7 +158,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
               <button 
                 onClick={simulateReceiptUpload}
                 disabled={receiptProgress > 0 && receiptProgress < 100}
-                className={`w-full group p-4 md:p-6 rounded-2xl md:rounded-3xl border-2 border-dashed transition-all flex items-center justify-center gap-3 md:gap-4 ${receiptUrl ? 'bg-green-500/10 border-green-500' : 'bg-slate-50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-700 hover:border-primary'}`}
+                className={`w-full group p-4 md:p-6 rounded-2xl md:rounded-3xl border-2 border-dashed transition-all flex items-center justify-center gap-3 md:gap-4 ${receiptUrl ? 'bg-green-500/10 border-green-500' : 'bg-primary/5 border-primary/30 hover:border-primary hover:bg-primary/10 shadow-sm'}`}
               >
                 {receiptUrl ? (
                   <div className="flex items-center gap-3">
@@ -178,8 +172,8 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                   </div>
                 ) : (
                   <div className="flex flex-col items-center gap-1 md:gap-2">
-                      <span className="material-symbols-outlined text-slate-400 group-hover:text-primary transition-colors text-2xl md:text-3xl">cloud_upload</span>
-                      <span className="text-[10px] md:text-sm font-black text-slate-50 group-hover:text-primary transition-colors uppercase tracking-widest">
+                      <span className="material-symbols-outlined text-primary group-hover:scale-110 transition-transform text-2xl md:text-3xl">cloud_upload</span>
+                      <span className="text-[10px] md:text-sm font-black text-primary uppercase tracking-widest">
                         {receiptProgress > 0 ? 'Uploading...' : 'Upload Receipt'}
                       </span>
                   </div>

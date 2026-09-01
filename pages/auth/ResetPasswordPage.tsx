@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import { apiUrl } from '@/lib/api-config';
 import AuthLayout from '../../components/layouts/AuthLayout';
 
 const ResetPasswordPage: React.FC = () => {
@@ -41,8 +42,7 @@ const ResetPasswordPage: React.FC = () => {
         setMessage('');
 
         try {
-            const backendUrl = '';
-            await axios.post(`${backendUrl}/auth/reset-password`, {
+            await axios.post(apiUrl('/auth/reset-password'), {
                 token,
                 email,
                 password

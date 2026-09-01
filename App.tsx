@@ -35,6 +35,8 @@ import VerifyGiftPage from './pages/investment/VerifyGiftPage';
 import ClaimGiftPage from './pages/investment/ClaimGiftPage';
 import ProfilePage from './pages/ProfilePage';
 import StaffPromotionsPage from './pages/StaffPromotionsPage';
+import StaffMobileNotificationsPage from './pages/StaffMobileNotificationsPage';
+import StaffTransfersPage from './pages/StaffTransfersPage';
 import StaffCalculatorPage from './pages/StaffCalculatorPage';
 import ProductsPage from './pages/ProductsPage';
 import LogoutWarningModal from './components/modals/LogoutWarningModal';
@@ -42,6 +44,17 @@ import JointAcceptancePage from './pages/investment/JointAcceptancePage';
 import CustomerDetailsPage from './pages/CustomerDetailsPage';
 import CbaMigrationPage from './pages/CbaMigrationPage';
 import PayrollUploadPage from './pages/PayrollUploadPage';
+import { apiBase, apiUrl } from './lib/api-config';
+import { scheduleDeferredScripts } from './lib/deferred-scripts';
+
+// Same-origin proxy: always send session cookies on API/auth requests.
+axios.defaults.withCredentials = true;
+
+// Set global axios base URL (empty in local proxy mode → relative /api, /auth)
+const globalBackendUrl = apiBase();
+if (globalBackendUrl) {
+  axios.defaults.baseURL = globalBackendUrl;
+}
 
 // Setup Global Axios Interceptor for GPS Tracking
 axios.interceptors.request.use((config) => {
@@ -79,6 +92,8 @@ const ALLOWED_BI_AND_REPORTS_ROLES = [
   'admin',
   'customer_experience'
 ];
+
+const isSuperAdmin = (role?: string) => role === 'super_admin' || role === 'superadmin';
 
 // ProtectedRoute Component extracted to prevent re-renders
 interface ProtectedRouteProps {
@@ -156,9 +171,6 @@ const AppContent: React.FC = () => {
 
   const [lastProduct, setLastProduct] = useState<'LOAN' | 'INVESTMENT'>('LOAN');
   const [resumeDraft, setResumeDraft] = useState<SavedDraft | null>(null);
-  // Use relative path (proxy) by default for First-Party Cookies on Vercel
-  // Only use VITE_BACKEND_URL if explicitly set (e.g. for local dev without proxy)
-  const backendUrl = ''; // Force relative path to use Vercel Rewrites
   const [isLoading, setIsLoading] = useState(true);
   const [user, setUser] = useState<UserState>({
     email: '',
@@ -196,16 +208,13 @@ const AppContent: React.FC = () => {
 
   const refreshUser = useCallback(async () => {
     try {
-      const { data } = await axios.get(`${backendUrl}/api/me?t=${new Date().getTime()}`, {
-        withCredentials: true
-      });
+      const cacheBust = Date.now();
+      const [meRes, profileRes] = await Promise.all([
+        axios.get(apiUrl(`/api/me?t=${cacheBust}`), { withCredentials: true }),
+        axios.get(apiUrl(`/api/profile?t=${cacheBust}`), { withCredentials: true }),
+      ]);
 
-      // Also fetch profile
-      const profileRes = await axios.get(`${backendUrl}/api/profile?t=${new Date().getTime()}`, {
-        withCredentials: true
-      });
-
-      console.log(data)
+      const data = meRes.data;
       setUser({
         id: data.id,
         email: data.email,
@@ -223,7 +232,11 @@ const AppContent: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [backendUrl]);
+  }, []);
+
+  useEffect(() => {
+    scheduleDeferredScripts();
+  }, []);
 
   useEffect(() => {
     refreshUser();
@@ -269,31 +282,23 @@ const AppContent: React.FC = () => {
       email,
       isLoggedIn: true,
       ...userData,
-      // Ensure name falls back to prev or default if not provided
       name: userData?.name || (userData as any)?.full_name || prev.name || 'User'
     }));
-  }, []);
+    refreshUser();
+  }, [refreshUser]);
 
-  // Handle Google Login Callback
+  // Handle Google Login Callback — load session from cookie, then route client-side
   useEffect(() => {
-    if (searchParams.get('login') === 'success') {
-      const pendingToken = localStorage.getItem('pending_gift_token');
-      const pendingJointToken = localStorage.getItem('pending_joint_token');
-      if (pendingToken || pendingJointToken) {
-          console.log("Google login success with pending action, redirection will be handled by auth effect");
-          // Redirection is handled by the useEffect above that watches user.isLoggedIn
-      } else {
-          navigateRouter('/dashboard', { replace: true });
-      }
-    }
-  }, [searchParams, navigateRouter]);
+    if (searchParams.get('login') !== 'success') return;
+
+    refreshUser().finally(() => {
+      navigateRouter('/dashboard', { replace: true });
+    });
+  }, [searchParams, navigateRouter, refreshUser]);
 
   const performLogout = useCallback(async () => {
     try {
-      const backendUrl = ''; // Use proxy
-      // If backendUrl is empty, it means we are using proxy (relative path)
-      const url = backendUrl ? `${backendUrl}/auth/logout` : '/auth/logout';
-      await fetch(url, {
+      await fetch(apiUrl('/auth/logout'), {
         credentials: 'include'
       });
     } catch (e) {
@@ -430,35 +435,35 @@ const AppContent: React.FC = () => {
       <Routes>
         {/* Auth Routes */}
         <Route path="/login" element={
-          isLoading ? null : (user.isLoggedIn ? (user.new_comer ? <Navigate to="/onboarding" /> : <Navigate to="/dashboard" />) : (
+          (!isLoading && user.isLoggedIn) ? (user.new_comer ? <Navigate to="/onboarding" /> : <Navigate to="/dashboard" />) : (
             <AuthLayout>
               <LoginPage onLogin={handleLogin} />
             </AuthLayout>
-          ))
+          )
         } />
         <Route path="/register" element={
-          isLoading ? null : (user.isLoggedIn ? <Navigate to="/dashboard" /> : (
+          (!isLoading && user.isLoggedIn) ? <Navigate to="/dashboard" /> : (
             <AuthLayout>
               <RegisterPage />
             </AuthLayout>
-          ))
+          )
         } />
         <Route path="/verify" element={
-          isLoading ? null : (user.isLoggedIn && user.new_comer ? <Navigate to="/onboarding" /> : (
+          (!isLoading && user.isLoggedIn && user.new_comer) ? <Navigate to="/onboarding" /> : (
             <AuthLayout>
               <VerifyPage onLogin={handleLogin} />
             </AuthLayout>
-          ))
+          )
         } />
         <Route path="/forgot-password" element={
-          isLoading ? null : (user.isLoggedIn ? <Navigate to="/dashboard" /> : (
+          (!isLoading && user.isLoggedIn) ? <Navigate to="/dashboard" /> : (
             <ForgotPasswordPage />
-          ))
+          )
         } />
         <Route path="/reset-password" element={
-          isLoading ? null : (user.isLoggedIn ? <Navigate to="/dashboard" /> : (
+          (!isLoading && user.isLoggedIn) ? <Navigate to="/dashboard" /> : (
             <ResetPasswordPage />
-          ))
+          )
         } />
         <Route path="/onboarding" element={
           isLoading ? null : (!user.isLoggedIn ? <Navigate to="/login" /> : (!user.new_comer ? <Navigate to="/dashboard" /> : (
@@ -466,8 +471,7 @@ const AppContent: React.FC = () => {
               <OnboardingPage onComplete={async () => {
                 // Call backend to complete onboarding
                 try {
-                  const backendUrl = ''; // Use proxy
-                  await axios.put(`${backendUrl}/api/onboarding-complete`, {}, { withCredentials: true });
+                  await axios.put(apiUrl('/api/onboarding-complete'), {}, { withCredentials: true });
                   // Update local state by refetching from backend to get referral code
                   await refreshUser();
                   navigateRouter('/dashboard');
@@ -501,6 +505,16 @@ const AppContent: React.FC = () => {
             />
           ) : <Navigate to="/login" />)
         } />
+        <Route path="/staff/transfers" element={
+          isLoading ? null : (user.isLoggedIn && isSuperAdmin(user.role) ? (
+            <StaffTransfersPage
+              user={user}
+              onLogout={handleLogoutRequest}
+              toggleTheme={toggleTheme}
+              theme={theme}
+            />
+          ) : user.isLoggedIn ? <Navigate to="/staff-dashboard" /> : <Navigate to="/login" />)
+        } />
         <Route path="/staff/investments" element={
           isLoading ? null : (user.isLoggedIn && user.role !== 'customer' ? (
             <StaffInvestmentsPage
@@ -530,6 +544,16 @@ const AppContent: React.FC = () => {
               theme={theme}
             />
           ) : <Navigate to="/login" />)
+        } />
+        <Route path="/staff/mobile-notifications" element={
+          isLoading ? null : (user.isLoggedIn && isSuperAdmin(user.role) ? (
+            <StaffMobileNotificationsPage
+              user={user}
+              onLogout={handleLogoutRequest}
+              toggleTheme={toggleTheme}
+              theme={theme}
+            />
+          ) : user.isLoggedIn ? <Navigate to="/staff-dashboard" /> : <Navigate to="/login" />)
         } />
         <Route path="/staff/products" element={
           isLoading ? null : (user.isLoggedIn && user.role !== 'customer' ? (

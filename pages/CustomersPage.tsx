@@ -5,6 +5,7 @@ import CustomerDetailsDrawer from '../components/drawers/CustomerDetailsDrawer';
 import NewCustomerModal from '../components/modals/NewCustomerModal';
 import { formatDate } from '../utils/dateFormatter';
 import { useNavigate } from 'react-router-dom';
+import { apiUrl } from '@/lib/api-config';
 
 interface Customer {
     id: number;
@@ -129,7 +130,7 @@ const CustomersPage: React.FC<CustomersPageProps> = ({ user, onLogout, toggleThe
         setIsLoading(true);
         try {
             // Fetch ALL customers for export (matching search if any)
-            const res = await axios.get(`${import.meta.env.VITE_BACKEND_URL || ''}/api/staff/users`, {
+            const res = await axios.get(apiUrl('/api/staff/users'), {
                 params: {
                     role: 'customer',
                     page: 1,
