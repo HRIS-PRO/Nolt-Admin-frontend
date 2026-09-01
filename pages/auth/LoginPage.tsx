@@ -36,6 +36,8 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
                 password
             }, { withCredentials: true });
 
+            console.log("🔑 [LOGIN RESPONSE / TOKEN]:", data);
+
             if (data.requireOtp) {
                 navigate('/verify', { state: { email: email.trim().toLowerCase() } });
             } else {

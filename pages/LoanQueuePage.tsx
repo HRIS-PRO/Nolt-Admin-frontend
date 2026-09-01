@@ -333,6 +333,7 @@ const LoanQueuePage: React.FC<LoanQueuePageProps> = ({ user, onLogout, toggleThe
                             className="w-full px-2 py-2.5 rounded-xl bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-[10px] font-bold uppercase border border-slate-200 dark:border-slate-700 outline-none cursor-pointer hover:border-blue-500 transition-colors truncate"
                         >
                             <option value="">All Status</option>
+                            <option value="draft">Draft</option>
                             <option value="pending">Pending</option>
                             <option value="approved">Approved</option>
                             <option value="rejected">Rejected</option>

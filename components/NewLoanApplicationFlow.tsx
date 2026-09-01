@@ -3,6 +3,8 @@ import axios from 'axios';
 import { motion, AnimatePresence } from 'motion/react';
 import NewCustomerModal from './modals/NewCustomerModal';
 import StaffLoanForm from './StaffLoanForm';
+import { storageService } from '../services/storageService';
+import { StaffLoanDraft } from '../types';
 
 interface NewLoanApplicationFlowProps {
     isOpen: boolean;
@@ -20,9 +22,11 @@ const NewLoanApplicationFlow: React.FC<NewLoanApplicationFlowProps> = ({ isOpen,
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [customerData, setCustomerData] = useState<any>(null);
+    const [rawCustomer, setRawCustomer] = useState<any>(null);
     const [loanHistory, setLoanHistory] = useState<any[]>([]);
     const [cbaLoans, setCbaLoans] = useState<any[]>([]);
     const [selectedLoanType, setSelectedLoanType] = useState<string>('new');
+    const [activeDraft, setActiveDraft] = useState<any | null>(null);
 
     if (!isOpen) return null;
 
@@ -47,9 +51,20 @@ const NewLoanApplicationFlow: React.FC<NewLoanApplicationFlowProps> = ({ isOpen,
             const response = await axios.get(`/api/staff/customers/lookup?${param}`);
 
             if (response.data.success) {
-                setCustomerData(response.data.customer);
+                const cust = response.data.customer;
+                setRawCustomer(cust);
                 setLoanHistory(response.data.loans || []);
                 setCbaLoans(response.data.cbaLoans || []);
+
+                const dbDraft = (response.data.loans || []).find((l: any) => l.status && String(l.status).toLowerCase() === 'draft');
+                if (dbDraft) {
+                    setCustomerData({ ...cust, ...dbDraft });
+                    setActiveDraft(dbDraft);
+                } else {
+                    setCustomerData(cust);
+                    setActiveDraft(null);
+                }
+
                 setCurrentState('CUSTOMER_CARD');
             }
         } catch (err: any) {
@@ -81,6 +96,7 @@ const NewLoanApplicationFlow: React.FC<NewLoanApplicationFlowProps> = ({ isOpen,
         setLoanHistory([]);
         setCbaLoans([]);
         setError(null);
+        setActiveDraft(null);
         onClose();
     };
 
@@ -109,12 +125,14 @@ const NewLoanApplicationFlow: React.FC<NewLoanApplicationFlowProps> = ({ isOpen,
                 onClose={resetFlow}
                 onSuccess={() => { onSuccess(); resetFlow(); }}
                 initialData={enrichedInitialData}
+                initialDraft={activeDraft || undefined}
                 user={user}
                 isCustomerVerified={true}
                 lockedLoanType={isLoanTypeLocked ? selectedLoanType : undefined}
             />
         );
     }
+
 
     return (
         <AnimatePresence>
@@ -234,6 +252,49 @@ const NewLoanApplicationFlow: React.FC<NewLoanApplicationFlowProps> = ({ isOpen,
                                         Existing Customer
                                     </div>
                                 </div>
+
+                                {activeDraft && (
+                                    <div className="p-5 bg-amber-50 dark:bg-amber-950/40 border-2 border-amber-300 dark:border-amber-700/60 rounded-3xl mb-8 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 animate-in fade-in slide-in-from-top-4 shadow-sm">
+                                        <div className="flex items-center gap-3">
+                                            <div className="size-10 rounded-2xl bg-amber-500 text-white flex items-center justify-center font-black shrink-0">
+                                                <span className="material-symbols-outlined text-xl">history</span>
+                                            </div>
+                                            <div>
+                                                <h5 className="font-black text-amber-900 dark:text-amber-200 uppercase text-xs tracking-wider">Unfinished Application Draft Found</h5>
+                                                <p className="text-[10px] font-bold text-amber-700 dark:text-amber-400 uppercase tracking-widest mt-0.5">
+                                                    {activeDraft.sub_step ? `Saved at Step ${activeDraft.sub_step}` : 'Saved Draft'} • {new Date(activeDraft.updated_at || activeDraft.created_at || Date.now()).toLocaleDateString('en-GB')}
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-2 w-full md:w-auto">
+                                            <button
+                                                type="button"
+                                                onClick={async () => {
+                                                    if (activeDraft?.id) {
+                                                        try {
+                                                            await axios.delete(`/api/loans/${activeDraft.id}`);
+                                                        } catch (err) {
+                                                            console.error("Failed to delete draft:", err);
+                                                        }
+                                                    }
+                                                    setActiveDraft(null);
+                                                    if (rawCustomer) setCustomerData(rawCustomer);
+                                                }}
+                                                className="px-4 py-2.5 bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all cursor-pointer"
+                                            >
+                                                Discard Draft
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => setCurrentState('LOAN_FORM')}
+                                                className="flex-1 md:flex-initial px-5 py-2.5 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-md shadow-amber-500/20 cursor-pointer"
+                                            >
+                                                Continue Application
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
+
 
                                 {/* Demographics Grid */}
                                 <div className="grid grid-cols-3 gap-y-8 gap-x-4 mb-10 pb-8 border-b border-slate-100 dark:border-slate-800">

@@ -77,26 +77,20 @@ const MdaTertiarySelect: React.FC<MdaTertiarySelectProps> = ({
     const [activeTab, setActiveTab] = useState<'MDA' | 'TERTIARY'>('MDA');
     const [searchQuery, setSearchQuery] = useState('');
     const dropdownRef = useRef<HTMLButtonElement>(null);
-    const [dropdownStyles, setDropdownStyles] = useState({});
+    const menuRef = useRef<HTMLDivElement>(null);
+    const [dropdownStyles, setDropdownStyles] = useState<React.CSSProperties>({});
 
     useEffect(() => {
-        const handleScroll = (e: Event) => {
-            // If scroll happens within the dropdown content, don't close
-            // We use a class name or ref check. Since the portal is disjoint, we check the target.
-            const target = e.target as HTMLElement;
-            if (target.classList?.contains('scrollbar-thin')) return;
+        if (value && TERTIARY_LIST.includes(value)) {
+            setActiveTab('TERTIARY');
+        }
+    }, [value]);
 
-            if (isOpen) setIsOpen(false);
-        };
-        window.addEventListener('scroll', handleScroll, true);
-        return () => window.removeEventListener('scroll', handleScroll, true);
-    }, [isOpen]);
-
-    const toggleDropdown = () => {
-        if (!isOpen && dropdownRef.current) {
+    const updatePosition = () => {
+        if (dropdownRef.current) {
             const rect = dropdownRef.current.getBoundingClientRect();
             const spaceBelow = window.innerHeight - rect.bottom;
-            const dropUp = spaceBelow < 400;
+            const dropUp = spaceBelow < 350 && rect.top > 350;
 
             setDropdownStyles({
                 position: 'fixed',
@@ -107,8 +101,44 @@ const MdaTertiarySelect: React.FC<MdaTertiarySelectProps> = ({
                 zIndex: 9999
             });
         }
+    };
+
+    const toggleDropdown = () => {
+        if (!isOpen) {
+            updatePosition();
+        }
         setIsOpen(!isOpen);
     };
+
+    useEffect(() => {
+        if (!isOpen) return;
+
+        updatePosition();
+
+        const handleScrollOrResize = () => {
+            updatePosition();
+        };
+
+        const handleClickOutside = (e: MouseEvent | TouchEvent) => {
+            const target = e.target as Node;
+            if (
+                dropdownRef.current && !dropdownRef.current.contains(target) &&
+                menuRef.current && !menuRef.current.contains(target)
+            ) {
+                setIsOpen(false);
+            }
+        };
+
+        window.addEventListener('scroll', handleScrollOrResize, true);
+        window.addEventListener('resize', handleScrollOrResize);
+        document.addEventListener('pointerdown', handleClickOutside);
+
+        return () => {
+            window.removeEventListener('scroll', handleScrollOrResize, true);
+            window.removeEventListener('resize', handleScrollOrResize);
+            document.removeEventListener('pointerdown', handleClickOutside);
+        };
+    }, [isOpen]);
 
     const filteredItems = (activeTab === 'MDA' ? MDAS_LIST : TERTIARY_LIST).filter(item =>
         item.toLowerCase().includes(searchQuery.toLowerCase())
@@ -142,7 +172,11 @@ const MdaTertiarySelect: React.FC<MdaTertiarySelectProps> = ({
 
             {/* Dropdown Panel - Portaled to Body */}
             {isOpen && createPortal(
-                <div style={dropdownStyles} className="fixed bg-white dark:bg-slate-800 rounded-3xl shadow-2xl shadow-slate-900/20 border border-slate-100 dark:border-slate-700 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+                <div
+                    ref={menuRef}
+                    style={dropdownStyles}
+                    className="fixed bg-white dark:bg-slate-800 rounded-3xl shadow-2xl shadow-slate-900/20 border border-slate-100 dark:border-slate-700 overflow-hidden animate-in fade-in zoom-in-95 duration-200"
+                >
                     <div className="flex border-b border-slate-100 dark:border-slate-700">
                         <button
                             type="button"
@@ -181,6 +215,7 @@ const MdaTertiarySelect: React.FC<MdaTertiarySelectProps> = ({
                                     <button
                                         key={item}
                                         type="button"
+                                        onMouseDown={(e) => e.preventDefault()}
                                         onClick={() => handleSelect(item)}
                                         className={`w-full text-left px-4 py-3 rounded-xl font-bold transition-all text-sm ${value === item
                                             ? 'bg-primary text-white shadow-lg shadow-primary/20'
@@ -197,8 +232,6 @@ const MdaTertiarySelect: React.FC<MdaTertiarySelectProps> = ({
                             </div>
                         )}
                     </div>
-                    {/* Backdrop to close on click outside (transparent) */}
-                    <div className="fixed inset-0 -z-10" onClick={() => setIsOpen(false)}></div>
                 </div>,
                 document.body
             )}
