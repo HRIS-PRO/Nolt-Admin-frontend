@@ -1,6 +1,10 @@
-import React, { useState } from 'react';
-import { Link, NavLink, useSearchParams } from 'react-router-dom';
-import { Theme } from '../../types';
+import React, { useMemo, useState } from 'react';
+import { Link, NavLink, useLocation, useSearchParams } from 'react-router-dom';
+
+import { isSuperAdminRole, normalizeStaffRole } from '../../lib/staff-roles';
+
+type NavChild = { label: string; icon: string; path: string };
+type NavItem = { label: string; icon: string; path: string; children?: NavChild[] };
 
 interface StaffLayoutProps {
     children: React.ReactNode;
@@ -12,8 +16,11 @@ interface StaffLayoutProps {
 
 const StaffLayout: React.FC<StaffLayoutProps> = ({ children, user, onLogout, toggleTheme, theme }) => {
     const [searchParams, setSearchParams] = useSearchParams();
+    const location = useLocation();
     const searchQuery = searchParams.get('search') || '';
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+    /** Collapsible nav groups — closed by default; toggled via caret. */
+    const [expandedNav, setExpandedNav] = useState<Record<string, boolean>>({});
 
     const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
         const value = e.target.value;
@@ -26,12 +33,14 @@ const StaffLayout: React.FC<StaffLayoutProps> = ({ children, user, onLogout, tog
         }
     };
 
-    const navGroups = [
+    const navGroups: { title: string; items: NavItem[] }[] = [
         {
             title: 'MANAGEMENT',
             items: [
                 { label: 'Dashboard', icon: 'grid_view', path: '/staff-dashboard' },
                 { label: 'Loans', icon: 'credit_card', path: '/staff/loans' },
+                { label: 'Transfers', icon: 'swap_horiz', path: '/staff/transfers' },
+                { label: 'Push Notifications', icon: 'notifications_active', path: '/staff/mobile-notifications' },
                 { label: 'Investments', icon: 'account_balance_wallet', path: '/staff/investments' },
                 { label: 'Products', icon: 'inventory_2', path: '/staff/products' },
                 { label: 'Promotions', icon: 'campaign', path: '/staff/promotions' },
@@ -51,6 +60,48 @@ const StaffLayout: React.FC<StaffLayoutProps> = ({ children, user, onLogout, tog
             ]
         }
     ];
+
+    const canSeeNavItem = useMemo(() => {
+        const role = normalizeStaffRole(user?.role);
+        const allowedBiAndReportsRoles = [
+            'sales_manager', 'credit_manager', 'internal_audit', 'finance', 'compliance',
+            'md', 'hr', 'super_admin', 'superadmin', 'admin', 'customer_experience',
+        ];
+
+        return (label: string): boolean => {
+            if (label === 'Reports' || label === 'BI Dashboard') {
+                return allowedBiAndReportsRoles.includes(role);
+            }
+            if (label === 'Products') {
+                return role !== 'customer_experience';
+            }
+            if (label === 'Customers') {
+                return isSuperAdminRole(role) || role === 'customer_experience';
+            }
+            if (label === 'Users' || label === 'Audit Trail' || label === 'CBA Migration') {
+                return isSuperAdminRole(role);
+            }
+            if (label === 'Promotions') {
+                return isSuperAdminRole(role) || role === 'marketing';
+            }
+            if (label === 'Push Notifications' || label === 'Transfers') {
+                return isSuperAdminRole(role);
+            }
+            if (role === 'marketing') {
+                return ['Dashboard', 'Loans', 'Investments', 'Promotions'].includes(label);
+            }
+            return true;
+        };
+    }, [user?.role]);
+
+    const toggleNavGroup = (path: string) => {
+        setExpandedNav((prev) => ({ ...prev, [path]: !prev[path] }));
+    };
+
+    const isNavGroupExpanded = (item: NavItem, childActive: boolean) => {
+        if (item.path in expandedNav) return expandedNav[item.path];
+        return childActive;
+    };
 
     return (
         <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex text-slate-900 dark:text-white font-sans relative">
@@ -97,55 +148,116 @@ const StaffLayout: React.FC<StaffLayoutProps> = ({ children, user, onLogout, tog
                 {/* Navigation */}
                 <nav className="flex-1 px-4 flex flex-col gap-8 overflow-y-auto">
                     {navGroups.map((group, idx) => {
-                        // Filter items based on role
-                        const filteredItems = group.items.filter(item => {
-                            const role = user?.role || '';
-                            const allowedBiAndReportsRoles = ['sales_manager', 'credit_manager', 'internal_audit', 'finance', 'compliance', 'md', 'hr', 'super_admin', 'superadmin', 'admin', 'customer_experience'];
-                            
-                            if (item.label === 'Reports' || item.label === 'BI Dashboard') {
-                                return allowedBiAndReportsRoles.includes(role);
-                            }
-                            if (item.label === 'Products') {
-                                return role !== 'customer_experience';
-                            }
-                            if (item.label === 'Customers') {
-                                return role === 'super_admin' || role === 'customer_experience';
-                            }
-                            if (item.label === 'Users' || item.label === 'Audit Trail' || item.label === 'CBA Migration') {
-                                return role === 'super_admin';
-                            }
-                            if (item.label === 'Promotions') {
-                                return role === 'super_admin' || role === 'marketing';
-                            }
-                            if (role === 'marketing') {
-                                // Marketing should only see these specific tabs
-                                return ['Dashboard', 'Loans', 'Investments', 'Promotions'].includes(item.label);
-                            }
-                            return true;
-                        });
+                        const filteredItems = group.items
+                            .map((item) => {
+                                const children = item.children?.filter((child) => canSeeNavItem(child.label));
+                                if (!canSeeNavItem(item.label) && (!children || children.length === 0)) {
+                                    return null;
+                                }
+                                return { ...item, children };
+                            })
+                            .filter(Boolean) as NavItem[];
 
-                        // Don't render group if no items
                         if (filteredItems.length === 0) return null;
 
                         return (
                             <div key={idx} className="flex flex-col gap-2">
                                 <h3 className="px-4 text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 mb-2">{group.title}</h3>
-                                {filteredItems.map((item) => (
-                                    <NavLink
-                                        key={item.path}
-                                        to={item.path}
-                                        onClick={() => setIsSidebarOpen(false)} // Close sidebar on mobile nav
-                                        className={({ isActive }) => `flex items-center gap-4 px-4 py-3.5 rounded-xl transition-all font-bold text-sm ${isActive
-                                            ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/20'
-                                            : 'text-slate-400 hover:bg-slate-800 hover:text-white'
-                                            }`}
-                                    >
-                                        <span className="material-symbols-outlined text-[20px]">{item.icon}</span>
-                                        {item.label}
-                                    </NavLink>
-                                ))}
+                                {filteredItems.map((item) => {
+                                    const childActive = item.children?.some((c) => location.pathname === c.path) ?? false;
+                                    const parentActive = location.pathname === item.path;
+                                    const hasChildren = Boolean(item.children?.length);
+                                    const isExpanded = hasChildren
+                                        ? isNavGroupExpanded(item, childActive)
+                                        : false;
+
+                                    if (!hasChildren) {
+                                        return (
+                                            <NavLink
+                                                key={item.path}
+                                                to={item.path}
+                                                onClick={() => setIsSidebarOpen(false)}
+                                                className={({ isActive }) =>
+                                                    `flex items-center gap-4 px-4 py-3.5 rounded-xl transition-all font-bold text-sm ${
+                                                        isActive
+                                                            ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/20'
+                                                            : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                                                    }`
+                                                }
+                                            >
+                                                <span className="material-symbols-outlined text-[20px]">{item.icon}</span>
+                                                {item.label}
+                                            </NavLink>
+                                        );
+                                    }
+
+                                    return (
+                                        <div key={item.path} className="flex flex-col gap-1">
+                                            <div
+                                                className={`flex items-center rounded-xl transition-all font-bold text-sm overflow-hidden ${
+                                                    parentActive && !childActive
+                                                        ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/20'
+                                                        : childActive
+                                                          ? 'text-white bg-slate-800/80'
+                                                          : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                                                }`}
+                                            >
+                                                <NavLink
+                                                    to={item.path}
+                                                    onClick={() => setIsSidebarOpen(false)}
+                                                    className="flex flex-1 items-center gap-4 px-4 py-3.5 min-w-0"
+                                                >
+                                                    <span className="material-symbols-outlined text-[20px] shrink-0">
+                                                        {item.icon}
+                                                    </span>
+                                                    <span className="truncate">{item.label}</span>
+                                                </NavLink>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => toggleNavGroup(item.path)}
+                                                    aria-expanded={isExpanded}
+                                                    aria-label={`${isExpanded ? 'Collapse' : 'Expand'} ${item.label}`}
+                                                    className={`shrink-0 px-3 py-3.5 transition-colors ${
+                                                        parentActive && !childActive
+                                                            ? 'text-white/80 hover:text-white'
+                                                            : 'text-slate-500 hover:text-slate-200'
+                                                    }`}
+                                                >
+                                                    <span
+                                                        className={`material-symbols-outlined text-[20px] transition-transform duration-200 ${
+                                                            isExpanded ? 'rotate-180' : ''
+                                                        }`}
+                                                    >
+                                                        expand_more
+                                                    </span>
+                                                </button>
+                                            </div>
+                                            {isExpanded
+                                                ? item.children?.map((child) => (
+                                                      <NavLink
+                                                          key={child.path}
+                                                          to={child.path}
+                                                          onClick={() => setIsSidebarOpen(false)}
+                                                          className={({ isActive }) =>
+                                                              `flex items-center gap-3 ml-6 mr-2 pl-4 pr-3 py-2.5 rounded-lg transition-all text-xs font-bold border-l-2 ${
+                                                                  isActive
+                                                                      ? 'border-blue-500 bg-blue-500/15 text-blue-300'
+                                                                      : 'border-slate-700 text-slate-500 hover:border-slate-500 hover:text-slate-200 hover:bg-slate-800/60'
+                                                              }`
+                                                          }
+                                                      >
+                                                          <span className="material-symbols-outlined text-[18px]">
+                                                              {child.icon}
+                                                          </span>
+                                                          {child.label}
+                                                      </NavLink>
+                                                  ))
+                                                : null}
+                                        </div>
+                                    );
+                                })}
                             </div>
-                        )
+                        );
                     })}
                 </nav>
 
