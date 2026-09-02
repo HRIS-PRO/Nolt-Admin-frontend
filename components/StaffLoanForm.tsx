@@ -1081,13 +1081,14 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
                 };
             }
 
-            if (loanId) {
-                // UPDATE Mode
-                const res = await axios.put(`/api/staff/loans/${loanId}`, payload);
+            const existingLoanId = dbLoanId || loanId;
+            if (existingLoanId) {
+                // UPDATE Mode — always PUT to update the existing draft
+                const res = await axios.put(`/api/staff/loans/${existingLoanId}`, payload);
                 console.log("🚀 [FINAL LOAN APPLICATION UPDATE RESPONSE]:", res.data);
                 alert("Loan Application Updated Successfully!");
             } else {
-                // CREATE Mode
+                // CREATE Mode — only if truly no existing loan ID
                 const res = await axios.post('/api/staff/loans/application', payload);
                 console.log("🚀 [FINAL LOAN APPLICATION SUBMISSION RESPONSE]:", res.data);
                 alert("Loan Application Created Successfully!");
