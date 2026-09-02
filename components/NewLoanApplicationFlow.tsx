@@ -56,7 +56,12 @@ const NewLoanApplicationFlow: React.FC<NewLoanApplicationFlowProps> = ({ isOpen,
                 setLoanHistory(response.data.loans || []);
                 setCbaLoans(response.data.cbaLoans || []);
 
-                const dbDraft = (response.data.loans || []).find((l: any) => l.status && String(l.status).toLowerCase() === 'draft');
+                // Only surface the current officer's own draft (not another officer's draft for the same customer)
+                const currentOfficerId = user?.id || user?.customer_id;
+                const dbDraft = (response.data.loans || []).find((l: any) =>
+                    String(l.status).toLowerCase() === 'draft' &&
+                    (currentOfficerId ? String(l.sales_officer_id) === String(currentOfficerId) : true)
+                );
                 if (dbDraft) {
                     setCustomerData({ ...cust, ...dbDraft });
                     setActiveDraft(dbDraft);
@@ -273,12 +278,19 @@ const NewLoanApplicationFlow: React.FC<NewLoanApplicationFlowProps> = ({ isOpen,
                                                     if (activeDraft?.id) {
                                                         try {
                                                             await axios.delete(`/api/loans/${activeDraft.id}`);
-                                                        } catch (err) {
+                                                            // Only clear draft from UI if delete succeeded
+                                                            setActiveDraft(null);
+                                                            if (rawCustomer) setCustomerData(rawCustomer);
+                                                        } catch (err: any) {
                                                             console.error("Failed to delete draft:", err);
+                                                            const msg = err?.response?.data?.message || "Failed to discard draft. Please try again.";
+                                                            alert(msg);
+                                                            // DO NOT clear activeDraft — keep the banner visible
                                                         }
+                                                    } else {
+                                                        setActiveDraft(null);
+                                                        if (rawCustomer) setCustomerData(rawCustomer);
                                                     }
-                                                    setActiveDraft(null);
-                                                    if (rawCustomer) setCustomerData(rawCustomer);
                                                 }}
                                                 className="px-4 py-2.5 bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all cursor-pointer"
                                             >
