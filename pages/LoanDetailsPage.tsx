@@ -1373,12 +1373,12 @@ const LoanDetailsPage: React.FC<LoanDetailsPageProps> = ({ user, onLogout, toggl
                                 <div className="space-y-2">
                                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Preferred Name</p>
                                     <p className="font-bold text-slate-900 dark:text-white text-lg">
-                                        {[loan.preferred_first_name, loan.preferred_middle_name, loan.preferred_surname].filter(Boolean).join(' ') || loan.applicant_full_name || 'Not provided'}
+                                        {[loan.preferred_first_name, loan.preferred_middle_name, loan.preferred_surname].filter(Boolean).join(' ') || [loan.first_name, loan.middle_name, loan.surname].filter(Boolean).join(' ') || loan.applicant_full_name || 'Not provided'}
                                     </p>
                                 </div>
 
                                 {/* BVN Verified Name — with badge */}
-                                {(loan.bvn_first_name || loan.bvn_surname) && (
+                                {(loan.bvn || loan.bvn_first_name || loan.bvn_surname) && (
                                     <div className="space-y-2">
                                         <div className="flex items-center gap-2">
                                             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Verified Name</p>
@@ -1388,7 +1388,7 @@ const LoanDetailsPage: React.FC<LoanDetailsPageProps> = ({ user, onLogout, toggl
                                             </span>
                                         </div>
                                         <p className="font-bold text-slate-600 dark:text-slate-300">
-                                            {[loan.bvn_surname, loan.bvn_first_name, loan.bvn_middle_name].filter(Boolean).join(' ')}
+                                            {[loan.bvn_surname || loan.surname, loan.bvn_first_name || loan.first_name, loan.bvn_middle_name || loan.middle_name].filter(Boolean).join(' ')}
                                         </p>
                                     </div>
                                 )}
