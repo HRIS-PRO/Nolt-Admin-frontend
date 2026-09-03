@@ -338,7 +338,8 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
                 nok_relationship: nokRelationship,
                 nok_address: nokAddress,
                 nok_phone_number: `${nokCountryCode}${nokPhoneNumber}`,
-                references
+                references,
+                sales_officer_id: user?.id || undefined
             };
 
             const response = await axios.post('/api/loans', payload);
