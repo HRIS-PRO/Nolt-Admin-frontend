@@ -257,6 +257,8 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
     const [dbLoanId, setDbLoanId] = useState<number | null>(() => {
         if (loanId && !isNaN(Number(loanId))) return Number(loanId);
         if (typeof initialData?.loan_id === 'number') return initialData.loan_id;
+        if (typeof initialData?.id === 'number') return initialData.id;
+        if (initialDraft?.id && !isNaN(Number(initialDraft.id))) return Number(initialDraft.id);
         return null;
     });
 
@@ -338,7 +340,8 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
                 nok_relationship: nokRelationship,
                 nok_address: nokAddress,
                 nok_phone_number: `${nokCountryCode}${nokPhoneNumber}`,
-                references
+                references,
+                sales_officer_id: user?.id || undefined
             };
 
             const response = await axios.post('/api/loans', payload);
@@ -1014,6 +1017,7 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
                 ippis_number: ippisNumber,
                 casa: casa, // Send as string ID
                 payslip_url: uploadedDocs.payslip?.url,
+                sales_officer_id: user?.id || undefined,
             };
 
             if (['topup', 're-app', 'add_on'].includes(loanType)) {
@@ -1081,7 +1085,7 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
                 };
             }
 
-            const existingLoanId = dbLoanId || loanId;
+            const existingLoanId = dbLoanId || (loanId && !isNaN(Number(loanId)) ? Number(loanId) : null) || (typeof initialData?.id === 'number' ? initialData.id : null) || (initialDraft?.id && !isNaN(Number(initialDraft.id)) ? Number(initialDraft.id) : null);
             if (existingLoanId) {
                 // UPDATE Mode — always PUT to update the existing draft
                 const res = await axios.put(`/api/staff/loans/${existingLoanId}`, payload);
