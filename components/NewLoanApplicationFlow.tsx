@@ -442,6 +442,27 @@ const NewLoanApplicationFlow: React.FC<NewLoanApplicationFlowProps> = ({ isOpen,
                                 )}
 
 
+                                {/* Active Nolt Application Pending Restriction Block */}
+                                {(() => {
+                                    const activeNoltApp = (loanHistory || []).find((l: any) =>
+                                        ['pending', 'submitted', 'sales', 'customer_experience', 'credit_check_1', 'credit_check_2', 'internal_audit', 'finance'].includes(String(l.stage || l.status).toLowerCase()) &&
+                                        !['rejected', 'disbursed', 'cancelled', 'draft'].includes(String(l.status).toLowerCase())
+                                    );
+                                    if (!activeNoltApp) return null;
+                                    const stageLabel = (activeNoltApp.stage || 'Processing').replace(/_/g, ' ').toUpperCase();
+                                    return (
+                                        <div className="p-6 bg-amber-50/70 dark:bg-amber-950/40 rounded-3xl border border-amber-300 dark:border-amber-800 border-dashed mb-8">
+                                            <div className="flex items-center gap-3 mb-2">
+                                                <span className="material-symbols-outlined text-amber-600 text-xl">warning</span>
+                                                <h4 className="text-sm font-black text-amber-900 dark:text-amber-200 uppercase italic tracking-tight">Active Application Pending Approval</h4>
+                                            </div>
+                                            <p className="text-[10px] font-black text-amber-700 dark:text-amber-400 uppercase tracking-widest leading-relaxed">
+                                                This customer already has an active loan application (#LOAN-{activeNoltApp.id}) currently in <span className="font-extrabold text-amber-900 dark:text-amber-100">{stageLabel}</span> stage. You cannot open a new application for this client until the existing one is completed.
+                                            </p>
+                                        </div>
+                                    );
+                                })()}
+
                                 {/* Active Loan Options Block */}
                                 {(() => {
                                     const activeLoans = cbaLoans.filter(loan => loan.currentBalance < 0 && loan.nextTotalPayment !== 0);
@@ -503,6 +524,12 @@ const NewLoanApplicationFlow: React.FC<NewLoanApplicationFlowProps> = ({ isOpen,
                                         onClick={() => setCurrentState('LOAN_FORM')}
                                         disabled={(() => {
                                             if (!customerData.is_active) return true;
+                                            const activeNoltApp = (loanHistory || []).find((l: any) =>
+                                                ['pending', 'submitted', 'sales', 'customer_experience', 'credit_check_1', 'credit_check_2', 'internal_audit', 'finance'].includes(String(l.stage || l.status).toLowerCase()) &&
+                                                !['rejected', 'disbursed', 'cancelled', 'draft'].includes(String(l.status).toLowerCase())
+                                            );
+                                            if (activeNoltApp) return true; // Block new application if active loan is pending
+
                                             const activeLoans = cbaLoans.filter(loan => loan.currentBalance < 0 && loan.nextTotalPayment !== 0);
                                             const hasActiveLoan = activeLoans.length > 0;
                                             const hasActiveIppisLoan = activeLoans.some(loan => loan.product === 'NOLT IPPIS');

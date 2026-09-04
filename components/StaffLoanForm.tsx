@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import MdaTertiarySelect, { TERTIARY_LIST } from './MdaTertiarySelect';
 
@@ -290,12 +290,18 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
         };
     };
 
+    const isSavingDraftRef = useRef(false);
+
     const handleSaveDraft = async (showToast = false, hasError = false, errorMsg?: string, targetStepOverride?: number) => {
+        if (isSavingDraftRef.current) return;
+        isSavingDraftRef.current = true;
+
         const targetStep = typeof targetStepOverride === 'number' ? targetStepOverride : step;
+        const existingLoanId = dbLoanId || (loanId && !isNaN(Number(loanId)) ? Number(loanId) : null) || (typeof initialData?.id === 'number' ? initialData.id : null) || (initialDraft?.id && !isNaN(Number(initialDraft.id)) ? Number(initialDraft.id) : null);
 
         try {
             const payload = {
-                id: dbLoanId || undefined,
+                id: existingLoanId || undefined,
                 status: 'draft',
                 sub_step: targetStep,
                 step: targetStep,
@@ -344,13 +350,21 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
                 sales_officer_id: user?.id || undefined
             };
 
-            const response = await axios.post('/api/loans', payload);
-            console.log(`💾 [STAFF FORM DRAFT SAVED - SUB_STEP ${targetStep} (${steps[targetStep] || 'Loan Details'})]:`, response.data);
-            if (response.data && response.data.loanId) {
-                setDbLoanId(response.data.loanId);
+            if (existingLoanId) {
+                const response = await axios.put(`/api/staff/loans/${existingLoanId}`, payload);
+                console.log(`💾 [STAFF FORM DRAFT UPDATED - SUB_STEP ${targetStep} (${steps[targetStep] || 'Loan Details'})]:`, response.data);
+                setDbLoanId(existingLoanId);
+            } else {
+                const response = await axios.post('/api/loans', payload);
+                console.log(`💾 [STAFF FORM DRAFT SAVED - SUB_STEP ${targetStep} (${steps[targetStep] || 'Loan Details'})]:`, response.data);
+                if (response.data && response.data.loanId) {
+                    setDbLoanId(response.data.loanId);
+                }
             }
         } catch (err: any) {
             console.error(`❌ [STAFF FORM DRAFT SAVE FAILED - SUB_STEP ${targetStep}]:`, err.response?.data || err.message);
+        } finally {
+            isSavingDraftRef.current = false;
         }
 
         if (showToast) {
@@ -560,11 +574,12 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
 
     // Auto-verify bank account when bank + 10-digit account number are both filled
     useEffect(() => {
+        if (bankList.length === 0) return;
+
         const selectedBank = bankList.find(b => b.name === bankName);
         if (!selectedBank || !/^\d{10}$/.test(accountNumber)) {
             setBankVerificationResult(null);
             setBankVerificationError(null);
-            setAccountName('');
             return;
         }
 
@@ -572,7 +587,6 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
             setIsVerifyingBank(true);
             setBankVerificationResult(null);
             setBankVerificationError(null);
-            setAccountName('');
 
             try {
                 const response = await axios.post('/api/misc/resolve-account', {
@@ -602,11 +616,12 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
 
     // Auto-verify Buy Over bank account
     useEffect(() => {
+        if (bankList.length === 0) return;
+
         const selectedBank = bankList.find(b => b.name === buyOverBankName);
         if (!selectedBank || !/^\d{10}$/.test(buyOverAccountNumber)) {
             setBuyOverBankVerificationResult(null);
             setBuyOverBankVerificationError(null);
-            setBuyOverAccountName('');
             return;
         }
 
@@ -614,7 +629,6 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
             setIsVerifyingBuyOverBank(true);
             setBuyOverBankVerificationResult(null);
             setBuyOverBankVerificationError(null);
-            setBuyOverAccountName('');
 
             try {
                 const response = await axios.post('/api/misc/resolve-account', {
@@ -625,8 +639,6 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
                 });
 
                 if (response.data.success) {
-                    // For buy over, we don't strictly require a name match because company names can differ slightly
-                    // But we still pass the company name so it can try to match
                     setBuyOverBankVerificationResult(response.data.data);
                     setBuyOverAccountName(response.data.data.account_name);
                 } else {
@@ -756,9 +768,51 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
         setUploadProcessing(prev => { const next = { ...prev }; delete next[id]; return next; });
     };
 
-    const validateStep = (stepToCheck = step) => {
+    const FIELD_LABELS: Record<string, string> = {
+        surname: 'Surname',
+        firstName: 'First Name',
+        middleName: 'Middle Name',
+        gender: 'Gender',
+        dob: 'Date of Birth',
+        maritalStatus: 'Marital Status',
+        religion: 'Religion',
+        mobileNumber: 'Mobile Phone Number',
+        email: 'Personal Email',
+        bvn: 'BVN (11 digits)',
+        nin: 'NIN (11 digits)',
+        stateOfOrigin: 'State of Origin',
+        stateOfResidence: 'State of Residence',
+        residentialStatus: 'Residential Status',
+        address: 'Home Address',
+        mda: 'MDA / Organization',
+        ippisNumber: 'IPPIS Number',
+        staffId: 'Staff ID',
+        monthlyIncome: 'Average Monthly Income',
+        amount: 'Requested Loan Amount',
+        bankName: 'Bank Name',
+        accountNumber: 'Bank Account Number',
+        accountName: 'Bank Account Name',
+        casa: 'CASA Account Number',
+        topUpAmount: 'Top-up Amount',
+        buyOverAmount: 'Buy Over Amount',
+        buyOverCompanyName: 'Buy Over Company Name',
+        buyOverBankName: 'Buy Over Bank Name',
+        buyOverAccountNumber: 'Buy Over Company Account Number',
+        buyOverAccountName: 'Buy Over Company Account Name',
+        govt_id: 'Government ID Document',
+        work_id: 'Work ID Document',
+        payslip: 'Payslip Document',
+        selfie: 'Selfie Verification Document',
+        bank_statement: 'Bank Statement Document',
+        proof_address: 'Proof of Address Document',
+        nokName: 'Next of Kin Name',
+        nokRelationship: 'Next of Kin Relationship',
+        nokPhoneNumber: 'Next of Kin Phone Number',
+        nokAddress: 'Next of Kin Address',
+    };
+
+    const getStepErrors = (stepToCheck = step): Record<string, string> => {
         const newErrors: Record<string, string> = {};
-        let isValid = true;
 
         // Check for Simplified Mode (Buy Over removed)
         if (['topup', 're-app', 'add_on'].includes(loanType)) {
@@ -771,10 +825,6 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
 
             if (!ippisNumber) newErrors.ippisNumber = "Required";
             if (!casa) newErrors.casa = "Required";
-
-            if (loanType === 'topup' || loanType === 'add_on') {
-                if (!topUpAmount) newErrors.topUpAmount = "Required";
-            }
 
             if (loanType === 'topup' || loanType === 'add_on') {
                 if (!topUpAmount) newErrors.topUpAmount = "Required";
@@ -800,8 +850,8 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
                 if (!firstName.trim()) newErrors.firstName = "Required";
                 if (!gender) newErrors.gender = "Required";
                 if (!dob) newErrors.dob = "Required";
-                if (!religion) newErrors.religion = "Required";
                 if (!maritalStatus) newErrors.maritalStatus = "Required";
+                if (!religion) newErrors.religion = "Required";
 
                 if (!mobileNumber) newErrors.mobileNumber = "Required";
                 else if (mobileNumber.length < 10) newErrors.mobileNumber = "Invalid Number";
@@ -821,7 +871,7 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
 
             if (stepToCheck === 1) { // Address
                 if (!stateOfOrigin) newErrors.stateOfOrigin = "Required";
-                if (!stateOfResidence) newErrors.stateOfResidence = "Required";
+                if (!stateOfResidence || stateOfResidence === 'N/A') newErrors.stateOfResidence = "Required";
                 if (!residentialStatus) newErrors.residentialStatus = "Required";
                 if (!address.trim()) newErrors.address = "Required";
             }
@@ -848,7 +898,7 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
                 }
                 if (!accountName) newErrors.accountName = "Required";
                 if (bankVerificationResult && !bankVerificationResult.isMatch) newErrors.accountName = "Name mismatch";
-                if (isVerifyingBank) newErrors.accountNumber = "Verifying...";
+                if (isVerifyingBank && !accountName) newErrors.accountNumber = "Verifying...";
 
                 if (loanType === 'buy_over') {
                     if (!buyOverAmount) newErrors.buyOverAmount = "Required";
@@ -860,7 +910,7 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
                         newErrors.buyOverAccountNumber = "Must be 10 digits";
                     }
                     if (!buyOverAccountName) newErrors.buyOverAccountName = "Required";
-                    if (isVerifyingBuyOverBank) newErrors.buyOverAccountNumber = "Verifying...";
+                    if (isVerifyingBuyOverBank && !buyOverAccountName) newErrors.buyOverAccountNumber = "Verifying...";
                 }
             }
 
@@ -902,12 +952,16 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
             }
         }
 
+        return newErrors;
+    };
+
+    const validateStep = (stepToCheck = step) => {
+        const newErrors = getStepErrors(stepToCheck);
         if (Object.keys(newErrors).length > 0) {
             setErrors(newErrors);
-            isValid = false;
+            return false;
         }
-
-        return isValid;
+        return true;
     };
 
     const handleProductSelect = (p: any) => {
@@ -930,6 +984,13 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
         }
 
         if (step === 0 && !showProductSelect) {
+            // Validate Identity (Step 0)
+            const isIdentityValid = validateStep(0);
+            if (!isIdentityValid) {
+                console.warn("⚠️ [STEP 0 VALIDATION FAILED]: Identity section contains errors");
+                setExpandedSection('identity');
+                return;
+            }
             // Validate Address (Step 1)
             const isAddressValid = validateStep(1);
             if (!isAddressValid) {
@@ -971,6 +1032,15 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
         }
     };
 
+    const handleClose = async () => {
+        try {
+            await handleSaveDraft(false);
+        } catch (e) {
+            console.error("Save draft before close failed:", e);
+        }
+        onClose();
+    };
+
     const handleBack = () => {
         if (step === 6) {
             setStep(5);
@@ -995,12 +1065,62 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
                 return;
             }
         }
-        // Otherwise trigger close
-        onClose();
+        // Otherwise trigger save and close
+        handleClose();
     };
 
     const handleSubmit = async () => {
-        if (!validateStep()) return; // Validate final step
+        // Collect errors across all steps
+        let accumulatedErrors: Record<string, string> = {};
+        const stepsToValidate = ['topup', 're-app', 'add_on'].includes(loanType)
+            ? [step]
+            : [0, 1, 2, 3, 4, 5];
+
+        for (const s of stepsToValidate) {
+            const stepErrs = getStepErrors(s);
+            accumulatedErrors = { ...accumulatedErrors, ...stepErrs };
+        }
+
+        if (Object.keys(accumulatedErrors).length > 0) {
+            setErrors(accumulatedErrors);
+            const missingLabels = Object.keys(accumulatedErrors).map(key => {
+                if (FIELD_LABELS[key]) return FIELD_LABELS[key];
+                if (key.startsWith('ref_')) {
+                    const parts = key.split('_');
+                    const refNum = Number(parts[1]) + 1;
+                    const field = parts[2];
+                    const fieldTitle = field === 'fullName' ? 'Full Name' : field === 'phoneNumber' ? 'Phone Number' : field === 'relationship' ? 'Relationship' : 'Address';
+                    return `Reference ${refNum} ${fieldTitle}`;
+                }
+                return key;
+            });
+
+            // Automatically navigate user directly to the missing step & expand accordion section
+            if (accumulatedErrors.surname || accumulatedErrors.firstName || accumulatedErrors.gender || accumulatedErrors.dob || accumulatedErrors.maritalStatus || accumulatedErrors.religion || accumulatedErrors.bvn || accumulatedErrors.nin) {
+                setStep(0);
+                setShowProductSelect(false);
+                setExpandedSection('identity');
+            } else if (accumulatedErrors.stateOfOrigin || accumulatedErrors.stateOfResidence || accumulatedErrors.residentialStatus || accumulatedErrors.address) {
+                setStep(0);
+                setShowProductSelect(false);
+                setExpandedSection('address');
+            } else if (accumulatedErrors.mda || accumulatedErrors.ippisNumber || accumulatedErrors.staffId || accumulatedErrors.monthlyIncome) {
+                setStep(0);
+                setShowProductSelect(false);
+                setExpandedSection('employment');
+            } else if (accumulatedErrors.amount || accumulatedErrors.bankName || accumulatedErrors.accountNumber || accumulatedErrors.accountName) {
+                setStep(0);
+                setShowProductSelect(false);
+                setExpandedSection('loan');
+            } else if (accumulatedErrors.govt_id || accumulatedErrors.work_id || accumulatedErrors.payslip || accumulatedErrors.selfie || accumulatedErrors.bank_statement) {
+                setStep(4);
+            } else if (accumulatedErrors.nokName || accumulatedErrors.nokRelationship || accumulatedErrors.nokPhoneNumber || accumulatedErrors.nokAddress) {
+                setStep(5);
+            }
+
+            alert(`Cannot submit application: Please complete all required fields:\n• ${missingLabels.join('\n• ')}`);
+            return;
+        }
 
         setLoading(true);
         try {
@@ -1118,10 +1238,10 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
         const visualSteps = [
             { label: "BVN LOOKUP", type: "checked" },
             { label: "CUSTOMER CARD", type: "checked" },
-            { label: "LOAN DETAILS", number: 2, isActive: step < 4 },
-            { label: "DOCUMENTS", number: 3, isActive: step === 4 },
-            { label: "REFERENCES", number: 4, isActive: step === 5 },
-            { label: "SUMMARY", number: 5, isActive: step === 6 }
+            { label: "LOAN DETAILS", number: 2, stepVal: 0, isActive: step < 4 },
+            { label: "DOCUMENTS", number: 3, stepVal: 4, isActive: step === 4 },
+            { label: "REFERENCES", number: 4, stepVal: 5, isActive: step === 5 },
+            { label: "SUMMARY", number: 5, stepVal: 6, isActive: step === 6 }
         ];
 
         return (
@@ -1139,7 +1259,18 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
                     );
 
                     return (
-                        <div key={idx} className="flex flex-col items-center flex-1 relative z-10 select-none">
+                        <div
+                            key={idx}
+                            onClick={() => {
+                                if (typeof s.stepVal === 'number') {
+                                    setStep(s.stepVal);
+                                    setShowProductSelect(false);
+                                    setErrors({});
+                                    handleSaveDraft(false, false, undefined, s.stepVal);
+                                }
+                            }}
+                            className={`flex flex-col items-center flex-1 relative z-10 select-none ${typeof s.stepVal === 'number' ? 'cursor-pointer hover:opacity-80' : ''}`}
+                        >
                             {isChecked || isCompleted ? (
                                 <div className="w-10 h-10 rounded-full bg-emerald-500 text-white flex items-center justify-center shadow-lg shadow-emerald-500/20">
                                     <span className="material-symbols-outlined text-xl font-black">check</span>
@@ -1173,7 +1304,7 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
                         <p className="text-xs font-black text-primary uppercase tracking-widest">New Application</p>
                     </div>
                     <button
-                        onClick={onClose}
+                        onClick={handleClose}
                         className="size-10 rounded-full bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center justify-center transition-all duration-300 group"
                     >
                         <span className="material-symbols-outlined text-slate-400 group-hover:text-slate-900 dark:group-hover:text-white transition-colors">close</span>
