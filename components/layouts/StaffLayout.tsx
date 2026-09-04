@@ -39,11 +39,11 @@ const StaffLayout: React.FC<StaffLayoutProps> = ({ children, user, onLogout, tog
             items: [
                 { label: 'Dashboard', icon: 'grid_view', path: '/staff-dashboard' },
                 { label: 'Loans', icon: 'credit_card', path: '/staff/loans' },
+                { label: 'Investment', icon: 'account_balance_wallet', path: '/staff/investments' },
                 { label: 'Transfers', icon: 'swap_horiz', path: '/staff/transfers' },
-                { label: 'Push Notifications', icon: 'notifications_active', path: '/staff/mobile-notifications' },
-                { label: 'Investments', icon: 'account_balance_wallet', path: '/staff/investments' },
                 { label: 'Products', icon: 'inventory_2', path: '/staff/products' },
                 { label: 'Promotions', icon: 'campaign', path: '/staff/promotions' },
+                { label: 'Push Notifications', icon: 'notifications_active', path: '/staff/mobile-notifications' },
                 { label: 'Reports', icon: 'description', path: '/staff/reports' },
                 { label: 'BI Dashboard', icon: 'timeline', path: '/staff/timeline' },
                 { label: 'Calculator', icon: 'calculate', path: '/staff/calculator' },
@@ -88,7 +88,7 @@ const StaffLayout: React.FC<StaffLayoutProps> = ({ children, user, onLogout, tog
                 return isSuperAdminRole(role);
             }
             if (role === 'marketing') {
-                return ['Dashboard', 'Loans', 'Investments', 'Promotions'].includes(label);
+                return ['Dashboard', 'Loans', 'Investment', 'Promotions'].includes(label);
             }
             return true;
         };

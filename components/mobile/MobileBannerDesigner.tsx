@@ -33,9 +33,11 @@ type Props = {
     onChange: (patch: Partial<BannerFormState>) => void;
     onSubmit: (e: React.FormEvent) => void;
     submitting: boolean;
+    mode?: 'create' | 'edit';
+    onCancel?: () => void;
 };
 
-export function MobileBannerDesigner({ form, onChange, onSubmit, submitting }: Props) {
+export function MobileBannerDesigner({ form, onChange, onSubmit, submitting, mode = 'create', onCancel }: Props) {
     const customLink = form.link_mode === '__custom__';
     const linkHint = customLink ? form.cta_url || '—' : form.link_mode;
 
@@ -43,13 +45,24 @@ export function MobileBannerDesigner({ form, onChange, onSubmit, submitting }: P
         <form onSubmit={onSubmit} className={`${panelClass} overflow-hidden`}>
             <div className="grid xl:grid-cols-[1fr_340px]">
                 <div className="p-6 lg:p-8 space-y-5 border-b xl:border-b-0 xl:border-r border-slate-100 dark:border-slate-800">
-                    <div>
-                        <h2 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight">
-                            Home banner
-                        </h2>
-                        <p className="text-sm font-medium text-slate-500 mt-1">
-                            Full-width creative in the app home sheet — 3:1 ratio, tap opens your chosen destination.
-                        </p>
+                    <div className="flex items-start justify-between gap-4">
+                        <div>
+                            <h2 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight">
+                                {mode === 'edit' ? 'Edit home banner' : 'Home banner'}
+                            </h2>
+                            <p className="text-sm font-medium text-slate-500 mt-1">
+                                Full-width creative in the app home sheet — 3:1 ratio, tap opens your chosen destination.
+                            </p>
+                        </div>
+                        {mode === 'edit' && onCancel ? (
+                            <button
+                                type="button"
+                                onClick={onCancel}
+                                className="text-xs font-bold uppercase tracking-wider text-slate-400 hover:text-slate-700 dark:hover:text-white shrink-0"
+                            >
+                                Cancel
+                            </button>
+                        ) : null}
                     </div>
 
                 <div>
@@ -150,7 +163,7 @@ export function MobileBannerDesigner({ form, onChange, onSubmit, submitting }: P
                     disabled={submitting || !form.image_url}
                     className={`${primaryBtnClass} w-full sm:w-auto`}
                 >
-                    {submitting ? 'Publishing…' : 'Publish home banner'}
+                    {submitting ? (mode === 'edit' ? 'Saving…' : 'Publishing…') : mode === 'edit' ? 'Save banner changes' : 'Publish home banner'}
                 </button>
             </div>
 
