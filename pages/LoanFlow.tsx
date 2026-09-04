@@ -152,6 +152,7 @@ const LoanFlow: React.FC<LoanFlowProps> = ({ initialStep, onComplete, navigate, 
         // { id: 'salary_advance', label: 'Salary Advance', icon: 'payments', description: 'Access a portion of your earned wages before payday.' },
         // { id: 'automobile_loan', label: 'Automobile Loan', icon: 'directions_car', description: 'Purchase a new or used vehicle for personal or business use.' },
         { id: 'public_sector', label: 'Public Sector Loan (IPPIS)', icon: 'account_balance', description: 'Loans for federal government employees on IPPIS platform.' },
+        { id: 'private_sector', label: 'Private Sector Loan', icon: 'corporate_fare', description: 'Tailored loans for verified corporate and private sector employees.' },
       ]
     },
     // {
@@ -168,11 +169,11 @@ const LoanFlow: React.FC<LoanFlowProps> = ({ initialStep, onComplete, navigate, 
 
   const handleNext = async () => {
     console.log("Saving draft...");
-    console.log(subStep)
-    if (subStep < 13) { // Adjusted from 12 to 13 for new step
+    console.log(subStep);
+    if (subStep < 13) {
       setSubStep(prev => prev + 1);
       window.scrollTo({ top: 0, behavior: 'smooth' });
-    } else if (subStep === 13) { // Adjusted from 12 to 13 for new step
+    } else if (subStep === 13) {
       setLoading(true);
       await submitLoan();
       setLoading(false);
