@@ -17,7 +17,10 @@ type Props = {
     campaigns: CampaignRow[];
     onCompose: () => void;
     onSend: (id: string) => void;
+    onEdit: (campaign: CampaignRow) => void;
+    onDelete: (id: string) => void;
     sending: boolean;
+    deleting: boolean;
 };
 
 function formatWhen(iso: string | null): string {
@@ -38,7 +41,7 @@ function priorityLabel(p: string): string {
     return 'Normal';
 }
 
-export function CampaignsHubTable({ campaigns, onCompose, onSend, sending }: Props) {
+export function CampaignsHubTable({ campaigns, onCompose, onSend, onEdit, onDelete, sending, deleting }: Props) {
     return (
         <div className={`${panelClass} p-8`}>
             <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-8">
@@ -121,18 +124,38 @@ export function CampaignsHubTable({ campaigns, onCompose, onSend, sending }: Pro
                                             {when}
                                         </td>
                                         <td className="px-4 py-4 border-b border-slate-100 dark:border-slate-800">
-                                            {c.status !== 'sent' ? (
+                                            <div className="flex flex-wrap items-center gap-3">
+                                                {c.status !== 'sent' ? (
+                                                    <button
+                                                        type="button"
+                                                        disabled={sending}
+                                                        onClick={() => onSend(c.id)}
+                                                        className="text-xs font-bold text-emerald-600 dark:text-emerald-400 hover:underline disabled:opacity-50"
+                                                    >
+                                                        Send now
+                                                    </button>
+                                                ) : (
+                                                    <span className="text-xs font-bold text-slate-400 uppercase">Delivered</span>
+                                                )}
+                                                {c.status !== 'sent' ? (
+                                                    <button
+                                                        type="button"
+                                                        disabled={sending || deleting}
+                                                        onClick={() => onEdit(c)}
+                                                        className="text-xs font-bold text-blue-600 dark:text-blue-400 hover:underline disabled:opacity-50"
+                                                    >
+                                                        Edit
+                                                    </button>
+                                                ) : null}
                                                 <button
                                                     type="button"
-                                                    disabled={sending}
-                                                    onClick={() => onSend(c.id)}
-                                                    className="text-xs font-bold text-emerald-600 dark:text-emerald-400 hover:underline disabled:opacity-50"
+                                                    disabled={sending || deleting}
+                                                    onClick={() => onDelete(c.id)}
+                                                    className="text-xs font-bold text-rose-600 dark:text-rose-400 hover:underline disabled:opacity-50"
                                                 >
-                                                    Send now
+                                                    Delete
                                                 </button>
-                                            ) : (
-                                                <span className="text-xs font-bold text-slate-400 uppercase">Delivered</span>
-                                            )}
+                                            </div>
                                         </td>
                                     </tr>
                                 );

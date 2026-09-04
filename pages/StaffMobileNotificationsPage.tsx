@@ -14,6 +14,7 @@ import {
 import { CampaignsHubTable, type CampaignRow } from '../components/mobile/CampaignsHubTable';
 import { DeliveryAnalyticsPanel } from '../components/mobile/DeliveryAnalyticsPanel';
 import { panelClass, staffStatCardClass } from '../components/mobile/push-hub-styles';
+import { MOBILE_DEEP_LINKS } from '../constants/mobileBannerSpec';
 
 interface Banner {
     id: string;
@@ -55,6 +56,63 @@ function resolveCampaignStatus(form: CampaignFormState): { status: string; sched
     return { status: 'draft', scheduled_at: null };
 }
 
+function toLocalInput(iso: string | null): string {
+    if (!iso) return '';
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return '';
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function resolveDeepLinkMode(deepLink: string | null): { deep_link_mode: string; deep_link: string } {
+    const link = deepLink?.trim() || '/invest';
+    const known = MOBILE_DEEP_LINKS.find((item) => item.value === link);
+    if (known && known.value !== '__custom__') {
+        return { deep_link_mode: link, deep_link: link };
+    }
+    return { deep_link_mode: '__custom__', deep_link: link };
+}
+
+function resolveLinkMode(ctaUrl: string | null): { link_mode: string; cta_url: string } {
+    const link = ctaUrl?.trim() || '/invest';
+    const known = MOBILE_DEEP_LINKS.find((item) => item.value === link);
+    if (known && known.value !== '__custom__') {
+        return { link_mode: link, cta_url: link };
+    }
+    return { link_mode: '__custom__', cta_url: link };
+}
+
+function campaignToForm(campaign: CampaignRow): CampaignFormState {
+    const deepLink = resolveDeepLinkMode(campaign.deep_link);
+    const dispatchMode: CampaignFormState['dispatchMode'] =
+        campaign.status === 'scheduled' ? 'scheduled' : 'draft';
+
+    return {
+        title: campaign.title,
+        body: campaign.body,
+        priority: campaign.priority,
+        deep_link: deepLink.deep_link,
+        deep_link_mode: deepLink.deep_link_mode,
+        dispatchMode,
+        scheduled_at: toLocalInput(campaign.scheduled_at),
+    };
+}
+
+function bannerToForm(banner: Banner): BannerFormState {
+    const link = resolveLinkMode(banner.cta_url);
+    return {
+        title: banner.title,
+        image_url: banner.image_url,
+        link_mode: link.link_mode,
+        cta_url: link.cta_url,
+        cta_label: banner.cta_label ?? 'Click me',
+        sort_order: String(banner.sort_order ?? 0),
+        is_active: banner.is_active,
+        starts_at: toLocalInput(banner.starts_at),
+        ends_at: toLocalInput(banner.ends_at),
+    };
+}
+
 const StaffMobileNotificationsPage: React.FC<StaffMobileNotificationsPageProps> = ({
     user,
     onLogout,
@@ -63,6 +121,8 @@ const StaffMobileNotificationsPage: React.FC<StaffMobileNotificationsPageProps> 
 }) => {
     const [tab, setTab] = useState<HubTab>('campaigns');
     const [composing, setComposing] = useState(false);
+    const [editingCampaignId, setEditingCampaignId] = useState<string | null>(null);
+    const [editingBannerId, setEditingBannerId] = useState<string | null>(null);
     const [campaigns, setCampaigns] = useState<CampaignRow[]>([]);
     const [banners, setBanners] = useState<Banner[]>([]);
     const [loading, setLoading] = useState(true);
@@ -128,35 +188,69 @@ const StaffMobileNotificationsPage: React.FC<StaffMobileNotificationsPageProps> 
                     ? campaignForm.deep_link.trim() || null
                     : campaignForm.deep_link_mode;
 
-            await axios.post(
-                '/api/staff/mobile-notifications/campaigns',
-                {
-                    title: campaignForm.title.trim(),
-                    body: campaignForm.body.trim(),
-                    priority: campaignForm.priority,
-                    deep_link: deepLink,
-                    status,
-                    scheduled_at,
-                    audience: { all: true },
-                },
-                { withCredentials: true },
-            );
+            const payload = {
+                title: campaignForm.title.trim(),
+                body: campaignForm.body.trim(),
+                priority: campaignForm.priority,
+                deep_link: deepLink,
+                status,
+                scheduled_at,
+                audience: { all: true },
+            };
+
+            if (editingCampaignId) {
+                await axios.patch(
+                    `/api/staff/mobile-notifications/campaigns/${editingCampaignId}`,
+                    payload,
+                    { withCredentials: true },
+                );
+            } else {
+                await axios.post('/api/staff/mobile-notifications/campaigns', payload, { withCredentials: true });
+            }
 
             setCampaignForm(emptyCampaignForm);
             setComposing(false);
+            setEditingCampaignId(null);
             await fetchCampaigns();
 
-            if (status === 'sent') {
+            if (editingCampaignId) {
+                alert('Campaign updated.');
+            } else if (status === 'sent') {
                 alert('Campaign broadcast started.');
             } else if (status === 'scheduled') {
                 alert('Campaign scheduled.');
             }
         } catch (error) {
-            console.error('[push-notifications] create campaign:', error);
+            console.error('[push-notifications] save campaign:', error);
             const msg = axios.isAxiosError(error)
-                ? (error.response?.data as { message?: string })?.message ?? 'Failed to create campaign'
-                : 'Failed to create campaign';
+                ? (error.response?.data as { message?: string })?.message ?? 'Failed to save campaign'
+                : 'Failed to save campaign';
             alert(msg);
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
+    const handleEditCampaign = (campaign: CampaignRow) => {
+        setEditingCampaignId(campaign.id);
+        setCampaignForm(campaignToForm(campaign));
+        setComposing(true);
+        setTab('campaigns');
+    };
+
+    const handleDeleteCampaign = async (id: string) => {
+        if (!window.confirm('Delete this campaign permanently?')) return;
+        setSubmitting(true);
+        try {
+            await axios.delete(`/api/staff/mobile-notifications/campaigns/${id}`, { withCredentials: true });
+            if (editingCampaignId === id) {
+                setEditingCampaignId(null);
+                setCampaignForm(emptyCampaignForm);
+                setComposing(false);
+            }
+            await fetchCampaigns();
+        } catch {
+            alert('Failed to delete campaign.');
         } finally {
             setSubmitting(false);
         }
@@ -186,31 +280,68 @@ const StaffMobileNotificationsPage: React.FC<StaffMobileNotificationsPageProps> 
             const link =
                 bannerForm.link_mode === '__custom__' ? bannerForm.cta_url.trim() : bannerForm.link_mode;
 
-            await axios.post(
-                '/api/staff/mobile-notifications/banners',
-                {
-                    title: bannerForm.title.trim(),
-                    image_url: bannerForm.image_url,
-                    cta_url: link,
-                    cta_label: bannerForm.cta_label.trim() || 'Click me',
-                    sort_order: Number(bannerForm.sort_order) || 0,
-                    is_active: bannerForm.is_active,
-                    starts_at: bannerForm.starts_at || null,
-                    ends_at: bannerForm.ends_at || null,
-                    audience: { all: true },
-                },
-                { withCredentials: true },
-            );
+            const payload = {
+                title: bannerForm.title.trim(),
+                image_url: bannerForm.image_url,
+                cta_url: link,
+                cta_label: bannerForm.cta_label.trim() || 'Click me',
+                sort_order: Number(bannerForm.sort_order) || 0,
+                is_active: bannerForm.is_active,
+                starts_at: bannerForm.starts_at || null,
+                ends_at: bannerForm.ends_at || null,
+                audience: { all: true },
+            };
+
+            if (editingBannerId) {
+                await axios.patch(
+                    `/api/staff/mobile-notifications/banners/${editingBannerId}`,
+                    payload,
+                    { withCredentials: true },
+                );
+            } else {
+                await axios.post('/api/staff/mobile-notifications/banners', payload, { withCredentials: true });
+            }
+
             setBannerForm(emptyBannerForm);
+            setEditingBannerId(null);
             await fetchBanners();
         } catch (error) {
             const msg = axios.isAxiosError(error)
-                ? (error.response?.data as { message?: string })?.message ?? 'Failed to publish banner'
-                : 'Failed to publish banner';
+                ? (error.response?.data as { message?: string })?.message ?? 'Failed to save banner'
+                : 'Failed to save banner';
             alert(msg);
         } finally {
             setSubmitting(false);
         }
+    };
+
+    const handleEditBanner = (banner: Banner) => {
+        setEditingBannerId(banner.id);
+        setBannerForm(bannerToForm(banner));
+        setTab('banners');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+
+    const handleDeleteBanner = async (id: string) => {
+        if (!window.confirm('Delete this banner permanently?')) return;
+        setSubmitting(true);
+        try {
+            await axios.delete(`/api/staff/mobile-notifications/banners/${id}`, { withCredentials: true });
+            if (editingBannerId === id) {
+                setEditingBannerId(null);
+                setBannerForm(emptyBannerForm);
+            }
+            await fetchBanners();
+        } catch {
+            alert('Failed to delete banner.');
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
+    const cancelBannerEdit = () => {
+        setEditingBannerId(null);
+        setBannerForm(emptyBannerForm);
     };
 
     const toggleBannerActive = async (banner: Banner) => {
@@ -312,16 +443,25 @@ const StaffMobileNotificationsPage: React.FC<StaffMobileNotificationsPageProps> 
                         onSubmit={handleCreateCampaign}
                         onCancel={() => {
                             setComposing(false);
+                            setEditingCampaignId(null);
                             setCampaignForm(emptyCampaignForm);
                         }}
                         submitting={submitting}
+                        mode={editingCampaignId ? 'edit' : 'create'}
                     />
                 ) : (
                     <CampaignsHubTable
                         campaigns={campaigns}
-                        onCompose={() => setComposing(true)}
+                        onCompose={() => {
+                            setEditingCampaignId(null);
+                            setCampaignForm(emptyCampaignForm);
+                            setComposing(true);
+                        }}
                         onSend={handleSendCampaign}
+                        onEdit={handleEditCampaign}
+                        onDelete={handleDeleteCampaign}
                         sending={submitting}
+                        deleting={submitting}
                     />
                 )
             ) : tab === 'banners' ? (
@@ -331,6 +471,8 @@ const StaffMobileNotificationsPage: React.FC<StaffMobileNotificationsPageProps> 
                         onChange={(patch) => setBannerForm((f) => ({ ...f, ...patch }))}
                         onSubmit={handleCreateBanner}
                         submitting={submitting}
+                        mode={editingBannerId ? 'edit' : 'create'}
+                        onCancel={cancelBannerEdit}
                     />
 
                     <div className={`${panelClass} p-8`}>
@@ -350,7 +492,7 @@ const StaffMobileNotificationsPage: React.FC<StaffMobileNotificationsPageProps> 
                                 <table className="w-full text-left border-collapse min-w-[640px]">
                                     <thead>
                                         <tr>
-                                            {['Preview', 'Name', 'Destination', 'Order', 'Status'].map((h) => (
+                                            {['Preview', 'Name', 'Destination', 'Order', 'Status', 'Actions'].map((h) => (
                                                 <th
                                                     key={h}
                                                     className="px-4 py-4 border-b border-slate-100 dark:border-slate-800 text-[10px] font-black uppercase text-slate-400 tracking-widest"
@@ -403,6 +545,25 @@ const StaffMobileNotificationsPage: React.FC<StaffMobileNotificationsPageProps> 
                                                     >
                                                         {banner.is_active ? 'Live' : 'Paused'}
                                                     </button>
+                                                </td>
+                                                <td className="px-4 py-4 border-b border-slate-100 dark:border-slate-800">
+                                                    <div className="flex flex-wrap items-center gap-3">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleEditBanner(banner)}
+                                                            className="text-xs font-bold text-blue-600 dark:text-blue-400 hover:underline"
+                                                        >
+                                                            Edit
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            disabled={submitting}
+                                                            onClick={() => handleDeleteBanner(banner.id)}
+                                                            className="text-xs font-bold text-rose-600 dark:text-rose-400 hover:underline disabled:opacity-50"
+                                                        >
+                                                            Delete
+                                                        </button>
+                                                    </div>
                                                 </td>
                                             </tr>
                                         ))}

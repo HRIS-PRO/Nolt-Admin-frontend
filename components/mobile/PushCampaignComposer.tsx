@@ -31,6 +31,7 @@ type Props = {
     onSubmit: (e: React.FormEvent) => void;
     onCancel: () => void;
     submitting: boolean;
+    mode?: 'create' | 'edit';
 };
 
 const DISPATCH_OPTIONS: { id: DispatchMode; label: string; hint: string }[] = [
@@ -39,18 +40,20 @@ const DISPATCH_OPTIONS: { id: DispatchMode; label: string; hint: string }[] = [
     { id: 'draft', label: 'Save as draft', hint: 'Review internally before sending' },
 ];
 
-export function PushCampaignComposer({ form, onChange, onSubmit, onCancel, submitting }: Props) {
+export function PushCampaignComposer({ form, onChange, onSubmit, onCancel, submitting, mode = 'create' }: Props) {
     const customLink = form.deep_link_mode === '__custom__';
     const linkLabel = customLink
         ? form.deep_link || 'Custom link'
         : MOBILE_DEEP_LINKS.find((l) => l.value === form.deep_link_mode)?.label ?? form.deep_link_mode;
 
     const submitLabel =
-        form.dispatchMode === 'immediate'
-            ? 'Create & broadcast'
-            : form.dispatchMode === 'scheduled'
-              ? 'Schedule campaign'
-              : 'Save draft';
+        mode === 'edit'
+            ? 'Save changes'
+            : form.dispatchMode === 'immediate'
+              ? 'Create & broadcast'
+              : form.dispatchMode === 'scheduled'
+                ? 'Schedule campaign'
+                : 'Save draft';
 
     return (
         <form onSubmit={onSubmit} className={`${panelClass} overflow-hidden`}>
@@ -59,7 +62,7 @@ export function PushCampaignComposer({ form, onChange, onSubmit, onCancel, submi
                     <div className="flex items-start justify-between gap-4">
                         <div>
                             <h2 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight">
-                                New push campaign
+                                {mode === 'edit' ? 'Edit push campaign' : 'New push campaign'}
                             </h2>
                             <p className="text-sm font-medium text-slate-500 mt-1">
                                 Compose copy, set priority, and choose when to reach customers.
@@ -159,7 +162,7 @@ export function PushCampaignComposer({ form, onChange, onSubmit, onCancel, submi
                     <div>
                         <label className={labelClass}>Dispatch</label>
                         <div className="grid sm:grid-cols-3 gap-3">
-                            {DISPATCH_OPTIONS.map((opt) => (
+                            {DISPATCH_OPTIONS.filter((opt) => mode === 'create' || opt.id !== 'immediate').map((opt) => (
                                 <button
                                     key={opt.id}
                                     type="button"
