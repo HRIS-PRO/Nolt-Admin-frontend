@@ -51,6 +51,7 @@ const LoanFlow: React.FC<LoanFlowProps> = ({ initialStep, onComplete, navigate, 
   const [acceptedIndemnity, setAcceptedIndemnity] = useState(initialDraft?.data?.acceptedIndemnity ?? false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const signatureInputRef = useRef<HTMLInputElement>(null);
+  const isSavingDraftRef = useRef(false);
   const [isDrawing, setIsDrawing] = useState(false);
 
   // Form Fields
@@ -492,6 +493,8 @@ const LoanFlow: React.FC<LoanFlowProps> = ({ initialStep, onComplete, navigate, 
   };
 
   const saveDraft = async () => {
+    if (isSavingDraftRef.current) return;
+    isSavingDraftRef.current = true;
     setIsSaving(true);
     console.log("Saving draft to DB...");
 
@@ -500,6 +503,7 @@ const LoanFlow: React.FC<LoanFlowProps> = ({ initialStep, onComplete, navigate, 
       const payload = {
         id: dbLoanId || undefined,
         status: 'draft',
+        sub_step: subStep,
         applying_for_others: isOnBehalf,
         relationship_to_applicant: isOnBehalf ? representativeRelation : null,
         surname,
@@ -554,6 +558,7 @@ const LoanFlow: React.FC<LoanFlowProps> = ({ initialStep, onComplete, navigate, 
     } catch (err) {
       console.error("Failed to save draft to DB:", err);
     } finally {
+      isSavingDraftRef.current = false;
       setIsSaving(false);
     }
   };

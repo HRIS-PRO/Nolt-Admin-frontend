@@ -737,15 +737,18 @@ const ProfilePage: React.FC = () => {
                                                             if (e.target.files && e.target.files[0]) {
                                                                 const file = e.target.files[0];
                                                                 const formData = new FormData();
-                                                                formData.append('document', file);
+                                                                formData.append('file', file);
+                                                                formData.append('document_type', 'generic');
                                                                 try {
                                                                     const res = await fetch(apiUrl('/api/upload'), {
                                                                         method: 'POST',
-                                                                        body: formData
+                                                                        body: formData,
+                                                                        credentials: 'include',
                                                                     });
                                                                     const data = await res.json();
-                                                                    if (data.url) {
-                                                                        setProfile({...profile, bank_statement_url: data.url});
+                                                                    const fileUrl = data.url || data.document?.file_url;
+                                                                    if (fileUrl) {
+                                                                        setProfile({...profile, bank_statement_url: fileUrl});
                                                                     }
                                                                 } catch (error) {
                                                                     console.error(error);
