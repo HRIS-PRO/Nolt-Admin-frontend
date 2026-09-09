@@ -63,7 +63,13 @@ const NewLoanApplicationFlow: React.FC<NewLoanApplicationFlowProps> = ({ isOpen,
                     (currentOfficerId ? String(l.sales_officer_id) === String(currentOfficerId) : true)
                 );
                 if (dbDraft) {
-                    setCustomerData({ ...cust, ...dbDraft });
+                    setCustomerData({
+                        ...cust,
+                        ...dbDraft,
+                        customer_id: cust.customer_id ?? dbDraft.customer_id,
+                        user_id: cust.user_id,
+                        loan_id: dbDraft.id,
+                    });
                     setActiveDraft(dbDraft);
                 } else {
                     setCustomerData(cust);

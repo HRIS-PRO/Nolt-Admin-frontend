@@ -33,6 +33,55 @@ const NIGERIAN_STATES = [
     "Osun", "Oyo", "Plateau", "Rivers", "Sokoto", "Taraba", "Yobe", "Zamfara"
 ];
 
+const SELFIE_DUMMY_URL = 'https://identity.dojah.io/widget/selfie_dummy.jpg';
+
+const LOAN_DOC_URL_FIELDS: Record<string, string> = {
+    govt_id: 'govt_id_url',
+    work_id: 'work_id_url',
+    payslip: 'payslip_url',
+    selfie: 'selfie_verification_url',
+    bank_statement: 'statement_of_account_url',
+    proof_address: 'proof_of_residence_url',
+};
+
+function resolveLoanDocUrl(
+    docKey: string,
+    uploadedDocs: Record<string, { url?: string } | null>,
+    initialData?: any,
+): string | null {
+    const fromState = uploadedDocs[docKey]?.url;
+    const field = LOAN_DOC_URL_FIELDS[docKey];
+    const fromLoan = field ? initialData?.[field] : null;
+    const url = fromState || fromLoan;
+    if (!url || url === SELFIE_DUMMY_URL) return null;
+    return url;
+}
+
+/** Numeric customers.id only — never profile UUID or loan id from initialData.id. */
+function resolveApplicantCustomerId(data: any): number | undefined {
+    const candidates = [data?.customer_id, data?.user_id];
+    for (const raw of candidates) {
+        if (raw == null || raw === '') continue;
+        const num = Number(raw);
+        if (Number.isInteger(num) && num > 0) return num;
+    }
+    return undefined;
+}
+
+function resolveExistingLoanId(
+    dbLoanId: number | null,
+    loanId?: string,
+    initialData?: any,
+    initialDraft?: StaffLoanDraft,
+): number | null {
+    if (dbLoanId) return dbLoanId;
+    if (loanId && !isNaN(Number(loanId))) return Number(loanId);
+    if (typeof initialData?.loan_id === 'number') return initialData.loan_id;
+    if (typeof initialData?.id === 'number') return initialData.id;
+    if (initialDraft?.id && !isNaN(Number(initialDraft.id))) return Number(initialDraft.id);
+    return null;
+}
+
 /** First wizard step that still has missing required fields (edit/resume draft). */
 function resolveResumeStepFromLoanData(data: any): number {
     const loanType = data?.loan_type || 'new';
@@ -62,7 +111,8 @@ function resolveResumeStepFromLoanData(data: any): number {
             data.account_name
         ),
         () => Boolean(
-            data.govt_id_url && data.work_id_url && data.payslip_url && data.selfie_verification_url &&
+            data.govt_id_url && data.work_id_url && data.payslip_url &&
+            data.selfie_verification_url && data.selfie_verification_url !== SELFIE_DUMMY_URL &&
             (amount <= 500000 || data.statement_of_account_url)
         ),
         () => {
@@ -78,7 +128,12 @@ function resolveResumeStepFromLoanData(data: any): number {
     ];
 
     for (let i = 0; i < stepComplete.length; i++) {
-        if (!stepComplete[i]()) return i;
+        if (!stepComplete[i]()) {
+            // Steps 0–3 share one UI screen (loan-details accordion on step 0).
+            if (i <= 3) return 0;
+            if (i === 4) return 4;
+            return 5;
+        }
     }
     return 5;
 }
@@ -211,6 +266,7 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
     const [draftId] = useState(() => initialDraft?.id || `L-DRAFT-${Date.now()}`); // Generate or reuse Draft ID for uploads
     const [errors, setErrors] = useState<Record<string, string>>({});
     const [draftToast, setDraftToast] = useState<string | null>(null);
+    const initialDataHydratedRef = useRef(false);
 
     const [showProductSelect, setShowProductSelect] = useState(() => {
         if (initialDraft?.formData?.showProductSelect !== undefined) return initialDraft.formData.showProductSelect;
@@ -301,6 +357,8 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
         proof_address: null
     });
 
+    const getLoanDocUrl = (docKey: string) => resolveLoanDocUrl(docKey, uploadedDocs, initialData);
+
     // Next of Kin
     const [nokName, setNokName] = useState('');
     const [nokRelationship, setNokRelationship] = useState('');
@@ -365,7 +423,8 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
         isSavingDraftRef.current = true;
 
         const targetStep = typeof targetStepOverride === 'number' ? targetStepOverride : step;
-        const existingLoanId = dbLoanId || (loanId && !isNaN(Number(loanId)) ? Number(loanId) : null) || (typeof initialData?.id === 'number' ? initialData.id : null) || (initialDraft?.id && !isNaN(Number(initialDraft.id)) ? Number(initialDraft.id) : null);
+        const existingLoanId = resolveExistingLoanId(dbLoanId, loanId, initialData, initialDraft);
+        const applicantCustomerId = resolveApplicantCustomerId(initialData);
 
         try {
             const payload = {
@@ -404,12 +463,12 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
                 account_name: accountName,
                 casa,
                 topup_amount: parseFloat(topUpAmount) || 0,
-                govt_id_url: uploadedDocs.govt_id?.url || null,
-                work_id_url: uploadedDocs.work_id?.url || null,
-                payslip_url: uploadedDocs.payslip?.url || null,
-                selfie_verification_url: uploadedDocs.selfie?.url || null,
-                statement_of_account_url: uploadedDocs.bank_statement?.url || null,
-                proof_of_residence_url: uploadedDocs.proof_address?.url || null,
+                govt_id_url: getLoanDocUrl('govt_id'),
+                work_id_url: getLoanDocUrl('work_id'),
+                payslip_url: getLoanDocUrl('payslip'),
+                selfie_verification_url: getLoanDocUrl('selfie'),
+                statement_of_account_url: getLoanDocUrl('bank_statement'),
+                proof_of_residence_url: getLoanDocUrl('proof_address'),
                 nok_name: nokName,
                 nok_relationship: nokRelationship,
                 nok_address: nokAddress,
@@ -418,7 +477,7 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
                 ...(existingLoanId || initialData?.sales_officer_id
                     ? {}
                     : { sales_officer_id: user?.id || undefined }),
-                applicant_customer_id: initialData?.id || initialData?.customer_id || undefined,
+                ...(applicantCustomerId ? { applicant_customer_id: applicantCustomerId } : {}),
             };
 
             if (existingLoanId) {
@@ -506,7 +565,8 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
 
     // Populate form if initialData exists (Edit Mode) & no initialDraft is restoring
     useEffect(() => {
-        if (initialData && !initialDraft) {
+        if (initialData && !initialDraft && !initialDataHydratedRef.current) {
+            initialDataHydratedRef.current = true;
             const resumeStep = resolveResumeStepFromLoanData(initialData);
             setStep(resumeStep);
             if (resumeStep === 0 && initialData.product_type) {
@@ -557,15 +617,19 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
             setBuyOverAccountName(initialData.buy_over_company_account_name || '');
             setBuyOverAccountNumber(initialData.buy_over_company_account_number || '');
 
-            // Pre-fill documents references if URLs exist (visual only, real re-upload needed to change)
+            const toExistingDoc = (url?: string | null) =>
+                url && url !== SELFIE_DUMMY_URL
+                    ? { name: 'Existing Document', size: 'Unknown', url }
+                    : null;
+
+            // Pre-fill documents from saved loan URLs; keep any in-session uploads already in state
             setUploadedDocs(prev => ({
-                ...prev,
-                govt_id: initialData.govt_id_url ? { name: 'Existing Document', size: 'Unknown', url: initialData.govt_id_url } : null,
-                work_id: initialData.work_id_url ? { name: 'Existing Document', size: 'Unknown', url: initialData.work_id_url } : null,
-                payslip: initialData.payslip_url ? { name: 'Existing Document', size: 'Unknown', url: initialData.payslip_url } : null,
-                selfie: initialData.selfie_verification_url ? { name: 'Existing Document', size: 'Unknown', url: initialData.selfie_verification_url } : null,
-                bank_statement: initialData.statement_of_account_url ? { name: 'Existing Document', size: 'Unknown', url: initialData.statement_of_account_url } : null,
-                proof_address: initialData.proof_of_residence_url ? { name: 'Existing Document', size: 'Unknown', url: initialData.proof_of_residence_url } : null,
+                govt_id: prev.govt_id || toExistingDoc(initialData.govt_id_url),
+                work_id: prev.work_id || toExistingDoc(initialData.work_id_url),
+                payslip: prev.payslip || toExistingDoc(initialData.payslip_url),
+                selfie: prev.selfie || toExistingDoc(initialData.selfie_verification_url),
+                bank_statement: prev.bank_statement || toExistingDoc(initialData.statement_of_account_url),
+                proof_address: prev.proof_address || toExistingDoc(initialData.proof_of_residence_url),
             }));
 
             if (initialData.customer_references) {
@@ -764,7 +828,6 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
         setErrors(prev => { const n = { ...prev }; delete n[field]; return n; });
     };
 
-    // File Upload Logic
     const uploadFile = async (id: string, file: File) => {
         // Prevent uploading the exact same file in multiple document slots within this application
         const isDuplicate = Object.entries(uploadedDocs).some(([slotId, doc]) => {
@@ -782,7 +845,8 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
         const formData = new FormData();
         formData.append('file', file);
         formData.append('document_type', id);
-        formData.append('loan_id', loanId || draftId); // Pass real loan ID in edit mode, or draft ID
+        const uploadLoanId = dbLoanId || (loanId && !isNaN(Number(loanId)) ? Number(loanId) : null) || draftId;
+        formData.append('loan_id', String(uploadLoanId));
 
         try {
             const response = await axios.post('/api/upload', formData, {
@@ -803,12 +867,21 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
                 }
             });
 
+            const uploadedUrl =
+                response.data?.document?.file_url
+                || response.data?.url
+                || response.data?.document?.url;
+
+            if (!uploadedUrl) {
+                throw new Error('Upload succeeded but no file URL was returned.');
+            }
+
             setUploadedDocs(prev => ({
                 ...prev,
                 [id]: {
                     name: file.name,
                     size: `${(file.size / (1024 * 1024)).toFixed(2)} MB`,
-                    url: response.data.document.file_url
+                    url: uploadedUrl
                 }
             }));
 
@@ -915,7 +988,7 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
             if (bankVerificationResult && !bankVerificationResult.isMatch) newErrors.accountName = "Name mismatch";
             if (isVerifyingBank) newErrors.accountNumber = "Verifying...";
 
-            if (!uploadedDocs.payslip) newErrors.payslip = "Required";
+            if (!getLoanDocUrl('payslip')) newErrors.payslip = "Required";
 
         } else {
             // Standard Wizard Validation
@@ -989,13 +1062,12 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
             }
 
             if (stepToCheck === 4) { // Documents
-                if (!uploadedDocs.govt_id) newErrors.govt_id = "Required";
-                if (!uploadedDocs.work_id) newErrors.work_id = "Required";
-                if (!uploadedDocs.payslip) newErrors.payslip = "Required";
-                if (!uploadedDocs.selfie) newErrors.selfie = "Required";
+                if (!getLoanDocUrl('govt_id')) newErrors.govt_id = "Required";
+                if (!getLoanDocUrl('work_id')) newErrors.work_id = "Required";
+                if (!getLoanDocUrl('payslip')) newErrors.payslip = "Required";
+                if (!getLoanDocUrl('selfie')) newErrors.selfie = "Required";
 
-                // Bank Statement required for > 500k
-                if ((parseFloat(amount) || 0) > 500000 && !uploadedDocs.bank_statement) {
+                if ((parseFloat(amount) || 0) > 500000 && !getLoanDocUrl('bank_statement')) {
                     newErrors.bank_statement = "Required for > ₦500k";
                 }
             }
@@ -1210,7 +1282,7 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
                 mobile_number: mobileNumber,
                 ippis_number: ippisNumber,
                 casa: casa, // Send as string ID
-                payslip_url: uploadedDocs.payslip?.url,
+                payslip_url: getLoanDocUrl('payslip'),
             };
 
             const existingLoanIdForSubmit = dbLoanId || (loanId && !isNaN(Number(loanId)) ? Number(loanId) : null) ||
@@ -1258,11 +1330,11 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
                     requested_loan_amount: parseFloat(amount) || 0,
                     loan_tenure_months: tenure,
 
-                    govt_id_url: uploadedDocs.govt_id?.url,
-                    work_id_url: uploadedDocs.work_id?.url,
-                    statement_of_account_url: uploadedDocs.bank_statement?.url,
-                    proof_of_residence_url: uploadedDocs.proof_address?.url,
-                    selfie_verification_url: uploadedDocs.selfie?.url,
+                    govt_id_url: getLoanDocUrl('govt_id'),
+                    work_id_url: getLoanDocUrl('work_id'),
+                    statement_of_account_url: getLoanDocUrl('bank_statement'),
+                    proof_of_residence_url: getLoanDocUrl('proof_address'),
+                    selfie_verification_url: getLoanDocUrl('selfie'),
                     references,
 
                     // Next of Kin

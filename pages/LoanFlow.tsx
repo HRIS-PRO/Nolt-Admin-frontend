@@ -35,7 +35,10 @@ const isValidAccountNumber = (acc: string) => /^\d{10}$/.test(acc);
 
 const LoanFlow: React.FC<LoanFlowProps> = ({ initialStep, onComplete, navigate, formatMoney, initialDraft, referralCodeUsed, user }) => {
 
-  const [subStep, setSubStep] = useState(initialDraft?.subStep ?? (initialStep === 'TYPE' ? 0 : 1));
+  const [subStep, setSubStep] = useState(() => {
+    if (typeof initialDraft?.subStep === 'number') return initialDraft.subStep;
+    return initialStep === 'TYPE' ? 0 : 1;
+  });
   const [loading, setLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
