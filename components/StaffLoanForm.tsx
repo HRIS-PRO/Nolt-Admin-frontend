@@ -33,6 +33,8 @@ const NIGERIAN_STATES = [
     "Osun", "Oyo", "Plateau", "Rivers", "Sokoto", "Taraba", "Yobe", "Zamfara"
 ];
 
+const SELFIE_DUMMY_URL = 'https://identity.dojah.io/widget/selfie_dummy.jpg';
+
 /** First wizard step that still has missing required fields (edit/resume draft). */
 function resolveResumeStepFromLoanData(data: any): number {
     const loanType = data?.loan_type || 'new';
@@ -62,7 +64,8 @@ function resolveResumeStepFromLoanData(data: any): number {
             data.account_name
         ),
         () => Boolean(
-            data.govt_id_url && data.work_id_url && data.payslip_url && data.selfie_verification_url &&
+            data.govt_id_url && data.work_id_url && data.payslip_url &&
+            data.selfie_verification_url && data.selfie_verification_url !== SELFIE_DUMMY_URL &&
             (amount <= 500000 || data.statement_of_account_url)
         ),
         () => {
@@ -78,7 +81,12 @@ function resolveResumeStepFromLoanData(data: any): number {
     ];
 
     for (let i = 0; i < stepComplete.length; i++) {
-        if (!stepComplete[i]()) return i;
+        if (!stepComplete[i]()) {
+            // Steps 0–3 share one UI screen (loan-details accordion on step 0).
+            if (i <= 3) return 0;
+            if (i === 4) return 4;
+            return 5;
+        }
     }
     return 5;
 }
