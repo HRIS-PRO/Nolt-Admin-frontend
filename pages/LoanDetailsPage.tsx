@@ -1052,6 +1052,15 @@ const LoanDetailsPage: React.FC<LoanDetailsPageProps> = ({ user, onLogout, toggl
         }
     }, [id, navigate]);
 
+    // Draft applications should open the edit flow at the first incomplete step.
+    useEffect(() => {
+        if (!loan || isLoading) return;
+        const loanIsDraft = String(loan.status || '').toLowerCase() === 'draft' || loan.stage === 'draft';
+        if (loanIsDraft) {
+            setShowEditModal(true);
+        }
+    }, [loan?.id, loan?.status, loan?.stage, isLoading]);
+
     useEffect(() => {
         if (!id) return;
 

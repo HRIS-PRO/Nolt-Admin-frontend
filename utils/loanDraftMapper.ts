@@ -1,4 +1,7 @@
 import type { SavedDraft } from '../types';
+import { TERTIARY_LIST } from '../components/MdaTertiarySelect';
+
+const SELFIE_DUMMY_URL = 'https://identity.dojah.io/widget/selfie_dummy.jpg';
 
 function parseReferences(raw: unknown): Array<{ name: string; phone: string; relationship: string }> {
   if (!raw) return [{ name: '', phone: '', relationship: '' }];
@@ -11,16 +14,75 @@ function parseReferences(raw: unknown): Array<{ name: string; phone: string; rel
   }));
 }
 
+function isValidSelfie(url?: string | null): boolean {
+  return Boolean(url && url !== SELFIE_DUMMY_URL);
+}
+
+/** First LoanFlow sub-step (0–13) that still has missing required fields. */
+export function resolveResumeSubStepFromLoan(loan: Record<string, any>): number {
+  const productType = loan.product_type || loan.loan_type || '';
+  const isPublic = String(productType).toLowerCase().includes('public') || String(productType).toLowerCase().includes('ippis');
+  const selectedLoanId = isPublic ? 'public_sector' : (productType ? 'private_sector' : '');
+  const isTertiary = TERTIARY_LIST.includes(loan.mda_tertiary);
+  const amount = parseFloat(String(loan.requested_loan_amount || 0));
+  const refs = parseReferences(loan.customer_references);
+  const docs = {
+    national_id: loan.govt_id_url,
+    work_id: loan.work_id_url,
+    payslip: loan.payslip_url,
+    bank_statement: loan.statement_of_account_url,
+    selfie: isValidSelfie(loan.selfie_verification_url) ? loan.selfie_verification_url : null,
+  };
+
+  const stepComplete = [
+    () => Boolean(selectedLoanId),
+    () => Boolean(loan.surname?.trim() && loan.first_name?.trim() && loan.is_politically_exposed !== null && loan.is_politically_exposed !== undefined),
+    () => Boolean(loan.gender && loan.date_of_birth),
+    () => Boolean(loan.mothers_maiden_name?.trim()),
+    () => Boolean(loan.mobile_number?.length >= 10 && loan.personal_email?.trim()),
+    () => Boolean(loan.bvn?.length === 11 && loan.nin?.length === 11),
+    () => Boolean(loan.primary_home_address?.trim() && loan.state_of_residence),
+    () => Boolean(loan.residential_status),
+    () => {
+      const incomeOk = Boolean(loan.average_monthly_income);
+      if (selectedLoanId !== 'public_sector') return incomeOk;
+      const mdaOk = Boolean(loan.mda_tertiary);
+      const ippisOk = isTertiary || Boolean(loan.ippis_number);
+      const staffOk = !isTertiary || Boolean(loan.staff_id);
+      return incomeOk && mdaOk && ippisOk && staffOk;
+    },
+    () => Boolean(
+      docs.national_id && docs.work_id && docs.payslip && docs.selfie &&
+      (amount <= 500000 || docs.bank_statement)
+    ),
+    () => Boolean(
+      loan.bank_name && /^\d{10}$/.test(String(loan.account_number || '')) && loan.account_name
+    ),
+    () => Boolean(
+      loan.nok_name?.trim() && loan.nok_relationship && loan.nok_phone_number && loan.nok_address?.trim() &&
+      refs[0]?.name?.trim() && refs[0]?.phone?.trim() && refs[0]?.relationship
+    ),
+    () => amount >= 100000,
+    () => false,
+  ];
+
+  for (let i = 0; i < stepComplete.length; i++) {
+    if (!stepComplete[i]()) return i;
+  }
+  return typeof loan.sub_step === 'number' ? loan.sub_step : 12;
+}
+
 /** Map a DB loan row (status=draft) into the SavedDraft shape LoanFlow expects. */
 export function mapDbLoanToSavedDraft(loan: Record<string, any>): SavedDraft {
   const productType = loan.product_type || loan.loan_type || 'Personal Loan';
   const isPublic = String(productType).toLowerCase().includes('public') || String(productType).toLowerCase().includes('ippis');
+  const resumeSubStep = resolveResumeSubStepFromLoan(loan);
 
   return {
     id: String(loan.id),
     type: 'LOAN',
     updatedAt: loan.updated_at ? new Date(loan.updated_at).getTime() : Date.now(),
-    subStep: typeof loan.sub_step === 'number' ? loan.sub_step : 1,
+    subStep: resumeSubStep,
     label: productType,
     data: {
       dbLoanId: loan.id,
@@ -54,7 +116,9 @@ export function mapDbLoanToSavedDraft(loan: Record<string, any>): SavedDraft {
         payslip: loan.payslip_url ? { name: 'Payslip', size: 'Saved', url: loan.payslip_url } : null,
         bank_statement: loan.statement_of_account_url ? { name: 'Bank Statement', size: 'Saved', url: loan.statement_of_account_url } : null,
         proof_address: loan.proof_of_residence_url ? { name: 'Proof of Address', size: 'Saved', url: loan.proof_of_residence_url } : null,
-        selfie: loan.selfie_verification_url ? { name: 'Selfie', size: 'Saved', url: loan.selfie_verification_url } : null,
+        selfie: isValidSelfie(loan.selfie_verification_url)
+          ? { name: 'Selfie', size: 'Saved', url: loan.selfie_verification_url }
+          : null,
       },
       references: parseReferences(loan.customer_references),
       desiredAmount: String(loan.requested_loan_amount ?? '100000'),
