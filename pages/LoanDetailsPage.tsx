@@ -17,15 +17,6 @@ interface LoanDetailsPageProps {
     theme?: 'light' | 'dark';
 }
 
-const LOAN_APPLICATION_DOCS = [
-    { type: 'govt_id', label: 'Government ID', field: 'govt_id_url' },
-    { type: 'work_id', label: 'Work ID', field: 'work_id_url' },
-    { type: 'payslip', label: 'Payslip', field: 'payslip_url' },
-    { type: 'selfie', label: 'Selfie', field: 'selfie_verification_url' },
-    { type: 'bank_statement', label: 'Bank Statement', field: 'statement_of_account_url' },
-    { type: 'proof_address', label: 'Proof of Residence', field: 'proof_of_residence_url' },
-] as const;
-
 function CollapsibleGroup({
     sectionId,
     title,
@@ -975,7 +966,6 @@ const LoanDetailsPage: React.FC<LoanDetailsPageProps> = ({ user, onLogout, toggl
     const [isProcessingIndemnity, setIsProcessingIndemnity] = useState(false);
     const [signatureBase64, setSignatureBase64] = useState<string | null>(null);
     const [directIndemnityUrl, setDirectIndemnityUrl] = useState<string | null>(null);
-    const [docUploadType, setDocUploadType] = useState<string | null>(null);
     const [openSections, setOpenSections] = useState<Record<string, boolean>>({ personal: true });
 
     const isSectionOpen = (sectionId: string, fallback = false) =>
@@ -986,37 +976,6 @@ const LoanDetailsPage: React.FC<LoanDetailsPageProps> = ({ user, onLogout, toggl
             ...prev,
             [sectionId]: !(prev[sectionId] ?? false),
         }));
-    };
-
-    const refreshLoan = async () => {
-        if (!id) return;
-        try {
-            const response = await axios.get(`/api/staff/loans/${id}`, { withCredentials: true });
-            setLoan(response.data);
-        } catch (error) {
-            console.error('Failed to refresh loan', error);
-        }
-    };
-
-    const handleLoanDocUpload = async (documentType: string, file: File) => {
-        if (!id) return;
-        setOpenSections((prev) => ({ ...prev, documents: true }));
-        setDocUploadType(documentType);
-        try {
-            const formData = new FormData();
-            formData.append('file', file);
-            formData.append('loan_id', String(id));
-            formData.append('document_type', documentType);
-            await axios.post('/api/upload', formData, {
-                headers: { 'Content-Type': 'multipart/form-data' },
-                withCredentials: true,
-            });
-            await refreshLoan();
-        } catch (error: any) {
-            alert(error.response?.data?.message || 'Upload failed');
-        } finally {
-            setDocUploadType(null);
-        }
     };
 
     const handleFileUpload = async (file: File, type: 'signature' | 'indemnity') => {
@@ -1148,13 +1107,17 @@ const LoanDetailsPage: React.FC<LoanDetailsPageProps> = ({ user, onLogout, toggl
 
             const handleDocUpload = (data: { loanId?: number | string; contextType?: string; contextId?: number | string }) => {
                 if (matchesLoan(data)) {
-                    setLoan((prev: any) => ({ ...prev, updated_at: new Date().toISOString() }));
+                    axios.get(`/api/staff/loans/${id}`, { withCredentials: true })
+                        .then(res => setLoan(res.data))
+                        .catch(console.error);
                 }
             };
 
             const handleDocDelete = (data: { loanId?: number | string; contextType?: string; contextId?: number | string }) => {
                 if (matchesLoan(data)) {
-                    setLoan((prev: any) => ({ ...prev, updated_at: new Date().toISOString() }));
+                    axios.get(`/api/staff/loans/${id}`, { withCredentials: true })
+                        .then(res => setLoan(res.data))
+                        .catch(console.error);
                 }
             };
 
@@ -1547,50 +1510,15 @@ const LoanDetailsPage: React.FC<LoanDetailsPageProps> = ({ user, onLogout, toggl
                         sectionId="documents"
                         title="Documents"
                         icon="folder_open"
-                        isOpen={isSectionOpen('documents', isDraft)}
+                        isOpen={isSectionOpen('documents')}
                         onToggle={toggleSection}
                     >
-                        {isDraft && (
-                            <div className="col-span-2 mb-2 p-4 rounded-xl bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800/40">
-                                <p className="text-xs font-bold text-blue-800 dark:text-blue-300 leading-relaxed">
-                                    Upload application documents here while the loan is in draft. The application form no longer accepts uploads during document verification.
-                                </p>
-                            </div>
-                        )}
-                        {LOAN_APPLICATION_DOCS.map((doc) => {
-                            const currentUrl = loan[doc.field];
-                            const isUploading = docUploadType === doc.type;
-                            return (
-                                <div key={doc.type} className="space-y-2">
-                                    <Field label={doc.label} value={currentUrl} isLink />
-                                    {isDraft && (
-                                        <div className="flex items-center gap-2">
-                                            <label
-                                                className="cursor-pointer inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-100 dark:bg-slate-800 text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
-                                                onClick={(e) => e.stopPropagation()}
-                                            >
-                                                <span className="material-symbols-outlined text-sm">{currentUrl ? 'sync' : 'upload'}</span>
-                                                {isUploading ? 'Uploading…' : currentUrl ? 'Replace file' : 'Upload file'}
-                                                <input
-                                                    type="file"
-                                                    accept="image/*,application/pdf"
-                                                    className="hidden"
-                                                    disabled={isUploading}
-                                                    onChange={(e) => {
-                                                        const file = e.target.files?.[0];
-                                                        if (file) void handleLoanDocUpload(doc.type, file);
-                                                        e.target.value = '';
-                                                    }}
-                                                />
-                                            </label>
-                                            {currentUrl && (
-                                                <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider">Uploaded</span>
-                                            )}
-                                        </div>
-                                    )}
-                                </div>
-                            );
-                        })}
+                        <Field label="Government ID" value={loan.govt_id_url} isLink />
+                        <Field label="Work ID" value={loan.work_id_url} isLink />
+                        <Field label="Payslip" value={loan.payslip_url} isLink />
+                        <Field label="Bank Statement" value={loan.statement_of_account_url} isLink />
+                        <Field label="Proof of Residence" value={loan.proof_of_residence_url} isLink />
+                        <Field label="Selfie" value={loan.selfie_verification_url} isLink />
                     </CollapsibleGroup>
                     {(loan.promotion_source || loan.hear_about_us) && (
                         <CollapsibleGroup
@@ -1885,7 +1813,7 @@ const LoanDetailsPage: React.FC<LoanDetailsPageProps> = ({ user, onLogout, toggl
             {/* Edit Modal */}
             {showEditModal && (
                 <StaffLoanForm
-                    key={`${loan.id}-${loan.updated_at}`}
+                    key={loan.id}
                     user={user}
                     initialData={loan}
                     loanId={loan.id}
