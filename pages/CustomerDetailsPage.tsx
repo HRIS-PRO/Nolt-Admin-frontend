@@ -4,6 +4,7 @@ import axios from 'axios';
 import StaffLayout from '../components/layouts/StaffLayout';
 import { UserState, Theme } from '../types';
 import { apiUrl } from '@/lib/api-config';
+import { canManageBlacklist, getEligibilityBanner, LoanEligibility } from '../utils/loanEligibility';
 
 interface CustomerDetailsPageProps {
   user: UserState;
@@ -50,6 +51,13 @@ const CustomerDetailsPage: React.FC<CustomerDetailsPageProps> = ({ user, onLogou
   const [cbaRetryStep, setCbaRetryStep] = useState(0);
   const [cbaRetryTimedOut, setCbaRetryTimedOut] = useState(false);
   const [cbaRetryError, setCbaRetryError] = useState<string | null>(null);
+  const [loanEligibility, setLoanEligibility] = useState<LoanEligibility | null>(null);
+  const [isUnblacklisting, setIsUnblacklisting] = useState(false);
+  const [showUnblacklistModal, setShowUnblacklistModal] = useState(false);
+  const [unblacklistReason, setUnblacklistReason] = useState('');
+  const [isBlacklisting, setIsBlacklisting] = useState(false);
+  const [showBlacklistModal, setShowBlacklistModal] = useState(false);
+  const [blacklistReason, setBlacklistReason] = useState('');
 
   useEffect(() => { fetchCustomerData(); }, [id]);
   useEffect(() => {
@@ -193,6 +201,7 @@ const CustomerDetailsPage: React.FC<CustomerDetailsPageProps> = ({ user, onLogou
     try {
       const res = await axios.get(API(`/api/staff/customers/${id}`), { withCredentials: true });
       setProfile(res.data.profile);
+      setLoanEligibility(res.data.loan_eligibility || res.data.profile?.loan_eligibility || null);
       setLoans(res.data.loans || []);
       if (res.data.profile?.casa) fetchBalance(res.data.profile.casa);
     } catch (e) { console.error('fetch customer', e); }
@@ -206,7 +215,53 @@ const CustomerDetailsPage: React.FC<CustomerDetailsPageProps> = ({ user, onLogou
     } catch {}
   };
 
+  const handleBlacklist = async () => {
+    if (!id) return;
+    if (!blacklistReason.trim()) {
+      alert('Please provide a reason for blacklisting this customer.');
+      return;
+    }
+    setIsBlacklisting(true);
+    try {
+      await axios.post(
+        API(`/api/staff/customers/${id}/blacklist`),
+        { reason: blacklistReason.trim() },
+        { withCredentials: true },
+      );
+      setShowBlacklistModal(false);
+      setBlacklistReason('');
+      await fetchCustomerData();
+    } catch (e: any) {
+      alert(e.response?.data?.message || 'Failed to blacklist customer.');
+    } finally {
+      setIsBlacklisting(false);
+    }
+  };
+
+  const handleUnblacklist = async () => {
+    if (!id) return;
+    setIsUnblacklisting(true);
+    try {
+      await axios.post(
+        API(`/api/staff/customers/${id}/unblacklist`),
+        { reason: unblacklistReason.trim() || undefined },
+        { withCredentials: true },
+      );
+      setShowUnblacklistModal(false);
+      setUnblacklistReason('');
+      await fetchCustomerData();
+    } catch (e: any) {
+      alert(e.response?.data?.message || 'Failed to unblacklist customer.');
+    } finally {
+      setIsUnblacklisting(false);
+    }
+  };
+
   const copyToClipboard = (text: string) => navigator.clipboard.writeText(text);
+  const eligibilityBanner = getEligibilityBanner(loanEligibility);
+  const canManageCustomerBlacklist = canManageBlacklist(user?.role);
+  const canUnblacklist = canManageCustomerBlacklist && loanEligibility?.block_type === 'blacklist';
+  const canBlacklist = canManageCustomerBlacklist && loanEligibility?.block_type !== 'blacklist' && !profile?.is_blacklisted;
   const formatMoney = (n: number) =>
     new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN' }).format(n).replace('NGN', '₦');
 
@@ -374,9 +429,59 @@ const CustomerDetailsPage: React.FC<CustomerDetailsPageProps> = ({ user, onLogou
             <button className="p-2 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
               <svg className="size-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
             </button>
+            {canBlacklist && !eligibilityBanner && (
+              <button
+                onClick={() => setShowBlacklistModal(true)}
+                className="px-6 py-2 bg-slate-900 text-white text-xs font-bold uppercase rounded-lg hover:bg-black transition-colors"
+              >
+                Blacklist Customer
+              </button>
+            )}
             <button className="px-6 py-2 bg-blue-500 text-white text-xs font-bold uppercase rounded-lg hover:bg-blue-600 transition-colors shadow-sm shadow-blue-500/20">EXPORT SUMMARY</button>
           </div>
         </div>
+
+        {eligibilityBanner && (
+          <div className={`rounded-3xl p-5 border ${
+            eligibilityBanner.tone === 'red'
+              ? 'bg-rose-50 dark:bg-rose-950/30 border-rose-200 dark:border-rose-800'
+              : 'bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800'
+          }`}>
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <span className={`material-symbols-outlined ${eligibilityBanner.tone === 'red' ? 'text-rose-600' : 'text-amber-600'}`}>
+                    {eligibilityBanner.tone === 'red' ? 'block' : 'schedule'}
+                  </span>
+                  <h3 className={`text-sm font-black uppercase tracking-wide ${eligibilityBanner.tone === 'red' ? 'text-rose-800 dark:text-rose-200' : 'text-amber-800 dark:text-amber-200'}`}>
+                    {eligibilityBanner.title}
+                  </h3>
+                </div>
+                <p className={`text-xs font-bold leading-relaxed ${eligibilityBanner.tone === 'red' ? 'text-rose-700 dark:text-rose-300' : 'text-amber-700 dark:text-amber-300'}`}>
+                  {eligibilityBanner.message}
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-3">
+                {canBlacklist && (
+                  <button
+                    onClick={() => setShowBlacklistModal(true)}
+                    className="px-5 py-3 bg-slate-900 hover:bg-black text-white text-xs font-black uppercase rounded-xl border border-slate-800 transition-colors"
+                  >
+                    Blacklist Customer
+                  </button>
+                )}
+                {canUnblacklist && (
+                  <button
+                    onClick={() => setShowUnblacklistModal(true)}
+                    className="px-5 py-3 bg-white dark:bg-slate-900 text-rose-700 dark:text-rose-300 text-xs font-black uppercase rounded-xl border border-rose-200 dark:border-rose-700 hover:bg-rose-100 dark:hover:bg-rose-950/50 transition-colors"
+                  >
+                    Remove Blacklist
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Profile Banner */}
         <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 md:p-8 flex flex-col md:flex-row items-start md:items-center justify-between shadow-sm border border-slate-100 dark:border-slate-800/50">
@@ -409,6 +514,16 @@ const CustomerDetailsPage: React.FC<CustomerDetailsPageProps> = ({ user, onLogou
                   ? <span className="px-3 py-1 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 text-[10px] font-bold uppercase rounded-full tracking-wider border border-emerald-100 dark:border-emerald-800">✓ VERIFIED</span>
                   : <span className="px-3 py-1 bg-rose-50 dark:bg-rose-900/20 text-rose-500 dark:text-rose-400 text-[10px] font-bold uppercase rounded-full tracking-wider border border-rose-100 dark:border-rose-800">UNVERIFIED</span>
                 }
+                {profile.is_blacklisted && (
+                  <span className="px-3 py-1 bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-300 text-[10px] font-bold uppercase rounded-full tracking-wider border border-rose-200 dark:border-rose-800">
+                    Blacklisted
+                  </span>
+                )}
+                {loanEligibility?.block_type === 'rejection_cooldown' && (
+                  <span className="px-3 py-1 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 text-[10px] font-bold uppercase rounded-full tracking-wider border border-amber-200 dark:border-amber-800">
+                    Reapply Blocked
+                  </span>
+                )}
               </div>
               <div className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">USER ID: NOLT-{String(profile.id).padStart(4, '0')}-990</div>
             </div>
@@ -1436,6 +1551,80 @@ const CustomerDetailsPage: React.FC<CustomerDetailsPageProps> = ({ user, onLogou
                 className="w-full py-3.5 bg-slate-900 hover:bg-black dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 rounded-2xl text-xs font-black uppercase tracking-widest transition-all shadow-md cursor-pointer"
               >
                 Close Details
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showBlacklistModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl w-full max-w-md shadow-2xl border border-slate-100 dark:border-slate-800 p-6 space-y-5">
+            <div>
+              <h3 className="text-xl font-black text-slate-900 dark:text-white">Blacklist Customer</h3>
+              <p className="text-sm text-slate-500 mt-1">
+                This rejects all active loan applications and blocks new loans for 6 months.
+              </p>
+            </div>
+            <div>
+              <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2 block">
+                Blacklist Reason <span className="text-red-500">*</span>
+              </label>
+              <textarea
+                value={blacklistReason}
+                onChange={(e) => setBlacklistReason(e.target.value)}
+                className="w-full p-4 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm min-h-[120px]"
+                placeholder="Explain why this customer is being blacklisted..."
+              />
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={() => { setShowBlacklistModal(false); setBlacklistReason(''); }}
+                className="flex-1 py-3 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-black uppercase"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleBlacklist}
+                disabled={isBlacklisting || !blacklistReason.trim()}
+                className="flex-1 py-3 rounded-xl bg-slate-900 hover:bg-black text-white text-xs font-black uppercase disabled:opacity-50"
+              >
+                {isBlacklisting ? 'Processing…' : 'Confirm Blacklist'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showUnblacklistModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl w-full max-w-md shadow-2xl border border-slate-100 dark:border-slate-800 p-6 space-y-5">
+            <div>
+              <h3 className="text-xl font-black text-slate-900 dark:text-white">Remove Blacklist</h3>
+              <p className="text-sm text-slate-500 mt-1">This will allow the customer to apply for loans again.</p>
+            </div>
+            <div>
+              <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2 block">Reason (optional)</label>
+              <textarea
+                value={unblacklistReason}
+                onChange={(e) => setUnblacklistReason(e.target.value)}
+                className="w-full p-4 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm min-h-[100px]"
+                placeholder="Why is this customer being unblacklisted?"
+              />
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={() => { setShowUnblacklistModal(false); setUnblacklistReason(''); }}
+                className="flex-1 py-3 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-black uppercase"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleUnblacklist}
+                disabled={isUnblacklisting}
+                className="flex-1 py-3 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-black uppercase disabled:opacity-50"
+              >
+                {isUnblacklisting ? 'Removing…' : 'Confirm Unblacklist'}
               </button>
             </div>
           </div>

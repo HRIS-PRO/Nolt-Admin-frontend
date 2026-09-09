@@ -5,6 +5,7 @@ import NewCustomerModal from './modals/NewCustomerModal';
 import StaffLoanForm from './StaffLoanForm';
 import { storageService } from '../services/storageService';
 import { StaffLoanDraft } from '../types';
+import { getEligibilityBanner, LoanEligibility } from '../utils/loanEligibility';
 
 interface NewLoanApplicationFlowProps {
     isOpen: boolean;
@@ -27,6 +28,7 @@ const NewLoanApplicationFlow: React.FC<NewLoanApplicationFlowProps> = ({ isOpen,
     const [cbaLoans, setCbaLoans] = useState<any[]>([]);
     const [selectedLoanType, setSelectedLoanType] = useState<string>('new');
     const [activeDraft, setActiveDraft] = useState<any | null>(null);
+    const [loanEligibility, setLoanEligibility] = useState<LoanEligibility | null>(null);
 
     if (!isOpen) return null;
 
@@ -55,6 +57,7 @@ const NewLoanApplicationFlow: React.FC<NewLoanApplicationFlowProps> = ({ isOpen,
                 setRawCustomer(cust);
                 setLoanHistory(response.data.loans || []);
                 setCbaLoans(response.data.cbaLoans || []);
+                setLoanEligibility(response.data.loan_eligibility || response.data.customer?.loan_eligibility || null);
 
                 // Only surface the current officer's own draft (not another officer's draft for the same customer)
                 const currentOfficerId = user?.id || user?.customer_id;
@@ -108,8 +111,12 @@ const NewLoanApplicationFlow: React.FC<NewLoanApplicationFlowProps> = ({ isOpen,
         setCbaLoans([]);
         setError(null);
         setActiveDraft(null);
+        setLoanEligibility(null);
         onClose();
     };
+
+    const eligibilityBanner = getEligibilityBanner(loanEligibility);
+    const isLoanBlocked = Boolean(loanEligibility && !loanEligibility.allowed);
 
     // When showing full modals like NEW_CUSTOMER or LOAN_FORM, we don't render the wrapper styling.
     if (currentState === 'NEW_CUSTOMER') {
@@ -130,7 +137,7 @@ const NewLoanApplicationFlow: React.FC<NewLoanApplicationFlowProps> = ({ isOpen,
         const hasActiveLoan = activeLoans.length > 0;
         const isLoanTypeLocked = hasActiveLoan && ['topup', 're-app', 'add_on'].includes(selectedLoanType);
 
-        const enrichedInitialData = { ...customerData, loan_type: selectedLoanType };
+        const enrichedInitialData = { ...customerData, loan_type: selectedLoanType, loan_eligibility: loanEligibility };
         return (
             <StaffLoanForm
                 onClose={resetFlow}
@@ -448,6 +455,26 @@ const NewLoanApplicationFlow: React.FC<NewLoanApplicationFlowProps> = ({ isOpen,
                                 )}
 
 
+                                {eligibilityBanner && (
+                                    <div className={`p-6 rounded-3xl border border-dashed mb-8 ${
+                                        eligibilityBanner.tone === 'red'
+                                            ? 'bg-rose-50/70 dark:bg-rose-950/40 border-rose-300 dark:border-rose-800'
+                                            : 'bg-amber-50/70 dark:bg-amber-950/40 border-amber-300 dark:border-amber-800'
+                                    }`}>
+                                        <div className="flex items-center gap-3 mb-2">
+                                            <span className={`material-symbols-outlined text-xl ${eligibilityBanner.tone === 'red' ? 'text-rose-600' : 'text-amber-600'}`}>
+                                                {eligibilityBanner.tone === 'red' ? 'block' : 'schedule'}
+                                            </span>
+                                            <h4 className={`text-sm font-black uppercase italic tracking-tight ${eligibilityBanner.tone === 'red' ? 'text-rose-900 dark:text-rose-200' : 'text-amber-900 dark:text-amber-200'}`}>
+                                                {eligibilityBanner.title}
+                                            </h4>
+                                        </div>
+                                        <p className={`text-[10px] font-black uppercase tracking-widest leading-relaxed ${eligibilityBanner.tone === 'red' ? 'text-rose-700 dark:text-rose-400' : 'text-amber-700 dark:text-amber-400'}`}>
+                                            {eligibilityBanner.message}
+                                        </p>
+                                    </div>
+                                )}
+
                                 {/* Active Nolt Application Pending Restriction Block */}
                                 {(() => {
                                     const activeNoltApp = (loanHistory || []).find((l: any) =>
@@ -529,6 +556,7 @@ const NewLoanApplicationFlow: React.FC<NewLoanApplicationFlowProps> = ({ isOpen,
                                     <button
                                         onClick={() => setCurrentState('LOAN_FORM')}
                                         disabled={(() => {
+                                            if (isLoanBlocked) return true;
                                             if (!customerData.is_active) return true;
                                             const activeNoltApp = (loanHistory || []).find((l: any) =>
                                                 ['pending', 'submitted', 'sales', 'customer_experience', 'credit_check_1', 'credit_check_2', 'internal_audit', 'finance'].includes(String(l.stage || l.status).toLowerCase()) &&

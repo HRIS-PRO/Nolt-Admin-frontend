@@ -9,6 +9,14 @@ import StaffLoanForm from '../components/StaffLoanForm';
 import { getStatusStyles } from '../utils/statusStyles';
 import { formatDate } from '../utils/dateFormatter';
 import { formatCasaLabel } from '../utils/formatCasa';
+import {
+    canManageBlacklist,
+    DEFAULT_REJECTION_COOLDOWN_DAYS,
+    getEligibilityBanner,
+    MAX_REJECTION_COOLDOWN_DAYS,
+    REJECTION_COOLDOWN_PRESETS,
+    resolveRejectionCooldownDays,
+} from '../utils/loanEligibility';
 
 interface LoanDetailsPageProps {
     user: { name: string; email: string; avatar_url?: string; role?: string };
@@ -64,6 +72,58 @@ const Field = ({ label, value, isLink = false }: { label: string; value?: string
     </div>
 );
 
+const RejectionCooldownField = ({
+    preset,
+    customDays,
+    onPresetChange,
+    onCustomDaysChange,
+    disabled = false,
+}: {
+    preset: string;
+    customDays: string;
+    onPresetChange: (value: string) => void;
+    onCustomDaysChange: (value: string) => void;
+    disabled?: boolean;
+}) => (
+    <div className="mb-6">
+        <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2 block">
+            Block Reapplication For
+        </label>
+        <select
+            value={preset}
+            onChange={(e) => onPresetChange(e.target.value)}
+            disabled={disabled}
+            className="w-full p-4 pr-10 rounded-xl bg-slate-50 dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white text-sm font-semibold focus:outline-none focus:ring-4 focus:ring-red-500/20 focus:border-red-500 cursor-pointer appearance-none transition-all disabled:opacity-50"
+            style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2364748b'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 1rem center', backgroundSize: '1.25em 1.25em' }}
+        >
+            {REJECTION_COOLDOWN_PRESETS.map((option) => (
+                <option key={option.value} value={String(option.value)}>
+                    {option.label}
+                </option>
+            ))}
+            <option value="custom">Custom duration…</option>
+        </select>
+        {preset === 'custom' && (
+            <div className="mt-3">
+                <input
+                    type="number"
+                    min={0}
+                    max={MAX_REJECTION_COOLDOWN_DAYS}
+                    step={1}
+                    value={customDays}
+                    onChange={(e) => onCustomDaysChange(e.target.value)}
+                    disabled={disabled}
+                    placeholder={`Enter days (0–${MAX_REJECTION_COOLDOWN_DAYS})`}
+                    className="w-full p-4 rounded-xl bg-slate-50 dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white text-sm font-semibold focus:outline-none focus:ring-4 focus:ring-red-500/20 focus:border-red-500 disabled:opacity-50"
+                />
+            </div>
+        )}
+        <p className="text-[10px] font-bold text-slate-400 mt-2">
+            Customer cannot start a new loan until this period ends (0 = no block).
+        </p>
+    </div>
+);
+
 // --- Action Card Component ---
 const ActionCard = ({ loan, userRole, onActionComplete }: { loan: any, userRole: any, onActionComplete: () => void }) => {
     const [actionLoading, setActionLoading] = useState(false);
@@ -86,6 +146,10 @@ const ActionCard = ({ loan, userRole, onActionComplete }: { loan: any, userRole:
     const [returnTargetStage, setReturnTargetStage] = useState('');
     const [showCXRejectModal, setShowCXRejectModal] = useState(false);
     const [cxRejectionReason, setCxRejectionReason] = useState('');
+    const [rejectionCooldownPreset, setRejectionCooldownPreset] = useState(String(DEFAULT_REJECTION_COOLDOWN_DAYS));
+    const [customRejectionCooldownDays, setCustomRejectionCooldownDays] = useState('');
+    const [showBlacklistModal, setShowBlacklistModal] = useState(false);
+    const [blacklistReason, setBlacklistReason] = useState('');
     const [glAccounts, setGlAccounts] = useState<any[]>([]);
     const [selectedGL, setSelectedGL] = useState(loan.gl_account || '');
     const [startDate, setStartDate] = useState(() => {
@@ -189,10 +253,21 @@ const ActionCard = ({ loan, userRole, onActionComplete }: { loan: any, userRole:
         return disbursement > 0 ? disbursement : 0;
     };
 
+    const getRejectionCooldownDays = (): number | null =>
+        resolveRejectionCooldownDays(rejectionCooldownPreset, customRejectionCooldownDays);
+
     const handleAction = async (action: 'approve' | 'reject' | 'return', targetStage?: string) => {
         if ((action === 'reject' || action === 'return') && !reason.trim()) {
             alert("Please provide a reason for this action.");
             return;
+        }
+
+        if (action === 'reject') {
+            const cooldownDays = getRejectionCooldownDays();
+            if (cooldownDays === null) {
+                alert(`Enter a valid reapplication block between 0 and ${MAX_REJECTION_COOLDOWN_DAYS} days.`);
+                return;
+            }
         }
 
         setActionLoading(true);
@@ -251,6 +326,10 @@ const ActionCard = ({ loan, userRole, onActionComplete }: { loan: any, userRole:
                 payload.data.gl_account = selectedGL;
             }
 
+            if (action === 'reject') {
+                payload.rejection_cooldown_days = getRejectionCooldownDays();
+            }
+
             await axios.post(
                 `/api/staff/loans/${loan.id}/action`,
                 payload,
@@ -270,11 +349,21 @@ const ActionCard = ({ loan, userRole, onActionComplete }: { loan: any, userRole:
             alert('Please select a rejection reason.');
             return;
         }
+        const cooldownDays = getRejectionCooldownDays();
+        if (cooldownDays === null) {
+            alert(`Enter a valid reapplication block between 0 and ${MAX_REJECTION_COOLDOWN_DAYS} days.`);
+            return;
+        }
         setActionLoading(true);
         try {
             await axios.post(
                 `/api/staff/loans/${loan.id}/action`,
-                { action: 'reject', cx_rejection_reason: cxRejectionReason, reason: cxRejectionReason },
+                {
+                    action: 'reject',
+                    cx_rejection_reason: cxRejectionReason,
+                    reason: cxRejectionReason,
+                    rejection_cooldown_days: cooldownDays,
+                },
                 { withCredentials: true }
             );
             setShowCXRejectModal(false);
@@ -287,8 +376,41 @@ const ActionCard = ({ loan, userRole, onActionComplete }: { loan: any, userRole:
         }
     };
 
+    const handleBlacklist = async () => {
+        if (!blacklistReason.trim()) {
+            alert('Please provide a reason for blacklisting this customer.');
+            return;
+        }
+        setActionLoading(true);
+        try {
+            await axios.post(
+                `/api/staff/loans/${loan.id}/blacklist`,
+                {
+                    reason: blacklistReason.trim(),
+                    customer_id: loan.customer_id,
+                    bvn: loan.bvn,
+                },
+                { withCredentials: true },
+            );
+            setShowBlacklistModal(false);
+            setBlacklistReason('');
+            onActionComplete();
+        } catch (err: any) {
+            alert(err.response?.data?.message || 'Blacklist failed. Please try again.');
+        } finally {
+            setActionLoading(false);
+        }
+    };
+
+    const eligibilityBanner = getEligibilityBanner(loan.loan_eligibility);
+    const canBlacklistCustomer = canManageBlacklist(userRole) && loan.customer_id;
+
     const handleUpload = async () => {
         if (!uploadFile) return;
+        if (isDraft) {
+            alert('Document uploads are disabled while this application is in draft. Submit the application first.');
+            return;
+        }
         setUploadLoading(true);
         const formData = new FormData();
         formData.append('file', uploadFile);
@@ -311,7 +433,9 @@ const ActionCard = ({ loan, userRole, onActionComplete }: { loan: any, userRole:
         }
     };
 
-    const stage = loan.stage || 'submitted';
+    const stage = isDraft ? null : (loan.stage || 'submitted');
+    const stageLabel = isDraft ? 'Draft' : (loan.stage || 'submitted').replace(/_/g, ' ');
+    const usesCxRejectModal = !isDraft && (stage === 'sales' || stage === 'customer_experience' || stage === 'submitted');
 
     useEffect(() => {
         if (stage === 'finance') {
@@ -328,6 +452,10 @@ const ActionCard = ({ loan, userRole, onActionComplete }: { loan: any, userRole:
     // --- VISIBILITY CHECK ---
     const isAllowed = (() => {
         if (userRole === 'super_admin' || userRole === 'superadmin') return true;
+
+        if (isDraft) {
+            return ['sales_officer', 'sales_public_sector', 'sales_private_sector', 'sales_manager'].includes(userRole);
+        }
 
         switch (stage) {
             case 'submitted':
@@ -364,7 +492,7 @@ const ActionCard = ({ loan, userRole, onActionComplete }: { loan: any, userRole:
             <div className="bg-slate-50 dark:bg-slate-800/50 rounded-[24px] p-6 border border-slate-200 dark:border-slate-800 text-center opacity-75">
                 <span className="material-symbols-outlined text-3xl text-slate-400 mb-2">lock</span>
                 <p className="font-bold text-slate-900 dark:text-white mb-1">View Only</p>
-                <p className="text-xs text-slate-500">This loan is currently with the <strong>{stage.replace(/_/g, ' ').toUpperCase()}</strong> team.</p>
+                <p className="text-xs text-slate-500">This loan is currently with the <strong>{stageLabel.toUpperCase()}</strong> team.</p>
             </div>
         );
     }
@@ -378,7 +506,7 @@ const ActionCard = ({ loan, userRole, onActionComplete }: { loan: any, userRole:
                 </div>
 
                 <h3 className="text-2xl font-black mb-2 capitalize text-slate-900 dark:text-white">
-                    {stage.replace(/_/g, ' ')} Review
+                    {isDraft ? 'Draft' : `${stageLabel} Review`}
                 </h3>
                 <p className="text-sm text-slate-500 dark:text-slate-400 mb-6 font-medium leading-relaxed">
                     You have permission to process this application.
@@ -619,7 +747,7 @@ const ActionCard = ({ loan, userRole, onActionComplete }: { loan: any, userRole:
 
                 {/* Upload Section */}
                 {(() => {
-                    const canUpload = (
+                    const canUpload = !isDraft && (
                         (stage === 'sales' && ['sales_officer', 'sales_public_sector', 'sales_private_sector', 'sales_manager', 'super_admin', 'superadmin'].includes(userRole)) ||
                         (stage === 'customer_experience' && ['customer_experience', 'customer_service', 'super_admin', 'superadmin'].includes(userRole)) ||
                         (stage === 'credit_check_1' && ['credit_officer', 'super_admin', 'superadmin'].includes(userRole))
@@ -726,6 +854,15 @@ const ActionCard = ({ loan, userRole, onActionComplete }: { loan: any, userRole:
                     </div>
                 )}
 
+                {!isDraft && !usesCxRejectModal && (
+                    <RejectionCooldownField
+                        preset={rejectionCooldownPreset}
+                        customDays={customRejectionCooldownDays}
+                        onPresetChange={setRejectionCooldownPreset}
+                        onCustomDaysChange={setCustomRejectionCooldownDays}
+                    />
+                )}
+
                 {/* Reason Input */}
                 <div className="mb-6">
                     <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2 block">
@@ -770,8 +907,8 @@ const ActionCard = ({ loan, userRole, onActionComplete }: { loan: any, userRole:
                         <button
                             onClick={() => {
                                 if (isDraft) return;
-                                const stage = loan.stage || 'submitted';
-                                if (stage === 'customer_experience' || stage === 'submitted' || stage === 'sales') {
+                                const rejectStage = loan.stage || 'submitted';
+                                if (rejectStage === 'customer_experience' || rejectStage === 'submitted' || rejectStage === 'sales') {
                                     setShowCXRejectModal(true);
                                 } else {
                                     handleAction('reject');
@@ -788,6 +925,26 @@ const ActionCard = ({ loan, userRole, onActionComplete }: { loan: any, userRole:
                         <p className="text-[11px] font-bold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 p-3 rounded-xl border border-amber-200 dark:border-amber-800/40 text-center leading-relaxed">
                             ⚠️ Application is currently saved as a draft. Approval, return, and rejection actions are disabled until submitted.
                         </p>
+                    )}
+
+                    {eligibilityBanner && (
+                        <div className={`p-4 rounded-xl border text-[11px] font-bold leading-relaxed ${
+                            eligibilityBanner.tone === 'red'
+                                ? 'bg-rose-50 dark:bg-rose-950/40 border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300'
+                                : 'bg-amber-50 dark:bg-amber-950/40 border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-300'
+                        }`}>
+                            {eligibilityBanner.message}
+                        </div>
+                    )}
+
+                    {canBlacklistCustomer && !isDraft && loan.loan_eligibility?.block_type !== 'blacklist' && (
+                        <button
+                            onClick={() => setShowBlacklistModal(true)}
+                            disabled={actionLoading}
+                            className="w-full py-3 rounded-xl bg-slate-900 hover:bg-black text-white font-bold text-xs uppercase tracking-wider transition-all border border-slate-800 disabled:opacity-50"
+                        >
+                            Blacklist Customer
+                        </button>
                     )}
                 </div>
 
@@ -874,6 +1031,48 @@ const ActionCard = ({ loan, userRole, onActionComplete }: { loan: any, userRole:
                         </div>
                     )}
 
+                    {showBlacklistModal && (
+                        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+                            <div className="bg-white dark:bg-slate-900 rounded-2xl w-full max-w-md shadow-2xl border border-slate-100 dark:border-slate-800 p-6 space-y-6">
+                                <div className="flex justify-between items-start">
+                                    <div className="space-y-1">
+                                        <h3 className="text-xl font-black text-slate-900 dark:text-white">Blacklist Customer</h3>
+                                        <p className="text-sm text-slate-500">This rejects all active loan applications and blocks new loans for 6 months.</p>
+                                    </div>
+                                    <button onClick={() => { setShowBlacklistModal(false); setBlacklistReason(''); }} className="text-slate-400 hover:text-slate-600 dark:hover:text-white transition-colors">
+                                        <span className="material-symbols-outlined">close</span>
+                                    </button>
+                                </div>
+                                <div>
+                                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2 block">
+                                        Blacklist Reason <span className="text-red-500">*</span>
+                                    </label>
+                                    <textarea
+                                        value={blacklistReason}
+                                        onChange={(e) => setBlacklistReason(e.target.value)}
+                                        className="w-full p-4 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm min-h-[120px]"
+                                        placeholder="Explain why this customer is being blacklisted..."
+                                    />
+                                </div>
+                                <div className="flex gap-3">
+                                    <button
+                                        onClick={() => { setShowBlacklistModal(false); setBlacklistReason(''); }}
+                                        className="flex-1 py-3 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-black uppercase"
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        onClick={handleBlacklist}
+                                        disabled={actionLoading || !blacklistReason.trim()}
+                                        className="flex-1 py-3 rounded-xl bg-slate-900 hover:bg-black text-white text-xs font-black uppercase disabled:opacity-50"
+                                    >
+                                        {actionLoading ? 'Processing…' : 'Confirm Blacklist'}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
                     {/* ── CX Rejection Modal ─────────────────────────────────── */}
                     {showCXRejectModal && (
                         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in duration-200">
@@ -914,6 +1113,13 @@ const ActionCard = ({ loan, userRole, onActionComplete }: { loan: any, userRole:
                                             </select>
                                         </div>
                                     </div>
+
+                                    <RejectionCooldownField
+                                        preset={rejectionCooldownPreset}
+                                        customDays={customRejectionCooldownDays}
+                                        onPresetChange={setRejectionCooldownPreset}
+                                        onCustomDaysChange={setCustomRejectionCooldownDays}
+                                    />
 
                                     {cxRejectionReason && (
                                         <div className="flex items-start gap-3 p-3 rounded-xl bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-900/30">
@@ -1174,9 +1380,9 @@ const LoanDetailsPage: React.FC<LoanDetailsPageProps> = ({ user, onLogout, toggl
     ];
 
     const isDraft = loan.status === 'draft' || loan.stage === 'draft';
-    const currentStageId = isDraft ? 'submitted' : (loan.stage || 'submitted');
-    const currentStageIndex = isDraft ? 0 : stages.findIndex(s => s.id === (currentStageId === 'credit_check' ? 'credit_check_1' : currentStageId));
-    const activeIndex = currentStageIndex === -1 ? 0 : currentStageIndex;
+    const currentStageId = loan.stage || 'submitted';
+    const currentStageIndex = isDraft ? -1 : stages.findIndex(s => s.id === (currentStageId === 'credit_check' ? 'credit_check_1' : currentStageId));
+    const activeIndex = isDraft ? -1 : (currentStageIndex === -1 ? 0 : currentStageIndex);
 
     return (
         <StaffLayout user={user} onLogout={onLogout} toggleTheme={toggleTheme} theme={theme}>
@@ -1817,7 +2023,15 @@ const LoanDetailsPage: React.FC<LoanDetailsPageProps> = ({ user, onLogout, toggl
                     user={user}
                     initialData={loan}
                     loanId={loan.id}
-                    onClose={() => setShowEditModal(false)}
+                    onClose={async () => {
+                        setShowEditModal(false);
+                        try {
+                            const response = await axios.get(`/api/staff/loans/${id}`, { withCredentials: true });
+                            setLoan(response.data);
+                        } catch (error) {
+                            console.error('Failed to refresh loan after closing form', error);
+                        }
+                    }}
                     onSuccess={() => {
                         setShowEditModal(false);
                         // Refresh logic
