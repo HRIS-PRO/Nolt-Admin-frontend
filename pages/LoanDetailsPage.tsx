@@ -17,6 +17,15 @@ interface LoanDetailsPageProps {
     theme?: 'light' | 'dark';
 }
 
+const LOAN_APPLICATION_DOCS = [
+    { type: 'govt_id', label: 'Government ID', field: 'govt_id_url' },
+    { type: 'work_id', label: 'Work ID', field: 'work_id_url' },
+    { type: 'payslip', label: 'Payslip', field: 'payslip_url' },
+    { type: 'selfie', label: 'Selfie', field: 'selfie_verification_url' },
+    { type: 'bank_statement', label: 'Bank Statement', field: 'statement_of_account_url' },
+    { type: 'proof_address', label: 'Proof of Residence', field: 'proof_of_residence_url' },
+] as const;
+
 // --- Action Card Component ---
 const ActionCard = ({ loan, userRole, onActionComplete }: { loan: any, userRole: any, onActionComplete: () => void }) => {
     const [actionLoading, setActionLoading] = useState(false);
@@ -241,10 +250,6 @@ const ActionCard = ({ loan, userRole, onActionComplete }: { loan: any, userRole:
     };
 
     const handleUpload = async () => {
-        if (isDraft) {
-            alert('Document uploads are disabled while this application is in draft. Submit the application first.');
-            return;
-        }
         if (!uploadFile) return;
         setUploadLoading(true);
         const formData = new FormData();
@@ -582,25 +587,6 @@ const ActionCard = ({ loan, userRole, onActionComplete }: { loan: any, userRole:
                         (stage === 'credit_check_1' && ['credit_officer', 'super_admin', 'superadmin'].includes(userRole))
                     );
                     if (!canUpload) return null;
-
-                    if (isDraft) {
-                        return (
-                            <div className="mb-6 p-4 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/40">
-                                <div className="flex items-start gap-3">
-                                    <span className="material-symbols-outlined text-amber-600 dark:text-amber-400 text-xl shrink-0">lock</span>
-                                    <div>
-                                        <p className="text-[10px] font-black uppercase tracking-widest text-amber-700 dark:text-amber-400 mb-1">
-                                            Upload Supporting Document
-                                        </p>
-                                        <p className="text-xs font-bold text-amber-800 dark:text-amber-300 leading-relaxed">
-                                            Document uploads are disabled while this application is in draft. Use{' '}
-                                            <span className="font-black">Continue &amp; Submit Application</span> to finish and submit it first.
-                                        </p>
-                                    </div>
-                                </div>
-                            </div>
-                        );
-                    }
 
                     return (
                         <div className="mb-6 p-4 rounded-xl bg-slate-50 dark:bg-slate-800 border border-dashed border-slate-300 dark:border-slate-700">
@@ -942,6 +928,37 @@ const LoanDetailsPage: React.FC<LoanDetailsPageProps> = ({ user, onLogout, toggl
     const [isProcessingIndemnity, setIsProcessingIndemnity] = useState(false);
     const [signatureBase64, setSignatureBase64] = useState<string | null>(null);
     const [directIndemnityUrl, setDirectIndemnityUrl] = useState<string | null>(null);
+    const [docUploadType, setDocUploadType] = useState<string | null>(null);
+
+    const refreshLoan = async () => {
+        if (!id) return;
+        try {
+            const response = await axios.get(`/api/staff/loans/${id}`, { withCredentials: true });
+            setLoan(response.data);
+        } catch (error) {
+            console.error('Failed to refresh loan', error);
+        }
+    };
+
+    const handleLoanDocUpload = async (documentType: string, file: File) => {
+        if (!id) return;
+        setDocUploadType(documentType);
+        try {
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('loan_id', String(id));
+            formData.append('document_type', documentType);
+            await axios.post('/api/upload', formData, {
+                headers: { 'Content-Type': 'multipart/form-data' },
+                withCredentials: true,
+            });
+            await refreshLoan();
+        } catch (error: any) {
+            alert(error.response?.data?.message || 'Upload failed');
+        } finally {
+            setDocUploadType(null);
+        }
+    };
 
     const handleFileUpload = async (file: File, type: 'signature' | 'indemnity') => {
         const loanIsDraft = String(loan?.status || '').toLowerCase() === 'draft';
@@ -1051,15 +1068,6 @@ const LoanDetailsPage: React.FC<LoanDetailsPageProps> = ({ user, onLogout, toggl
             fetchOfficers();
         }
     }, [id, navigate]);
-
-    // Draft applications should open the edit flow at the first incomplete step.
-    useEffect(() => {
-        if (!loan || isLoading) return;
-        const loanIsDraft = String(loan.status || '').toLowerCase() === 'draft' || loan.stage === 'draft';
-        if (loanIsDraft) {
-            setShowEditModal(true);
-        }
-    }, [loan?.id, loan?.status, loan?.stage, isLoading]);
 
     useEffect(() => {
         if (!id) return;
@@ -1492,12 +1500,44 @@ const LoanDetailsPage: React.FC<LoanDetailsPageProps> = ({ user, onLogout, toggl
                     </CollapsibleGroup>
 
                     <CollapsibleGroup title="Documents" icon="folder_open">
-                        <Field label="Government ID" value={loan.govt_id_url} isLink />
-                        <Field label="Work ID" value={loan.work_id_url} isLink />
-                        <Field label="Payslip" value={loan.payslip_url} isLink />
-                        <Field label="Bank Statement" value={loan.statement_of_account_url} isLink />
-                        <Field label="Proof of Residence" value={loan.proof_of_residence_url} isLink />
-                        <Field label="Selfie" value={loan.selfie_verification_url} isLink />
+                        {isDraft && (
+                            <div className="col-span-2 mb-2 p-4 rounded-xl bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800/40">
+                                <p className="text-xs font-bold text-blue-800 dark:text-blue-300 leading-relaxed">
+                                    Upload application documents here while the loan is in draft. The application form no longer accepts uploads during document verification.
+                                </p>
+                            </div>
+                        )}
+                        {LOAN_APPLICATION_DOCS.map((doc) => {
+                            const currentUrl = loan[doc.field];
+                            const isUploading = docUploadType === doc.type;
+                            return (
+                                <div key={doc.type} className="space-y-2">
+                                    <Field label={doc.label} value={currentUrl} isLink />
+                                    {isDraft && (
+                                        <div className="flex items-center gap-2">
+                                            <label className="cursor-pointer inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-100 dark:bg-slate-800 text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
+                                                <span className="material-symbols-outlined text-sm">{currentUrl ? 'sync' : 'upload'}</span>
+                                                {isUploading ? 'Uploading…' : currentUrl ? 'Replace file' : 'Upload file'}
+                                                <input
+                                                    type="file"
+                                                    accept="image/*,application/pdf"
+                                                    className="hidden"
+                                                    disabled={isUploading}
+                                                    onChange={(e) => {
+                                                        const file = e.target.files?.[0];
+                                                        if (file) void handleLoanDocUpload(doc.type, file);
+                                                        e.target.value = '';
+                                                    }}
+                                                />
+                                            </label>
+                                            {currentUrl && (
+                                                <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider">Uploaded</span>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        })}
                     </CollapsibleGroup>
                     {(loan.promotion_source || loan.hear_about_us) && (
                         <CollapsibleGroup title="Marketing Data" icon="campaign">
@@ -1774,6 +1814,7 @@ const LoanDetailsPage: React.FC<LoanDetailsPageProps> = ({ user, onLogout, toggl
             {/* Edit Modal */}
             {showEditModal && (
                 <StaffLoanForm
+                    key={`${loan.id}-${loan.updated_at}`}
                     user={user}
                     initialData={loan}
                     loanId={loan.id}

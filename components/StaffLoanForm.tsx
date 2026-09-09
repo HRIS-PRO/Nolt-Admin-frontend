@@ -35,6 +35,28 @@ const NIGERIAN_STATES = [
 
 const SELFIE_DUMMY_URL = 'https://identity.dojah.io/widget/selfie_dummy.jpg';
 
+const LOAN_DOC_URL_FIELDS: Record<string, string> = {
+    govt_id: 'govt_id_url',
+    work_id: 'work_id_url',
+    payslip: 'payslip_url',
+    selfie: 'selfie_verification_url',
+    bank_statement: 'statement_of_account_url',
+    proof_address: 'proof_of_residence_url',
+};
+
+function resolveLoanDocUrl(
+    docKey: string,
+    uploadedDocs: Record<string, { url?: string } | null>,
+    initialData?: any,
+): string | null {
+    const fromState = uploadedDocs[docKey]?.url;
+    const field = LOAN_DOC_URL_FIELDS[docKey];
+    const fromLoan = field ? initialData?.[field] : null;
+    const url = fromState || fromLoan;
+    if (!url || url === SELFIE_DUMMY_URL) return null;
+    return url;
+}
+
 /** Numeric customers.id only — never profile UUID or loan id from initialData.id. */
 function resolveApplicantCustomerId(data: any): number | undefined {
     const candidates = [data?.customer_id, data?.user_id];
@@ -334,6 +356,8 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
         proof_address: null
     });
 
+    const getLoanDocUrl = (docKey: string) => resolveLoanDocUrl(docKey, uploadedDocs, initialData);
+
     // Next of Kin
     const [nokName, setNokName] = useState('');
     const [nokRelationship, setNokRelationship] = useState('');
@@ -438,12 +462,12 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
                 account_name: accountName,
                 casa,
                 topup_amount: parseFloat(topUpAmount) || 0,
-                govt_id_url: uploadedDocs.govt_id?.url || null,
-                work_id_url: uploadedDocs.work_id?.url || null,
-                payslip_url: uploadedDocs.payslip?.url || null,
-                selfie_verification_url: uploadedDocs.selfie?.url || null,
-                statement_of_account_url: uploadedDocs.bank_statement?.url || null,
-                proof_of_residence_url: uploadedDocs.proof_address?.url || null,
+                govt_id_url: getLoanDocUrl('govt_id'),
+                work_id_url: getLoanDocUrl('work_id'),
+                payslip_url: getLoanDocUrl('payslip'),
+                selfie_verification_url: getLoanDocUrl('selfie'),
+                statement_of_account_url: getLoanDocUrl('bank_statement'),
+                proof_of_residence_url: getLoanDocUrl('proof_address'),
                 nok_name: nokName,
                 nok_relationship: nokRelationship,
                 nok_address: nokAddress,
@@ -798,8 +822,11 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
         setErrors(prev => { const n = { ...prev }; delete n[field]; return n; });
     };
 
-    // File Upload Logic
+    // File Upload Logic — documents are uploaded on Loan Details, not in this form.
     const uploadFile = async (id: string, file: File) => {
+        alert('Upload documents on the Loan Details page (Documents section), then return here to continue.');
+        return;
+        // eslint-disable-next-line no-unreachable
         // Prevent uploading the exact same file in multiple document slots within this application
         const isDuplicate = Object.entries(uploadedDocs).some(([slotId, doc]) => {
             if (slotId === id || !doc) return false;
@@ -949,7 +976,7 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
             if (bankVerificationResult && !bankVerificationResult.isMatch) newErrors.accountName = "Name mismatch";
             if (isVerifyingBank) newErrors.accountNumber = "Verifying...";
 
-            if (!uploadedDocs.payslip) newErrors.payslip = "Required";
+            if (!getLoanDocUrl('payslip')) newErrors.payslip = "Required";
 
         } else {
             // Standard Wizard Validation
@@ -1022,15 +1049,14 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
                 }
             }
 
-            if (stepToCheck === 4) { // Documents
-                if (!uploadedDocs.govt_id) newErrors.govt_id = "Required";
-                if (!uploadedDocs.work_id) newErrors.work_id = "Required";
-                if (!uploadedDocs.payslip) newErrors.payslip = "Required";
-                if (!uploadedDocs.selfie) newErrors.selfie = "Required";
+            if (stepToCheck === 4) { // Documents (uploaded on Loan Details page)
+                if (!getLoanDocUrl('govt_id')) newErrors.govt_id = "Required — upload on Loan Details";
+                if (!getLoanDocUrl('work_id')) newErrors.work_id = "Required — upload on Loan Details";
+                if (!getLoanDocUrl('payslip')) newErrors.payslip = "Required — upload on Loan Details";
+                if (!getLoanDocUrl('selfie')) newErrors.selfie = "Required — upload on Loan Details";
 
-                // Bank Statement required for > 500k
-                if ((parseFloat(amount) || 0) > 500000 && !uploadedDocs.bank_statement) {
-                    newErrors.bank_statement = "Required for > ₦500k";
+                if ((parseFloat(amount) || 0) > 500000 && !getLoanDocUrl('bank_statement')) {
+                    newErrors.bank_statement = "Required for > ₦500k — upload on Loan Details";
                 }
             }
 
@@ -1244,7 +1270,7 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
                 mobile_number: mobileNumber,
                 ippis_number: ippisNumber,
                 casa: casa, // Send as string ID
-                payslip_url: uploadedDocs.payslip?.url,
+                payslip_url: getLoanDocUrl('payslip'),
             };
 
             const existingLoanIdForSubmit = dbLoanId || (loanId && !isNaN(Number(loanId)) ? Number(loanId) : null) ||
@@ -1292,11 +1318,11 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
                     requested_loan_amount: parseFloat(amount) || 0,
                     loan_tenure_months: tenure,
 
-                    govt_id_url: uploadedDocs.govt_id?.url,
-                    work_id_url: uploadedDocs.work_id?.url,
-                    statement_of_account_url: uploadedDocs.bank_statement?.url,
-                    proof_of_residence_url: uploadedDocs.proof_address?.url,
-                    selfie_verification_url: uploadedDocs.selfie?.url,
+                    govt_id_url: getLoanDocUrl('govt_id'),
+                    work_id_url: getLoanDocUrl('work_id'),
+                    statement_of_account_url: getLoanDocUrl('bank_statement'),
+                    proof_of_residence_url: getLoanDocUrl('proof_address'),
+                    selfie_verification_url: getLoanDocUrl('selfie'),
                     references,
 
                     // Next of Kin
@@ -1650,20 +1676,19 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
                                 </div>
                             </div>
 
-                            {/* Documents (Payslip Only) */}
+                            {/* Documents (Payslip Only) — upload on Loan Details page */}
                             <div className="p-6 bg-slate-50 dark:bg-slate-800/50 rounded-3xl border border-slate-100 dark:border-slate-800">
-                                <h4 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-widest mb-6 border-b border-slate-200 pb-2">Documents</h4>
-                                <FileUpload
-                                    id="payslip"
-                                    label="Recent Payslip"
-                                    required
-                                    doc={uploadedDocs.payslip}
-                                    progress={uploadProgress.payslip}
-                                    processing={uploadProcessing.payslip}
-                                    error={errors.payslip}
-                                    onSelect={handleFileSelect}
-                                    onRemove={removeDoc}
-                                />
+                                <h4 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-widest mb-4 border-b border-slate-200 pb-2">Documents</h4>
+                                <p className="text-xs font-bold text-slate-500 mb-4">
+                                    Upload the payslip on the Loan Details page, then return here to continue.
+                                </p>
+                                <div className={`flex items-center gap-2 px-4 py-3 rounded-xl border ${getLoanDocUrl('payslip') ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-amber-200 bg-amber-50 text-amber-700'}`}>
+                                    <span className="material-symbols-outlined text-lg">{getLoanDocUrl('payslip') ? 'check_circle' : 'pending'}</span>
+                                    <span className="text-xs font-black uppercase tracking-wider">
+                                        Payslip {getLoanDocUrl('payslip') ? 'uploaded' : 'missing'}
+                                    </span>
+                                </div>
+                                {errors.payslip && <p className="text-[10px] font-bold text-red-500 mt-2">{errors.payslip}</p>}
                             </div>
 
                         </div>
@@ -2189,83 +2214,44 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
                             {step === 4 && (
                                 <div className="space-y-8 animate-in fade-in slide-in-from-right-8 duration-500 max-w-4xl mx-auto py-2">
                                     <div className="text-center space-y-3 mb-6">
-                                        <h3 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight uppercase">Document Verification</h3>
-                                        <p className="text-xs font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest leading-relaxed">
-                                            Upload clear, scanned copies of supporting documents
+                                        <h3 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight uppercase">Document Checklist</h3>
+                                        <p className="text-xs font-bold text-slate-500 dark:text-slate-400 leading-relaxed max-w-lg mx-auto">
+                                            Close this form and upload documents on the <span className="font-black text-primary">Loan Details</span> page under <span className="font-black">Documents</span>, then reopen the application to continue.
                                         </p>
                                     </div>
 
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                        <FileUpload
-                                            id="govt_id"
-                                            label="Government ID"
-                                            subtitle="PASSPORT, DRIVER LICENSE, ETC."
-                                            required
-                                            doc={uploadedDocs.govt_id}
-                                            progress={uploadProgress.govt_id}
-                                            processing={uploadProcessing.govt_id}
-                                            error={errors.govt_id}
-                                            onSelect={handleFileSelect}
-                                            onRemove={removeDoc}
-                                        />
-                                        <FileUpload
-                                            id="work_id"
-                                            label="Work ID"
-                                            subtitle="VALID COMPANY/ORG ID"
-                                            required
-                                            doc={uploadedDocs.work_id}
-                                            progress={uploadProgress.work_id}
-                                            processing={uploadProcessing.work_id}
-                                            error={errors.work_id}
-                                            onSelect={handleFileSelect}
-                                            onRemove={removeDoc}
-                                        />
-                                        <FileUpload
-                                            id="payslip"
-                                            label="Recent Payslip"
-                                            subtitle="MUST BE FROM LAST 3 MONTHS"
-                                            required
-                                            doc={uploadedDocs.payslip}
-                                            progress={uploadProgress.payslip}
-                                            processing={uploadProcessing.payslip}
-                                            error={errors.payslip}
-                                            onSelect={handleFileSelect}
-                                            onRemove={removeDoc}
-                                        />
-                                        <FileUpload
-                                            id="selfie"
-                                            label="Selfie"
-                                            subtitle="REAL-TIME FACIAL CAPTURE"
-                                            required
-                                            doc={uploadedDocs.selfie}
-                                            progress={uploadProgress.selfie}
-                                            processing={uploadProcessing.selfie}
-                                            error={errors.selfie}
-                                            onSelect={handleFileSelect}
-                                            onRemove={removeDoc}
-                                        />
-                                        <FileUpload
-                                            id="bank_statement"
-                                            label="Bank Statement"
-                                            subtitle="6 MONTHS STAMPED STATEMENT"
-                                            required={(parseFloat(amount) || 0) > 500000}
-                                            doc={uploadedDocs.bank_statement}
-                                            progress={uploadProgress.bank_statement}
-                                            processing={uploadProcessing.bank_statement}
-                                            error={errors.bank_statement}
-                                            onSelect={handleFileSelect}
-                                            onRemove={removeDoc}
-                                        />
-                                        <FileUpload
-                                            id="proof_address"
-                                            label="Proof of Residence"
-                                            subtitle="UTILITY BILL OR RENT RECEIPT"
-                                            doc={uploadedDocs.proof_address}
-                                            progress={uploadProgress.proof_address}
-                                            processing={uploadProcessing.proof_address}
-                                            onSelect={handleFileSelect}
-                                            onRemove={removeDoc}
-                                        />
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        {[
+                                            { id: 'govt_id', label: 'Government ID', required: true },
+                                            { id: 'work_id', label: 'Work ID', required: true },
+                                            { id: 'payslip', label: 'Recent Payslip', required: true },
+                                            { id: 'selfie', label: 'Selfie', required: true },
+                                            { id: 'bank_statement', label: 'Bank Statement', required: (parseFloat(amount) || 0) > 500000 },
+                                            { id: 'proof_address', label: 'Proof of Residence', required: false },
+                                        ].map((doc) => {
+                                            const uploaded = Boolean(getLoanDocUrl(doc.id));
+                                            return (
+                                                <div
+                                                    key={doc.id}
+                                                    className={`p-5 rounded-2xl border-2 flex items-start gap-3 ${uploaded ? 'border-emerald-200 bg-emerald-50/50 dark:bg-emerald-950/20' : 'border-amber-200 bg-amber-50/50 dark:bg-amber-950/20'}`}
+                                                >
+                                                    <span className={`material-symbols-outlined text-2xl ${uploaded ? 'text-emerald-500' : 'text-amber-500'}`}>
+                                                        {uploaded ? 'check_circle' : 'pending'}
+                                                    </span>
+                                                    <div>
+                                                        <p className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-tight">
+                                                            {doc.label}{doc.required && <span className="text-red-500 ml-1">*</span>}
+                                                        </p>
+                                                        <p className="text-[10px] font-bold uppercase tracking-widest mt-1 text-slate-500">
+                                                            {uploaded ? 'Uploaded on Loan Details' : 'Missing — upload on Loan Details'}
+                                                        </p>
+                                                        {errors[doc.id] && (
+                                                            <p className="text-[10px] font-bold text-red-500 mt-1">{errors[doc.id]}</p>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
                                     </div>
                                 </div>
                             )}
