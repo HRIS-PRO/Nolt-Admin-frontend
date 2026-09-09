@@ -4,6 +4,7 @@ import MdaTertiarySelect, { TERTIARY_LIST } from './MdaTertiarySelect';
 
 import { StaffLoanDraft } from '../types';
 import { storageService } from '../services/storageService';
+import { getEligibilityBanner } from '../utils/loanEligibility';
 
 const STATIC_PRODUCTS = [
     { name: "NOLT IPPIS", code: "314", rate: "4% PER MONTH", icon: "inventory_2" },
@@ -493,6 +494,10 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
             }
         } catch (err: any) {
             console.error(`❌ [STAFF FORM DRAFT SAVE FAILED - SUB_STEP ${targetStep}]:`, err.response?.data || err.message);
+            const blockMessage = err.response?.data?.message;
+            if (err.response?.status === 403 && blockMessage) {
+                alert(blockMessage);
+            }
         } finally {
             isSavingDraftRef.current = false;
         }
@@ -1466,6 +1471,25 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
 
                 {/* Progress Indicator */}
                 {renderStepIndicator()}
+
+                {(() => {
+                    const eligibilityBanner = getEligibilityBanner(initialData?.loan_eligibility);
+                    if (!eligibilityBanner) return null;
+                    return (
+                        <div className={`mx-6 md:mx-8 mb-2 p-4 rounded-2xl border ${
+                            eligibilityBanner.tone === 'red'
+                                ? 'bg-rose-50 dark:bg-rose-950/30 border-rose-200 dark:border-rose-800'
+                                : 'bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800'
+                        }`}>
+                            <p className={`text-xs font-black uppercase tracking-wide ${eligibilityBanner.tone === 'red' ? 'text-rose-800 dark:text-rose-200' : 'text-amber-800 dark:text-amber-200'}`}>
+                                {eligibilityBanner.title}
+                            </p>
+                            <p className={`text-[11px] font-bold mt-1 leading-relaxed ${eligibilityBanner.tone === 'red' ? 'text-rose-700 dark:text-rose-300' : 'text-amber-700 dark:text-amber-300'}`}>
+                                {eligibilityBanner.message}
+                            </p>
+                        </div>
+                    );
+                })()}
 
                 {/* Content */}
                 <div className="flex-1 overflow-y-auto p-6 md:p-8 scrollbar-thin scrollbar-thumb-slate-200 dark:scrollbar-thumb-slate-800">

@@ -637,13 +637,13 @@ const LoanQueuePage: React.FC<LoanQueuePageProps> = ({ user, onLogout, toggleThe
                                                 <td className="p-6">
                                                     <div className="w-40">
                                                         <div className="flex justify-between items-center mb-1.5">
-                                                            <span className="text-[10px] font-black uppercase tracking-wider text-slate-900 dark:text-white">{loan.stage?.replace('_', ' ') || 'Onboarding'}</span>
-                                                            <span className="text-[10px] font-bold text-slate-400">{Math.round(getStageProgress(loan.stage || 'onboarding'))}%</span>
+                                                            <span className="text-[10px] font-black uppercase tracking-wider text-slate-900 dark:text-white">{loan.status === 'draft' ? 'Draft' : (loan.stage?.replace('_', ' ') || 'Onboarding')}</span>
+                                                            <span className="text-[10px] font-bold text-slate-400">{loan.status === 'draft' ? 0 : Math.round(getStageProgress(loan.stage || 'onboarding'))}%</span>
                                                         </div>
                                                         <div className="h-1.5 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden border border-slate-200 dark:border-slate-700/50">
                                                             <motion.div
                                                                 initial={{ width: 0 }}
-                                                                animate={{ width: `${getStageProgress(loan.stage || 'onboarding')}%` }}
+                                                                animate={{ width: `${loan.status === 'draft' ? 0 : getStageProgress(loan.stage || 'onboarding')}%` }}
                                                                 className={`h-full rounded-full ${loan.status === 'rejected' ? 'bg-rose-500' : 'bg-gradient-to-r from-blue-600 to-indigo-600 shadow-[0_0_8px_rgba(37,99,235,0.4)]'}`}
                                                             />
                                                         </div>
