@@ -173,9 +173,11 @@ const NewCustomerModal: React.FC<NewCustomerModalProps> = ({ isOpen, onClose, on
 
     try {
       const response = await axios.post('/api/upload', uploadData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
+        headers: { 'Content-Type': 'multipart/form-data' },
+        withCredentials: true,
       });
-      setFormData(prev => ({ ...prev, utility_bill_url: response.data.document.file_url }));
+      const fileUrl = response.data.document?.file_url || response.data.url;
+      setFormData(prev => ({ ...prev, utility_bill_url: fileUrl }));
       setError(null);
     } catch (err) {
       alert('Failed to upload utility bill');
