@@ -3,7 +3,15 @@ import { AppStep, SavedDraft, UserState } from '../types';
 import { storageService } from '../services/storageService';
 import axios from 'axios';
 import { formatDate } from '../utils/dateFormatter';
+import { mapDbLoanToSavedDraft } from '../utils/loanDraftMapper';
 import { apiUrl } from '@/lib/api-config';
+
+function mergeDraftLists(localDrafts: SavedDraft[], dbDrafts: SavedDraft[]): SavedDraft[] {
+  const merged = new Map<string, SavedDraft>();
+  for (const draft of localDrafts) merged.set(draft.id, draft);
+  for (const draft of dbDrafts) merged.set(draft.id, draft);
+  return Array.from(merged.values()).sort((a, b) => b.updatedAt - a.updatedAt);
+}
 
 interface ApplicationsListProps {
   navigate: (step: AppStep, draft?: SavedDraft | null) => void;
@@ -313,9 +321,7 @@ const ApplicationsList: React.FC<ApplicationsListProps> = ({ navigate, formatMon
 
 
   useEffect(() => {
-    setDrafts(storageService.getDrafts());
-
-    // Fetch Completed Applications
+    // Fetch Completed Applications + DB-backed loan drafts
     const fetchApplications = async () => {
       try {
         const [loansRes, investmentsRes] = await Promise.all([
@@ -327,8 +333,15 @@ const ApplicationsList: React.FC<ApplicationsListProps> = ({ navigate, formatMon
         console.log("DEBUG: Fetched Completed Investments:", investmentsRes.data);
         
         let completed: any[] = [];
+        let dbDrafts: SavedDraft[] = [];
         
         if (Array.isArray(loansRes.data)) {
+          dbDrafts = loansRes.data
+            .filter((app: any) => app.status?.toLowerCase() === 'draft')
+            .map((app: any) => mapDbLoanToSavedDraft(app));
+
+          setDrafts(mergeDraftLists(storageService.getDrafts(), dbDrafts));
+
           // Filter for completed statuses (disbursed, rejected)
           // Also including repayment_started and closed as they are logically completed/advanced steps of disbursed
           const completedLoans = loansRes.data.filter((app: any) =>
@@ -435,11 +448,19 @@ const ApplicationsList: React.FC<ApplicationsListProps> = ({ navigate, formatMon
     }
   };
 
-  const handleDeleteDraft = (id: string, e: React.MouseEvent) => {
+  const handleDeleteDraft = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    e.nativeEvent.stopImmediatePropagation(); // stops the window 'click' listener too
-    storageService.deleteDraft(id);
-    setDrafts(storageService.getDrafts());
+    e.nativeEvent.stopImmediatePropagation();
+    try {
+      if (/^\d+$/.test(id)) {
+        await axios.delete(apiUrl(`/api/loans/${id}`), { withCredentials: true });
+      } else {
+        storageService.deleteDraft(id);
+      }
+      setDrafts((prev) => prev.filter((draft) => draft.id !== id));
+    } catch (err: any) {
+      alert(err.response?.data?.message || 'Failed to delete draft');
+    }
   };
 
   const handleShowDetails = (app: any) => {
@@ -551,7 +572,7 @@ const ApplicationsList: React.FC<ApplicationsListProps> = ({ navigate, formatMon
             )}
 
             {drafts.length > 0 ? drafts.map((draft, idx) => {
-              const totalSteps = draft.type === 'LOAN' ? 12 : 11;
+              const totalSteps = draft.type === 'LOAN' ? 14 : 11;
               const pct = Math.min(Math.round(((draft.subStep + 1) / totalSteps) * 100), 100);
               const isLoan = draft.type === 'LOAN';
               return (

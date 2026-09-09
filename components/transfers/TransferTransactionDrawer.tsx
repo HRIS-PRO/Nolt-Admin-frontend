@@ -50,6 +50,8 @@ interface TransactionContext {
 
 type DrawerTab = 'overview' | 'ledger' | 'audit' | 'payload';
 
+const drawerPanelClass = 'rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60';
+
 type Props = {
     transaction: CbaTransactionRow | null;
     open: boolean;
@@ -78,10 +80,16 @@ function formatDateTime(iso: string): string {
 
 function statusTone(code: string): string {
     const s = (code ?? '').toLowerCase();
-    if (s === 'success' || s === 'successful') return 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30';
-    if (s === 'failed') return 'text-rose-400 bg-rose-500/10 border-rose-500/30';
-    if (s === 'pending' || s === 'processing') return 'text-amber-400 bg-amber-500/10 border-amber-500/30';
-    return 'text-slate-300 bg-slate-700/50 border-slate-600';
+    if (s === 'success' || s === 'successful') {
+        return 'text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 border-emerald-200 dark:border-emerald-500/30';
+    }
+    if (s.includes('fail') || s === 'failed') {
+        return 'text-rose-700 dark:text-rose-400 bg-rose-50 dark:bg-rose-500/10 border-rose-200 dark:border-rose-500/30';
+    }
+    if (s === 'pending' || s === 'processing') {
+        return 'text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-500/10 border-amber-200 dark:border-amber-500/30';
+    }
+    return 'text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-700/50 border-slate-200 dark:border-slate-600';
 }
 
 function typeLabel(code: string): string {
@@ -101,11 +109,20 @@ export function TransferTransactionDrawer({ transaction, open, onClose }: Props)
     const [tab, setTab] = useState<DrawerTab>('overview');
     const [context, setContext] = useState<TransactionContext | null>(null);
     const [loadingContext, setLoadingContext] = useState(false);
+    const [showReversalConfirm, setShowReversalConfirm] = useState(false);
+
+    const panelClass = drawerPanelClass;
+    const canReverse = useMemo(() => {
+        if (!transaction) return false;
+        const status = (transaction.transactionStatusCode ?? '').toLowerCase();
+        return status === 'success' || status === 'successful';
+    }, [transaction]);
 
     useEffect(() => {
         if (!open) {
             setTab('overview');
             setContext(null);
+            setShowReversalConfirm(false);
             return;
         }
         if (!transaction) return;
@@ -191,10 +208,10 @@ export function TransferTransactionDrawer({ transaction, open, onClose }: Props)
                 open ? 'opacity-100' : 'opacity-0 pointer-events-none'
             }`}
         >
-            <div className="absolute inset-0 bg-slate-900/70 backdrop-blur-sm" onClick={onClose} aria-hidden />
+            <div className="absolute inset-0 bg-black/50 dark:bg-slate-900/70 backdrop-blur-sm" onClick={onClose} aria-hidden />
 
             <aside
-                className={`relative w-full max-w-xl bg-[#0b1220] text-slate-100 shadow-2xl flex flex-col h-[100dvh] min-h-0 transition-transform duration-300 border-l border-slate-800 ${
+                className={`relative w-full max-w-xl bg-white dark:bg-[#1e293b] text-slate-900 dark:text-white shadow-2xl flex flex-col h-[100dvh] min-h-0 transition-transform duration-300 border-l border-slate-200 dark:border-slate-800 ${
                     open ? 'translate-x-0' : 'translate-x-full'
                 }`}
                 role="dialog"
@@ -202,7 +219,7 @@ export function TransferTransactionDrawer({ transaction, open, onClose }: Props)
                 aria-label="Transaction audit"
             >
                 {/* header */}
-                <div className="p-6 border-b border-slate-800 shrink-0">
+                <div className="p-6 border-b border-slate-200 dark:border-slate-800 shrink-0">
                     <div className="flex items-start justify-between gap-3 mb-4">
                         <div className="min-w-0">
                             <div className="flex flex-wrap items-center gap-2 mb-2">
@@ -216,7 +233,7 @@ export function TransferTransactionDrawer({ transaction, open, onClose }: Props)
                                     {transaction.transactionStatusCode}
                                 </span>
                             </div>
-                            <p className="text-3xl font-black text-white tabular-nums">{formatNaira(transaction.amount)}</p>
+                            <p className="text-3xl font-black text-slate-900 dark:text-white tabular-nums">{formatNaira(transaction.amount)}</p>
                             <div className="mt-3 space-y-1">
                                 <p className="text-xs text-slate-400 font-mono truncate">
                                     Ref: {transaction.transactionReference}
@@ -233,21 +250,21 @@ export function TransferTransactionDrawer({ transaction, open, onClose }: Props)
                                 type="button"
                                 title="Copy reference"
                                 onClick={() => copyText(transaction.transactionReference)}
-                                className="size-9 rounded-lg bg-slate-800 hover:bg-slate-700 flex items-center justify-center text-slate-400"
+                                className="size-9 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 flex items-center justify-center text-slate-500 dark:text-slate-400"
                             >
                                 <span className="material-symbols-outlined text-lg">content_copy</span>
                             </button>
                             <button
                                 type="button"
                                 onClick={onClose}
-                                className="size-9 rounded-lg bg-slate-800 hover:bg-slate-700 flex items-center justify-center text-slate-400"
+                                className="size-9 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 flex items-center justify-center text-slate-500 dark:text-slate-400"
                             >
                                 <span className="material-symbols-outlined text-lg">close</span>
                             </button>
                         </div>
                     </div>
 
-                    <div className="flex gap-1 border-b border-slate-800 -mb-px overflow-x-auto">
+                    <div className="flex gap-1 border-b border-slate-200 dark:border-slate-800 -mb-px overflow-x-auto">
                         {(
                             [
                                 ['overview', 'Overview'],
@@ -262,8 +279,8 @@ export function TransferTransactionDrawer({ transaction, open, onClose }: Props)
                                 onClick={() => setTab(id)}
                                 className={`px-3 py-2.5 text-[10px] font-black uppercase tracking-widest whitespace-nowrap border-b-2 transition-colors ${
                                     tab === id
-                                        ? 'border-blue-500 text-blue-400'
-                                        : 'border-transparent text-slate-500 hover:text-slate-300'
+                                        ? 'border-blue-500 text-blue-600 dark:text-blue-400'
+                                        : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
                                 }`}
                             >
                                 {label}
@@ -282,12 +299,12 @@ export function TransferTransactionDrawer({ transaction, open, onClose }: Props)
                             ) : null}
 
                             <div className="grid sm:grid-cols-2 gap-4">
-                                <div className="rounded-xl border border-slate-800 bg-[#111827] p-4">
+                                <div className={`${panelClass} p-4`}>
                                     <p className="text-[10px] font-black uppercase tracking-widest text-blue-400 mb-3 flex items-center gap-1">
                                         <span className="material-symbols-outlined text-sm">north_east</span>
                                         Source (initiator)
                                     </p>
-                                    <p className="font-bold text-white text-sm mb-3">
+                                    <p className="font-bold text-slate-900 dark:text-white text-sm mb-3">
                                         {context?.source?.fullName ?? 'Customer profile not linked'}
                                     </p>
                                     <dl className="space-y-2 text-xs">
@@ -307,12 +324,12 @@ export function TransferTransactionDrawer({ transaction, open, onClose }: Props)
                                     </dl>
                                 </div>
 
-                                <div className="rounded-xl border border-slate-800 bg-[#111827] p-4">
+                                <div className={`${panelClass} p-4`}>
                                     <p className="text-[10px] font-black uppercase tracking-widest text-emerald-400 mb-3 flex items-center gap-1">
                                         <span className="material-symbols-outlined text-sm">south_west</span>
                                         Destination (beneficiary)
                                     </p>
-                                    <p className="font-bold text-white text-sm mb-3">
+                                    <p className="font-bold text-slate-900 dark:text-white text-sm mb-3">
                                         {context?.destination?.profile?.fullName
                                             ?? (context?.destination?.isInternalWallet
                                                 ? 'NOLT wallet customer'
@@ -339,7 +356,7 @@ export function TransferTransactionDrawer({ transaction, open, onClose }: Props)
                                 <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-3">
                                     Transaction pricing &amp; charges
                                 </p>
-                                <div className="rounded-xl border border-slate-800 bg-[#111827] divide-y divide-slate-800">
+                                <div className={`${panelClass} divide-y divide-slate-200 dark:divide-slate-800`}>
                                     <PricingRow label="Principal transfer amount" value={formatNaira(transaction.amount)} />
                                     <PricingRow label="Processing fee" value={formatNaira(transaction.fee)} />
                                     <PricingRow
@@ -354,7 +371,7 @@ export function TransferTransactionDrawer({ transaction, open, onClose }: Props)
                                 <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2">
                                     Transaction narration
                                 </p>
-                                <blockquote className="rounded-xl border border-slate-800 bg-[#111827] px-4 py-3 text-sm text-slate-300 italic">
+                                <blockquote className={`${panelClass} px-4 py-3 text-sm text-slate-600 dark:text-slate-300 italic`}>
                                     &ldquo;{transaction.narration || 'No narration provided'}&rdquo;
                                 </blockquote>
                             </section>
@@ -369,9 +386,9 @@ export function TransferTransactionDrawer({ transaction, open, onClose }: Props)
                                     <AnalyticsTile label="Channel" value="Mobile app → CBA" />
                                     <AnalyticsTile label="Posted at" value={formatDateTime(transaction.transactionDate)} />
                                     {transaction.paymentGatewayError ? (
-                                        <div className="col-span-2 rounded-xl border border-rose-500/30 bg-rose-500/10 px-3 py-2.5">
-                                            <p className="text-[10px] font-black uppercase text-rose-400 mb-1">Gateway error</p>
-                                            <p className="text-xs text-rose-200">{transaction.paymentGatewayError}</p>
+                                        <div className="col-span-2 rounded-xl border border-rose-200 dark:border-rose-500/30 bg-rose-50 dark:bg-rose-500/10 px-3 py-2.5">
+                                            <p className="text-[10px] font-black uppercase text-rose-700 dark:text-rose-400 mb-1">Gateway error</p>
+                                            <p className="text-xs text-rose-800 dark:text-rose-200">{transaction.paymentGatewayError}</p>
                                         </div>
                                     ) : null}
                                 </div>
@@ -382,7 +399,7 @@ export function TransferTransactionDrawer({ transaction, open, onClose }: Props)
                                     <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-3">
                                         Customer contact (LMS)
                                     </p>
-                                    <div className="rounded-xl border border-slate-800 bg-[#111827] p-4 text-xs space-y-2">
+                                    <div className={`${panelClass} p-4 text-xs space-y-2`}>
                                         {context.source.email ? <Row label="Email" value={context.source.email} /> : null}
                                         {context.source.phone ? <Row label="Phone" value={context.source.phone} mono /> : null}
                                         {context.source.customerId ? (
@@ -405,10 +422,10 @@ export function TransferTransactionDrawer({ transaction, open, onClose }: Props)
                             {ledgerEntries.map((entry, i) => (
                                 <div
                                     key={i}
-                                    className="flex items-center justify-between gap-4 rounded-xl border border-slate-800 bg-[#111827] px-4 py-3"
+                                    className={`flex items-center justify-between gap-4 ${panelClass} px-4 py-3`}
                                 >
                                     <div>
-                                        <p className="text-sm font-bold text-white">{entry.label}</p>
+                                        <p className="text-sm font-bold text-slate-900 dark:text-white">{entry.label}</p>
                                         <p className="text-[11px] text-slate-500 font-mono mt-0.5">{entry.account}</p>
                                     </div>
                                     <div className="text-right">
@@ -421,7 +438,7 @@ export function TransferTransactionDrawer({ transaction, open, onClose }: Props)
                                         >
                                             {entry.direction}
                                         </span>
-                                        <p className="text-sm font-black text-white mt-1 tabular-nums">
+                                        <p className="text-sm font-black text-slate-900 dark:text-white mt-1 tabular-nums">
                                             {formatNaira(Number(entry.amount))}
                                         </p>
                                     </div>
@@ -441,14 +458,14 @@ export function TransferTransactionDrawer({ transaction, open, onClose }: Props)
                                         ) : null}
                                     </div>
                                     <div className="pb-4">
-                                        <p className="text-sm font-bold text-white">{event.label}</p>
+                                        <p className="text-sm font-bold text-slate-900 dark:text-white">{event.label}</p>
                                         <p className="text-[11px] text-slate-500 mt-0.5">{event.detail}</p>
                                         <p className="text-xs text-slate-400 font-mono mt-1">{formatDateTime(event.at)}</p>
                                     </div>
                                 </div>
                             ))}
                             {transaction.extTransactionId || transaction.extPaymentReference ? (
-                                <div className="rounded-xl border border-slate-800 bg-[#111827] p-4 text-xs space-y-2 mt-4">
+                                <div className={`${drawerPanelClass} p-4 text-xs space-y-2 mt-4`}>
                                     {transaction.extTransactionId ? (
                                         <Row label="External txn ID" value={transaction.extTransactionId} mono />
                                     ) : null}
@@ -461,11 +478,67 @@ export function TransferTransactionDrawer({ transaction, open, onClose }: Props)
                     )}
 
                     {tab === 'payload' && (
-                        <pre className="text-[11px] leading-relaxed font-mono text-slate-300 bg-[#111827] border border-slate-800 rounded-xl p-4 overflow-x-auto whitespace-pre-wrap break-all">
+                        <pre className={`text-[11px] leading-relaxed font-mono text-slate-700 dark:text-slate-300 ${panelClass} p-4 overflow-x-auto whitespace-pre-wrap break-all`}>
                             {JSON.stringify(transaction, null, 2)}
                         </pre>
                     )}
                 </div>
+
+                <div className="shrink-0 p-6 border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-[#1e293b]">
+                    <button
+                        type="button"
+                        disabled={!canReverse}
+                        onClick={() => setShowReversalConfirm(true)}
+                        className="w-full h-12 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-black text-xs uppercase tracking-widest disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                    >
+                        Reverse transaction
+                    </button>
+                    {!canReverse ? (
+                        <p className="text-[11px] text-slate-500 dark:text-slate-400 text-center mt-2">
+                            Reversal is only available for successful transfers.
+                        </p>
+                    ) : null}
+                </div>
+
+                {showReversalConfirm ? (
+                    <div className="absolute inset-0 z-10 flex items-center justify-center p-6 bg-black/40 dark:bg-slate-950/70">
+                        <div
+                            role="dialog"
+                            aria-modal="true"
+                            aria-labelledby="reversal-confirm-title"
+                            className="w-full max-w-md rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-6 shadow-2xl"
+                        >
+                            <h3 id="reversal-confirm-title" className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight">
+                                Confirm reversal
+                            </h3>
+                            <p className="text-sm text-slate-600 dark:text-slate-300 mt-3 leading-relaxed">
+                                This will request a reversal for{' '}
+                                <span className="font-bold">{formatNaira(transaction.amount)}</span> to account{' '}
+                                <span className="font-mono">{transaction.beneficiaryAccountNumber || '—'}</span>.
+                                The reversal API is not connected yet — this action is a placeholder for staff workflow.
+                            </p>
+                            <div className="flex gap-3 mt-6">
+                                <button
+                                    type="button"
+                                    onClick={() => setShowReversalConfirm(false)}
+                                    className="flex-1 h-11 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-black uppercase tracking-widest text-slate-600 dark:text-slate-300"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setShowReversalConfirm(false);
+                                        window.alert('Reversal request queued. Tunde will connect the live reversal API soon.');
+                                    }}
+                                    className="flex-1 h-11 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-black uppercase tracking-widest"
+                                >
+                                    Confirm reversal
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                ) : null}
             </aside>
         </div>
     );
@@ -489,7 +562,7 @@ function Row({
             <dt className="text-slate-500 shrink-0">{label}</dt>
             <dd
                 className={`text-right ${mono ? 'font-mono' : ''} ${
-                    highlight ? 'text-blue-400 font-bold' : 'text-slate-200'
+                    highlight ? 'text-blue-600 dark:text-blue-400 font-bold' : 'text-slate-700 dark:text-slate-200'
                 }`}
             >
                 {value}
@@ -509,8 +582,8 @@ function PricingRow({
 }) {
     return (
         <div className="flex justify-between items-center px-4 py-3 text-sm">
-            <span className={emphasis ? 'font-bold text-white' : 'text-slate-400'}>{label}</span>
-            <span className={`tabular-nums ${emphasis ? 'text-blue-400 font-black text-base' : 'text-slate-200 font-bold'}`}>
+            <span className={emphasis ? 'font-bold text-slate-900 dark:text-white' : 'text-slate-500 dark:text-slate-400'}>{label}</span>
+            <span className={`tabular-nums ${emphasis ? 'text-blue-600 dark:text-blue-400 font-black text-base' : 'text-slate-800 dark:text-slate-200 font-bold'}`}>
                 {value}
             </span>
         </div>
@@ -519,9 +592,9 @@ function PricingRow({
 
 function AnalyticsTile({ label, value }: { label: string; value: string }) {
     return (
-        <div className="rounded-xl border border-slate-800 bg-[#111827] px-3 py-2.5">
-            <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">{label}</p>
-            <p className="text-xs font-bold text-slate-200 mt-1 leading-snug">{value}</p>
+        <div className={`${drawerPanelClass} px-3 py-2.5`}>
+            <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400">{label}</p>
+            <p className="text-xs font-bold text-slate-700 dark:text-slate-200 mt-1 leading-snug">{value}</p>
         </div>
     );
 }

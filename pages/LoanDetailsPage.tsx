@@ -8,6 +8,7 @@ import SensitiveDataField from '../components/SensitiveDataField';
 import StaffLoanForm from '../components/StaffLoanForm';
 import { getStatusStyles } from '../utils/statusStyles';
 import { formatDate } from '../utils/dateFormatter';
+import { formatCasaLabel } from '../utils/formatCasa';
 
 interface LoanDetailsPageProps {
     user: { name: string; email: string; avatar_url?: string; role?: string };
@@ -240,6 +241,10 @@ const ActionCard = ({ loan, userRole, onActionComplete }: { loan: any, userRole:
     };
 
     const handleUpload = async () => {
+        if (isDraft) {
+            alert('Document uploads are disabled while this application is in draft. Submit the application first.');
+            return;
+        }
         if (!uploadFile) return;
         setUploadLoading(true);
         const formData = new FormData();
@@ -570,15 +575,34 @@ const ActionCard = ({ loan, userRole, onActionComplete }: { loan: any, userRole:
                 )}
 
                 {/* Upload Section */}
-                {/* Upload Section */}
                 {(() => {
                     const canUpload = (
                         (stage === 'sales' && ['sales_officer', 'sales_public_sector', 'sales_private_sector', 'sales_manager', 'super_admin', 'superadmin'].includes(userRole)) ||
                         (stage === 'customer_experience' && ['customer_experience', 'customer_service', 'super_admin', 'superadmin'].includes(userRole)) ||
                         (stage === 'credit_check_1' && ['credit_officer', 'super_admin', 'superadmin'].includes(userRole))
                     );
-                    return canUpload;
-                })() && (
+                    if (!canUpload) return null;
+
+                    if (isDraft) {
+                        return (
+                            <div className="mb-6 p-4 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/40">
+                                <div className="flex items-start gap-3">
+                                    <span className="material-symbols-outlined text-amber-600 dark:text-amber-400 text-xl shrink-0">lock</span>
+                                    <div>
+                                        <p className="text-[10px] font-black uppercase tracking-widest text-amber-700 dark:text-amber-400 mb-1">
+                                            Upload Supporting Document
+                                        </p>
+                                        <p className="text-xs font-bold text-amber-800 dark:text-amber-300 leading-relaxed">
+                                            Document uploads are disabled while this application is in draft. Use{' '}
+                                            <span className="font-black">Continue &amp; Submit Application</span> to finish and submit it first.
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        );
+                    }
+
+                    return (
                         <div className="mb-6 p-4 rounded-xl bg-slate-50 dark:bg-slate-800 border border-dashed border-slate-300 dark:border-slate-700">
                             <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2 block">Upload Supporting Document</label>
                             <div className="flex gap-2">
@@ -598,7 +622,8 @@ const ActionCard = ({ loan, userRole, onActionComplete }: { loan: any, userRole:
                                 )}
                             </div>
                         </div>
-                    )}
+                    );
+                })()}
 
                 {/* Finance GL Selection */}
                 {stage === 'finance' && (
@@ -919,6 +944,11 @@ const LoanDetailsPage: React.FC<LoanDetailsPageProps> = ({ user, onLogout, toggl
     const [directIndemnityUrl, setDirectIndemnityUrl] = useState<string | null>(null);
 
     const handleFileUpload = async (file: File, type: 'signature' | 'indemnity') => {
+        const loanIsDraft = String(loan?.status || '').toLowerCase() === 'draft';
+        if (loanIsDraft) {
+            alert('Document uploads are disabled while this application is in draft. Submit the application first.');
+            return;
+        }
         if (type === 'signature') {
             const reader = new FileReader();
             reader.onload = () => {
@@ -1020,48 +1050,52 @@ const LoanDetailsPage: React.FC<LoanDetailsPageProps> = ({ user, onLogout, toggl
             fetchLoan();
             fetchOfficers();
         }
+    }, [id, navigate]);
 
-        // Socket Listeners
-        import('../services/socket').then(({ socket }) => {
-            if (!id) return;
+    useEffect(() => {
+        if (!id) return;
 
-            const handleUpdate = (data: any) => {
+        let detach: (() => void) | undefined;
+
+        void import('../services/socket').then(({ socket }) => {
+            const matchesLoan = (data: { loanId?: number | string; contextType?: string; contextId?: number | string }) =>
+                String(data.loanId) === String(id)
+                || (data.contextType === 'loan' && String(data.contextId) === String(id));
+
+            const handleUpdate = (data: { id?: number | string; loanId?: number | string }) => {
                 if (String(data.id) === String(id) || String(data.loanId) === String(id)) {
-                    console.log("Real-time update for this loan");
-                    // Re-fetch loan
                     axios.get(`/api/staff/loans/${id}`, { withCredentials: true })
                         .then(res => setLoan(res.data))
                         .catch(console.error);
                 }
             };
 
-            const handleDocUpload = (data: any) => {
-                if (String(data.loanId) === String(id)) {
-                    console.log("Document uploaded");
-                    // Force refresh of DocumentsList
+            const handleDocUpload = (data: { loanId?: number | string; contextType?: string; contextId?: number | string }) => {
+                if (matchesLoan(data)) {
                     setLoan((prev: any) => ({ ...prev, updated_at: new Date().toISOString() }));
                 }
-            }
+            };
 
-            const handleDocDelete = (data: any) => {
-                if (String(data.loanId) === String(id)) {
-                    console.log("Document deleted");
-                    // Force refresh
+            const handleDocDelete = (data: { loanId?: number | string; contextType?: string; contextId?: number | string }) => {
+                if (matchesLoan(data)) {
                     setLoan((prev: any) => ({ ...prev, updated_at: new Date().toISOString() }));
                 }
-            }
+            };
 
             socket.on('loan_updated', handleUpdate);
             socket.on('doc_uploaded', handleDocUpload);
             socket.on('doc_deleted', handleDocDelete);
-
-            return () => {
+            detach = () => {
                 socket.off('loan_updated', handleUpdate);
                 socket.off('doc_uploaded', handleDocUpload);
                 socket.off('doc_deleted', handleDocDelete);
             };
         });
-    }, [id, navigate]);
+
+        return () => {
+            detach?.();
+        };
+    }, [id]);
 
     // console.log(loan);
 
@@ -1185,7 +1219,7 @@ const LoanDetailsPage: React.FC<LoanDetailsPageProps> = ({ user, onLogout, toggl
                     {loan.casa && (
                         <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-50 dark:bg-blue-900/20 text-xs font-bold text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800">
                             <span className="material-symbols-outlined text-sm">account_balance</span>
-                            CASA: {loan.casa}
+                            CASA: {formatCasaLabel(loan.casa)}
                         </span>
                     )}
                     <button
@@ -1440,7 +1474,7 @@ const LoanDetailsPage: React.FC<LoanDetailsPageProps> = ({ user, onLogout, toggl
                         <Field label="Staff ID" value={loan.staff_id} />
 
                         {/* New Fields */}
-                        {loan.casa && <Field label="CASA" value={String(loan.casa).split('.')[0]} />}
+                        {loan.casa && <Field label="CASA" value={formatCasaLabel(loan.casa)} />}
                         {loan.topup_amount && <Field label="Top Up Amount" value={`₦${Number(loan.topup_amount).toLocaleString()}`} />}
                         {loan.buy_over_amount && <Field label="Buy Over Amount" value={`₦${Number(loan.buy_over_amount).toLocaleString()}`} />}
                         {loan.buy_over_company_name && <Field label="Buy Over Company" value={loan.buy_over_company_name} />}
@@ -1472,7 +1506,14 @@ const LoanDetailsPage: React.FC<LoanDetailsPageProps> = ({ user, onLogout, toggl
                     )}
 
                     <CollapsibleGroup title="Indemnity Agreement" icon="gavel" defaultOpen={!loan.indemnity_document_url}>
-                        {loan.indemnity_document_url ? (
+                        {isDraft ? (
+                            <div className="md:col-span-2 p-6 rounded-2xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/40 flex items-start gap-3">
+                                <span className="material-symbols-outlined text-amber-600 dark:text-amber-400 text-xl shrink-0">lock</span>
+                                <p className="text-xs font-bold text-amber-800 dark:text-amber-300 leading-relaxed">
+                                    Indemnity uploads are disabled while this application is in draft. Submit the application first.
+                                </p>
+                            </div>
+                        ) : loan.indemnity_document_url ? (
                             <div className="md:col-span-2 space-y-6">
                                 <div className="p-6 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-between">
                                     <div className="flex items-center gap-4">
