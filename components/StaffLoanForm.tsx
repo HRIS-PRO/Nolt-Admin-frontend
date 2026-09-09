@@ -347,7 +347,8 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
                 nok_address: nokAddress,
                 nok_phone_number: `${nokCountryCode}${nokPhoneNumber}`,
                 references,
-                sales_officer_id: user?.id || undefined
+                sales_officer_id: user?.id || undefined,
+                applicant_customer_id: initialData?.id || initialData?.customer_id || undefined,
             };
 
             if (existingLoanId) {
@@ -714,6 +715,7 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
         try {
             const response = await axios.post('/api/upload', formData, {
                 timeout: 120_000,
+                withCredentials: true,
                 onUploadProgress: (progressEvent) => {
                     const total = progressEvent.total;
                     if (!total || total <= 0) return;

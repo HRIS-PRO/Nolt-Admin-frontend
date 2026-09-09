@@ -1,10 +1,11 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import StaffLayout from '../components/layouts/StaffLayout';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import NewLoanApplicationFlow from '../components/NewLoanApplicationFlow';
 import { getStatusStyles } from '../utils/statusStyles';
 import { formatDate } from '../utils/dateFormatter';
+import { formatCasaLabel } from '../utils/formatCasa';
 import { motion, AnimatePresence } from 'motion/react';
 
 interface LoanQueuePageProps {
@@ -38,9 +39,10 @@ const LoanQueuePage: React.FC<LoanQueuePageProps> = ({ user, onLogout, toggleThe
     const [glAccounts, setGlAccounts] = useState<any[]>([]);
     const [bulkGL, setBulkGL] = useState('');
 
+    const isFinanceUser = ['finance', 'admin', 'super_admin', 'superadmin'].includes(user.role || '');
 
-    const fetchLoans = async () => {
-        setIsLoading(true);
+    const fetchLoans = useCallback(async (opts?: { silent?: boolean }) => {
+        if (!opts?.silent) setIsLoading(true);
         try {
             const response = await axios.get(`${''}/api/staff/loans`, {
                 params: {
@@ -60,9 +62,18 @@ const LoanQueuePage: React.FC<LoanQueuePageProps> = ({ user, onLogout, toggleThe
         } catch (error) {
             console.error("Failed to fetch loans", error);
         } finally {
-            setIsLoading(false);
+            if (!opts?.silent) setIsLoading(false);
         }
-    };
+    }, [searchQuery, statusFilter, stageFilter, officerFilter, dateFrom, dateTo, currentPage, itemsPerPage]);
+
+    const refetchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    const scheduleSilentRefetch = useCallback(() => {
+        if (refetchTimerRef.current) clearTimeout(refetchTimerRef.current);
+        refetchTimerRef.current = setTimeout(() => {
+            void fetchLoans({ silent: true });
+        }, 500);
+    }, [fetchLoans]);
 
     const fetchOfficers = async () => {
         if (['sales_manager', 'admin', 'super_admin', 'superadmin', 'customer_experience', 'marketing'].includes(user.role || '')) {
@@ -76,17 +87,19 @@ const LoanQueuePage: React.FC<LoanQueuePageProps> = ({ user, onLogout, toggleThe
         }
     };
 
-    const handleToggleSelection = (id: number) => {
+    const handleToggleSelection = (id: number, stage?: string) => {
+        if (isFinanceUser && stage && stage !== 'finance') return;
         setSelectedLoans(prev =>
             prev.includes(id) ? prev.filter(loanId => loanId !== id) : [...prev, id]
         );
     };
 
     const handleSelectAll = () => {
-        if (selectedLoans.length === filteredLoans.length) {
+        const eligible = isFinanceUser ? loans.filter(l => l.stage === 'finance') : loans;
+        if (selectedLoans.length === eligible.length && eligible.length > 0) {
             setSelectedLoans([]);
         } else {
-            setSelectedLoans(filteredLoans.map(l => l.id));
+            setSelectedLoans(eligible.map(l => l.id));
         }
     };
 
@@ -94,18 +107,36 @@ const LoanQueuePage: React.FC<LoanQueuePageProps> = ({ user, onLogout, toggleThe
     // console.log(loans)
 
     const handleBulkApprove = async () => {
-        if (!confirm(`Are you sure you want to approve ${selectedLoans.length} loans? This will move them to Disbursed stage.`)) return;
+        const financeSelection = selectedLoans.filter(id => {
+            const loan = loans.find(l => l.id === id);
+            return loan?.stage === 'finance';
+        });
+
+        if (financeSelection.length === 0) {
+            alert('Select at least one loan in the Finance stage.');
+            return;
+        }
+
+        if (!confirm(`Disburse ${financeSelection.length} loan(s)? They will move to Disbursed stage.`)) return;
 
         setIsBulkApproving(true);
         try {
             const response = await axios.post(`${''}/api/staff/loans/bulk-approve`, {
-                loanIds: selectedLoans,
+                loanIds: financeSelection,
                 gl_account: bulkGL || null
             }, { withCredentials: true });
 
-            alert(response.data.message);
+            const { message, failures, processedIds } = response.data;
+            let detail = message;
+            if (processedIds?.length) {
+                detail += `\n\nDisbursed: ${processedIds.map((id: number) => `#LOAN-${id}`).join(', ')}`;
+            }
+            if (failures?.length) {
+                detail += `\n\nFailed:\n${failures.map((f: { id: number; reason: string }) => `#LOAN-${f.id}: ${f.reason}`).join('\n')}`;
+            }
+            alert(detail);
             setSelectedLoans([]);
-            fetchLoans(); // Refresh list
+            fetchLoans();
         } catch (error: any) {
             console.error("Bulk approval failed", error);
             alert(error.response?.data?.message || "Bulk approval failed");
@@ -136,29 +167,38 @@ const LoanQueuePage: React.FC<LoanQueuePageProps> = ({ user, onLogout, toggleThe
     };
 
     useEffect(() => {
-        fetchLoans();
+        void fetchLoans();
         fetchOfficers();
+    }, [fetchLoans, user.role]);
 
-        // Socket Listeners
-        import('../services/socket').then(({ socket }) => {
-            const handleLoanChange = () => {
-                console.log("Real-time update received");
-                fetchLoans(); // Refresh list on any change
+    useEffect(() => {
+        let detach: (() => void) | undefined;
+
+        void import('../services/socket').then(({ socket }) => {
+            const handleLoanChange = (payload: { id?: number; loanId?: number }) => {
+                console.log('Real-time loan update', payload?.id ?? payload?.loanId);
+                scheduleSilentRefetch();
             };
 
             socket.on('loan_new', handleLoanChange);
             socket.on('loan_updated', handleLoanChange);
-
-            return () => {
+            detach = () => {
                 socket.off('loan_new', handleLoanChange);
                 socket.off('loan_updated', handleLoanChange);
             };
         });
-    }, [user.role, searchQuery, statusFilter, stageFilter, officerFilter, dateFrom, dateTo, currentPage]);
 
-    // Fetch GL accounts when finance stage is filtered
+        return () => {
+            if (refetchTimerRef.current) clearTimeout(refetchTimerRef.current);
+            detach?.();
+        };
+    }, [scheduleSilentRefetch]);
+
+    const canBulkApprove = selectedLoans.length > 0 && isFinanceUser;
+
+    // Fetch GL accounts for finance users
     useEffect(() => {
-        if (stageFilter === 'finance') {
+        if (isFinanceUser) {
             axios.get('/api/gl-accounts', { withCredentials: true })
                 .then(res => {
                     if (res.data.success) {
@@ -167,12 +207,13 @@ const LoanQueuePage: React.FC<LoanQueuePageProps> = ({ user, onLogout, toggleThe
                 })
                 .catch(err => console.error('Failed to fetch GL accounts:', err));
         }
-    }, [stageFilter]);
+    }, [isFinanceUser]);
 
-    // Re-fetch on params change
-
-    // Client-side filtering removed as pagination is server-side now
     const filteredLoans = loans;
+    const bulkEligibleLoans = filteredLoans.filter(l => l.stage === 'finance');
+    const allBulkEligibleSelected =
+        bulkEligibleLoans.length > 0
+        && bulkEligibleLoans.every(l => selectedLoans.includes(l.id));
 
     const handleFilterChange = (key: string, value: string) => {
         setSearchParams(prev => {
@@ -423,7 +464,7 @@ const LoanQueuePage: React.FC<LoanQueuePageProps> = ({ user, onLogout, toggleThe
 
 
             {/* Bulk Action Bar */}
-            {selectedLoans.length > 0 && stageFilter === 'finance' && ['finance', 'admin', 'super_admin', 'superadmin'].includes(user.role || '') && (
+            {canBulkApprove && (
                 <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-2xl rounded-2xl px-6 py-3 flex items-center gap-4 z-50 animate-in slide-in-from-bottom-4">
                     <span className="text-sm font-bold text-slate-700 dark:text-slate-200">{selectedLoans.length} selected</span>
                     <div className="h-4 w-px bg-slate-200 dark:bg-slate-700"></div>
@@ -487,17 +528,19 @@ const LoanQueuePage: React.FC<LoanQueuePageProps> = ({ user, onLogout, toggleThe
                         <table className="w-full text-left">
                             <thead>
                                 <tr className="bg-slate-50/50 dark:bg-slate-900/50 text-[10px] uppercase text-slate-400 font-black tracking-[0.2em] border-b border-slate-100 dark:border-slate-800">
+                                    {isFinanceUser && (
                                     <th className="p-6 w-4">
                                         <div
                                             onClick={handleSelectAll}
-                                            className={`size-5 rounded-lg border-2 cursor-pointer flex items-center justify-center transition-all ${selectedLoans.length > 0 && selectedLoans.length === filteredLoans.length
+                                            className={`size-5 rounded-lg border-2 cursor-pointer flex items-center justify-center transition-all ${allBulkEligibleSelected
                                                 ? 'bg-blue-600 border-blue-600 shadow-lg shadow-blue-500/30'
                                                 : 'border-slate-300 dark:border-slate-700 hover:border-slate-400'
                                                 }`}
                                         >
-                                            {selectedLoans.length > 0 && selectedLoans.length === filteredLoans.length && <span className="material-symbols-outlined text-xs text-white font-black">check</span>}
+                                            {allBulkEligibleSelected && <span className="material-symbols-outlined text-xs text-white font-black">check</span>}
                                         </div>
                                     </th>
+                                    )}
                                     <th className="p-6">Applicant</th>
                                     <th className="p-6">Loan Detail</th>
                                     <th className="p-6">Stage & Progress</th>
@@ -512,7 +555,7 @@ const LoanQueuePage: React.FC<LoanQueuePageProps> = ({ user, onLogout, toggleThe
                                 <AnimatePresence mode="popLayout">
                                     {isLoading ? (
                                         <tr>
-                                            <td colSpan={8} className="p-20 text-center">
+                                            <td colSpan={isFinanceUser ? 8 : 7} className="p-20 text-center">
                                                 <div className="flex flex-col items-center gap-3">
                                                     <div className="size-10 border-4 border-blue-500/20 border-t-blue-500 rounded-full animate-spin"></div>
                                                     <p className="text-slate-500 font-bold uppercase tracking-widest text-[10px]">Synchronizing...</p>
@@ -521,7 +564,7 @@ const LoanQueuePage: React.FC<LoanQueuePageProps> = ({ user, onLogout, toggleThe
                                         </tr>
                                     ) : filteredLoans.length === 0 ? (
                                         <tr>
-                                            <td colSpan={8} className="p-20 text-center">
+                                            <td colSpan={isFinanceUser ? 8 : 7} className="p-20 text-center">
                                                 <div className="flex flex-col items-center gap-4 opacity-50">
                                                     <span className="material-symbols-outlined text-6xl">cloud_off</span>
                                                     <p className="text-slate-500 font-bold uppercase tracking-widest text-xs">No records matching your search</p>
@@ -538,9 +581,11 @@ const LoanQueuePage: React.FC<LoanQueuePageProps> = ({ user, onLogout, toggleThe
                                                 onClick={() => navigate(`/staff/loans/${loan.id}`)}
                                                 className={`hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-all group cursor-pointer ${selectedLoans.includes(loan.id) ? 'bg-blue-50/50 dark:bg-blue-900/10' : ''}`}
                                             >
+                                                {isFinanceUser && (
                                                 <td className="p-6" onClick={(e) => e.stopPropagation()}>
+                                                    {loan.stage === 'finance' ? (
                                                     <div
-                                                        onClick={() => handleToggleSelection(loan.id)}
+                                                        onClick={() => handleToggleSelection(loan.id, loan.stage)}
                                                         className={`size-5 rounded-lg border-2 cursor-pointer flex items-center justify-center transition-all ${selectedLoans.includes(loan.id)
                                                             ? 'bg-blue-600 border-blue-600 shadow-lg shadow-blue-500/30'
                                                             : 'border-slate-200 dark:border-slate-700 group-hover:border-slate-400'
@@ -548,7 +593,11 @@ const LoanQueuePage: React.FC<LoanQueuePageProps> = ({ user, onLogout, toggleThe
                                                     >
                                                         {selectedLoans.includes(loan.id) && <span className="material-symbols-outlined text-xs text-white font-black">check</span>}
                                                     </div>
+                                                    ) : (
+                                                    <div className="size-5 rounded-lg border-2 border-slate-100 dark:border-slate-800 opacity-30" title="Only Finance-stage loans can be bulk disbursed" />
+                                                    )}
                                                 </td>
+                                                )}
                                                 <td className="p-6">
                                                     <div className="flex items-center gap-4">
                                                         <div className="size-12 rounded-2xl bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-800 dark:to-slate-700 flex items-center justify-center text-lg font-black text-slate-700 dark:text-white border border-white dark:border-slate-600 shadow-inner group-hover:scale-110 transition-transform">
@@ -563,7 +612,7 @@ const LoanQueuePage: React.FC<LoanQueuePageProps> = ({ user, onLogout, toggleThe
                                                                 {loan.casa && (
                                                                     <>
                                                                         <span className="size-1 rounded-full bg-slate-300"></span>
-                                                                        <span className="text-[10px] font-mono text-blue-500">CASA: {loan.casa}</span>
+                                                                        <span className="text-[10px] font-mono text-blue-500">CASA: {formatCasaLabel(loan.casa)}</span>
                                                                     </>
                                                                 )}
                                                             </div>

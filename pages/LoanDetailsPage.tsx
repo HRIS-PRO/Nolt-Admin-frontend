@@ -8,6 +8,7 @@ import SensitiveDataField from '../components/SensitiveDataField';
 import StaffLoanForm from '../components/StaffLoanForm';
 import { getStatusStyles } from '../utils/statusStyles';
 import { formatDate } from '../utils/dateFormatter';
+import { formatCasaLabel } from '../utils/formatCasa';
 
 interface LoanDetailsPageProps {
     user: { name: string; email: string; avatar_url?: string; role?: string };
@@ -1020,48 +1021,52 @@ const LoanDetailsPage: React.FC<LoanDetailsPageProps> = ({ user, onLogout, toggl
             fetchLoan();
             fetchOfficers();
         }
+    }, [id, navigate]);
 
-        // Socket Listeners
-        import('../services/socket').then(({ socket }) => {
-            if (!id) return;
+    useEffect(() => {
+        if (!id) return;
 
-            const handleUpdate = (data: any) => {
+        let detach: (() => void) | undefined;
+
+        void import('../services/socket').then(({ socket }) => {
+            const matchesLoan = (data: { loanId?: number | string; contextType?: string; contextId?: number | string }) =>
+                String(data.loanId) === String(id)
+                || (data.contextType === 'loan' && String(data.contextId) === String(id));
+
+            const handleUpdate = (data: { id?: number | string; loanId?: number | string }) => {
                 if (String(data.id) === String(id) || String(data.loanId) === String(id)) {
-                    console.log("Real-time update for this loan");
-                    // Re-fetch loan
                     axios.get(`/api/staff/loans/${id}`, { withCredentials: true })
                         .then(res => setLoan(res.data))
                         .catch(console.error);
                 }
             };
 
-            const handleDocUpload = (data: any) => {
-                if (String(data.loanId) === String(id)) {
-                    console.log("Document uploaded");
-                    // Force refresh of DocumentsList
+            const handleDocUpload = (data: { loanId?: number | string; contextType?: string; contextId?: number | string }) => {
+                if (matchesLoan(data)) {
                     setLoan((prev: any) => ({ ...prev, updated_at: new Date().toISOString() }));
                 }
-            }
+            };
 
-            const handleDocDelete = (data: any) => {
-                if (String(data.loanId) === String(id)) {
-                    console.log("Document deleted");
-                    // Force refresh
+            const handleDocDelete = (data: { loanId?: number | string; contextType?: string; contextId?: number | string }) => {
+                if (matchesLoan(data)) {
                     setLoan((prev: any) => ({ ...prev, updated_at: new Date().toISOString() }));
                 }
-            }
+            };
 
             socket.on('loan_updated', handleUpdate);
             socket.on('doc_uploaded', handleDocUpload);
             socket.on('doc_deleted', handleDocDelete);
-
-            return () => {
+            detach = () => {
                 socket.off('loan_updated', handleUpdate);
                 socket.off('doc_uploaded', handleDocUpload);
                 socket.off('doc_deleted', handleDocDelete);
             };
         });
-    }, [id, navigate]);
+
+        return () => {
+            detach?.();
+        };
+    }, [id]);
 
     // console.log(loan);
 
@@ -1185,7 +1190,7 @@ const LoanDetailsPage: React.FC<LoanDetailsPageProps> = ({ user, onLogout, toggl
                     {loan.casa && (
                         <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-50 dark:bg-blue-900/20 text-xs font-bold text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800">
                             <span className="material-symbols-outlined text-sm">account_balance</span>
-                            CASA: {loan.casa}
+                            CASA: {formatCasaLabel(loan.casa)}
                         </span>
                     )}
                     <button
@@ -1440,7 +1445,7 @@ const LoanDetailsPage: React.FC<LoanDetailsPageProps> = ({ user, onLogout, toggl
                         <Field label="Staff ID" value={loan.staff_id} />
 
                         {/* New Fields */}
-                        {loan.casa && <Field label="CASA" value={String(loan.casa).split('.')[0]} />}
+                        {loan.casa && <Field label="CASA" value={formatCasaLabel(loan.casa)} />}
                         {loan.topup_amount && <Field label="Top Up Amount" value={`₦${Number(loan.topup_amount).toLocaleString()}`} />}
                         {loan.buy_over_amount && <Field label="Buy Over Amount" value={`₦${Number(loan.buy_over_amount).toLocaleString()}`} />}
                         {loan.buy_over_company_name && <Field label="Buy Over Company" value={loan.buy_over_company_name} />}

@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import StaffLayout from '../components/layouts/StaffLayout';
+import ProductImageUploader from '../components/products/ProductImageUploader';
 import axios from 'axios';
 
 interface Product {
@@ -7,11 +8,13 @@ interface Product {
     category: 'loan' | 'investment';
     custom_name: string;
     note: string | null;
+    image_url: string | null;
     cba_product_code: string;
     cba_product_name: string;
     interest_rate: number;
     is_active: boolean;
     created_at: string;
+    cba_synced_at?: string | null;
 }
 
 interface CBAProduct {
@@ -25,6 +28,7 @@ interface CBAProduct {
 }
 
 const API_BASE = '/api';
+const CBA_POLL_MS = 45_000;
 
 const ProductsPage: React.FC<any> = ({ user, onLogout, toggleTheme, theme }) => {
     const [activeTab, setActiveTab] = useState<'loan' | 'investment'>('loan');
@@ -38,6 +42,9 @@ const ProductsPage: React.FC<any> = ({ user, onLogout, toggleTheme, theme }) => 
     const [isSaving, setIsSaving] = useState(false);
     const [processingId, setProcessingId] = useState<number | string | null>(null);
     const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+    const [isSyncingAll, setIsSyncingAll] = useState(false);
+    const [lastSyncSummary, setLastSyncSummary] = useState<string | null>(null);
+    const pollInFlight = useRef(false);
 
     // Form State
     const [selectedCbaCode, setSelectedCbaCode] = useState('');
@@ -48,6 +55,70 @@ const ProductsPage: React.FC<any> = ({ user, onLogout, toggleTheme, theme }) => 
         fetchOurProducts();
         fetchAllCBAData();
     }, []);
+
+    const syncAllFromCba = useCallback(async (opts?: { silent?: boolean }) => {
+        if (pollInFlight.current) return;
+        pollInFlight.current = true;
+        if (!opts?.silent) setIsSyncingAll(true);
+        try {
+            const res = await axios.post(`${API_BASE}/products/sync-from-cba`, {}, { withCredentials: true });
+            const payload = res.data as {
+                products?: Product[];
+                updated_count?: number;
+                missing_in_cba_count?: number;
+                message?: string;
+            };
+            if (Array.isArray(payload.products)) {
+                setProducts(payload.products);
+            } else {
+                await fetchOurProducts();
+            }
+            const summary = payload.updated_count
+                ? `${payload.updated_count} wrapper(s) updated from CBA`
+                : payload.message ?? 'CBA sync complete';
+            setLastSyncSummary(summary);
+            if (!opts?.silent && payload.updated_count) {
+                // eslint-disable-next-line no-alert
+                alert(summary);
+            }
+        } catch (err) {
+            console.error('CBA sync failed:', err);
+            if (!opts?.silent) alert('Failed to sync products from CBA');
+        } finally {
+            pollInFlight.current = false;
+            if (!opts?.silent) setIsSyncingAll(false);
+        }
+    }, []);
+
+    useEffect(() => {
+        const timer = window.setInterval(() => {
+            void syncAllFromCba({ silent: true });
+        }, CBA_POLL_MS);
+        return () => window.clearInterval(timer);
+    }, [syncAllFromCba]);
+
+    const handleRefreshProduct = async (product: Product) => {
+        setProcessingId(`refresh-${product.id}`);
+        try {
+            const res = await axios.post(
+                `${API_BASE}/products/${product.id}/refresh-from-cba`,
+                {},
+                { withCredentials: true },
+            );
+            const updated = (res.data as { product?: Product }).product;
+            if (updated) {
+                setProducts((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
+            } else {
+                await fetchOurProducts();
+            }
+            const message = (res.data as { message?: string }).message;
+            if (message) setLastSyncSummary(message);
+        } catch (err) {
+            alert('Failed to refresh product from CBA');
+        } finally {
+            setProcessingId(null);
+        }
+    };
 
     const fetchOurProducts = async () => {
         setIsLoading(true);
@@ -192,6 +263,14 @@ const ProductsPage: React.FC<any> = ({ user, onLogout, toggleTheme, theme }) => 
                     </p>
                 </div>
                 <div className="flex gap-3 animate-in fade-in slide-in-from-right-4 duration-500">
+                    <button
+                        onClick={() => void syncAllFromCba()}
+                        disabled={isSyncingAll}
+                        className="px-5 py-3 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 text-xs font-black uppercase tracking-widest flex items-center gap-2 hover:border-blue-500 transition-all disabled:opacity-50"
+                    >
+                        <span className={`material-symbols-outlined text-sm ${isSyncingAll ? 'animate-spin' : ''}`}>sync</span>
+                        {isSyncingAll ? 'Syncing…' : 'Sync all from CBA'}
+                    </button>
                     <button 
                         onClick={handleOpenWizard}
                         className="px-6 py-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-black uppercase tracking-widest flex items-center gap-2 shadow-lg shadow-blue-500/20 transition-all active:scale-95"
@@ -201,6 +280,12 @@ const ProductsPage: React.FC<any> = ({ user, onLogout, toggleTheme, theme }) => 
                     </button>
                 </div>
             </header>
+
+            {lastSyncSummary ? (
+                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-6 -mt-4">
+                    Last CBA sync: {lastSyncSummary}
+                </p>
+            ) : null}
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
                 {[
@@ -237,7 +322,7 @@ const ProductsPage: React.FC<any> = ({ user, onLogout, toggleTheme, theme }) => 
                     
                     <div className="flex items-center gap-2 text-slate-400 text-[10px] font-black uppercase tracking-widest">
                         <span className="size-2 rounded-full bg-blue-500 animate-pulse"></span>
-                        Live Connection to CBA
+                        Live Connection to CBA · auto-sync every 45s
                     </div>
                 </div>
 
@@ -277,15 +362,26 @@ const ProductsPage: React.FC<any> = ({ user, onLogout, toggleTheme, theme }) => 
                                     <tr key={product.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-all group">
                                         <td className="p-8">
                                             <div className="flex items-center gap-5">
+                                                {product.image_url ? (
+                                                    <img
+                                                        src={product.image_url}
+                                                        alt={product.custom_name}
+                                                        className="size-12 rounded-[1rem] object-cover border border-slate-200 dark:border-slate-700 shadow-lg"
+                                                    />
+                                                ) : (
                                                 <div className={`size-12 rounded-[1rem] flex items-center justify-center text-white font-black shadow-xl transform group-hover:scale-110 transition-all ${product.category === 'loan' ? 'bg-gradient-to-br from-cyan-500 to-blue-500 shadow-cyan-500/20' : 'bg-gradient-to-br from-indigo-600 to-blue-700 shadow-indigo-500/20'}`}>
                                                     {product.custom_name[0]}
                                                 </div>
+                                                )}
                                                 <div>
                                                     <p className="font-black text-slate-900 dark:text-white text-base mb-0.5">{product.custom_name}</p>
                                                     {product.note && (
                                                         <p className="text-xs text-slate-500 dark:text-slate-400 font-medium max-w-xs leading-tight mt-0.5 line-clamp-2">{product.note}</p>
                                                     )}
-                                                    <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest mt-1">Added {new Date(product.created_at).toLocaleDateString()}</p>
+                                                    <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest mt-1">
+                                                        Added {new Date(product.created_at).toLocaleDateString()}
+                                                        {product.cba_synced_at ? ` · CBA sync ${new Date(product.cba_synced_at).toLocaleString()}` : ''}
+                                                    </p>
                                                 </div>
                                             </div>
                                         </td>
@@ -321,6 +417,18 @@ const ProductsPage: React.FC<any> = ({ user, onLogout, toggleTheme, theme }) => 
                                         </td>
                                         <td className="p-8 text-right">
                                             <div className="flex justify-end gap-2">
+                                                <button
+                                                    disabled={processingId === `refresh-${product.id}`}
+                                                    onClick={() => void handleRefreshProduct(product)}
+                                                    title="Refresh from CBA"
+                                                    className="size-10 rounded-xl bg-white dark:bg-slate-800 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-500/10 border border-slate-200 dark:border-slate-700 transition-all flex items-center justify-center group/btn disabled:opacity-50"
+                                                >
+                                                    {processingId === `refresh-${product.id}` ? (
+                                                        <div className="size-4 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
+                                                    ) : (
+                                                        <span className="material-symbols-outlined text-xl group-hover/btn:rotate-180 transition-transform duration-500">sync</span>
+                                                    )}
+                                                </button>
                                                 <button 
                                                     disabled={processingId === `delete-${product.id}`}
                                                     onClick={() => handleEditProduct(product)}
@@ -468,6 +576,25 @@ const ProductsPage: React.FC<any> = ({ user, onLogout, toggleTheme, theme }) => 
                                         <p className="text-[10px] text-slate-400 font-medium px-1">This note will be visible to customers when they browse investment products.</p>
                                     </div>
 
+                                    {editingProduct ? (
+                                        <ProductImageUploader
+                                            productId={editingProduct.id}
+                                            value={editingProduct.image_url}
+                                            onChange={(url) => {
+                                                setEditingProduct({ ...editingProduct, image_url: url });
+                                                setProducts((prev) =>
+                                                    prev.map((p) => (p.id === editingProduct.id ? { ...p, image_url: url } : p)),
+                                                );
+                                            }}
+                                        />
+                                    ) : (
+                                        <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-dashed border-slate-200 dark:border-slate-700">
+                                            <p className="text-xs text-slate-500 font-medium">
+                                                Product image can be uploaded after the wrapper is created — open Edit on the product row.
+                                            </p>
+                                        </div>
+                                    )}
+
                                     <div className="p-10 rounded-[2.5rem] bg-slate-900 text-white relative overflow-hidden group shadow-2xl">
                                         <div className="absolute top-0 right-0 p-10 opacity-5 group-hover:opacity-10 transition-opacity">
                                             <span className="material-symbols-outlined text-8xl">identity_platform</span>
@@ -484,6 +611,13 @@ const ProductsPage: React.FC<any> = ({ user, onLogout, toggleTheme, theme }) => 
                                                 <h4 className="text-4xl font-black tracking-tighter leading-tight mb-2 truncate">
                                                     {customName || 'Product Name'}
                                                 </h4>
+                                                {editingProduct?.image_url ? (
+                                                    <img
+                                                        src={editingProduct.image_url}
+                                                        alt=""
+                                                        className="w-full max-w-[140px] h-20 object-cover rounded-xl mb-3 border border-white/10"
+                                                    />
+                                                ) : null}
                                                 <div className="flex items-center gap-3">
                                                     <span className="material-symbols-outlined text-sm text-blue-500">verified</span>
                                                     <p className="text-xs font-bold text-slate-400">Backed by Core Banking Application (CBA)</p>

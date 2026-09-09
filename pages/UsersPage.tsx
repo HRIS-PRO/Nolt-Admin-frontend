@@ -212,6 +212,7 @@ const UsersPage: React.FC<UsersPageProps> = ({ user, onLogout, toggleTheme, them
             sales_officer: "text-emerald-600 bg-emerald-100 dark:bg-emerald-500/10 dark:text-emerald-400 border-emerald-200 dark:border-emerald-500/20",
             sales_public_sector: "text-emerald-600 bg-emerald-100 dark:bg-emerald-500/10 dark:text-emerald-400 border-emerald-200 dark:border-emerald-500/20",
             sales_private_sector: "text-green-600 bg-green-100 dark:bg-green-500/10 dark:text-green-400 border-green-200 dark:border-green-500/20",
+            agent: "text-lime-600 bg-lime-100 dark:bg-lime-500/10 dark:text-lime-400 border-lime-200 dark:border-lime-500/20",
             customer_experience: "text-sky-600 bg-sky-100 dark:bg-sky-500/10 dark:text-sky-400 border-sky-200 dark:border-sky-500/20",
             compliance: "text-teal-600 bg-teal-100 dark:bg-teal-500/10 dark:text-teal-400 border-teal-200 dark:border-teal-500/20",
             ed: "text-amber-600 bg-amber-100 dark:bg-amber-500/10 dark:text-amber-400 border-amber-200 dark:border-amber-500/20",
@@ -378,6 +379,7 @@ const UsersPage: React.FC<UsersPageProps> = ({ user, onLogout, toggleTheme, them
                                                 <option value="credit_officer">Credit Officer</option>
                                                 <option value="sales_public_sector">Sales — Public Sector</option>
                                                 <option value="sales_private_sector">Sales — Private Sector</option>
+                                                <option value="agent">Agent</option>
                                                 <option value="sales_manager">Sales Manager</option>
                                                 <option value="customer_experience">Customer Experience</option>
                                                 <option value="internal_audit">Internal Audit</option>
@@ -651,6 +653,7 @@ const UsersPage: React.FC<UsersPageProps> = ({ user, onLogout, toggleTheme, them
                                 <select value={inviteForm.role} onChange={e => setInviteForm({ ...inviteForm, role: e.target.value })} className="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border-none outline-none font-bold text-slate-900 dark:text-white cursor-pointer">
                                     <option value="sales_public_sector">Sales — Public Sector</option>
                                     <option value="sales_private_sector">Sales — Private Sector</option>
+                                    <option value="agent">Agent</option>
                                     <option value="sales_manager">Sales Manager</option>
                                     <option value="credit_manager">Credit Manager</option>
                                     <option value="credit_officer">Credit Officer</option>

@@ -6,6 +6,7 @@ import ActivityTimeline from '../components/ActivityTimeline';
 import axios from 'axios';
 import { getStatusStyles } from '../utils/statusStyles';
 import { formatDate } from '../utils/dateFormatter';
+import { formatCasaLabel } from '../utils/formatCasa';
 import { maskValue } from '../utils/maskHelper';
 
 interface StaffInvestmentDetailsPageProps {
@@ -585,7 +586,7 @@ const StaffInvestmentDetailsPage: React.FC<StaffInvestmentDetailsPageProps> = ({
                     {investment.casa && (
                         <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-50 dark:bg-blue-900/20 text-xs font-bold text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800">
                             <span className="material-symbols-outlined text-sm">account_balance</span>
-                            CASA: {investment.casa}
+                            CASA: {formatCasaLabel(investment.casa)}
                         </span>
                     )}
                     <button
@@ -1573,7 +1574,7 @@ const StaffInvestmentDetailsPage: React.FC<StaffInvestmentDetailsPageProps> = ({
                             </div>
                             */}
                             {/* CASA Read-Only Display */}
-                            {investment.casa_account_number && (
+                            {(investment.casa_account_number || investment.casa) && (
                                 <div className="bg-white dark:bg-[#1e293b] rounded-2xl p-6 border border-slate-200 dark:border-slate-800 shadow-sm">
                                     <div className="flex items-center gap-3 mb-4">
                                         <div className="flex items-center justify-center size-10 rounded-xl bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400">
@@ -1586,7 +1587,9 @@ const StaffInvestmentDetailsPage: React.FC<StaffInvestmentDetailsPageProps> = ({
                                     </div>
                                     <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-700/50 flex justify-between items-center">
                                         <span className="text-sm font-medium text-slate-500 dark:text-slate-400">Account Number</span>
-                                        <span className="text-sm font-semibold text-slate-900 dark:text-white font-mono">{investment.casa_account_number}</span>
+                                        <span className="text-sm font-semibold text-slate-900 dark:text-white font-mono">
+                                            {formatCasaLabel(investment.casa_account_number || investment.casa)}
+                                        </span>
                                     </div>
                                 </div>
                             )}
