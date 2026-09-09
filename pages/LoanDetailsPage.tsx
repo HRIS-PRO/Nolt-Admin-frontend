@@ -17,6 +17,53 @@ interface LoanDetailsPageProps {
     theme?: 'light' | 'dark';
 }
 
+function CollapsibleGroup({
+    sectionId,
+    title,
+    icon,
+    isOpen,
+    onToggle,
+    children,
+}: {
+    sectionId: string;
+    title: string;
+    icon: string;
+    isOpen: boolean;
+    onToggle: (id: string) => void;
+    children: React.ReactNode;
+}) {
+    return (
+        <div className="bg-white dark:bg-[#1e293b] rounded-[24px] border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden mb-6">
+            <div
+                onClick={() => onToggle(sectionId)}
+                className="flex items-center justify-between p-6 cursor-pointer bg-slate-50/50 hover:bg-slate-50 transition-colors"
+            >
+                <div className="flex items-center gap-4">
+                    <span className="material-symbols-outlined text-2xl text-slate-400">{icon}</span>
+                    <h3 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight">{title}</h3>
+                </div>
+                <span className={`material-symbols-outlined transition-transform ${isOpen ? 'rotate-180' : ''}`}>keyboard_arrow_down</span>
+            </div>
+            {isOpen && (
+                <div className="p-8 border-t border-slate-100 dark:border-slate-800 grid grid-cols-1 md:grid-cols-2 gap-8">
+                    {children}
+                </div>
+            )}
+        </div>
+    );
+}
+
+const Field = ({ label, value, isLink = false }: { label: string; value?: string | null; isLink?: boolean }) => (
+    <div className="space-y-2">
+        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{label}</p>
+        {isLink && value ? (
+            <a href={value} target="_blank" rel="noopener noreferrer" className="text-blue-600 font-bold underline">View Document</a>
+        ) : (
+            <p className="font-bold text-slate-900 dark:text-white break-words">{value || 'Not provided'}</p>
+        )}
+    </div>
+);
+
 // --- Action Card Component ---
 const ActionCard = ({ loan, userRole, onActionComplete }: { loan: any, userRole: any, onActionComplete: () => void }) => {
     const [actionLoading, setActionLoading] = useState(false);
@@ -241,10 +288,6 @@ const ActionCard = ({ loan, userRole, onActionComplete }: { loan: any, userRole:
     };
 
     const handleUpload = async () => {
-        if (isDraft) {
-            alert('Document uploads are disabled while this application is in draft. Submit the application first.');
-            return;
-        }
         if (!uploadFile) return;
         setUploadLoading(true);
         const formData = new FormData();
@@ -582,25 +625,6 @@ const ActionCard = ({ loan, userRole, onActionComplete }: { loan: any, userRole:
                         (stage === 'credit_check_1' && ['credit_officer', 'super_admin', 'superadmin'].includes(userRole))
                     );
                     if (!canUpload) return null;
-
-                    if (isDraft) {
-                        return (
-                            <div className="mb-6 p-4 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/40">
-                                <div className="flex items-start gap-3">
-                                    <span className="material-symbols-outlined text-amber-600 dark:text-amber-400 text-xl shrink-0">lock</span>
-                                    <div>
-                                        <p className="text-[10px] font-black uppercase tracking-widest text-amber-700 dark:text-amber-400 mb-1">
-                                            Upload Supporting Document
-                                        </p>
-                                        <p className="text-xs font-bold text-amber-800 dark:text-amber-300 leading-relaxed">
-                                            Document uploads are disabled while this application is in draft. Use{' '}
-                                            <span className="font-black">Continue &amp; Submit Application</span> to finish and submit it first.
-                                        </p>
-                                    </div>
-                                </div>
-                            </div>
-                        );
-                    }
 
                     return (
                         <div className="mb-6 p-4 rounded-xl bg-slate-50 dark:bg-slate-800 border border-dashed border-slate-300 dark:border-slate-700">
@@ -942,6 +966,17 @@ const LoanDetailsPage: React.FC<LoanDetailsPageProps> = ({ user, onLogout, toggl
     const [isProcessingIndemnity, setIsProcessingIndemnity] = useState(false);
     const [signatureBase64, setSignatureBase64] = useState<string | null>(null);
     const [directIndemnityUrl, setDirectIndemnityUrl] = useState<string | null>(null);
+    const [openSections, setOpenSections] = useState<Record<string, boolean>>({ personal: true });
+
+    const isSectionOpen = (sectionId: string, fallback = false) =>
+        openSections[sectionId] ?? fallback;
+
+    const toggleSection = (sectionId: string) => {
+        setOpenSections((prev) => ({
+            ...prev,
+            [sectionId]: !(prev[sectionId] ?? false),
+        }));
+    };
 
     const handleFileUpload = async (file: File, type: 'signature' | 'indemnity') => {
         const loanIsDraft = String(loan?.status || '').toLowerCase() === 'draft';
@@ -1052,15 +1087,6 @@ const LoanDetailsPage: React.FC<LoanDetailsPageProps> = ({ user, onLogout, toggl
         }
     }, [id, navigate]);
 
-    // Draft applications should open the edit flow at the first incomplete step.
-    useEffect(() => {
-        if (!loan || isLoading) return;
-        const loanIsDraft = String(loan.status || '').toLowerCase() === 'draft' || loan.stage === 'draft';
-        if (loanIsDraft) {
-            setShowEditModal(true);
-        }
-    }, [loan?.id, loan?.status, loan?.stage, isLoading]);
-
     useEffect(() => {
         if (!id) return;
 
@@ -1081,13 +1107,17 @@ const LoanDetailsPage: React.FC<LoanDetailsPageProps> = ({ user, onLogout, toggl
 
             const handleDocUpload = (data: { loanId?: number | string; contextType?: string; contextId?: number | string }) => {
                 if (matchesLoan(data)) {
-                    setLoan((prev: any) => ({ ...prev, updated_at: new Date().toISOString() }));
+                    axios.get(`/api/staff/loans/${id}`, { withCredentials: true })
+                        .then(res => setLoan(res.data))
+                        .catch(console.error);
                 }
             };
 
             const handleDocDelete = (data: { loanId?: number | string; contextType?: string; contextId?: number | string }) => {
                 if (matchesLoan(data)) {
-                    setLoan((prev: any) => ({ ...prev, updated_at: new Date().toISOString() }));
+                    axios.get(`/api/staff/loans/${id}`, { withCredentials: true })
+                        .then(res => setLoan(res.data))
+                        .catch(console.error);
                 }
             };
 
@@ -1147,33 +1177,6 @@ const LoanDetailsPage: React.FC<LoanDetailsPageProps> = ({ user, onLogout, toggl
     const currentStageId = isDraft ? 'submitted' : (loan.stage || 'submitted');
     const currentStageIndex = isDraft ? 0 : stages.findIndex(s => s.id === (currentStageId === 'credit_check' ? 'credit_check_1' : currentStageId));
     const activeIndex = currentStageIndex === -1 ? 0 : currentStageIndex;
-
-    const CollapsibleGroup = ({ title, icon, children, defaultOpen = false }: any) => {
-        const [isOpen, setIsOpen] = useState(defaultOpen);
-        return (
-            <div className="bg-white dark:bg-[#1e293b] rounded-[24px] border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden mb-6">
-                <div onClick={() => setIsOpen(!isOpen)} className="flex items-center justify-between p-6 cursor-pointer bg-slate-50/50 hover:bg-slate-50 transition-colors">
-                    <div className="flex items-center gap-4">
-                        <span className="material-symbols-outlined text-2xl text-slate-400">{icon}</span>
-                        <h3 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight">{title}</h3>
-                    </div>
-                    <span className={`material-symbols-outlined transition-transform ${isOpen ? 'rotate-180' : ''}`}>keyboard_arrow_down</span>
-                </div>
-                {isOpen && <div className="p-8 border-t border-slate-100 dark:border-slate-800 grid grid-cols-1 md:grid-cols-2 gap-8">{children}</div>}
-            </div>
-        );
-    };
-
-    const Field = ({ label, value, isLink = false, copy = false }: any) => (
-        <div className="space-y-2">
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{label}</p>
-            {isLink && value ? (
-                <a href={value} target="_blank" rel="noopener noreferrer" className="text-blue-600 font-bold underline">View Document</a>
-            ) : (
-                <p className="font-bold text-slate-900 dark:text-white break-words">{value || 'Not provided'}</p>
-            )}
-        </div>
-    );
 
     return (
         <StaffLayout user={user} onLogout={onLogout} toggleTheme={toggleTheme} theme={theme}>
@@ -1409,7 +1412,13 @@ const LoanDetailsPage: React.FC<LoanDetailsPageProps> = ({ user, onLogout, toggl
                         </div>
                     </div>
 
-                    <CollapsibleGroup title="Personal Information" icon="person" defaultOpen={true}>
+                    <CollapsibleGroup
+                        sectionId="personal"
+                        title="Personal Information"
+                        icon="person"
+                        isOpen={isSectionOpen('personal', true)}
+                        onToggle={toggleSection}
+                    >
                         <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-8">
                             <div className="space-y-8">
                                 {/* Preferred Name — prominent */}
@@ -1473,7 +1482,13 @@ const LoanDetailsPage: React.FC<LoanDetailsPageProps> = ({ user, onLogout, toggl
                         </div>
                     </CollapsibleGroup>
 
-                    <CollapsibleGroup title="Financial Profile" icon="trending_up">
+                    <CollapsibleGroup
+                        sectionId="financial"
+                        title="Financial Profile"
+                        icon="trending_up"
+                        isOpen={isSectionOpen('financial')}
+                        onToggle={toggleSection}
+                    >
                         <Field label="Monthly Income" value={`₦${Number(loan.average_monthly_income).toLocaleString()}`} />
                         <Field label="Bank Name" value={loan.bank_name} />
                         <Field label="Account Number" value={loan.account_number} copy />
@@ -1491,7 +1506,13 @@ const LoanDetailsPage: React.FC<LoanDetailsPageProps> = ({ user, onLogout, toggl
                         {loan.buy_over_company_account_number && <Field label="Buy Over Account Number" value={loan.buy_over_company_account_number} copy />}
                     </CollapsibleGroup>
 
-                    <CollapsibleGroup title="Documents" icon="folder_open">
+                    <CollapsibleGroup
+                        sectionId="documents"
+                        title="Documents"
+                        icon="folder_open"
+                        isOpen={isSectionOpen('documents')}
+                        onToggle={toggleSection}
+                    >
                         <Field label="Government ID" value={loan.govt_id_url} isLink />
                         <Field label="Work ID" value={loan.work_id_url} isLink />
                         <Field label="Payslip" value={loan.payslip_url} isLink />
@@ -1500,7 +1521,13 @@ const LoanDetailsPage: React.FC<LoanDetailsPageProps> = ({ user, onLogout, toggl
                         <Field label="Selfie" value={loan.selfie_verification_url} isLink />
                     </CollapsibleGroup>
                     {(loan.promotion_source || loan.hear_about_us) && (
-                        <CollapsibleGroup title="Marketing Data" icon="campaign">
+                        <CollapsibleGroup
+                            sectionId="marketing"
+                            title="Marketing Data"
+                            icon="campaign"
+                            isOpen={isSectionOpen('marketing')}
+                            onToggle={toggleSection}
+                        >
                             {loan.promotion_source && (
                                 <>
                                     <Field label="Promotion Source" value={loan.promotion_source} />
@@ -1514,7 +1541,13 @@ const LoanDetailsPage: React.FC<LoanDetailsPageProps> = ({ user, onLogout, toggl
                         </CollapsibleGroup>
                     )}
 
-                    <CollapsibleGroup title="Indemnity Agreement" icon="gavel" defaultOpen={!loan.indemnity_document_url}>
+                    <CollapsibleGroup
+                        sectionId="indemnity"
+                        title="Indemnity Agreement"
+                        icon="gavel"
+                        isOpen={isSectionOpen('indemnity', !loan.indemnity_document_url)}
+                        onToggle={toggleSection}
+                    >
                         {isDraft ? (
                             <div className="md:col-span-2 p-6 rounded-2xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/40 flex items-start gap-3">
                                 <span className="material-symbols-outlined text-amber-600 dark:text-amber-400 text-xl shrink-0">lock</span>
@@ -1655,7 +1688,13 @@ const LoanDetailsPage: React.FC<LoanDetailsPageProps> = ({ user, onLogout, toggl
 
                     {/* References */}
                     {loan.customer_references && (
-                        <CollapsibleGroup title="References" icon="group">
+                        <CollapsibleGroup
+                            sectionId="references"
+                            title="References"
+                            icon="group"
+                            isOpen={isSectionOpen('references')}
+                            onToggle={toggleSection}
+                        >
                             {(loan.customer_references as any[]).map((ref, idx) => (
                                 <div key={idx} className="col-span-2 p-4 bg-slate-50 dark:bg-slate-800 rounded-xl">
                                     <p className="font-bold">{ref.fullName} ({ref.relationship})</p>
@@ -1774,6 +1813,7 @@ const LoanDetailsPage: React.FC<LoanDetailsPageProps> = ({ user, onLogout, toggl
             {/* Edit Modal */}
             {showEditModal && (
                 <StaffLoanForm
+                    key={loan.id}
                     user={user}
                     initialData={loan}
                     loanId={loan.id}
