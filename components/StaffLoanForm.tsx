@@ -33,6 +33,74 @@ const NIGERIAN_STATES = [
     "Osun", "Oyo", "Plateau", "Rivers", "Sokoto", "Taraba", "Yobe", "Zamfara"
 ];
 
+/** First wizard step that still has missing required fields (edit/resume draft). */
+function resolveResumeStepFromLoanData(data: any): number {
+    const loanType = data?.loan_type || 'new';
+    if (['topup', 're-app', 'add_on'].includes(loanType)) return 0;
+    if (!data?.product_type?.trim()) return 0;
+
+    const amount = parseFloat(String(data.requested_loan_amount || 0));
+    const isTertiary = TERTIARY_LIST.includes(data.mda_tertiary);
+    const refs = Array.isArray(data.customer_references) ? data.customer_references : [];
+
+    const stepComplete = [
+        () => Boolean(
+            data.surname?.trim() && data.first_name?.trim() && data.gender && data.date_of_birth &&
+            data.marital_status && data.religion && data.mobile_number?.length >= 10 &&
+            data.bvn?.length === 11 && data.nin?.length === 11
+        ),
+        () => Boolean(
+            data.state_of_origin && data.state_of_residence && data.state_of_residence !== 'N/A' &&
+            data.residential_status && (data.primary_home_address || data.address)?.trim()
+        ),
+        () => Boolean(
+            data.mda_tertiary && data.average_monthly_income &&
+            (isTertiary ? data.staff_id : data.ippis_number)
+        ),
+        () => Boolean(
+            amount >= 100000 && data.bank_name && /^\d{10}$/.test(String(data.account_number || '')) &&
+            data.account_name
+        ),
+        () => Boolean(
+            data.govt_id_url && data.work_id_url && data.payslip_url && data.selfie_verification_url &&
+            (amount <= 500000 || data.statement_of_account_url)
+        ),
+        () => {
+            const nokOk = Boolean(
+                data.nok_name?.trim() && data.nok_relationship && data.nok_address?.trim() &&
+                data.nok_phone_number
+            );
+            const refsOk = refs.length > 0 && refs.every((ref: any) =>
+                ref?.fullName?.trim() && ref?.phoneNumber?.trim() && ref?.relationship && ref?.address?.trim()
+            );
+            return nokOk && refsOk;
+        },
+    ];
+
+    for (let i = 0; i < stepComplete.length; i++) {
+        if (!stepComplete[i]()) return i;
+    }
+    return 5;
+}
+
+function getResumeAccordionSection(data: any): 'identity' | 'address' | 'employment' | 'loan' {
+    if (!data?.surname?.trim() || !data?.first_name?.trim() || !data?.gender || !data?.date_of_birth ||
+        !data?.marital_status || !data?.religion || !data?.mobile_number || data?.bvn?.length !== 11 ||
+        data?.nin?.length !== 11) {
+        return 'identity';
+    }
+    if (!data?.state_of_origin || !data?.state_of_residence || data?.state_of_residence === 'N/A' ||
+        !data?.residential_status || !(data?.primary_home_address || data?.address)?.trim()) {
+        return 'address';
+    }
+    const isTertiary = TERTIARY_LIST.includes(data.mda_tertiary);
+    if (!data?.mda_tertiary || !data?.average_monthly_income ||
+        (isTertiary ? !data?.staff_id : !data?.ippis_number)) {
+        return 'employment';
+    }
+    return 'loan';
+}
+
 // --- Helper Components ---
 
 const InputGroup = ({ label, required = false, children, className = "", error }: any) => (
@@ -134,7 +202,7 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
 }) => {
     const [step, setStep] = useState(() => {
         if (typeof initialDraft?.step === 'number') return initialDraft.step;
-        if (typeof initialData?.sub_step === 'number' && initialData.sub_step > 0) return initialData.sub_step;
+        if (initialData) return resolveResumeStepFromLoanData(initialData);
         return 0;
     });
     const [loading, setLoading] = useState(false);
@@ -347,7 +415,9 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
                 nok_address: nokAddress,
                 nok_phone_number: `${nokCountryCode}${nokPhoneNumber}`,
                 references,
-                sales_officer_id: user?.id || undefined,
+                ...(existingLoanId || initialData?.sales_officer_id
+                    ? {}
+                    : { sales_officer_id: user?.id || undefined }),
                 applicant_customer_id: initialData?.id || initialData?.customer_id || undefined,
             };
 
@@ -437,8 +507,10 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
     // Populate form if initialData exists (Edit Mode) & no initialDraft is restoring
     useEffect(() => {
         if (initialData && !initialDraft) {
-            if (typeof initialData.sub_step === 'number') {
-                setStep(initialData.sub_step);
+            const resumeStep = resolveResumeStepFromLoanData(initialData);
+            setStep(resumeStep);
+            if (resumeStep === 0 && initialData.product_type) {
+                setExpandedSection(getResumeAccordionSection(initialData));
             }
             if (initialData.sub_step > 0 || initialData.product_type || initialData.id || initialData.loan_id) {
                 setShowProductSelect(false);
@@ -1139,8 +1211,13 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
                 ippis_number: ippisNumber,
                 casa: casa, // Send as string ID
                 payslip_url: uploadedDocs.payslip?.url,
-                sales_officer_id: user?.id || undefined,
             };
+
+            const existingLoanIdForSubmit = dbLoanId || (loanId && !isNaN(Number(loanId)) ? Number(loanId) : null) ||
+                (typeof initialData?.id === 'number' ? initialData.id : null);
+            if (!existingLoanIdForSubmit && !initialData?.sales_officer_id) {
+                payload.sales_officer_id = user?.id || undefined;
+            }
 
             if (['topup', 're-app', 'add_on'].includes(loanType)) {
                 // --- SPECIAL LOAN PAYLOAD ---
