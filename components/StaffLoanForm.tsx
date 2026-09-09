@@ -35,6 +35,31 @@ const NIGERIAN_STATES = [
 
 const SELFIE_DUMMY_URL = 'https://identity.dojah.io/widget/selfie_dummy.jpg';
 
+/** Numeric customers.id only — never profile UUID or loan id from initialData.id. */
+function resolveApplicantCustomerId(data: any): number | undefined {
+    const candidates = [data?.customer_id, data?.user_id];
+    for (const raw of candidates) {
+        if (raw == null || raw === '') continue;
+        const num = Number(raw);
+        if (Number.isInteger(num) && num > 0) return num;
+    }
+    return undefined;
+}
+
+function resolveExistingLoanId(
+    dbLoanId: number | null,
+    loanId?: string,
+    initialData?: any,
+    initialDraft?: StaffLoanDraft,
+): number | null {
+    if (dbLoanId) return dbLoanId;
+    if (loanId && !isNaN(Number(loanId))) return Number(loanId);
+    if (typeof initialData?.loan_id === 'number') return initialData.loan_id;
+    if (typeof initialData?.id === 'number') return initialData.id;
+    if (initialDraft?.id && !isNaN(Number(initialDraft.id))) return Number(initialDraft.id);
+    return null;
+}
+
 /** First wizard step that still has missing required fields (edit/resume draft). */
 function resolveResumeStepFromLoanData(data: any): number {
     const loanType = data?.loan_type || 'new';
@@ -373,7 +398,8 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
         isSavingDraftRef.current = true;
 
         const targetStep = typeof targetStepOverride === 'number' ? targetStepOverride : step;
-        const existingLoanId = dbLoanId || (loanId && !isNaN(Number(loanId)) ? Number(loanId) : null) || (typeof initialData?.id === 'number' ? initialData.id : null) || (initialDraft?.id && !isNaN(Number(initialDraft.id)) ? Number(initialDraft.id) : null);
+        const existingLoanId = resolveExistingLoanId(dbLoanId, loanId, initialData, initialDraft);
+        const applicantCustomerId = resolveApplicantCustomerId(initialData);
 
         try {
             const payload = {
@@ -426,7 +452,7 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
                 ...(existingLoanId || initialData?.sales_officer_id
                     ? {}
                     : { sales_officer_id: user?.id || undefined }),
-                applicant_customer_id: initialData?.id || initialData?.customer_id || undefined,
+                ...(applicantCustomerId ? { applicant_customer_id: applicantCustomerId } : {}),
             };
 
             if (existingLoanId) {
