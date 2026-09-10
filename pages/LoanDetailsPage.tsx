@@ -152,6 +152,8 @@ const ActionCard = ({ loan, userRole, onActionComplete }: { loan: any, userRole:
     const [blacklistReason, setBlacklistReason] = useState('');
     const [glAccounts, setGlAccounts] = useState<any[]>([]);
     const [selectedGL, setSelectedGL] = useState(loan.gl_account || '');
+    const [overrideLoading, setOverrideLoading] = useState(false);
+    const bulkDisburseFailed = Boolean(loan.finance_bulk_disburse_failed);
     const [startDate, setStartDate] = useState(() => {
         if (loan.start_date) {
             // Slice directly — never parse through Date to avoid UTC timezone shift.
@@ -376,6 +378,32 @@ const ActionCard = ({ loan, userRole, onActionComplete }: { loan: any, userRole:
         }
     };
 
+    const handleFinanceDisbursementOverride = async () => {
+        if (!selectedGL) {
+            alert('Select a bank GL account before running the override.');
+            return;
+        }
+        if (!window.confirm(
+            'This will transfer funds from the customer CASA to the selected GL via CBA, then mark the loan as disbursed. Continue?',
+        )) {
+            return;
+        }
+        setOverrideLoading(true);
+        try {
+            await axios.post(
+                `/api/staff/loans/${loan.id}/finance-disbursement-override`,
+                { gl_account: selectedGL, reason: reason.trim() || undefined },
+                { withCredentials: true },
+            );
+            onActionComplete();
+        } catch (err: any) {
+            console.error('Finance disbursement override failed:', err?.response?.data || err);
+            alert(err.response?.data?.message || 'Override failed. Check console for CBA details.');
+        } finally {
+            setOverrideLoading(false);
+        }
+    };
+
     const handleBlacklist = async () => {
         if (!blacklistReason.trim()) {
             alert('Please provide a reason for blacklisting this customer.');
@@ -436,6 +464,10 @@ const ActionCard = ({ loan, userRole, onActionComplete }: { loan: any, userRole:
     const stage = isDraft ? null : (loan.stage || 'submitted');
     const stageLabel = isDraft ? 'Draft' : (loan.stage || 'submitted').replace(/_/g, ' ');
     const usesCxRejectModal = !isDraft && (stage === 'sales' || stage === 'customer_experience' || stage === 'submitted');
+    const showFinanceOverride =
+        stage === 'finance'
+        && String(loan.status || '').toLowerCase() === 'approved'
+        && !isDraft;
 
     useEffect(() => {
         if (stage === 'finance') {
@@ -498,7 +530,7 @@ const ActionCard = ({ loan, userRole, onActionComplete }: { loan: any, userRole:
     }
 
     return (
-        <div className="bg-white dark:bg-[#1e293b] rounded-[32px] p-8 border border-slate-200 dark:border-slate-800 shadow-xl shadow-slate-200/50 dark:shadow-none relative overflow-hidden group">
+        <div className="bg-white dark:bg-[#1e293b] rounded-[32px] p-8 border border-slate-200 dark:border-slate-800 shadow-xl shadow-slate-200/50 dark:shadow-none relative overflow-visible group">
             <div className="relative z-10">
                 <div className="flex items-center gap-2 mb-4">
                     <span className="size-2 rounded-full bg-blue-500 animate-pulse"></span>
@@ -777,6 +809,30 @@ const ActionCard = ({ loan, userRole, onActionComplete }: { loan: any, userRole:
                     );
                 })()}
 
+                {stage === 'finance' && bulkDisburseFailed && (
+                    <div className="mb-6 p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-start gap-3">
+                        <span className="material-symbols-outlined text-amber-600 text-xl mt-0.5 shrink-0">error</span>
+                        <div>
+                            <p className="text-[10px] font-black uppercase tracking-widest text-amber-600 mb-1">
+                                Disbursement failed
+                            </p>
+                            <p className="text-xs font-semibold text-amber-800 dark:text-amber-300 leading-relaxed">
+                                This loan stayed in finance after a failed disburse. Use <strong>Override disbursement</strong> to run
+                                Customer CASA → GL in CBA first; the loan moves to disbursed only if that transfer succeeds.
+                            </p>
+                        </div>
+                    </div>
+                )}
+
+                {stage === 'finance' && showFinanceOverride && !bulkDisburseFailed && (
+                    <div className="mb-6 p-4 rounded-xl bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700">
+                        <p className="text-xs font-semibold text-slate-600 dark:text-slate-300 leading-relaxed">
+                            <strong>Override disbursement</strong> runs CustomerAccountToGLTransfer (CASA → GL) before marking disbursed.
+                            Use it when standard approve/bulk disburse fails; the failure flag appears automatically after those errors.
+                        </p>
+                    </div>
+                )}
+
                 {/* Finance GL Selection */}
                 {stage === 'finance' && (
                     <div className="mb-6 p-5 rounded-[24px] bg-slate-50 dark:bg-[#111C2A] border border-emerald-500/20 relative overflow-hidden">
@@ -878,6 +934,25 @@ const ActionCard = ({ loan, userRole, onActionComplete }: { loan: any, userRole:
                 </div>
 
                 <div className="space-y-3">
+                    {showFinanceOverride && (
+                        <button
+                            type="button"
+                            onClick={handleFinanceDisbursementOverride}
+                            disabled={overrideLoading || actionLoading || !selectedGL || isDraft}
+                            title={bulkDisburseFailed ? 'Recovery after failed disburse' : 'CASA → GL transfer, then mark disbursed'}
+                            className="w-full py-4 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-black text-sm uppercase tracking-wider transition-all shadow-lg flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            {overrideLoading ? (
+                                <span className="size-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                            ) : (
+                                <>
+                                    <span className="material-symbols-outlined text-lg">published_with_changes</span>
+                                    Override disbursement (CASA → GL)
+                                </>
+                            )}
+                        </button>
+                    )}
+
                     <button
                         onClick={() => handleAction('approve')}
                         disabled={actionLoading || tierLimitExceeded || isDraft}

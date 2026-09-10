@@ -617,10 +617,16 @@ const LoanQueuePage: React.FC<LoanQueuePageProps> = ({ user, onLogout, toggleThe
                                                                 )}
                                                             </div>
                                                             {/* Promotion Source Badge */}
-                                                            {loan.promotion_source && (
+                                                                {loan.promotion_source && (
                                                                 <div className="flex items-center gap-1.5 mt-1.5 px-2 py-1 rounded-lg bg-amber-500/10 border border-amber-500/25 w-fit">
                                                                     <span className="material-symbols-outlined text-amber-500 text-[11px] leading-none">campaign</span>
                                                                     <span className="text-[9px] font-black uppercase tracking-widest text-amber-600 dark:text-amber-400 leading-none">via {loan.promotion_source}</span>
+                                                                </div>
+                                                            )}
+                                                            {loan.finance_bulk_disburse_failed && loan.stage === 'finance' && (
+                                                                <div className="flex items-center gap-1.5 mt-1.5 px-2 py-1 rounded-lg bg-red-500/10 border border-red-500/25 w-fit" title="Bulk disburse failed — use override on loan detail">
+                                                                    <span className="material-symbols-outlined text-red-500 text-[11px] leading-none">warning</span>
+                                                                    <span className="text-[9px] font-black uppercase tracking-widest text-red-600 dark:text-red-400 leading-none">Bulk disburse failed</span>
                                                                 </div>
                                                             )}
                                                         </div>
