@@ -467,7 +467,8 @@ const ActionCard = ({ loan, userRole, onActionComplete }: { loan: any, userRole:
     const showFinanceOverride =
         stage === 'finance'
         && String(loan.status || '').toLowerCase() === 'approved'
-        && !isDraft;
+        && !isDraft
+        && bulkDisburseFailed;
 
     useEffect(() => {
         if (stage === 'finance') {
@@ -821,15 +822,6 @@ const ActionCard = ({ loan, userRole, onActionComplete }: { loan: any, userRole:
                                 Customer CASA → GL in CBA first; the loan moves to disbursed only if that transfer succeeds.
                             </p>
                         </div>
-                    </div>
-                )}
-
-                {stage === 'finance' && showFinanceOverride && !bulkDisburseFailed && (
-                    <div className="mb-6 p-4 rounded-xl bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700">
-                        <p className="text-xs font-semibold text-slate-600 dark:text-slate-300 leading-relaxed">
-                            <strong>Override disbursement</strong> runs CustomerAccountToGLTransfer (CASA → GL) before marking disbursed.
-                            Use it when standard approve/bulk disburse fails; the failure flag appears automatically after those errors.
-                        </p>
                     </div>
                 )}
 
