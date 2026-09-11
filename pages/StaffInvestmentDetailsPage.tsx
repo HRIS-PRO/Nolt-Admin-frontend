@@ -8,6 +8,7 @@ import { getStatusStyles } from '../utils/statusStyles';
 import { formatDate } from '../utils/dateFormatter';
 import { formatCasaLabel } from '../utils/formatCasa';
 import { maskValue } from '../utils/maskHelper';
+import { canViewAgentCommission } from '../lib/staff-roles';
 
 interface StaffInvestmentDetailsPageProps {
     user: { id?: string | number; name: string; email: string; avatar_url?: string; role?: string };
@@ -730,6 +731,28 @@ const StaffInvestmentDetailsPage: React.FC<StaffInvestmentDetailsPageProps> = ({
                     <h3 className="text-2xl font-black text-emerald-600 dark:text-emerald-400 truncate">{investment.interest_rate}% P.A</h3>
                 </div>
             </div>
+
+            {investment?.agent_commission_amount != null &&
+                canViewAgentCommission(user.role, user.id, investment.sales_officer_id) && (
+                <div className="mb-8 p-6 rounded-[24px] bg-indigo-500/5 border border-indigo-500/20 grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div>
+                        <p className="text-[10px] font-black uppercase tracking-widest text-indigo-500 mb-1">Agent commission</p>
+                        <p className="text-2xl font-black text-slate-900 dark:text-white">
+                            ₦{Number(investment.agent_commission_amount).toLocaleString()}
+                        </p>
+                    </div>
+                    <div>
+                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1">Rate / tier</p>
+                        <p className="font-bold text-slate-900 dark:text-white">
+                            {investment.agent_commission_percent}% — {investment.agent_commission_tier_name || 'Tier snapshot'}
+                        </p>
+                    </div>
+                    <div>
+                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1">Attributed officer</p>
+                        <p className="font-bold text-slate-900 dark:text-white">{investment.officer_name || '—'}</p>
+                    </div>
+                </div>
+            )}
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
                 <div className="lg:col-span-8 space-y-6">

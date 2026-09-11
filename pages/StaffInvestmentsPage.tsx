@@ -7,6 +7,7 @@ import { investmentService } from '../services/investmentService';
 import { profileService } from '../services/profileService';
 import NewInvestmentLookupFlow from '../components/NewInvestmentLookupFlow';
 import { apiUrl } from '@/lib/api-config';
+import AgentCommissionSummaryPanel from '../components/investments/AgentCommissionSummaryPanel';
 
 interface StaffInvestmentsPageProps {
     user: { name: string; email: string; avatar_url?: string; role?: string };
@@ -1435,6 +1436,9 @@ const StaffInvestmentsPage: React.FC<StaffInvestmentsPageProps> = ({ user, onLog
 
             <StaffLayout user={user} onLogout={onLogout} toggleTheme={toggleTheme} theme={theme}>
                 <div className="space-y-8">
+                    {activeTab === 'applications' && (
+                        <AgentCommissionSummaryPanel user={user} />
+                    )}
                     {/* Header with Tabs */}
                     <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                         <div>
