@@ -5,6 +5,7 @@ import StaffLayout from '../components/layouts/StaffLayout';
 import { UserState, Theme } from '../types';
 import { apiUrl } from '@/lib/api-config';
 import { canManageBlacklist, getEligibilityBanner, LoanEligibility } from '../utils/loanEligibility';
+import { useNmsUploadSizeLimit } from '../hooks/useNmsUploadSizeLimit';
 
 interface CustomerDetailsPageProps {
   user: UserState;
@@ -53,6 +54,7 @@ const CustomerDetailsPage: React.FC<CustomerDetailsPageProps> = ({ user, onLogou
   const [cbaRetryError, setCbaRetryError] = useState<string | null>(null);
   const [loanEligibility, setLoanEligibility] = useState<LoanEligibility | null>(null);
   const [isUnblacklisting, setIsUnblacklisting] = useState(false);
+  const { validateFile, modal: uploadSizeModal } = useNmsUploadSizeLimit();
   const [showUnblacklistModal, setShowUnblacklistModal] = useState(false);
   const [unblacklistReason, setUnblacklistReason] = useState('');
   const [isBlacklisting, setIsBlacklisting] = useState(false);
@@ -76,7 +78,11 @@ const CustomerDetailsPage: React.FC<CustomerDetailsPageProps> = ({ user, onLogou
   const handleUtilityBillUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || e.target.files.length === 0) return;
     const file = e.target.files[0];
-    
+    if (!validateFile(file)) {
+      e.target.value = '';
+      return;
+    }
+
     setUploadingUtilityBill(true);
     const uploadData = new FormData();
     uploadData.append('file', file);
@@ -1746,6 +1752,7 @@ const CustomerDetailsPage: React.FC<CustomerDetailsPageProps> = ({ user, onLogou
           </div>
         </div>
       )}
+      {uploadSizeModal}
     </StaffLayout>
   );
 };

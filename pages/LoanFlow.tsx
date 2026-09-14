@@ -9,6 +9,7 @@ import MdaTertiarySelect, { TERTIARY_LIST } from '../components/MdaTertiarySelec
 import SelfieVerificationCapture, { type SelfieVerificationSuccess } from '../components/SelfieVerificationCapture';
 import { AnimatePresence } from 'motion/react';
 import { apiBase, apiUrl } from '@/lib/api-config';
+import { useNmsUploadSizeLimit } from '../hooks/useNmsUploadSizeLimit';
 interface LoanFlowProps {
   initialStep: 'TYPE' | 'IDENTITY';
   onComplete: () => void;
@@ -93,6 +94,7 @@ const LoanFlow: React.FC<LoanFlowProps> = ({ initialStep, onComplete, navigate, 
     }
   );
   const [uploadProgress, setUploadProgress] = useState<Record<string, number>>({});
+  const { validateFile, modal: uploadSizeModal } = useNmsUploadSizeLimit();
   const [references, setReferences] = useState(
     initialDraft?.data?.references ?? [
       { name: '', phone: '', relationship: '' }
@@ -697,6 +699,8 @@ const LoanFlow: React.FC<LoanFlowProps> = ({ initialStep, onComplete, navigate, 
   };
 
   const uploadFile = async (id: string, file: File) => {
+    if (!validateFile(file)) return;
+
     // Prevent uploading the exact same file in multiple document slots within this application
     const isDuplicate = Object.entries(uploadedDocs).some(([slotId, doc]) => {
       if (slotId === id || !doc) return false;
@@ -1820,6 +1824,7 @@ const LoanFlow: React.FC<LoanFlowProps> = ({ initialStep, onComplete, navigate, 
           )}
         </main>
       </div >
+      {uploadSizeModal}
     </div >
   );
 };

@@ -1389,6 +1389,10 @@ const StaffInvestmentsPage: React.FC<StaffInvestmentsPageProps> = ({ user, onLog
                                                 <input type="file" onChange={async (e) => {
                                                     const file = e.target.files?.[0];
                                                     if (!file) return;
+                                                    if (!validateFile(file)) {
+                                                        e.target.value = '';
+                                                        return;
+                                                    }
                                                     try {
                                                         const res = await investmentService.uploadDocument(file, `RECEIPT-${wizardData.email}`, 'receipt');
                                                         setWizardData({ ...wizardData, receiptUrl: res.document.file_url });

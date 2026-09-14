@@ -1,7 +1,7 @@
 /** NMS admin document upload limit (must match backend /api/upload). */
-export const NMS_MAX_UPLOAD_BYTES = 1024 * 1024;
+export const NMS_MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
 
-export const NMS_MAX_UPLOAD_LABEL = '1 MB';
+export const NMS_MAX_UPLOAD_LABEL = '10 MB';
 
 export function isWithinNmsUploadLimit(file: File): boolean {
     return file.size <= NMS_MAX_UPLOAD_BYTES;
