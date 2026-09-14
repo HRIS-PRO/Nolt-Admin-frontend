@@ -8,6 +8,7 @@ import { profileService } from '../services/profileService';
 import NewInvestmentLookupFlow from '../components/NewInvestmentLookupFlow';
 import { apiUrl } from '@/lib/api-config';
 import AgentCommissionSummaryPanel from '../components/investments/AgentCommissionSummaryPanel';
+import { useNmsUploadSizeLimit } from '../hooks/useNmsUploadSizeLimit';
 
 interface StaffInvestmentsPageProps {
     user: { name: string; email: string; avatar_url?: string; role?: string };
@@ -27,6 +28,7 @@ const TENURE_VALUES = [30, 60, 90, 120, 150, 180, 210, 240, 270, 300, 330, 365];
 
 
 const StaffInvestmentsPage: React.FC<StaffInvestmentsPageProps> = ({ user, onLogout, toggleTheme, theme }) => {
+    const { validateFile, modal: uploadSizeModal } = useNmsUploadSizeLimit();
     const navigate = useNavigate();
     const [activeTab, setActiveTab] = useState<'applications' | 'mobile' | 'rate_guide'>('applications');
     const [showAddRateForm, setShowAddRateForm] = useState(false);
@@ -707,6 +709,10 @@ const StaffInvestmentsPage: React.FC<StaffInvestmentsPageProps> = ({ user, onLog
     const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, fieldId: string) => {
         const file = e.target.files?.[0];
         if (!file) return;
+        if (!validateFile(file)) {
+            e.target.value = '';
+            return;
+        }
 
         // Prevent uploading the exact same file in multiple document slots within this application
         const isDuplicate = Object.entries(wizardData.uploadedDocs || {}).some(([slotId, doc]) => {
@@ -2393,6 +2399,7 @@ const StaffInvestmentsPage: React.FC<StaffInvestmentsPageProps> = ({ user, onLog
                         </div>
                     )}
                 </div>
+                {uploadSizeModal}
             </StaffLayout>
         </div>
     );

@@ -5,6 +5,7 @@ import MdaTertiarySelect, { TERTIARY_LIST } from './MdaTertiarySelect';
 import { StaffLoanDraft } from '../types';
 import { storageService } from '../services/storageService';
 import { getEligibilityBanner } from '../utils/loanEligibility';
+import { useNmsUploadSizeLimit } from '../hooks/useNmsUploadSizeLimit';
 
 const STATIC_PRODUCTS = [
     { name: "NOLT IPPIS", code: "314", rate: "4% PER MONTH", icon: "inventory_2" },
@@ -256,6 +257,7 @@ const FileUpload = ({
 const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ 
     onClose, onSuccess, initialData, initialDraft, loanId, user, isCustomerVerified, lockedLoanType 
 }) => {
+    const { validateFile, modal: uploadSizeModal } = useNmsUploadSizeLimit();
     const [step, setStep] = useState(() => {
         if (typeof initialDraft?.step === 'number') return initialDraft.step;
         if (initialData) return resolveResumeStepFromLoanData(initialData);
@@ -834,6 +836,7 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
     };
 
     const uploadFile = async (id: string, file: File) => {
+        if (!validateFile(file)) return;
         // Prevent uploading the exact same file in multiple document slots within this application
         const isDuplicate = Object.entries(uploadedDocs).some(([slotId, doc]) => {
             if (slotId === id || !doc) return false;
@@ -2623,6 +2626,7 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
                     background-color: #1e293b;
                 }
             `}</style>
+            {uploadSizeModal}
         </div>
     );
 };

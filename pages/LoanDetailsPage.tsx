@@ -9,6 +9,7 @@ import StaffLoanForm from '../components/StaffLoanForm';
 import { getStatusStyles } from '../utils/statusStyles';
 import { formatDate } from '../utils/dateFormatter';
 import { formatCasaLabel } from '../utils/formatCasa';
+import { useNmsUploadSizeLimit } from '../hooks/useNmsUploadSizeLimit';
 import {
     canManageBlacklist,
     DEFAULT_REJECTION_COOLDOWN_DAYS,
@@ -126,6 +127,7 @@ const RejectionCooldownField = ({
 
 // --- Action Card Component ---
 const ActionCard = ({ loan, userRole, onActionComplete }: { loan: any, userRole: any, onActionComplete: () => void }) => {
+    const { validateFile, modal: uploadSizeModal } = useNmsUploadSizeLimit();
     const [actionLoading, setActionLoading] = useState(false);
     const isSpecialLoan = ['topup', 'add_on', 're-app', 're_app'].includes(loan.loan_type?.toLowerCase());
     const isBuyOver = loan.loan_type?.toLowerCase() === 'buy_over';
@@ -435,6 +437,7 @@ const ActionCard = ({ loan, userRole, onActionComplete }: { loan: any, userRole:
 
     const handleUpload = async () => {
         if (!uploadFile) return;
+        if (!validateFile(uploadFile)) return;
         if (isDraft) {
             alert('Document uploads are disabled while this application is in draft. Submit the application first.');
             return;
@@ -793,7 +796,15 @@ const ActionCard = ({ loan, userRole, onActionComplete }: { loan: any, userRole:
                             <div className="flex gap-2">
                                 <input
                                     type="file"
-                                    onChange={(e) => setUploadFile(e.target.files ? e.target.files[0] : null)}
+                                    onChange={(e) => {
+                                        const file = e.target.files?.[0] ?? null;
+                                        if (file && !validateFile(file)) {
+                                            e.target.value = '';
+                                            setUploadFile(null);
+                                            return;
+                                        }
+                                        setUploadFile(file);
+                                    }}
                                     className="text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"
                                 />
                                 {uploadFile && (
@@ -1221,12 +1232,14 @@ const ActionCard = ({ loan, userRole, onActionComplete }: { loan: any, userRole:
                         </div>
                     )}
             </div>
+            {uploadSizeModal}
         </div>
     );
 };
 
 // --- Main Page Component ---
 const LoanDetailsPage: React.FC<LoanDetailsPageProps> = ({ user, onLogout, toggleTheme, theme }) => {
+    const { validateFile: validatePageUpload, modal: pageUploadSizeModal } = useNmsUploadSizeLimit();
     const { id } = useParams();
     const navigate = useNavigate();
     const [loan, setLoan] = useState<any>(null);
@@ -1252,6 +1265,7 @@ const LoanDetailsPage: React.FC<LoanDetailsPageProps> = ({ user, onLogout, toggl
     };
 
     const handleFileUpload = async (file: File, type: 'signature' | 'indemnity') => {
+        if (!validatePageUpload(file)) return;
         const loanIsDraft = String(loan?.status || '').toLowerCase() === 'draft';
         if (loanIsDraft) {
             alert('Document uploads are disabled while this application is in draft. Submit the application first.');
@@ -2113,6 +2127,7 @@ const LoanDetailsPage: React.FC<LoanDetailsPageProps> = ({ user, onLogout, toggl
                 />
             )}
 
+            {pageUploadSizeModal}
         </StaffLayout>
     );
 };
