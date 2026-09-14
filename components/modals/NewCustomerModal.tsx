@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import axios from 'axios';
+import { useNmsUploadSizeLimit } from '../../hooks/useNmsUploadSizeLimit';
 
 interface NewCustomerModalProps {
   isOpen: boolean;
@@ -34,6 +35,7 @@ const NewCustomerModal: React.FC<NewCustomerModalProps> = ({ isOpen, onClose, on
   const [cbaProcessingStep, setCbaProcessingStep] = useState(0);
   const [cbaTimedOut, setCbaTimedOut] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
+  const { validateFile, modal: uploadSizeModal } = useNmsUploadSizeLimit();
 
   // Form state pre-filled from BVN
   const [formData, setFormData] = useState({
@@ -165,6 +167,10 @@ const NewCustomerModal: React.FC<NewCustomerModalProps> = ({ isOpen, onClose, on
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    if (!validateFile(file)) {
+      e.target.value = '';
+      return;
+    }
 
     setUploading(true);
     const uploadData = new FormData();
@@ -898,6 +904,7 @@ const NewCustomerModal: React.FC<NewCustomerModalProps> = ({ isOpen, onClose, on
           }
         ` }} />
       </motion.div>
+      {uploadSizeModal}
     </div>
   );
 };

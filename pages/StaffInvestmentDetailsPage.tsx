@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useParams, useNavigate } from 'react-router-dom';
 import StaffLayout from '../components/layouts/StaffLayout';
+import { useNmsUploadSizeLimit } from '../hooks/useNmsUploadSizeLimit';
 import ActivityTimeline from '../components/ActivityTimeline';
 import axios from 'axios';
 import { getStatusStyles } from '../utils/statusStyles';
@@ -107,6 +108,7 @@ const StaffInvestmentDetailsPage: React.FC<StaffInvestmentDetailsPageProps> = ({
     const [returnTargetStage, setReturnTargetStage] = useState<string>('');
     const [reason, setReason] = useState('');
     const [activePanel, setActivePanel] = useState<'overview' | 'manage' | 'activity'>('overview');
+    const { validateFile, modal: uploadSizeModal } = useNmsUploadSizeLimit();
 
     // ── KYC Tier State ───────────────────────────────────────────────────────
     const INV_TIER_LIMITS: Record<number, number> = { 1: 300_000, 2: 500_000, 3: Infinity };
@@ -265,6 +267,7 @@ const StaffInvestmentDetailsPage: React.FC<StaffInvestmentDetailsPageProps> = ({
 
     const handleStaffUpload = async () => {
         if (!uploadFile || !id) return;
+        if (!validateFile(uploadFile)) return;
         setUploadLoading(true);
         const formData = new FormData();
         formData.append('file', uploadFile);
@@ -378,6 +381,7 @@ const StaffInvestmentDetailsPage: React.FC<StaffInvestmentDetailsPageProps> = ({
     };
 
     const handleFileUpload = async (file: File, type: 'signature' | 'indemnity') => {
+        if (type === 'indemnity' && !validateFile(file)) return;
         if (type === 'signature') {
             const reader = new FileReader();
             reader.onloadend = () => {
@@ -1100,7 +1104,14 @@ const StaffInvestmentDetailsPage: React.FC<StaffInvestmentDetailsPageProps> = ({
                                                 <input 
                                                     id="staff-upload-input"
                                                     type="file" 
-                                                    onChange={(e) => setUploadFile(e.target.files?.[0] || null)}
+                                                    onChange={(e) => {
+                                                        const file = e.target.files?.[0];
+                                                        if (file && !validateFile(file)) {
+                                                            e.target.value = '';
+                                                            return;
+                                                        }
+                                                        setUploadFile(file || null);
+                                                    }}
                                                     className="flex-1 text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-purple-50 file:text-purple-700 hover:file:bg-purple-100 dark:file:bg-purple-900/40 dark:file:text-purple-300"
                                                 />
                                                 <button
@@ -1817,6 +1828,7 @@ const StaffInvestmentDetailsPage: React.FC<StaffInvestmentDetailsPageProps> = ({
                     document.body)}
                 </div>
             </div>
+            {uploadSizeModal}
         </StaffLayout>
     );
 };
