@@ -6,6 +6,7 @@ import { useNavigate } from 'react-router-dom';
 import { maskValue } from '../utils/maskHelper';
 import SelfieVerificationCapture, { type SelfieVerificationSuccess } from '../components/SelfieVerificationCapture';
 import { apiUrl } from '@/lib/api-config';
+import { useNmsUploadSizeLimit } from '../hooks/useNmsUploadSizeLimit';
 
 const NIGERIAN_STATES = [
     "Abia", "Adamawa", "Akwa Ibom", "Anambra", "Bauchi", "Bayelsa", "Benue", "Borno", 
@@ -19,6 +20,7 @@ type TabType = 'security' | 'personal' | 'residential' | 'bank' | 'selfie';
 
 const ProfilePage: React.FC = () => {
     const navigate = useNavigate();
+    const { validateFile, modal: uploadSizeModal } = useNmsUploadSizeLimit();
     const [profile, setProfile] = useState<Partial<UserProfile>>({
         first_name: '',
         surname: '',
@@ -736,6 +738,10 @@ const ProfilePage: React.FC = () => {
                                                         onChange={async (e) => {
                                                             if (e.target.files && e.target.files[0]) {
                                                                 const file = e.target.files[0];
+                                                                if (!validateFile(file)) {
+                                                                    e.target.value = '';
+                                                                    return;
+                                                                }
                                                                 const formData = new FormData();
                                                                 formData.append('file', file);
                                                                 formData.append('document_type', 'generic');
@@ -984,6 +990,7 @@ const ProfilePage: React.FC = () => {
                 />
             )}
         </AnimatePresence>
+        {uploadSizeModal}
         </>
     );
 };

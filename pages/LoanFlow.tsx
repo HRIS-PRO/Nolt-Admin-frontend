@@ -9,6 +9,7 @@ import MdaTertiarySelect, { TERTIARY_LIST } from '../components/MdaTertiarySelec
 import SelfieVerificationCapture, { type SelfieVerificationSuccess } from '../components/SelfieVerificationCapture';
 import { AnimatePresence } from 'motion/react';
 import { apiBase, apiUrl } from '@/lib/api-config';
+import { useNmsUploadSizeLimit } from '../hooks/useNmsUploadSizeLimit';
 interface LoanFlowProps {
   initialStep: 'TYPE' | 'IDENTITY';
   onComplete: () => void;
@@ -93,6 +94,7 @@ const LoanFlow: React.FC<LoanFlowProps> = ({ initialStep, onComplete, navigate, 
     }
   );
   const [uploadProgress, setUploadProgress] = useState<Record<string, number>>({});
+  const { validateFile, modal: uploadSizeModal } = useNmsUploadSizeLimit();
   const [references, setReferences] = useState(
     initialDraft?.data?.references ?? [
       { name: '', phone: '', relationship: '' }
@@ -114,6 +116,11 @@ const LoanFlow: React.FC<LoanFlowProps> = ({ initialStep, onComplete, navigate, 
   const [nokCountryCode, setNokCountryCode] = useState(initialDraft?.data?.nokCountryCode ?? '+234');
   const [isNokSameAddress, setIsNokSameAddress] = useState(false);
   const [submitting, setSubmitting] = useState(false)
+  const [applicationLoanType, setApplicationLoanType] = useState<string>(
+    initialDraft?.data?.applicationLoanType ?? 'new',
+  );
+  const [cbaLoans, setCbaLoans] = useState<any[]>([]);
+  const [cbaLoansLoading, setCbaLoansLoading] = useState(false);
 
   // Bank Details
   const [bankDetails, setBankDetails] = useState(initialDraft?.data?.bankDetails ?? {
@@ -170,6 +177,19 @@ const LoanFlow: React.FC<LoanFlowProps> = ({ initialStep, onComplete, navigate, 
 
   const currentLoanLabel = categories.flatMap(c => c.loans).find(l => l.id === selectedLoanId)?.label || 'Personal Loan';
   const isTertiary = useMemo(() => TERTIARY_LIST.includes(mda), [mda]);
+
+  const activeCbaLoans = useMemo(
+    () => cbaLoans.filter((loan) => loan.currentBalance < 0 && loan.nextTotalPayment !== 0),
+    [cbaLoans],
+  );
+  const hasActiveCbaLoan = activeCbaLoans.length > 0;
+  const hasActiveIppisLoan = activeCbaLoans.some((loan) => loan.product === 'NOLT IPPIS');
+  const cbaBlocksNewApplication = hasActiveCbaLoan && !hasActiveIppisLoan;
+  const ippisRequiresApplicationType = hasActiveCbaLoan && hasActiveIppisLoan;
+  const canProceedFromProductStep =
+    Boolean(selectedLoanId) &&
+    !cbaBlocksNewApplication &&
+    (!ippisRequiresApplicationType || ['topup', 'add_on', 're-app'].includes(applicationLoanType));
 
   const handleNext = async () => {
     console.log("Saving draft...");
@@ -247,6 +267,7 @@ const LoanFlow: React.FC<LoanFlowProps> = ({ initialStep, onComplete, navigate, 
         account_name: bankDetails.accountName,
         loan_type: currentLoanLabel,
         product_type: currentLoanLabel,
+        application_loan_type: applicationLoanType,
 
         // Next of Kin
         nok_name: nokName,
@@ -275,6 +296,24 @@ const LoanFlow: React.FC<LoanFlowProps> = ({ initialStep, onComplete, navigate, 
       setSubmitting(false)
     }
   };
+
+  useEffect(() => {
+    const fetchCbaLoans = async () => {
+      setCbaLoansLoading(true);
+      try {
+        const backendUrl = apiBase();
+        const response = await axios.get(`${backendUrl}/api/loans/cba-loans`, { withCredentials: true });
+        if (response.data?.response && Array.isArray(response.data.response)) {
+          setCbaLoans(response.data.response);
+        }
+      } catch (error) {
+        console.error('Error fetching CBA loans:', error);
+      } finally {
+        setCbaLoansLoading(false);
+      }
+    };
+    fetchCbaLoans();
+  }, []);
 
   useEffect(() => {
     // Fetch banks
@@ -491,6 +530,16 @@ const LoanFlow: React.FC<LoanFlowProps> = ({ initialStep, onComplete, navigate, 
 
   const handleSelectLoanType = (id: string) => {
     setSelectedLoanId(id);
+    const active = cbaLoans.filter((loan) => loan.currentBalance < 0 && loan.nextTotalPayment !== 0);
+    const ippisActive = active.some((loan) => loan.product === 'NOLT IPPIS');
+    if (!ippisActive) {
+      setApplicationLoanType('new');
+    }
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleConfirmProductStep = () => {
+    if (!canProceedFromProductStep) return;
     setSubStep(1);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -548,6 +597,7 @@ const LoanFlow: React.FC<LoanFlowProps> = ({ initialStep, onComplete, navigate, 
         account_name: bankDetails.accountName,
         loan_type: currentLoanLabel,
         product_type: currentLoanLabel,
+        application_loan_type: applicationLoanType,
         nok_name: nokName,
         nok_relationship: nokRelationship,
         nok_address: nokAddress,
@@ -649,6 +699,8 @@ const LoanFlow: React.FC<LoanFlowProps> = ({ initialStep, onComplete, navigate, 
   };
 
   const uploadFile = async (id: string, file: File) => {
+    if (!validateFile(file)) return;
+
     // Prevent uploading the exact same file in multiple document slots within this application
     const isDuplicate = Object.entries(uploadedDocs).some(([slotId, doc]) => {
       if (slotId === id || !doc) return false;
@@ -845,14 +897,63 @@ const LoanFlow: React.FC<LoanFlowProps> = ({ initialStep, onComplete, navigate, 
           {subStep === 0 && (
             <div className="space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-500 text-center md:text-left">
               <h2 className="text-4xl md:text-5xl font-black text-slate-900 dark:text-white tracking-tight leading-tight">Which loan fits you?</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pb-12">
+              {cbaLoansLoading && (
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Checking your existing loans…</p>
+              )}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pb-4">
                 {categories.flatMap(c => c.loans).map(loan => (
-                  <button key={loan.id} onClick={() => handleSelectLoanType(loan.id)} className="group p-6 bg-white dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 rounded-3xl transition-all text-left flex flex-col gap-4 shadow-sm hover:border-primary active:scale-[0.98]">
+                  <button
+                    key={loan.id}
+                    onClick={() => handleSelectLoanType(loan.id)}
+                    className={`group p-6 bg-white dark:bg-slate-800 border-2 rounded-3xl transition-all text-left flex flex-col gap-4 shadow-sm active:scale-[0.98] ${selectedLoanId === loan.id ? 'border-primary ring-2 ring-primary/20' : 'border-slate-100 dark:border-slate-700 hover:border-primary'}`}
+                  >
                     <div className="size-12 rounded-xl bg-primary/10 flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-white transition-all"><span className="material-symbols-outlined text-2xl">{loan.icon}</span></div>
                     <div><h4 className="font-bold text-lg dark:text-white leading-tight mb-2">{loan.label}</h4><p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">{loan.description}</p></div>
                   </button>
                 ))}
               </div>
+
+              {cbaBlocksNewApplication && (
+                <div className="p-6 bg-rose-50/50 dark:bg-rose-900/10 rounded-3xl border border-rose-200 dark:border-rose-800 border-dashed text-left">
+                  <h4 className="text-sm font-black text-rose-700 dark:text-rose-400 uppercase italic tracking-tight mb-1">Active loan on your account</h4>
+                  <p className="text-[10px] font-black text-rose-500/70 dark:text-rose-400/70 uppercase tracking-widest leading-relaxed">
+                    You have an active non-IPPIS loan. A new application cannot be started until that loan is fully settled. Contact support if you need help.
+                  </p>
+                </div>
+              )}
+
+              {ippisRequiresApplicationType && selectedLoanId && (
+                <div className="p-6 bg-purple-50/50 dark:bg-purple-900/10 rounded-3xl border border-purple-200 dark:border-purple-800 border-dashed text-left">
+                  <h4 className="text-sm font-black text-purple-700 dark:text-purple-400 uppercase italic tracking-tight mb-1">Active IPPIS loan detected</h4>
+                  <p className="text-[10px] font-black text-purple-500/70 dark:text-purple-400/70 uppercase tracking-widest mb-6">
+                    You already have an active IPPIS loan. Choose how you want to proceed — a full new application is not available.
+                  </p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <button
+                      type="button"
+                      onClick={() => setApplicationLoanType('topup')}
+                      className={`p-4 rounded-lg border transition-all text-left ${applicationLoanType === 'topup' ? 'bg-white border-purple-400 shadow-md ring-2 ring-purple-100 dark:bg-slate-800' : 'bg-white/60 border-purple-100 hover:bg-white dark:bg-slate-800/60'}`}
+                    >
+                      <p className="font-black text-slate-900 dark:text-white text-sm mb-1">Top-up</p>
+                      <p className="text-[9px] font-bold text-slate-400 uppercase leading-relaxed">Add funds to your existing loan</p>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setApplicationLoanType('add_on')}
+                      className={`p-4 rounded-lg border transition-all text-left ${applicationLoanType === 'add_on' ? 'bg-white border-purple-400 shadow-md ring-2 ring-purple-100 dark:bg-slate-800' : 'bg-white/60 border-purple-100 hover:bg-white dark:bg-slate-800/60'}`}
+                    >
+                      <p className="font-black text-slate-900 dark:text-white text-sm mb-1">Add-on</p>
+                      <p className="text-[9px] font-bold text-slate-400 uppercase leading-relaxed">Add additional product or funds</p>
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              <NavActions
+                nextLabel="Continue"
+                onNext={handleConfirmProductStep}
+                isNextDisabled={!canProceedFromProductStep}
+              />
             </div>
           )}
 
@@ -1723,6 +1824,7 @@ const LoanFlow: React.FC<LoanFlowProps> = ({ initialStep, onComplete, navigate, 
           )}
         </main>
       </div >
+      {uploadSizeModal}
     </div >
   );
 };

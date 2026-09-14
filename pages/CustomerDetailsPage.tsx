@@ -5,6 +5,7 @@ import StaffLayout from '../components/layouts/StaffLayout';
 import { UserState, Theme } from '../types';
 import { apiUrl } from '@/lib/api-config';
 import { canManageBlacklist, getEligibilityBanner, LoanEligibility } from '../utils/loanEligibility';
+import { useNmsUploadSizeLimit } from '../hooks/useNmsUploadSizeLimit';
 
 interface CustomerDetailsPageProps {
   user: UserState;
@@ -53,13 +54,22 @@ const CustomerDetailsPage: React.FC<CustomerDetailsPageProps> = ({ user, onLogou
   const [cbaRetryError, setCbaRetryError] = useState<string | null>(null);
   const [loanEligibility, setLoanEligibility] = useState<LoanEligibility | null>(null);
   const [isUnblacklisting, setIsUnblacklisting] = useState(false);
+  const { validateFile, modal: uploadSizeModal } = useNmsUploadSizeLimit();
   const [showUnblacklistModal, setShowUnblacklistModal] = useState(false);
   const [unblacklistReason, setUnblacklistReason] = useState('');
   const [isBlacklisting, setIsBlacklisting] = useState(false);
   const [showBlacklistModal, setShowBlacklistModal] = useState(false);
   const [blacklistReason, setBlacklistReason] = useState('');
+  const [mobileDevices, setMobileDevices] = useState<any[]>([]);
+  const [activeMobileDeviceId, setActiveMobileDeviceId] = useState<string | null>(null);
+  const [mobileDevicesLoading, setMobileDevicesLoading] = useState(false);
+  const [mobileDevicesError, setMobileDevicesError] = useState<string | null>(null);
+  const [isRevokingMobileDevice, setIsRevokingMobileDevice] = useState(false);
 
   useEffect(() => { fetchCustomerData(); }, [id]);
+  useEffect(() => {
+    if (id && profile) void fetchMobileDevices(id);
+  }, [id, profile?.id]);
   useEffect(() => {
     if (activeTab === 'LOAN' && id && !hasFetchedCba) fetchCbaLoans(id);
     if (activeTab === 'INVESTMENT' && id && !hasFetchedCbaInvestments) fetchCbaInvestments(id);
@@ -68,7 +78,11 @@ const CustomerDetailsPage: React.FC<CustomerDetailsPageProps> = ({ user, onLogou
   const handleUtilityBillUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || e.target.files.length === 0) return;
     const file = e.target.files[0];
-    
+    if (!validateFile(file)) {
+      e.target.value = '';
+      return;
+    }
+
     setUploadingUtilityBill(true);
     const uploadData = new FormData();
     uploadData.append('file', file);
@@ -141,6 +155,44 @@ const CustomerDetailsPage: React.FC<CustomerDetailsPageProps> = ({ user, onLogou
       alert(e.response?.data?.message || 'Failed to send password.');
     } finally {
       setIsSendingPassword(false);
+    }
+  };
+
+  const fetchMobileDevices = async (customerId: string) => {
+    setMobileDevicesLoading(true);
+    setMobileDevicesError(null);
+    try {
+      const res = await axios.get(API(`/api/staff/customers/${customerId}/mobile-devices`), { withCredentials: true });
+      setMobileDevices(res.data.devices || []);
+      setActiveMobileDeviceId(res.data.active_device_id ?? null);
+    } catch (e: any) {
+      setMobileDevices([]);
+      setActiveMobileDeviceId(null);
+      setMobileDevicesError(e?.response?.data?.message || 'Could not load mobile devices.');
+    } finally {
+      setMobileDevicesLoading(false);
+    }
+  };
+
+  const handleRevokeMobileDevice = async () => {
+    if (!id) return;
+    const msg =
+      'Remove the active NOLT mobile/web device binding for this customer? They will sign in with OTP on a new device without needing the old phone (use for theft or lost device).';
+    if (!window.confirm(msg)) return;
+    const reason = window.prompt('Optional note for audit log (e.g. reported stolen phone):') || '';
+    setIsRevokingMobileDevice(true);
+    try {
+      const res = await axios.post(
+        API(`/api/staff/customers/${id}/mobile-devices/revoke-active`),
+        { reason },
+        { withCredentials: true },
+      );
+      alert(res.data.message);
+      await fetchMobileDevices(id);
+    } catch (e: any) {
+      alert(e?.response?.data?.message || 'Could not remove device.');
+    } finally {
+      setIsRevokingMobileDevice(false);
     }
   };
 
@@ -714,6 +766,76 @@ const CustomerDetailsPage: React.FC<CustomerDetailsPageProps> = ({ user, onLogou
                       </div>
                     </div>
                   )}
+                </div>
+
+                {/* Mobile app — single-device login */}
+                <div className="bg-white dark:bg-slate-900 rounded-3xl p-8 border border-slate-100 dark:border-slate-800/50 shadow-sm">
+                  <div className="flex items-center justify-between mb-6 gap-4 flex-wrap">
+                    <div>
+                      <div className="flex items-center gap-3 mb-1">
+                        <div className="size-2 rounded-full bg-violet-500" />
+                        <h3 className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider">Mobile app devices</h3>
+                      </div>
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400 max-w-xl leading-relaxed">
+                        NOLT allows one registered device at a time. If the customer is stuck on &quot;Approve this device&quot; (lost or stolen phone), remove the active device here so they can log in on a new one.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => id && fetchMobileDevices(id)}
+                      disabled={mobileDevicesLoading}
+                      className="text-[10px] font-black uppercase tracking-wider text-slate-500 hover:text-primary px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700"
+                    >
+                      {mobileDevicesLoading ? 'Refreshing…' : 'Refresh'}
+                    </button>
+                  </div>
+
+                  {mobileDevicesError ? (
+                    <p className="text-sm text-rose-600 dark:text-rose-400">{mobileDevicesError}</p>
+                  ) : null}
+
+                  {mobileDevicesLoading && mobileDevices.length === 0 ? (
+                    <p className="text-sm text-slate-500">Loading devices…</p>
+                  ) : null}
+
+                  {!mobileDevicesLoading && mobileDevices.length === 0 && !mobileDevicesError ? (
+                    <p className="text-sm text-slate-500">No mobile sign-in history yet.</p>
+                  ) : null}
+
+                  <ul className="space-y-3 mb-6">
+                    {mobileDevices.map((d) => (
+                      <li
+                        key={d.id || d.device_id}
+                        className={`flex flex-wrap items-center justify-between gap-3 p-4 rounded-2xl border ${
+                          d.is_active
+                            ? 'border-violet-300 bg-violet-50/50 dark:bg-violet-950/20 dark:border-violet-800'
+                            : 'border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30'
+                        }`}
+                      >
+                        <div>
+                          <p className="font-bold text-sm text-slate-900 dark:text-white">{d.display_name || d.device_name || 'Device'}</p>
+                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-1">
+                            {d.platform || 'unknown'} · Last seen {d.last_seen_at ? new Date(d.last_seen_at).toLocaleString() : '—'}
+                            {d.location_label ? ` · ${d.location_label}` : ''}
+                          </p>
+                        </div>
+                        {d.is_active ? (
+                          <span className="text-[10px] font-black uppercase tracking-widest text-violet-700 dark:text-violet-300 bg-white dark:bg-slate-900 px-3 py-1 rounded-full border border-violet-200 dark:border-violet-700">
+                            Active
+                          </span>
+                        ) : null}
+                      </li>
+                    ))}
+                  </ul>
+
+                  <button
+                    type="button"
+                    onClick={handleRevokeMobileDevice}
+                    disabled={isRevokingMobileDevice}
+                    className="w-full sm:w-auto px-6 py-3 rounded-2xl text-[11px] font-black uppercase tracking-widest bg-rose-600 hover:bg-rose-700 text-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  >
+                    {isRevokingMobileDevice ? 'Removing…' : 'Remove active device & clear sessions'}
+                  </button>
                 </div>
 
                 {/* TIER 2 */}
@@ -1630,6 +1752,7 @@ const CustomerDetailsPage: React.FC<CustomerDetailsPageProps> = ({ user, onLogou
           </div>
         </div>
       )}
+      {uploadSizeModal}
     </StaffLayout>
   );
 };
