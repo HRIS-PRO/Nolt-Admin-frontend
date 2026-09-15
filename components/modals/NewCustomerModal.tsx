@@ -60,6 +60,8 @@ const NewCustomerModal: React.FC<NewCustomerModalProps> = ({ isOpen, onClose, on
   });
 
   const [uploading, setUploading] = useState(false);
+  const [bvnLookupLevel, setBvnLookupLevel] = useState<'advance' | 'basic' | null>(null);
+  const [showBasicRetry, setShowBasicRetry] = useState(false);
 
   useEffect(() => {
     if (initialBvn && isOpen && initialBvn.length === 11) {
@@ -94,13 +96,14 @@ const NewCustomerModal: React.FC<NewCustomerModalProps> = ({ isOpen, onClose, on
 
   if (!isOpen) return null;
 
-  const handleLookupBVN = async (bvnToLookup?: string) => {
+  const handleLookupBVN = async (bvnToLookup?: string, mode: 'advance' | 'basic' = 'advance') => {
     const lookupVal = typeof bvnToLookup === 'string' ? bvnToLookup : bvn;
     if (lookupVal.length !== 11) return;
     setLoading(true);
     setError(null);
+    setShowBasicRetry(false);
     try {
-      const response = await axios.get(`/api/staff/kyc/lookup-bvn?bvn=${lookupVal}`);
+      const response = await axios.get(`/api/staff/kyc/lookup-bvn?bvn=${lookupVal}&mode=${mode}`);
       if (response.data.success) {
         if (response.data.already_exists) {
           const custData = response.data.customer;
@@ -122,6 +125,9 @@ const NewCustomerModal: React.FC<NewCustomerModalProps> = ({ isOpen, onClose, on
         }
 
         const data = response.data.data;
+        const level: 'advance' | 'basic' = response.data.lookup_level === 'basic' ? 'basic' : 'advance';
+        setBvnLookupLevel(level);
+
         // Convert YYYY-MM-DD or DD-MM-YYYY to YYYY-MM-DD for date input
         let dob = data.dob || '';
         if (dob.includes('-')) {
@@ -146,11 +152,17 @@ const NewCustomerModal: React.FC<NewCustomerModalProps> = ({ isOpen, onClose, on
             preferred_first_name: toProperCase(fName),
             preferred_surname: toProperCase(lName),
             preferred_middle_name: toProperCase(mName),
-            email: data.email || '',
-            phone: data.phone || '',
-            dob: dob,
-            gender: data.gender || '',
-            avatar_url: data.avatar_url || ''
+            email: data.email || prev.email || '',
+            phone: data.phone || prev.phone || '',
+            dob: dob || prev.dob,
+            gender: data.gender || prev.gender || '',
+            title: data.title || prev.title || '',
+            maritalStatus: data.maritalStatus || prev.maritalStatus || '',
+            nin: data.nin || prev.nin || '',
+            address: data.address || data.residentialAddress || prev.address || '',
+            stateOfOrigin: data.state_of_origin || data.stateOfOrigin || prev.stateOfOrigin || '',
+            stateOfResidence: data.state_of_residence || data.stateOfResidence || prev.stateOfResidence || '',
+            avatar_url: data.avatar_url || prev.avatar_url || '',
           };
         });
         setCurrentStep(1);
@@ -158,7 +170,11 @@ const NewCustomerModal: React.FC<NewCustomerModalProps> = ({ isOpen, onClose, on
         setError(response.data.message || 'BVN lookup failed');
       }
     } catch (err: any) {
+      const code = err.response?.data?.code;
       setError(err.response?.data?.message || 'Error connecting to verification service');
+      if (code === 'BVN_ADVANCE_FAILED' || mode === 'advance') {
+        setShowBasicRetry(true);
+      }
     } finally {
       setLoading(false);
     }
@@ -299,6 +315,8 @@ const NewCustomerModal: React.FC<NewCustomerModalProps> = ({ isOpen, onClose, on
     setCbaProcessing(false);
     setCbaProcessingStep(0);
     setCbaTimedOut(false);
+    setBvnLookupLevel(null);
+    setShowBasicRetry(false);
     setFormData({
       title: '',
       firstName: '',
@@ -646,7 +664,7 @@ const NewCustomerModal: React.FC<NewCustomerModalProps> = ({ isOpen, onClose, on
                         </div>
                         <h4 className="text-xl font-black text-slate-900 dark:text-white uppercase tracking-tight">Identity Verification</h4>
                         <p className="text-[11px] font-bold text-slate-500 dark:text-slate-400 leading-relaxed uppercase tracking-wide">
-                          Enter the customer's 11-digit BVN to fetch verified identity data from Dojah.
+                          Enter the customer's 11-digit BVN to fetch verified identity data from Prembly.
                         </p>
                       </div>
 
@@ -665,13 +683,23 @@ const NewCustomerModal: React.FC<NewCustomerModalProps> = ({ isOpen, onClose, on
                         </div>
 
                         {error && (
-                          <div className="p-4 bg-rose-50 dark:bg-rose-900/10 border border-rose-100 dark:border-rose-800 rounded-2xl text-center">
+                          <div className="p-4 bg-rose-50 dark:bg-rose-900/10 border border-rose-100 dark:border-rose-800 rounded-2xl text-center space-y-3">
                             <p className="text-[10px] font-black text-rose-600 uppercase tracking-widest">{error}</p>
+                            {showBasicRetry && (
+                              <button
+                                type="button"
+                                onClick={() => handleLookupBVN(bvn, 'basic')}
+                                disabled={loading || bvn.length !== 11}
+                                className="w-full py-3 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest disabled:opacity-40"
+                              >
+                                Retry with BVN basic (fill missing fields manually)
+                              </button>
+                            )}
                           </div>
                         )}
 
                         <button
-                          onClick={handleLookupBVN}
+                          onClick={() => handleLookupBVN()}
                           disabled={bvn.length !== 11 || loading}
                           className="w-full py-5 bg-slate-900 dark:bg-blue-600 text-white rounded-3xl font-black uppercase text-sm tracking-[0.2em] shadow-2xl hover:bg-blue-700 transition-all disabled:opacity-20 flex items-center justify-center gap-4"
                         >
@@ -687,6 +715,13 @@ const NewCustomerModal: React.FC<NewCustomerModalProps> = ({ isOpen, onClose, on
                   <form onSubmit={handleOnboard} className="space-y-8 animate-in fade-in slide-in-from-bottom-6 duration-500">
                     {currentStep === 1 ? (
                       <div className="grid grid-cols-2 gap-x-6 gap-y-5">
+                        {bvnLookupLevel === 'basic' && (
+                          <div className="col-span-full p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-2xl">
+                            <p className="text-[10px] font-bold text-amber-800 dark:text-amber-200 leading-relaxed">
+                              BVN basic returned name, date of birth, and phone only. Please enter email, gender, marital status, NIN, address, and states before continuing.
+                            </p>
+                          </div>
+                        )}
                         <div className="space-y-2">
                           <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Title</p>
                           <select required value={formData.title} onChange={(e) => setFormData({ ...formData, title: e.target.value })} className="input-field-onboarding">
