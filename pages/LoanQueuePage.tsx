@@ -617,10 +617,16 @@ const LoanQueuePage: React.FC<LoanQueuePageProps> = ({ user, onLogout, toggleThe
                                                                 )}
                                                             </div>
                                                             {/* Promotion Source Badge */}
-                                                            {loan.promotion_source && (
+                                                                {loan.promotion_source && (
                                                                 <div className="flex items-center gap-1.5 mt-1.5 px-2 py-1 rounded-lg bg-amber-500/10 border border-amber-500/25 w-fit">
                                                                     <span className="material-symbols-outlined text-amber-500 text-[11px] leading-none">campaign</span>
                                                                     <span className="text-[9px] font-black uppercase tracking-widest text-amber-600 dark:text-amber-400 leading-none">via {loan.promotion_source}</span>
+                                                                </div>
+                                                            )}
+                                                            {loan.finance_bulk_disburse_failed && loan.stage === 'finance' && (
+                                                                <div className="flex items-center gap-1.5 mt-1.5 px-2 py-1 rounded-lg bg-red-500/10 border border-red-500/25 w-fit" title="Bulk disburse failed — use override on loan detail">
+                                                                    <span className="material-symbols-outlined text-red-500 text-[11px] leading-none">warning</span>
+                                                                    <span className="text-[9px] font-black uppercase tracking-widest text-red-600 dark:text-red-400 leading-none">Bulk disburse failed</span>
                                                                 </div>
                                                             )}
                                                         </div>
@@ -637,13 +643,13 @@ const LoanQueuePage: React.FC<LoanQueuePageProps> = ({ user, onLogout, toggleThe
                                                 <td className="p-6">
                                                     <div className="w-40">
                                                         <div className="flex justify-between items-center mb-1.5">
-                                                            <span className="text-[10px] font-black uppercase tracking-wider text-slate-900 dark:text-white">{loan.stage?.replace('_', ' ') || 'Onboarding'}</span>
-                                                            <span className="text-[10px] font-bold text-slate-400">{Math.round(getStageProgress(loan.stage || 'onboarding'))}%</span>
+                                                            <span className="text-[10px] font-black uppercase tracking-wider text-slate-900 dark:text-white">{loan.status === 'draft' ? 'Draft' : (loan.stage?.replace('_', ' ') || 'Onboarding')}</span>
+                                                            <span className="text-[10px] font-bold text-slate-400">{loan.status === 'draft' ? 0 : Math.round(getStageProgress(loan.stage || 'onboarding'))}%</span>
                                                         </div>
                                                         <div className="h-1.5 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden border border-slate-200 dark:border-slate-700/50">
                                                             <motion.div
                                                                 initial={{ width: 0 }}
-                                                                animate={{ width: `${getStageProgress(loan.stage || 'onboarding')}%` }}
+                                                                animate={{ width: `${loan.status === 'draft' ? 0 : getStageProgress(loan.stage || 'onboarding')}%` }}
                                                                 className={`h-full rounded-full ${loan.status === 'rejected' ? 'bg-rose-500' : 'bg-gradient-to-r from-blue-600 to-indigo-600 shadow-[0_0_8px_rgba(37,99,235,0.4)]'}`}
                                                             />
                                                         </div>

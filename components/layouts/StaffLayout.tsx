@@ -116,7 +116,7 @@ const StaffLayout: React.FC<StaffLayoutProps> = ({ children, user, onLogout, tog
 
             {/* Sidebar */}
             <aside className={`
-                fixed lg:sticky top-0 h-screen w-72 bg-[#0f172a] text-white flex flex-col z-40 transition-transform duration-300 border-r border-[#1e293b]
+                fixed top-0 left-0 h-screen w-72 bg-[#0f172a] text-white flex flex-col z-40 transition-transform duration-300 border-r border-[#1e293b]
                 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
             `}>
                 {/* Brand */}
@@ -292,7 +292,7 @@ const StaffLayout: React.FC<StaffLayoutProps> = ({ children, user, onLogout, tog
             </aside>
 
             {/* Main Content */}
-            <main className="flex-1 w-full min-w-0 p-4 md:p-8 transition-all duration-300">
+            <main className="flex-1 w-full min-w-0 p-4 md:p-8 transition-all duration-300 lg:ml-72">
                 <div className="max-w-[1600px] mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
                     {/* Top Bar */}
                     <div className="flex flex-col md:flex-row justify-between md:items-center gap-4 mb-8">

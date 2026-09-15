@@ -4,6 +4,8 @@ import axios from 'axios';
 import StaffLayout from '../components/layouts/StaffLayout';
 import { UserState, Theme } from '../types';
 import { apiUrl } from '@/lib/api-config';
+import { canManageBlacklist, getEligibilityBanner, LoanEligibility } from '../utils/loanEligibility';
+import { useNmsUploadSizeLimit } from '../hooks/useNmsUploadSizeLimit';
 
 interface CustomerDetailsPageProps {
   user: UserState;
@@ -50,8 +52,24 @@ const CustomerDetailsPage: React.FC<CustomerDetailsPageProps> = ({ user, onLogou
   const [cbaRetryStep, setCbaRetryStep] = useState(0);
   const [cbaRetryTimedOut, setCbaRetryTimedOut] = useState(false);
   const [cbaRetryError, setCbaRetryError] = useState<string | null>(null);
+  const [loanEligibility, setLoanEligibility] = useState<LoanEligibility | null>(null);
+  const [isUnblacklisting, setIsUnblacklisting] = useState(false);
+  const { validateFile, modal: uploadSizeModal } = useNmsUploadSizeLimit();
+  const [showUnblacklistModal, setShowUnblacklistModal] = useState(false);
+  const [unblacklistReason, setUnblacklistReason] = useState('');
+  const [isBlacklisting, setIsBlacklisting] = useState(false);
+  const [showBlacklistModal, setShowBlacklistModal] = useState(false);
+  const [blacklistReason, setBlacklistReason] = useState('');
+  const [mobileDevices, setMobileDevices] = useState<any[]>([]);
+  const [activeMobileDeviceId, setActiveMobileDeviceId] = useState<string | null>(null);
+  const [mobileDevicesLoading, setMobileDevicesLoading] = useState(false);
+  const [mobileDevicesError, setMobileDevicesError] = useState<string | null>(null);
+  const [isRevokingMobileDevice, setIsRevokingMobileDevice] = useState(false);
 
   useEffect(() => { fetchCustomerData(); }, [id]);
+  useEffect(() => {
+    if (id && profile) void fetchMobileDevices(id);
+  }, [id, profile?.id]);
   useEffect(() => {
     if (activeTab === 'LOAN' && id && !hasFetchedCba) fetchCbaLoans(id);
     if (activeTab === 'INVESTMENT' && id && !hasFetchedCbaInvestments) fetchCbaInvestments(id);
@@ -60,7 +78,11 @@ const CustomerDetailsPage: React.FC<CustomerDetailsPageProps> = ({ user, onLogou
   const handleUtilityBillUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || e.target.files.length === 0) return;
     const file = e.target.files[0];
-    
+    if (!validateFile(file)) {
+      e.target.value = '';
+      return;
+    }
+
     setUploadingUtilityBill(true);
     const uploadData = new FormData();
     uploadData.append('file', file);
@@ -136,6 +158,44 @@ const CustomerDetailsPage: React.FC<CustomerDetailsPageProps> = ({ user, onLogou
     }
   };
 
+  const fetchMobileDevices = async (customerId: string) => {
+    setMobileDevicesLoading(true);
+    setMobileDevicesError(null);
+    try {
+      const res = await axios.get(API(`/api/staff/customers/${customerId}/mobile-devices`), { withCredentials: true });
+      setMobileDevices(res.data.devices || []);
+      setActiveMobileDeviceId(res.data.active_device_id ?? null);
+    } catch (e: any) {
+      setMobileDevices([]);
+      setActiveMobileDeviceId(null);
+      setMobileDevicesError(e?.response?.data?.message || 'Could not load mobile devices.');
+    } finally {
+      setMobileDevicesLoading(false);
+    }
+  };
+
+  const handleRevokeMobileDevice = async () => {
+    if (!id) return;
+    const msg =
+      'Remove the active NOLT mobile/web device binding for this customer? They will sign in with OTP on a new device without needing the old phone (use for theft or lost device).';
+    if (!window.confirm(msg)) return;
+    const reason = window.prompt('Optional note for audit log (e.g. reported stolen phone):') || '';
+    setIsRevokingMobileDevice(true);
+    try {
+      const res = await axios.post(
+        API(`/api/staff/customers/${id}/mobile-devices/revoke-active`),
+        { reason },
+        { withCredentials: true },
+      );
+      alert(res.data.message);
+      await fetchMobileDevices(id);
+    } catch (e: any) {
+      alert(e?.response?.data?.message || 'Could not remove device.');
+    } finally {
+      setIsRevokingMobileDevice(false);
+    }
+  };
+
   const CBA_TIMEOUT_MS = 60000;
 
   const handleRetryCbaRegistration = async () => {
@@ -193,6 +253,7 @@ const CustomerDetailsPage: React.FC<CustomerDetailsPageProps> = ({ user, onLogou
     try {
       const res = await axios.get(API(`/api/staff/customers/${id}`), { withCredentials: true });
       setProfile(res.data.profile);
+      setLoanEligibility(res.data.loan_eligibility || res.data.profile?.loan_eligibility || null);
       setLoans(res.data.loans || []);
       if (res.data.profile?.casa) fetchBalance(res.data.profile.casa);
     } catch (e) { console.error('fetch customer', e); }
@@ -206,7 +267,53 @@ const CustomerDetailsPage: React.FC<CustomerDetailsPageProps> = ({ user, onLogou
     } catch {}
   };
 
+  const handleBlacklist = async () => {
+    if (!id) return;
+    if (!blacklistReason.trim()) {
+      alert('Please provide a reason for blacklisting this customer.');
+      return;
+    }
+    setIsBlacklisting(true);
+    try {
+      await axios.post(
+        API(`/api/staff/customers/${id}/blacklist`),
+        { reason: blacklistReason.trim() },
+        { withCredentials: true },
+      );
+      setShowBlacklistModal(false);
+      setBlacklistReason('');
+      await fetchCustomerData();
+    } catch (e: any) {
+      alert(e.response?.data?.message || 'Failed to blacklist customer.');
+    } finally {
+      setIsBlacklisting(false);
+    }
+  };
+
+  const handleUnblacklist = async () => {
+    if (!id) return;
+    setIsUnblacklisting(true);
+    try {
+      await axios.post(
+        API(`/api/staff/customers/${id}/unblacklist`),
+        { reason: unblacklistReason.trim() || undefined },
+        { withCredentials: true },
+      );
+      setShowUnblacklistModal(false);
+      setUnblacklistReason('');
+      await fetchCustomerData();
+    } catch (e: any) {
+      alert(e.response?.data?.message || 'Failed to unblacklist customer.');
+    } finally {
+      setIsUnblacklisting(false);
+    }
+  };
+
   const copyToClipboard = (text: string) => navigator.clipboard.writeText(text);
+  const eligibilityBanner = getEligibilityBanner(loanEligibility);
+  const canManageCustomerBlacklist = canManageBlacklist(user?.role);
+  const canUnblacklist = canManageCustomerBlacklist && loanEligibility?.block_type === 'blacklist';
+  const canBlacklist = canManageCustomerBlacklist && loanEligibility?.block_type !== 'blacklist' && !profile?.is_blacklisted;
   const formatMoney = (n: number) =>
     new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN' }).format(n).replace('NGN', '₦');
 
@@ -258,8 +365,16 @@ const CustomerDetailsPage: React.FC<CustomerDetailsPageProps> = ({ user, onLogou
         if (k === 'utility_bill_url' && v === '') { payload[k] = ''; return; }
         if (v !== '' && v !== null && v !== undefined) payload[k] = v;
       });
-      await axios.put(API(`/api/staff/customers/${id}/profile`), payload, { withCredentials: true });
-      setSaveMsg({ type: 'success', text: 'Saved successfully.' });
+      const res = await axios.put(API(`/api/staff/customers/${id}/profile`), payload, { withCredentials: true });
+      const cbaSync = res.data?.cba_account_update;
+      if (cbaSync && cbaSync.succeeded === false) {
+        setSaveMsg({
+          type: 'error',
+          text: `Saved in NMS, but core banking sync failed: ${cbaSync.message || 'CreateAccountUpdate failed'}.`,
+        });
+      } else {
+        setSaveMsg({ type: 'success', text: 'Saved successfully.' });
+      }
       await fetchCustomerData();
       setTimeout(() => { setEditingTier(null); setSaveMsg(null); }, 1400);
     } catch (e: any) {
@@ -374,9 +489,59 @@ const CustomerDetailsPage: React.FC<CustomerDetailsPageProps> = ({ user, onLogou
             <button className="p-2 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
               <svg className="size-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
             </button>
+            {canBlacklist && !eligibilityBanner && (
+              <button
+                onClick={() => setShowBlacklistModal(true)}
+                className="px-6 py-2 bg-slate-900 text-white text-xs font-bold uppercase rounded-lg hover:bg-black transition-colors"
+              >
+                Blacklist Customer
+              </button>
+            )}
             <button className="px-6 py-2 bg-blue-500 text-white text-xs font-bold uppercase rounded-lg hover:bg-blue-600 transition-colors shadow-sm shadow-blue-500/20">EXPORT SUMMARY</button>
           </div>
         </div>
+
+        {eligibilityBanner && (
+          <div className={`rounded-3xl p-5 border ${
+            eligibilityBanner.tone === 'red'
+              ? 'bg-rose-50 dark:bg-rose-950/30 border-rose-200 dark:border-rose-800'
+              : 'bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800'
+          }`}>
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <span className={`material-symbols-outlined ${eligibilityBanner.tone === 'red' ? 'text-rose-600' : 'text-amber-600'}`}>
+                    {eligibilityBanner.tone === 'red' ? 'block' : 'schedule'}
+                  </span>
+                  <h3 className={`text-sm font-black uppercase tracking-wide ${eligibilityBanner.tone === 'red' ? 'text-rose-800 dark:text-rose-200' : 'text-amber-800 dark:text-amber-200'}`}>
+                    {eligibilityBanner.title}
+                  </h3>
+                </div>
+                <p className={`text-xs font-bold leading-relaxed ${eligibilityBanner.tone === 'red' ? 'text-rose-700 dark:text-rose-300' : 'text-amber-700 dark:text-amber-300'}`}>
+                  {eligibilityBanner.message}
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-3">
+                {canBlacklist && (
+                  <button
+                    onClick={() => setShowBlacklistModal(true)}
+                    className="px-5 py-3 bg-slate-900 hover:bg-black text-white text-xs font-black uppercase rounded-xl border border-slate-800 transition-colors"
+                  >
+                    Blacklist Customer
+                  </button>
+                )}
+                {canUnblacklist && (
+                  <button
+                    onClick={() => setShowUnblacklistModal(true)}
+                    className="px-5 py-3 bg-white dark:bg-slate-900 text-rose-700 dark:text-rose-300 text-xs font-black uppercase rounded-xl border border-rose-200 dark:border-rose-700 hover:bg-rose-100 dark:hover:bg-rose-950/50 transition-colors"
+                  >
+                    Remove Blacklist
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Profile Banner */}
         <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 md:p-8 flex flex-col md:flex-row items-start md:items-center justify-between shadow-sm border border-slate-100 dark:border-slate-800/50">
@@ -409,6 +574,16 @@ const CustomerDetailsPage: React.FC<CustomerDetailsPageProps> = ({ user, onLogou
                   ? <span className="px-3 py-1 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 text-[10px] font-bold uppercase rounded-full tracking-wider border border-emerald-100 dark:border-emerald-800">✓ VERIFIED</span>
                   : <span className="px-3 py-1 bg-rose-50 dark:bg-rose-900/20 text-rose-500 dark:text-rose-400 text-[10px] font-bold uppercase rounded-full tracking-wider border border-rose-100 dark:border-rose-800">UNVERIFIED</span>
                 }
+                {profile.is_blacklisted && (
+                  <span className="px-3 py-1 bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-300 text-[10px] font-bold uppercase rounded-full tracking-wider border border-rose-200 dark:border-rose-800">
+                    Blacklisted
+                  </span>
+                )}
+                {loanEligibility?.block_type === 'rejection_cooldown' && (
+                  <span className="px-3 py-1 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 text-[10px] font-bold uppercase rounded-full tracking-wider border border-amber-200 dark:border-amber-800">
+                    Reapply Blocked
+                  </span>
+                )}
               </div>
               <div className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">USER ID: NOLT-{String(profile.id).padStart(4, '0')}-990</div>
             </div>
@@ -599,6 +774,76 @@ const CustomerDetailsPage: React.FC<CustomerDetailsPageProps> = ({ user, onLogou
                       </div>
                     </div>
                   )}
+                </div>
+
+                {/* Mobile app — single-device login */}
+                <div className="bg-white dark:bg-slate-900 rounded-3xl p-8 border border-slate-100 dark:border-slate-800/50 shadow-sm">
+                  <div className="flex items-center justify-between mb-6 gap-4 flex-wrap">
+                    <div>
+                      <div className="flex items-center gap-3 mb-1">
+                        <div className="size-2 rounded-full bg-violet-500" />
+                        <h3 className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider">Mobile app devices</h3>
+                      </div>
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400 max-w-xl leading-relaxed">
+                        NOLT allows one registered device at a time. If the customer is stuck on &quot;Approve this device&quot; (lost or stolen phone), remove the active device here so they can log in on a new one.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => id && fetchMobileDevices(id)}
+                      disabled={mobileDevicesLoading}
+                      className="text-[10px] font-black uppercase tracking-wider text-slate-500 hover:text-primary px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700"
+                    >
+                      {mobileDevicesLoading ? 'Refreshing…' : 'Refresh'}
+                    </button>
+                  </div>
+
+                  {mobileDevicesError ? (
+                    <p className="text-sm text-rose-600 dark:text-rose-400">{mobileDevicesError}</p>
+                  ) : null}
+
+                  {mobileDevicesLoading && mobileDevices.length === 0 ? (
+                    <p className="text-sm text-slate-500">Loading devices…</p>
+                  ) : null}
+
+                  {!mobileDevicesLoading && mobileDevices.length === 0 && !mobileDevicesError ? (
+                    <p className="text-sm text-slate-500">No mobile sign-in history yet.</p>
+                  ) : null}
+
+                  <ul className="space-y-3 mb-6">
+                    {mobileDevices.map((d) => (
+                      <li
+                        key={d.id || d.device_id}
+                        className={`flex flex-wrap items-center justify-between gap-3 p-4 rounded-2xl border ${
+                          d.is_active
+                            ? 'border-violet-300 bg-violet-50/50 dark:bg-violet-950/20 dark:border-violet-800'
+                            : 'border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30'
+                        }`}
+                      >
+                        <div>
+                          <p className="font-bold text-sm text-slate-900 dark:text-white">{d.display_name || d.device_name || 'Device'}</p>
+                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-1">
+                            {d.platform || 'unknown'} · Last seen {d.last_seen_at ? new Date(d.last_seen_at).toLocaleString() : '—'}
+                            {d.location_label ? ` · ${d.location_label}` : ''}
+                          </p>
+                        </div>
+                        {d.is_active ? (
+                          <span className="text-[10px] font-black uppercase tracking-widest text-violet-700 dark:text-violet-300 bg-white dark:bg-slate-900 px-3 py-1 rounded-full border border-violet-200 dark:border-violet-700">
+                            Active
+                          </span>
+                        ) : null}
+                      </li>
+                    ))}
+                  </ul>
+
+                  <button
+                    type="button"
+                    onClick={handleRevokeMobileDevice}
+                    disabled={isRevokingMobileDevice}
+                    className="w-full sm:w-auto px-6 py-3 rounded-2xl text-[11px] font-black uppercase tracking-widest bg-rose-600 hover:bg-rose-700 text-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  >
+                    {isRevokingMobileDevice ? 'Removing…' : 'Remove active device & clear sessions'}
+                  </button>
                 </div>
 
                 {/* TIER 2 */}
@@ -1441,6 +1686,81 @@ const CustomerDetailsPage: React.FC<CustomerDetailsPageProps> = ({ user, onLogou
           </div>
         </div>
       )}
+
+      {showBlacklistModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl w-full max-w-md shadow-2xl border border-slate-100 dark:border-slate-800 p-6 space-y-5">
+            <div>
+              <h3 className="text-xl font-black text-slate-900 dark:text-white">Blacklist Customer</h3>
+              <p className="text-sm text-slate-500 mt-1">
+                This rejects all active loan applications and blocks new loans for 6 months.
+              </p>
+            </div>
+            <div>
+              <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2 block">
+                Blacklist Reason <span className="text-red-500">*</span>
+              </label>
+              <textarea
+                value={blacklistReason}
+                onChange={(e) => setBlacklistReason(e.target.value)}
+                className="w-full p-4 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm min-h-[120px]"
+                placeholder="Explain why this customer is being blacklisted..."
+              />
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={() => { setShowBlacklistModal(false); setBlacklistReason(''); }}
+                className="flex-1 py-3 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-black uppercase"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleBlacklist}
+                disabled={isBlacklisting || !blacklistReason.trim()}
+                className="flex-1 py-3 rounded-xl bg-slate-900 hover:bg-black text-white text-xs font-black uppercase disabled:opacity-50"
+              >
+                {isBlacklisting ? 'Processing…' : 'Confirm Blacklist'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showUnblacklistModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl w-full max-w-md shadow-2xl border border-slate-100 dark:border-slate-800 p-6 space-y-5">
+            <div>
+              <h3 className="text-xl font-black text-slate-900 dark:text-white">Remove Blacklist</h3>
+              <p className="text-sm text-slate-500 mt-1">This will allow the customer to apply for loans again.</p>
+            </div>
+            <div>
+              <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2 block">Reason (optional)</label>
+              <textarea
+                value={unblacklistReason}
+                onChange={(e) => setUnblacklistReason(e.target.value)}
+                className="w-full p-4 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm min-h-[100px]"
+                placeholder="Why is this customer being unblacklisted?"
+              />
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={() => { setShowUnblacklistModal(false); setUnblacklistReason(''); }}
+                className="flex-1 py-3 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-black uppercase"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleUnblacklist}
+                disabled={isUnblacklisting}
+                className="flex-1 py-3 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-black uppercase disabled:opacity-50"
+              >
+                {isUnblacklisting ? 'Removing…' : 'Confirm Unblacklist'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {uploadSizeModal}
     </StaffLayout>
   );
 };
