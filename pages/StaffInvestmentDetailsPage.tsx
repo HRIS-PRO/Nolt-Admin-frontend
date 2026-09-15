@@ -214,6 +214,14 @@ const StaffInvestmentDetailsPage: React.FC<StaffInvestmentDetailsPageProps> = ({
         }
     }, [id, navigate]);
 
+    const warnIfCbaProfileSyncFailed = (sync: { succeeded?: boolean; message?: string } | null | undefined) => {
+        if (sync && sync.succeeded === false) {
+            alert(
+                `Saved in NMS, but core banking profile sync failed: ${sync.message || 'CreateAccountUpdate failed'}.`,
+            );
+        }
+    };
+
     const handleAction = async (action: 'approve' | 'reject' | 'return', targetStage?: string) => {
         if (action === 'reject' && !reason.trim()) {
             alert("Please provide a reason for rejection in the comment box.");
@@ -243,6 +251,7 @@ const StaffInvestmentDetailsPage: React.FC<StaffInvestmentDetailsPageProps> = ({
                     if (tierRes.data?.success) {
                         setInvCustomerKycTier(invSelectedTier);
                     }
+                    warnIfCbaProfileSyncFailed(tierRes.data?.cba_account_update);
                 } catch (tierError: any) {
                     alert(tierError.response?.data?.message || 'Tier upgrade failed. Cannot proceed.');
                     setIsActioning(false);

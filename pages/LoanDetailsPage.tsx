@@ -260,6 +260,14 @@ const ActionCard = ({ loan, userRole, onActionComplete }: { loan: any, userRole:
     const getRejectionCooldownDays = (): number | null =>
         resolveRejectionCooldownDays(rejectionCooldownPreset, customRejectionCooldownDays);
 
+    const warnIfCbaProfileSyncFailed = (sync: { succeeded?: boolean; message?: string } | null | undefined) => {
+        if (sync && sync.succeeded === false) {
+            alert(
+                `Saved in NMS, but core banking profile sync failed: ${sync.message || 'CreateAccountUpdate failed'}.`,
+            );
+        }
+    };
+
     const handleAction = async (action: 'approve' | 'reject' | 'return', targetStage?: string) => {
         if ((action === 'reject' || action === 'return') && !reason.trim()) {
             alert("Please provide a reason for this action.");
@@ -292,6 +300,7 @@ const ActionCard = ({ loan, userRole, onActionComplete }: { loan: any, userRole:
                     if (tierRes.data?.success) {
                         setCustomerKycTier(selectedTier);
                     }
+                    warnIfCbaProfileSyncFailed(tierRes.data?.cba_account_update);
                 } catch (tierError: any) {
                     alert(tierError.response?.data?.message || 'Tier upgrade failed. Cannot proceed.');
                     setActionLoading(false);
@@ -334,11 +343,12 @@ const ActionCard = ({ loan, userRole, onActionComplete }: { loan: any, userRole:
                 payload.rejection_cooldown_days = getRejectionCooldownDays();
             }
 
-            await axios.post(
+            const actionRes = await axios.post(
                 `/api/staff/loans/${loan.id}/action`,
                 payload,
                 { withCredentials: true }
             );
+            warnIfCbaProfileSyncFailed(actionRes.data?.cba_account_update);
             onActionComplete();
         } catch (error: any) {
             alert(error.response?.data?.message || "Action failed");
