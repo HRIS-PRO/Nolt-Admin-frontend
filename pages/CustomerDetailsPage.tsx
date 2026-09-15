@@ -365,8 +365,16 @@ const CustomerDetailsPage: React.FC<CustomerDetailsPageProps> = ({ user, onLogou
         if (k === 'utility_bill_url' && v === '') { payload[k] = ''; return; }
         if (v !== '' && v !== null && v !== undefined) payload[k] = v;
       });
-      await axios.put(API(`/api/staff/customers/${id}/profile`), payload, { withCredentials: true });
-      setSaveMsg({ type: 'success', text: 'Saved successfully.' });
+      const res = await axios.put(API(`/api/staff/customers/${id}/profile`), payload, { withCredentials: true });
+      const cbaSync = res.data?.cba_account_update;
+      if (cbaSync && cbaSync.succeeded === false) {
+        setSaveMsg({
+          type: 'error',
+          text: `Saved in NMS, but core banking sync failed: ${cbaSync.message || 'CreateAccountUpdate failed'}.`,
+        });
+      } else {
+        setSaveMsg({ type: 'success', text: 'Saved successfully.' });
+      }
       await fetchCustomerData();
       setTimeout(() => { setEditingTier(null); setSaveMsg(null); }, 1400);
     } catch (e: any) {
