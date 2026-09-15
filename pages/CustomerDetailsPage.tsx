@@ -376,7 +376,8 @@ const CustomerDetailsPage: React.FC<CustomerDetailsPageProps> = ({ user, onLogou
         setSaveMsg({ type: 'success', text: 'Saved successfully.' });
       }
       await fetchCustomerData();
-      setTimeout(() => { setEditingTier(null); setSaveMsg(null); }, 1400);
+      const cbaFailed = res.data?.cba_account_update?.succeeded === false;
+      setTimeout(() => { setEditingTier(null); setSaveMsg(null); }, cbaFailed ? 6000 : 1400);
     } catch (e: any) {
       setSaveMsg({ type: 'error', text: e.response?.data?.message || 'Save failed.' });
     } finally {
