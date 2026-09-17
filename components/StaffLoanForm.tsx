@@ -616,7 +616,11 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
             setLoanType(initialData.loan_type || 'new');
 
             // Populate New Fields
-            setCasa(initialData.casa ? String(initialData.casa).split('.')[0] : '');
+            const casaFromProfile =
+                initialData.casa
+                || initialData.casa_account_number
+                || initialData.profile_casa;
+            setCasa(casaFromProfile ? String(casaFromProfile).split('.')[0] : '');
             setTopUpAmount(initialData.topup_amount || '');
             setBuyOverAmount(initialData.buy_over_amount || '');
             setBuyOverCompanyName(initialData.buy_over_company_name || '');
@@ -756,7 +760,7 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
 
         const timeout = setTimeout(verifyAccount, 500);
         return () => clearTimeout(timeout);
-    }, [bankName, accountNumber, bankList]);
+    }, [bankName, accountNumber, bankList, firstName, surname]);
 
     // Auto-verify Buy Over bank account
     useEffect(() => {
@@ -982,7 +986,10 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
             if (!casa) newErrors.casa = "Required";
 
             if (loanType === 'topup' || loanType === 'add_on') {
-                if (!topUpAmount) newErrors.topUpAmount = "Required";
+                const topUp = parseFloat(topUpAmount);
+                if (!topUpAmount?.trim() || !Number.isFinite(topUp) || topUp <= 0) {
+                    newErrors.topUpAmount = "Enter an amount greater than zero";
+                }
             }
 
             // New Validation for Tenure & Bank Details
@@ -992,11 +999,19 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
             } else if (!/^\d{10}$/.test(accountNumber)) {
                 newErrors.accountNumber = "Must be 10 digits";
             }
-            if (!accountName) newErrors.accountName = "Required";
-            if (bankVerificationResult && !bankVerificationResult.isMatch) newErrors.accountName = "Name mismatch";
-            if (isVerifyingBank) newErrors.accountNumber = "Verifying...";
+            if (isVerifyingBank) {
+                newErrors.accountNumber = "Wait for account verification to finish";
+            } else if (!accountName?.trim()) {
+                newErrors.accountName = "Required — pick bank and enter a valid 10-digit account number";
+            } else if (bankVerificationResult && !bankVerificationResult.isMatch) {
+                newErrors.accountName = "Account name does not match applicant name";
+            }
 
-            if (!getLoanDocUrl('payslip')) newErrors.payslip = "Required";
+            if (uploadProcessing.payslip) {
+                newErrors.payslip = "Payslip upload still in progress";
+            } else if (!getLoanDocUrl('payslip')) {
+                newErrors.payslip = "Upload a recent payslip (PDF or image)";
+            }
 
         } else {
             // Standard Wizard Validation
@@ -1226,9 +1241,8 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
     const handleSubmit = async () => {
         // Collect errors across all steps
         let accumulatedErrors: Record<string, string> = {};
-        const stepsToValidate = ['topup', 're-app', 'add_on'].includes(loanType)
-            ? [step]
-            : [0, 1, 2, 3, 4, 5];
+        const isSpecialLoanType = ['topup', 're-app', 'add_on'].includes(loanType);
+        const stepsToValidate = isSpecialLoanType ? [0] : [0, 1, 2, 3, 4, 5];
 
         for (const s of stepsToValidate) {
             const stepErrs = getStepErrors(s);
@@ -1249,8 +1263,17 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
                 return key;
             });
 
-            // Automatically navigate user directly to the missing step & expand accordion section
-            if (accumulatedErrors.surname || accumulatedErrors.firstName || accumulatedErrors.gender || accumulatedErrors.dob || accumulatedErrors.maritalStatus || accumulatedErrors.religion || accumulatedErrors.bvn || accumulatedErrors.nin) {
+            if (isSpecialLoanType) {
+                setStep(0);
+                setShowProductSelect(false);
+                window.requestAnimationFrame(() => {
+                    const firstKey = Object.keys(accumulatedErrors)[0];
+                    const el =
+                        document.querySelector(`[data-loan-field="${firstKey}"]`)
+                        ?? document.getElementById('special-loan-payslip');
+                    el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                });
+            } else if (accumulatedErrors.surname || accumulatedErrors.firstName || accumulatedErrors.gender || accumulatedErrors.dob || accumulatedErrors.maritalStatus || accumulatedErrors.religion || accumulatedErrors.bvn || accumulatedErrors.nin) {
                 setStep(0);
                 setShowProductSelect(false);
                 setExpandedSection('identity');
@@ -1297,6 +1320,11 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
                 (typeof initialData?.id === 'number' ? initialData.id : null);
             if (!existingLoanIdForSubmit && !initialData?.sales_officer_id) {
                 payload.sales_officer_id = user?.id || undefined;
+            }
+
+            const applicantCustomerId = resolveApplicantCustomerId(initialData);
+            if (applicantCustomerId) {
+                payload.applicant_customer_id = applicantCustomerId;
             }
 
             if (['topup', 're-app', 'add_on'].includes(loanType)) {
@@ -1535,7 +1563,7 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
                             <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
                                 <div className="md:col-span-4">
                                     <InputGroup label="Surname" required error={errors.surname}>
-                                        <input className="input-field" value={surname} onChange={e => { setSurname(e.target.value); clearError('surname'); }} placeholder="e.g. Doe" />
+                                        <input className="input-field" data-loan-field="surname" value={surname} onChange={e => { setSurname(e.target.value); clearError('surname'); }} placeholder="e.g. Doe" />
                                     </InputGroup>
                                 </div>
                                 <div className="md:col-span-4">
@@ -1563,13 +1591,19 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
                             <div className="p-6 bg-slate-50 dark:bg-slate-800/50 rounded-3xl border border-slate-100 dark:border-slate-800">
                                 <h4 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-widest mb-6 border-b border-slate-200 pb-2">Financial Details</h4>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                    <InputGroup label="CASA" error={errors.casa}>
-                                        <input className="input-field" value={casa} onChange={e => { setCasa(e.target.value); clearError('casa'); }} placeholder="Enter CASA" />
+                                    <InputGroup label="CASA (wallet account)" required error={errors.casa}>
+                                        <input
+                                            className="input-field"
+                                            data-loan-field="casa"
+                                            value={casa}
+                                            onChange={e => { setCasa(e.target.value); clearError('casa'); }}
+                                            placeholder="10-digit CASA from customer profile"
+                                        />
                                     </InputGroup>
 
                                     {(loanType === 'topup' || loanType === 'add_on' || loanType === 're-app') && (
                                         <InputGroup label="Top Up Amount (₦)" required error={errors.topUpAmount}>
-                                            <input type="number" className="input-field" value={topUpAmount} onChange={e => { setTopUpAmount(e.target.value); clearError('topUpAmount'); }} />
+                                            <input type="number" className="input-field" data-loan-field="topUpAmount" value={topUpAmount} onChange={e => { setTopUpAmount(e.target.value); clearError('topUpAmount'); }} />
                                         </InputGroup>
                                     )}
 
@@ -1716,7 +1750,7 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
                             </div>
 
                             {/* Documents (Payslip Only) */}
-                            <div className="p-6 bg-slate-50 dark:bg-slate-800/50 rounded-3xl border border-slate-100 dark:border-slate-800">
+                            <div id="special-loan-payslip" className="p-6 bg-slate-50 dark:bg-slate-800/50 rounded-3xl border border-slate-100 dark:border-slate-800" data-loan-field="payslip">
                                 <h4 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-widest mb-6 border-b border-slate-200 pb-2">Documents</h4>
                                 <FileUpload
                                     id="payslip"
