@@ -70,6 +70,24 @@ function resolveApplicantCustomerId(data: any): number | undefined {
     return undefined;
 }
 
+/** Loan already advanced past sales — edits must not reset status/stage via draft autosave. */
+function isPipelineLoanEdit(initialData?: any, existingLoanId?: number | null): boolean {
+    if (!existingLoanId || !initialData) return false;
+    const stage = String(initialData.stage || '').toLowerCase();
+    if (!stage || stage === 'sales' || stage === 'draft') return false;
+    return [
+        'submitted',
+        'customer_experience',
+        'credit_check_1',
+        'credit_check_2',
+        'credit_check',
+        'internal_audit',
+        'finance',
+        'finance_stage',
+        'disbursed',
+    ].includes(stage);
+}
+
 function resolveExistingLoanId(
     dbLoanId: number | null,
     loanId?: string,
@@ -430,9 +448,10 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
         const applicantCustomerId = resolveApplicantCustomerId(initialData);
 
         try {
+            const preservePipeline = isPipelineLoanEdit(initialData, existingLoanId);
             const payload = {
                 id: existingLoanId || undefined,
-                status: 'draft',
+                ...(preservePipeline ? {} : { status: 'draft' as const }),
                 sub_step: targetStep,
                 step: targetStep,
                 loan_type: loanType,
@@ -1301,9 +1320,17 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
 
         setLoading(true);
         try {
+            const existingLoanIdForSubmitEarly =
+                dbLoanId ||
+                (loanId && !isNaN(Number(loanId)) ? Number(loanId) : null) ||
+                (typeof initialData?.id === 'number' ? initialData.id : null);
+            const preservePipelineOnSubmit = isPipelineLoanEdit(initialData, existingLoanIdForSubmitEarly);
+
             let payload: any = {
                 id: dbLoanId || loanId || undefined,
-                status: 'pending',
+                ...(preservePipelineOnSubmit
+                    ? {}
+                    : { status: 'pending' as const }),
                 sub_step: 6,
                 loan_type: loanType,
                 // Common Identity
