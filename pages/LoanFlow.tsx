@@ -76,8 +76,31 @@ const LoanFlow: React.FC<LoanFlowProps> = ({ initialStep, onComplete, navigate, 
   const [contactEmail, setContactEmail] = useState(initialDraft?.data?.contactEmail ?? '');
   const [bvn, setBvn] = useState(initialDraft?.data?.bvn ?? '');
   const [nin, setNin] = useState(initialDraft?.data?.nin ?? '');
+  const [cbaStates, setCbaStates] = useState<{ stateCode: string; stateName: string }[]>([]);
   const [stateOfOrigin, setStateOfOrigin] = useState(initialDraft?.data?.stateOfOrigin ?? '');
   const [stateOfResidence, setStateOfResidence] = useState(initialDraft?.data?.stateOfResidence ?? '');
+
+  useEffect(() => {
+    let cancelled = false;
+    axios.get(`${apiBase()}/api/misc/states`, { withCredentials: true })
+      .then((res) => {
+        const states = Array.isArray(res.data?.states) ? res.data.states : [];
+        if (cancelled || states.length === 0) return;
+        setCbaStates(states);
+        const match = (saved: string) => {
+          const key = saved.trim().toUpperCase().replace(/[^A-Z0-9]+/g, ' ').replace(/\s+/g, ' ').trim();
+          if (!key) return saved;
+          if (key === 'FCT' || key === 'ABUJA' || key === 'FCT ABUJA') return 'FEDERAL CAPITAL TERRITORY';
+          return states.find((s: { stateName: string }) =>
+            s.stateName.toUpperCase().replace(/\s+/g, ' ').trim() === key,
+          )?.stateName || saved;
+        };
+        setStateOfOrigin((current) => match(current));
+        setStateOfResidence((current) => match(current));
+      })
+      .catch(() => undefined);
+    return () => { cancelled = true; };
+  }, []);
   const [homeAddress, setHomeAddress] = useState(initialDraft?.data?.homeAddress ?? '');
   const [residentialStatus, setResidentialStatus] = useState(initialDraft?.data?.residentialStatus ?? 'Rent');
   const [dependents, setDependents] = useState(initialDraft?.data?.dependents ?? 0);
@@ -1167,7 +1190,7 @@ const LoanFlow: React.FC<LoanFlowProps> = ({ initialStep, onComplete, navigate, 
                       onChange={e => setStateOfOrigin(e.target.value)}
                     >
                       <option value="">Select State</option>
-                      {NIGERIAN_STATES.map(state => (
+                      {(cbaStates.length > 0 ? cbaStates.map((s) => s.stateName) : NIGERIAN_STATES).map(state => (
                         <option key={state} value={state}>{state}</option>
                       ))}
                     </select>
@@ -1180,7 +1203,7 @@ const LoanFlow: React.FC<LoanFlowProps> = ({ initialStep, onComplete, navigate, 
                       onChange={e => setStateOfResidence(e.target.value)}
                     >
                       <option value="">Select State</option>
-                      {NIGERIAN_STATES.map(state => (
+                      {(cbaStates.length > 0 ? cbaStates.map((s) => s.stateName) : NIGERIAN_STATES).map(state => (
                         <option key={state} value={state}>{state}</option>
                       ))}
                     </select>
