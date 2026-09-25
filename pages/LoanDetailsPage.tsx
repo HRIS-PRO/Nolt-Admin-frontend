@@ -1459,18 +1459,24 @@ const LoanDetailsPage: React.FC<LoanDetailsPageProps> = ({ user, onLogout, toggl
         );
     }
 
+    const isDraft = loan.status === 'draft' || loan.stage === 'draft';
+    const isMobileApplication =
+        Boolean(loan.is_mobile_loan) || String(loan.application_channel || '').toLowerCase() === 'mobile';
+
     const stages = [
         { id: 'submitted', label: 'Submission', icon: 'send' },
         { id: 'sales', label: 'Sales', icon: 'point_of_sale' },
         { id: 'customer_experience', label: 'Review', icon: 'support_agent' },
         { id: 'credit_check_1', label: 'Credit I', icon: 'manage_search' },
         { id: 'credit_check_2', label: 'Credit II', icon: 'manage_search' },
+        ...(isMobileApplication
+            ? [{ id: 'customer_disbursement_offer', label: 'Customer approval', icon: 'thumb_up' }]
+            : []),
         { id: 'internal_audit', label: 'Audit', icon: 'policy' },
         { id: 'finance', label: 'Finance', icon: 'payments' },
         { id: 'disbursed', label: 'Disbursed', icon: 'check_circle' }
     ];
-
-    const isDraft = loan.status === 'draft' || loan.stage === 'draft';
+    const loanQueuePath = isMobileApplication ? '/staff/loans/mobile' : '/staff/loans/customer';
     const currentStageId = loan.stage || 'submitted';
     const currentStageIndex = isDraft ? -1 : stages.findIndex(s => s.id === (currentStageId === 'credit_check' ? 'credit_check_1' : currentStageId));
     const activeIndex = isDraft ? -1 : (currentStageIndex === -1 ? 0 : currentStageIndex);
@@ -1480,12 +1486,17 @@ const LoanDetailsPage: React.FC<LoanDetailsPageProps> = ({ user, onLogout, toggl
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8">
                 <div className="flex items-center gap-4">
-                    <button onClick={() => navigate('/staff/loans')} className="size-12 rounded-2xl bg-white dark:bg-[#1e293b] border border-slate-200 dark:border-slate-800 flex items-center justify-center text-slate-400 hover:text-slate-900 transition-all">
+                    <button onClick={() => navigate(loanQueuePath)} className="size-12 rounded-2xl bg-white dark:bg-[#1e293b] border border-slate-200 dark:border-slate-800 flex items-center justify-center text-slate-400 hover:text-slate-900 transition-all">
                         <span className="material-symbols-outlined">arrow_back</span>
                     </button>
                     <div>
                         <div className="flex items-center gap-3 mb-1">
                             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Application #{loan.id}</p>
+                            {isMobileApplication && (
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold border uppercase tracking-wider bg-violet-50 dark:bg-violet-900/20 text-violet-700 dark:text-violet-300 border-violet-200 dark:border-violet-800">
+                                    Mobile app
+                                </span>
+                            )}
                             {(() => {
                                 const styles = getStatusStyles(loan.status);
                                 return (
@@ -1499,11 +1510,12 @@ const LoanDetailsPage: React.FC<LoanDetailsPageProps> = ({ user, onLogout, toggl
                             {[loan.preferred_first_name, loan.preferred_surname].filter(Boolean).join(' ') || loan.applicant_full_name}
                         </h1>
 
-                        {/* Edit Button Logic */}
-                        {(isDraft || (loan.stage === 'sales' || loan.stage === 'submitted') &&
+                        {/* Edit Button Logic — mobile self-serve applications are read-only in staff UI */}
+                        {!isMobileApplication &&
+                        ((isDraft || (loan.stage === 'sales' || loan.stage === 'submitted') &&
                             (['sales_officer', 'sales_public_sector', 'sales_private_sector', 'sales_manager', 'super_admin', 'superadmin'].includes(user.role || ''))) ||
                             ((loan.stage === 'customer_experience') &&
-                                (['customer_experience', 'customer_service', 'super_admin', 'superadmin'].includes(user.role || ''))) ? (
+                                (['customer_experience', 'customer_service', 'super_admin', 'superadmin'].includes(user.role || '')))) ? (
                             <button
                                 onClick={() => setShowEditModal(true)}
                                 className="mt-2 text-xs font-bold text-blue-600 hover:underline flex items-center gap-1"
@@ -1515,6 +1527,21 @@ const LoanDetailsPage: React.FC<LoanDetailsPageProps> = ({ user, onLogout, toggl
                     </div>
                 </div>
             </div>
+
+            {currentStageId === 'customer_disbursement_offer' && (
+                <div className="mb-6 rounded-2xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 px-5 py-4">
+                    <p className="text-sm font-bold text-amber-900 dark:text-amber-100">
+                        Awaiting customer approval
+                    </p>
+                    <p className="text-xs text-amber-800 dark:text-amber-200 mt-1 leading-relaxed">
+                        Credit II approved this mobile application. The customer must accept or decline the
+                        disbursement amount in the mobile app before Internal Audit can proceed.
+                        {loan.customer_offer_status ? (
+                            <> Offer status: <span className="font-semibold">{String(loan.customer_offer_status)}</span>.</>
+                        ) : null}
+                    </p>
+                </div>
+            )}
 
             {/* Customer Banking Info Bar */}
             {loan.customer_id && (loan.cba_customer_id || loan.casa) && (
@@ -1587,7 +1614,7 @@ const LoanDetailsPage: React.FC<LoanDetailsPageProps> = ({ user, onLogout, toggl
 
 
             {/* 📝 Draft Status Banner */}
-            {isDraft && (
+            {isDraft && !isMobileApplication && (
                 <div className="mb-6 p-5 rounded-[24px] bg-slate-100 dark:bg-slate-800/80 border-2 border-slate-300 dark:border-slate-700 flex flex-col md:flex-row md:items-center justify-between gap-5 animate-in fade-in duration-300">
                     <div className="flex items-center gap-4">
                         <div className="size-12 rounded-2xl bg-slate-600 text-white flex items-center justify-center shrink-0 shadow-md">
@@ -1747,7 +1774,9 @@ const LoanDetailsPage: React.FC<LoanDetailsPageProps> = ({ user, onLogout, toggl
                                 <Field label="Marital Status" value={loan.marital_status} />
                                 <Field label="Religion" value={loan.religion} />
                                 <Field label="State of Origin" value={loan.state_of_origin} />
+                                <Field label="Town of Origin" value={loan.origin_town} />
                                 <Field label="State of Residence" value={loan.state_of_residence} />
+                                <Field label="Town of Residence" value={loan.residential_town} />
                                 <Field label="Phone" value={loan.mobile_number} />
                                 <Field label="Email" value={loan.personal_email} />
                                 <Field label="Address" value={loan.primary_home_address} />
@@ -1786,6 +1815,14 @@ const LoanDetailsPage: React.FC<LoanDetailsPageProps> = ({ user, onLogout, toggl
                         isOpen={isSectionOpen('financial')}
                         onToggle={toggleSection}
                     >
+                        <Field
+                            label="Employment Status"
+                            value={
+                                loan.employment_status_label
+                                || loan.employment_status
+                                || loan.employment_status_code
+                            }
+                        />
                         <Field label="Monthly Income" value={`₦${Number(loan.average_monthly_income).toLocaleString()}`} />
                         <Field label="Bank Name" value={loan.bank_name} />
                         <Field label="Account Number" value={loan.account_number} copy />
@@ -2108,7 +2145,7 @@ const LoanDetailsPage: React.FC<LoanDetailsPageProps> = ({ user, onLogout, toggl
             </div>
 
             {/* Edit Modal */}
-            {showEditModal && (
+            {showEditModal && !isMobileApplication && (
                 <StaffLoanForm
                     key={loan.id}
                     user={user}
