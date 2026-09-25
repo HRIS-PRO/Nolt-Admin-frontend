@@ -38,12 +38,21 @@ const StaffLayout: React.FC<StaffLayoutProps> = ({ children, user, onLogout, tog
             title: 'MANAGEMENT',
             items: [
                 { label: 'Dashboard', icon: 'grid_view', path: '/staff-dashboard' },
-                { label: 'Loans', icon: 'credit_card', path: '/staff/loans' },
+                {
+                    label: 'Loan Queue',
+                    icon: 'credit_card',
+                    path: '/staff/loans/customer',
+                    children: [
+                        { label: 'Mobile loans', icon: 'smartphone', path: '/staff/loans/mobile' },
+                        { label: 'Customer loans', icon: 'groups', path: '/staff/loans/customer' },
+                    ],
+                },
                 { label: 'Investment', icon: 'account_balance_wallet', path: '/staff/investments' },
                 { label: 'Transfers', icon: 'swap_horiz', path: '/staff/transfers' },
                 { label: 'Products', icon: 'inventory_2', path: '/staff/products' },
                 { label: 'Promotions', icon: 'campaign', path: '/staff/promotions' },
                 { label: 'Push Notifications', icon: 'notifications_active', path: '/staff/mobile-notifications' },
+                { label: 'Investment calendar', icon: 'event_busy', path: '/staff/investment-calendar' },
                 { label: 'Reports', icon: 'description', path: '/staff/reports' },
                 { label: 'BI Dashboard', icon: 'timeline', path: '/staff/timeline' },
                 { label: 'Calculator', icon: 'calculate', path: '/staff/calculator' },
@@ -84,11 +93,11 @@ const StaffLayout: React.FC<StaffLayoutProps> = ({ children, user, onLogout, tog
             if (label === 'Promotions') {
                 return isSuperAdminRole(role) || role === 'marketing';
             }
-            if (label === 'Push Notifications' || label === 'Transfers') {
+            if (label === 'Push Notifications' || label === 'Investment calendar' || label === 'Transfers') {
                 return isSuperAdminRole(role);
             }
             if (role === 'marketing') {
-                return ['Dashboard', 'Loans', 'Investment', 'Promotions'].includes(label);
+                return ['Dashboard', 'Loan Queue', 'Mobile loans', 'Customer loans', 'Investment', 'Promotions'].includes(label);
             }
             return true;
         };
@@ -141,9 +150,9 @@ const StaffLayout: React.FC<StaffLayoutProps> = ({ children, user, onLogout, tog
                 </div>
 
 
-                <h1 className="text-sm pl-8 pb-10 font-black font-bold text-slate-900 text-white uppercase">
-                    NOLT MANAGEMENT SYSTEM  
-                </h1> 
+                <h1 className="text-sm pl-8 pb-10 font-black text-white uppercase tracking-wide">
+                    NOLT Management System
+                </h1>
 
                 {/* Navigation */}
                 <nav className="flex-1 px-4 flex flex-col gap-8 overflow-y-auto">

@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import StaffLayout from '../components/layouts/StaffLayout';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import NewLoanApplicationFlow from '../components/NewLoanApplicationFlow';
 import { getStatusStyles } from '../utils/statusStyles';
@@ -17,6 +17,10 @@ interface LoanQueuePageProps {
 
 const LoanQueuePage: React.FC<LoanQueuePageProps> = ({ user, onLogout, toggleTheme, theme }) => {
     const navigate = useNavigate();
+    const location = useLocation();
+    const loanSource: 'mobile' | 'customer' = location.pathname.includes('/staff/loans/mobile')
+        ? 'mobile'
+        : 'customer';
     const [searchParams, setSearchParams] = useSearchParams();
     const searchQuery = searchParams.get('search') || '';
     const statusFilter = searchParams.get('status') || '';
@@ -32,6 +36,13 @@ const LoanQueuePage: React.FC<LoanQueuePageProps> = ({ user, onLogout, toggleThe
     const [loans, setLoans] = useState<any[]>([]);
     const [officers, setOfficers] = useState<any[]>([]);
     const [totalLoans, setTotalLoans] = useState(0);
+    const [queueStats, setQueueStats] = useState({
+        total_count: 0,
+        total_volume: 0,
+        pending_count: 0,
+        disbursed_count: 0,
+        approved_today_count: 0,
+    });
     const [isLoading, setIsLoading] = useState(true);
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
     const [selectedLoans, setSelectedLoans] = useState<number[]>([]);
@@ -53,18 +64,22 @@ const LoanQueuePage: React.FC<LoanQueuePageProps> = ({ user, onLogout, toggleThe
                     date_from: dateFrom,
                     date_to: dateTo,
                     page: currentPage,
-                    limit: itemsPerPage
+                    limit: itemsPerPage,
+                    source: loanSource,
                 },
                 withCredentials: true
             });
             setLoans(response.data.loans);
             setTotalLoans(response.data.total);
+            if (response.data.stats) {
+                setQueueStats(response.data.stats);
+            }
         } catch (error) {
             console.error("Failed to fetch loans", error);
         } finally {
             if (!opts?.silent) setIsLoading(false);
         }
-    }, [searchQuery, statusFilter, stageFilter, officerFilter, dateFrom, dateTo, currentPage, itemsPerPage]);
+    }, [searchQuery, statusFilter, stageFilter, officerFilter, dateFrom, dateTo, currentPage, itemsPerPage, loanSource]);
 
     const refetchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -286,13 +301,14 @@ const LoanQueuePage: React.FC<LoanQueuePageProps> = ({ user, onLogout, toggleThe
     })();
 
     const stats = [
-        { label: 'Total Volume', value: `₦${Number(loans.reduce((acc, curr) => acc + (Number(curr.requested_loan_amount) || 0), 0)).toLocaleString()}`, icon: 'payments', color: 'blue' },
-        { label: 'Pending Review', value: loans.filter(l => l.status === 'pending').length, icon: 'pending_actions', color: 'orange' },
-        { label: 'Approved Today', value: loans.filter(l => l.status === 'approved' && formatDate(l.updated_at) === formatDate(new Date().toISOString())).length, icon: 'verified', color: 'emerald' },
-        { label: 'Disbursed', value: loans.filter(l => l.status === 'disbursed').length, icon: 'account_balance_wallet', color: 'purple' },
+        { label: 'Applications', value: queueStats.total_count.toLocaleString(), icon: 'folder_open', color: 'slate' },
+        { label: 'Total Volume', value: `₦${Number(queueStats.total_volume).toLocaleString()}`, icon: 'payments', color: 'blue' },
+        { label: 'Pending Review', value: queueStats.pending_count.toLocaleString(), icon: 'pending_actions', color: 'orange' },
+        { label: 'Approved Today', value: queueStats.approved_today_count.toLocaleString(), icon: 'verified', color: 'emerald' },
+        { label: 'Disbursed', value: queueStats.disbursed_count.toLocaleString(), icon: 'account_balance_wallet', color: 'purple' },
     ];
 
-    const STAGE_ORDER = ['onboarding', 'sales', 'customer_experience', 'credit_check_1', 'credit_check_2', 'internal_audit', 'finance', 'disbursed'];
+    const STAGE_ORDER = ['onboarding', 'sales', 'customer_experience', 'credit_check_1', 'credit_check_2', 'customer_disbursement_offer', 'internal_audit', 'finance', 'disbursed'];
 
     const getStageProgress = (stage: string) => {
         const index = STAGE_ORDER.indexOf(stage);
@@ -310,14 +326,17 @@ const LoanQueuePage: React.FC<LoanQueuePageProps> = ({ user, onLogout, toggleThe
                 <div className="flex flex-col md:flex-row justify-between md:items-center gap-6 mb-8">
                     <div>
                         <h1 className="text-4xl font-black text-slate-900 dark:text-white tracking-tight leading-tight">
-                            Loan Queue
+                            {loanSource === 'mobile' ? 'Mobile loans' : 'Customer loans'}
                         </h1>
                         <p className="text-slate-500 dark:text-slate-400 font-medium mt-1">
-                            Operational control center for lending pipeline and risk management.
+                            {loanSource === 'mobile'
+                                ? 'Self-serve applications from the NOLT mobile app — read-only in staff UI, starting at Credit I.'
+                                : 'Staff-created and assisted applications from the NMS pipeline.'}
                         </p>
                     </div>
                     <div className="flex flex-wrap gap-3">
-                        {(['sales_officer', 'sales_public_sector', 'sales_private_sector'].includes(user.role) ||
+                        {loanSource === 'customer' &&
+                        (['sales_officer', 'sales_public_sector', 'sales_private_sector'].includes(user.role) ||
  user.role === 'admin' || user.role === 'super_admin') && (
                             <motion.button
                                 whileHover={{ scale: 1.02 }}
@@ -333,7 +352,7 @@ const LoanQueuePage: React.FC<LoanQueuePageProps> = ({ user, onLogout, toggleThe
                 </div>
 
                 {/* Stats Grid — always 2-col on mobile, 4-col on desktop */}
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 mb-6 md:mb-8">
+                <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 md:gap-4 mb-6 md:mb-8">
                     {stats.map((stat, i) => (
                         <motion.div
                             key={stat.label}
