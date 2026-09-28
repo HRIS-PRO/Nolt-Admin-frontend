@@ -43,6 +43,7 @@ interface TransactionContext {
         isInternalWallet: boolean;
         accountNumber: string | null;
         bankCode: string | null;
+        bankName?: string | null;
         bankLabel: string;
         profile: { fullName?: string; tierLevel?: number; casa?: string } | null;
     };
@@ -341,12 +342,24 @@ export function TransferTransactionDrawer({ transaction, open, onClose }: Props)
                                             value={transaction.beneficiaryAccountNumber || '—'}
                                             mono
                                         />
-                                        <Row label="Bank / rail" value={context?.destination?.bankLabel ?? '—'} />
+                                        <Row
+                                            label="Bank / rail"
+                                            value={
+                                                context?.destination?.bankLabel
+                                                ?? (transaction.beneficiaryBankCode
+                                                    ? `Code ${transaction.beneficiaryBankCode}`
+                                                    : '—')
+                                            }
+                                        />
                                         {context?.destination?.profile?.tierLevel != null ? (
                                             <Row label="KYC tier" value={`Tier ${context.destination.profile.tierLevel}`} />
                                         ) : null}
                                         {transaction.beneficiaryBankCode ? (
-                                            <Row label="NIP bank code" value={transaction.beneficiaryBankCode} mono />
+                                            <Row
+                                                label="NIP bank code"
+                                                value={transaction.beneficiaryBankCode}
+                                                mono
+                                            />
                                         ) : null}
                                     </dl>
                                 </div>
