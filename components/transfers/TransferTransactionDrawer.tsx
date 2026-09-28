@@ -57,6 +57,8 @@ type Props = {
     transaction: CbaTransactionRow | null;
     open: boolean;
     onClose: () => void;
+    /** Resolve NIP code → "BANK (code)" using staff nip-banks list (fallback if context API label is stale). */
+    formatBankCode?: (code: string) => string | null;
 };
 
 function formatNaira(amount: number): string {
@@ -106,7 +108,7 @@ function copyText(text: string) {
     void navigator.clipboard.writeText(text);
 }
 
-export function TransferTransactionDrawer({ transaction, open, onClose }: Props) {
+export function TransferTransactionDrawer({ transaction, open, onClose, formatBankCode }: Props) {
     const [tab, setTab] = useState<DrawerTab>('overview');
     const [context, setContext] = useState<TransactionContext | null>(null);
     const [loadingContext, setLoadingContext] = useState(false);
@@ -159,6 +161,22 @@ export function TransferTransactionDrawer({ transaction, open, onClose }: Props)
         if (!transaction) return 0;
         return Number(transaction.amount) + Number(transaction.fee || 0);
     }, [transaction]);
+
+    const destinationBankLabel = useMemo(() => {
+        const code = transaction?.beneficiaryBankCode?.trim();
+        if (!code) return context?.destination?.bankLabel ?? '—';
+
+        const fromClient = formatBankCode?.(code) ?? null;
+        if (fromClient && !fromClient.startsWith('Code ')) return fromClient;
+
+        const name = context?.destination?.bankName?.trim();
+        if (name) return `${name} (${code})`;
+
+        const apiLabel = context?.destination?.bankLabel;
+        if (apiLabel && !/^External bank \(code /i.test(apiLabel)) return apiLabel;
+
+        return fromClient ?? apiLabel ?? `Code ${code}`;
+    }, [transaction, context, formatBankCode]);
 
     const ledgerEntries = useMemo(() => {
         if (!transaction) return [];
@@ -342,15 +360,7 @@ export function TransferTransactionDrawer({ transaction, open, onClose }: Props)
                                             value={transaction.beneficiaryAccountNumber || '—'}
                                             mono
                                         />
-                                        <Row
-                                            label="Bank / rail"
-                                            value={
-                                                context?.destination?.bankLabel
-                                                ?? (transaction.beneficiaryBankCode
-                                                    ? `Code ${transaction.beneficiaryBankCode}`
-                                                    : '—')
-                                            }
-                                        />
+                                        <Row label="Bank / rail" value={destinationBankLabel} />
                                         {context?.destination?.profile?.tierLevel != null ? (
                                             <Row label="KYC tier" value={`Tier ${context.destination.profile.tierLevel}`} />
                                         ) : null}

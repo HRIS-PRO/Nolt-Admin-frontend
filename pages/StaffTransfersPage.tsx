@@ -644,6 +644,7 @@ const StaffTransfersPage: React.FC<StaffTransfersPageProps> = ({
                 transaction={selectedTx}
                 open={drawerOpen}
                 onClose={closeDrawer}
+                formatBankCode={formatBeneficiaryBank}
             />
         </StaffLayout>
     );
