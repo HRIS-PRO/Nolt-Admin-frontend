@@ -15,15 +15,23 @@ type PayoutFrequency = 'monthly' | 'quarterly' | 'maturity';
 
 const TENURE_VALUES = [30, 60, 90, 120, 150, 180, 210, 240, 270, 300, 330, 365];
 
-const LOAN_PRODUCTS = [
-    { id: 'ippis', name: 'IPPIS Loan', rate: 24 },
-];
+type LoanCatalogItem = {
+    id: string;
+    name: string;
+    interestRateMonthly: number;
+    minTerm?: number | null;
+    maxTerm?: number | null;
+    minAmount?: number | null;
+};
 
-const INVESTMENT_PRODUCTS = [
-    { id: 'rise', name: 'NOLT Rise' },
-    { id: 'surge', name: 'NOLT Surge' },
-    { id: 'vault', name: 'NOLT Vault' },
-];
+type InvestmentCatalogItem = {
+    id: string;
+    name: string;
+    cbaProductCode: string | null;
+    minTerm?: number | null;
+    maxTerm?: number | null;
+    minAmount?: number | null;
+};
 
 const PAYOUT_FREQUENCIES: { value: PayoutFrequency; label: string }[] = [
     { value: 'maturity', label: 'At Maturity' },
@@ -34,7 +42,9 @@ const PAYOUT_FREQUENCIES: { value: PayoutFrequency; label: string }[] = [
 const StaffCalculatorPage: React.FC<StaffCalculatorPageProps> = ({ user, onLogout, toggleTheme, theme, formatMoney }) => {
     const [calcType, setCalcType] = useState<'LOAN' | 'INVESTMENT'>('LOAN');
     const [currency, setCurrency] = useState<'NGN' | 'USD'>('NGN');
-    const [selectedProductId, setSelectedProductId] = useState<string>('ippis');
+    const [loanCatalog, setLoanCatalog] = useState<LoanCatalogItem[]>([]);
+    const [investmentCatalog, setInvestmentCatalog] = useState<InvestmentCatalogItem[]>([]);
+    const [selectedProductId, setSelectedProductId] = useState<string>('');
     const [payoutFrequency, setPayoutFrequency] = useState<PayoutFrequency>('maturity');
 
     const [principal, setPrincipal] = useState<number>(500000);
@@ -44,43 +54,92 @@ const StaffCalculatorPage: React.FC<StaffCalculatorPageProps> = ({ user, onLogou
     const [rateError, setRateError] = useState<string | null>(null);
     const debounceRef = useRef<NodeJS.Timeout | null>(null);
 
-    const isVault = calcType === 'INVESTMENT' && selectedProductId === 'vault';
+    const selectedInvestment = investmentCatalog.find((p) => p.id === selectedProductId);
+    const selectedLoan = loanCatalog.find((p) => p.id === selectedProductId);
+    const isVault =
+        calcType === 'INVESTMENT'
+        && Boolean(selectedInvestment?.name?.toLowerCase().includes('vault'));
+
+    useEffect(() => {
+        void axios.get('/api/staff/products/loans/active', { withCredentials: true }).then((res) => {
+            const mapped: LoanCatalogItem[] = (res.data ?? []).map((p: Record<string, unknown>) => ({
+                id: String(p.id),
+                name: String(p.custom_name ?? 'Loan product'),
+                interestRateMonthly: Number(p.interest_rate) || 0,
+                minTerm: p.min_term != null ? Number(p.min_term) : null,
+                maxTerm: p.max_term != null ? Number(p.max_term) : null,
+                minAmount: p.min_amount != null ? Number(p.min_amount) : null,
+            }));
+            setLoanCatalog(mapped);
+            if (mapped[0]) {
+                setSelectedProductId((prev) => prev || mapped[0].id);
+                setRate(mapped[0].interestRateMonthly * 12);
+            }
+        });
+        void axios.get('/api/staff/products/investments/active', { withCredentials: true }).then((res) => {
+            const mapped: InvestmentCatalogItem[] = (res.data ?? []).map((p: Record<string, unknown>) => ({
+                id: String(p.id),
+                name: String(p.custom_name ?? 'Investment product'),
+                cbaProductCode: p.cba_product_code ? String(p.cba_product_code) : null,
+                minTerm: p.min_term != null ? Number(p.min_term) : null,
+                maxTerm: p.max_term != null ? Number(p.max_term) : null,
+                minAmount: p.min_amount != null ? Number(p.min_amount) : null,
+            }));
+            setInvestmentCatalog(mapped);
+        });
+    }, []);
 
     const minAmount = useMemo(() => {
-        if (calcType === 'LOAN') return 100000;
-        const plan = selectedProductId.toUpperCase();
-        if (plan === 'VAULT') return currency === 'NGN' ? 100000 : 10000;
+        if (calcType === 'LOAN') {
+            return Number(selectedLoan?.minAmount) || 100000;
+        }
+        const fromProduct = Number(selectedInvestment?.minAmount);
+        if (Number.isFinite(fromProduct) && fromProduct > 0) return fromProduct;
+        if (isVault) return currency === 'NGN' ? 100000 : 10000;
         return 10000;
-    }, [calcType, selectedProductId, currency]);
+    }, [calcType, selectedLoan, selectedInvestment, isVault, currency]);
 
     const minTerm = useMemo(() => {
-        if (calcType === 'LOAN') return 3;
-        const plan = selectedProductId.toUpperCase();
-        if (plan === 'SURGE') return 30;
-        if (plan === 'VAULT' && currency === 'NGN') return 30;
+        if (calcType === 'LOAN') {
+            return Number(selectedLoan?.minTerm) || 3;
+        }
+        const fromProduct = Number(selectedInvestment?.minTerm);
+        if (Number.isFinite(fromProduct) && fromProduct > 0) return fromProduct;
+        const name = selectedInvestment?.name?.toLowerCase() ?? '';
+        if (name.includes('surge')) return 30;
+        if (isVault && currency === 'NGN') return 30;
         return 90;
-    }, [calcType, selectedProductId, currency]);
+    }, [calcType, selectedLoan, selectedInvestment, isVault, currency]);
 
     const maxTerm = useMemo(() => calcType === 'LOAN' ? 24 : 365, [calcType]);
 
     // Fetch real rate from backend
-    const fetchRate = useCallback(async (plan: string, cur: string, amount: number, tenure: number, payout?: PayoutFrequency) => {
+    const fetchRate = useCallback(async (productId: string, amount: number, tenure: number) => {
         if (calcType !== 'INVESTMENT') return;
         if (amount < 1000 || tenure < 1) return;
+
+        const product = investmentCatalog.find((p) => p.id === productId);
+        if (!product?.cbaProductCode) {
+            setRateError('Selected product has no core banking product code.');
+            return;
+        }
 
         setFetchingRate(true);
         setRateError(null);
         try {
-            const planName = plan === 'rise' ? 'NOLT_RISE' : plan === 'surge' ? 'NOLT_SURGE' : 'NOLT_VAULT';
-            const params: Record<string, string> = {
-                plan: planName, currency: cur, amount: amount.toString(), tenure: tenure.toString(),
-            };
-            if (plan === 'vault' && payout) params.payout_frequency = payout;
-            const { data } = await axios.get('/api/yield-rates/calculate', { params, withCredentials: true });
-            if (data?.interest_rate !== undefined) {
-                setRate(Number(data.interest_rate));
+            const { data } = await axios.get('/api/staff/investments/cba-rate', {
+                params: {
+                    productCode: product.cbaProductCode,
+                    amount: String(amount),
+                    duration: String(tenure),
+                },
+                withCredentials: true,
+            });
+            const live = data?.interestRate;
+            if (live != null && Number.isFinite(Number(live))) {
+                setRate(Number(live));
             } else {
-                setRateError('No rate found');
+                setRateError('No live rate returned for this amount and tenure.');
             }
         } catch (err: any) {
             const msg = err.response?.data?.message || 'Could not fetch rate';
@@ -88,7 +147,7 @@ const StaffCalculatorPage: React.FC<StaffCalculatorPageProps> = ({ user, onLogou
         } finally {
             setFetchingRate(false);
         }
-    }, [calcType]);
+    }, [calcType, investmentCatalog]);
 
     useEffect(() => {
         if (calcType !== 'INVESTMENT') return;
@@ -97,18 +156,28 @@ const StaffCalculatorPage: React.FC<StaffCalculatorPageProps> = ({ user, onLogou
 
         if (debounceRef.current) clearTimeout(debounceRef.current);
         debounceRef.current = setTimeout(() => {
-            fetchRate(selectedProductId, currency, effectivePrincipal, effectiveTerm, isVault ? payoutFrequency : undefined);
+            fetchRate(selectedProductId, effectivePrincipal, effectiveTerm);
         }, 400);
         return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
-    }, [calcType, selectedProductId, currency, principal, term, payoutFrequency, minAmount, minTerm, fetchRate, isVault]);
+    }, [calcType, selectedProductId, principal, term, minAmount, minTerm, fetchRate]);
 
     const handleCalcTypeChange = (type: 'LOAN' | 'INVESTMENT') => {
         setCalcType(type);
         setRateError(null);
         if (type === 'LOAN') {
-            setSelectedProductId('ippis'); setRate(24); setTerm(12); setPrincipal(500000); setCurrency('NGN');
+            const first = loanCatalog[0];
+            setSelectedProductId(first?.id ?? '');
+            setRate((first?.interestRateMonthly ?? 2) * 12);
+            setTerm(12);
+            setPrincipal(500000);
+            setCurrency('NGN');
         } else {
-            setSelectedProductId('rise'); setTerm(365); setPrincipal(100000); setPayoutFrequency('maturity'); setRate(0);
+            const first = investmentCatalog[0];
+            setSelectedProductId(first?.id ?? '');
+            setTerm(365);
+            setPrincipal(100000);
+            setPayoutFrequency('maturity');
+            setRate(0);
         }
     };
 
@@ -117,8 +186,8 @@ const StaffCalculatorPage: React.FC<StaffCalculatorPageProps> = ({ user, onLogou
         setRateError(null);
         if (productId === 'vault') setPayoutFrequency('maturity');
         if (calcType === 'LOAN') {
-            const product = LOAN_PRODUCTS.find(p => p.id === productId);
-            if (product) setRate(product.rate);
+            const product = loanCatalog.find((p) => p.id === productId);
+            if (product) setRate(product.interestRateMonthly * 12);
         } else {
             setRate(0);
         }
@@ -175,7 +244,7 @@ const StaffCalculatorPage: React.FC<StaffCalculatorPageProps> = ({ user, onLogou
                                 <div className="relative">
                                     <select value={selectedProductId} onChange={(e) => handleProductChange(e.target.value)}
                                         className="w-full h-14 bg-slate-50 dark:bg-slate-900 border-2 border-transparent focus:border-primary rounded-2xl px-5 text-base font-black dark:text-white outline-none transition-all appearance-none">
-                                        {(calcType === 'LOAN' ? LOAN_PRODUCTS : INVESTMENT_PRODUCTS).map(p => (
+                                        {(calcType === 'LOAN' ? loanCatalog : investmentCatalog).map((p) => (
                                             <option key={p.id} value={p.id}>{p.name}</option>
                                         ))}
                                     </select>
@@ -234,7 +303,7 @@ const StaffCalculatorPage: React.FC<StaffCalculatorPageProps> = ({ user, onLogou
                                         </div>
                                     )}
                                 </div>
-                                {calcType === 'INVESTMENT' && !rateError && <p className="text-[9px] font-bold text-primary/60 flex items-center gap-1"><span className="material-symbols-outlined text-[10px]">auto_fix_high</span>Live rate from rate engine</p>}
+                                {calcType === 'INVESTMENT' && !rateError && <p className="text-[9px] font-bold text-primary/60 flex items-center gap-1"><span className="material-symbols-outlined text-[10px]">auto_fix_high</span>Live rate from core banking</p>}
                                 {rateError && <p className="text-[9px] font-bold text-amber-500 flex items-center gap-1"><span className="material-symbols-outlined text-[10px]">info</span>{rateError}</p>}
                             </div>
                         </div>
@@ -303,7 +372,9 @@ const StaffCalculatorPage: React.FC<StaffCalculatorPageProps> = ({ user, onLogou
                             </div>
                             <div>
                                 <h4 className="text-slate-900 dark:text-white font-black text-sm">
-                                    {calcType === 'LOAN' ? 'IPPIS Loan' : INVESTMENT_PRODUCTS.find(p => p.id === selectedProductId)?.name}
+                                    {calcType === 'LOAN'
+                                        ? (selectedLoan?.name ?? 'Loan product')
+                                        : (selectedInvestment?.name ?? 'Investment product')}
                                 </h4>
                                 <p className="text-slate-400 text-[10px] font-medium leading-relaxed mt-0.5">
                                     Calculations use live rates. Final terms may vary based on eligibility.
