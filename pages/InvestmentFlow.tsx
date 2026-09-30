@@ -11,6 +11,7 @@ import { PaymentModal } from '../components/PaymentModal';
 import SelfieVerificationCapture, { type SelfieVerificationSuccess } from '../components/SelfieVerificationCapture';
 import { AnimatePresence } from 'motion/react';
 import { apiUrl } from '@/lib/api-config';
+import { useNmsUploadSizeLimit } from '../hooks/useNmsUploadSizeLimit';
 
 interface InvestmentFlowProps {
   navigate: (step: AppStep) => void;
@@ -285,6 +286,7 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
   }, [currentDocs, uploadedDocs, isIdentityVerifiedWithin6Months]);
 
   const [uploadProgress, setUploadProgress] = useState<Record<string, number>>({});
+  const { validateFile, modal: uploadSizeModal } = useNmsUploadSizeLimit();
   const [receiptProgress, setReceiptProgress] = useState(0);
   const [receiptFile, setReceiptFile] = useState<{ name: string; size: string, url?: string } | null>(null);
   const [isVerifyingPayment, setIsVerifyingPayment] = useState(false);
@@ -752,6 +754,8 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
   };
 
   const handleFileUpload = async (id: string, file: File) => {
+    if (!validateFile(file)) return;
+
     // Prevent uploading the exact same file in multiple document slots within this application
     const isDuplicate = Object.entries(uploadedDocs).some(([slotId, doc]) => {
       if (slotId === id || !doc) return false;
@@ -888,6 +892,9 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
   };
 
   const handleUploadReceipt = async (file: File): Promise<string> => {
+    if (!validateFile(file)) {
+      throw new Error('File exceeds the maximum upload size.');
+    }
     try {
       const result = await investmentService.uploadDocument(file, draftId, 'payment_receipt');
       return result.document.file_url;
@@ -2505,6 +2512,7 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
         onUploadReceipt={handleUploadReceipt}
         onBankTransferComplete={handleBankTransferSubmit}
       />
+      {uploadSizeModal}
     </div>
   );
 };

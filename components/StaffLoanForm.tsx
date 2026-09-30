@@ -4,6 +4,8 @@ import MdaTertiarySelect, { TERTIARY_LIST } from './MdaTertiarySelect';
 
 import { StaffLoanDraft } from '../types';
 import { storageService } from '../services/storageService';
+import { getEligibilityBanner } from '../utils/loanEligibility';
+import { useNmsUploadSizeLimit } from '../hooks/useNmsUploadSizeLimit';
 
 const STATIC_PRODUCTS = [
     { name: "NOLT IPPIS", code: "314", rate: "4% PER MONTH", icon: "inventory_2" },
@@ -32,6 +34,73 @@ const NIGERIAN_STATES = [
     "Kano", "Katsina", "Kebbi", "Kogi", "Kwara", "Lagos", "Nasarawa", "Niger", "Ogun", "Ondo",
     "Osun", "Oyo", "Plateau", "Rivers", "Sokoto", "Taraba", "Yobe", "Zamfara"
 ];
+
+const SELFIE_DUMMY_URL = 'https://identity.dojah.io/widget/selfie_dummy.jpg';
+
+const LOAN_DOC_URL_FIELDS: Record<string, string> = {
+    govt_id: 'govt_id_url',
+    work_id: 'work_id_url',
+    payslip: 'payslip_url',
+    selfie: 'selfie_verification_url',
+    bank_statement: 'statement_of_account_url',
+    proof_address: 'proof_of_residence_url',
+};
+
+function resolveLoanDocUrl(
+    docKey: string,
+    uploadedDocs: Record<string, { url?: string } | null>,
+    initialData?: any,
+): string | null {
+    const fromState = uploadedDocs[docKey]?.url;
+    const field = LOAN_DOC_URL_FIELDS[docKey];
+    const fromLoan = field ? initialData?.[field] : null;
+    const url = fromState || fromLoan;
+    if (!url || url === SELFIE_DUMMY_URL) return null;
+    return url;
+}
+
+/** Numeric customers.id only — never profile UUID or loan id from initialData.id. */
+function resolveApplicantCustomerId(data: any): number | undefined {
+    const candidates = [data?.customer_id, data?.user_id];
+    for (const raw of candidates) {
+        if (raw == null || raw === '') continue;
+        const num = Number(raw);
+        if (Number.isInteger(num) && num > 0) return num;
+    }
+    return undefined;
+}
+
+/** Loan already advanced past sales — edits must not reset status/stage via draft autosave. */
+function isPipelineLoanEdit(initialData?: any, existingLoanId?: number | null): boolean {
+    if (!existingLoanId || !initialData) return false;
+    const stage = String(initialData.stage || '').toLowerCase();
+    if (!stage || stage === 'sales' || stage === 'draft') return false;
+    return [
+        'submitted',
+        'customer_experience',
+        'credit_check_1',
+        'credit_check_2',
+        'credit_check',
+        'internal_audit',
+        'finance',
+        'finance_stage',
+        'disbursed',
+    ].includes(stage);
+}
+
+function resolveExistingLoanId(
+    dbLoanId: number | null,
+    loanId?: string,
+    initialData?: any,
+    initialDraft?: StaffLoanDraft,
+): number | null {
+    if (dbLoanId) return dbLoanId;
+    if (loanId && !isNaN(Number(loanId))) return Number(loanId);
+    if (typeof initialData?.loan_id === 'number') return initialData.loan_id;
+    if (typeof initialData?.id === 'number') return initialData.id;
+    if (initialDraft?.id && !isNaN(Number(initialDraft.id))) return Number(initialDraft.id);
+    return null;
+}
 
 /** First wizard step that still has missing required fields (edit/resume draft). */
 function resolveResumeStepFromLoanData(data: any): number {
@@ -62,7 +131,8 @@ function resolveResumeStepFromLoanData(data: any): number {
             data.account_name
         ),
         () => Boolean(
-            data.govt_id_url && data.work_id_url && data.payslip_url && data.selfie_verification_url &&
+            data.govt_id_url && data.work_id_url && data.payslip_url &&
+            data.selfie_verification_url && data.selfie_verification_url !== SELFIE_DUMMY_URL &&
             (amount <= 500000 || data.statement_of_account_url)
         ),
         () => {
@@ -78,7 +148,12 @@ function resolveResumeStepFromLoanData(data: any): number {
     ];
 
     for (let i = 0; i < stepComplete.length; i++) {
-        if (!stepComplete[i]()) return i;
+        if (!stepComplete[i]()) {
+            // Steps 0–3 share one UI screen (loan-details accordion on step 0).
+            if (i <= 3) return 0;
+            if (i === 4) return 4;
+            return 5;
+        }
     }
     return 5;
 }
@@ -200,6 +275,7 @@ const FileUpload = ({
 const StaffLoanForm: React.FC<StaffLoanFormProps> = ({ 
     onClose, onSuccess, initialData, initialDraft, loanId, user, isCustomerVerified, lockedLoanType 
 }) => {
+    const { validateFile, modal: uploadSizeModal } = useNmsUploadSizeLimit();
     const [step, setStep] = useState(() => {
         if (typeof initialDraft?.step === 'number') return initialDraft.step;
         if (initialData) return resolveResumeStepFromLoanData(initialData);
@@ -211,6 +287,7 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
     const [draftId] = useState(() => initialDraft?.id || `L-DRAFT-${Date.now()}`); // Generate or reuse Draft ID for uploads
     const [errors, setErrors] = useState<Record<string, string>>({});
     const [draftToast, setDraftToast] = useState<string | null>(null);
+    const initialDataHydratedRef = useRef(false);
 
     const [showProductSelect, setShowProductSelect] = useState(() => {
         if (initialDraft?.formData?.showProductSelect !== undefined) return initialDraft.formData.showProductSelect;
@@ -231,7 +308,17 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
     const [gender, setGender] = useState('');
     const [dob, setDob] = useState('');
     const [religion, setReligion] = useState('');
+    const [religionCode, setReligionCode] = useState('');
+    const [cbaReligions, setCbaReligions] = useState<{ religionCode: string; religionDesc: string }[]>([]);
     const [maritalStatus, setMaritalStatus] = useState('');
+    const [maritalStatusCode, setMaritalStatusCode] = useState('');
+    const [cbaMaritalStatuses, setCbaMaritalStatuses] = useState<{ maritalStatusCode: string; maritalStatusDesc: string }[]>([]);
+    const [educationLevel, setEducationLevel] = useState('');
+    const [educationLevelCode, setEducationLevelCode] = useState('');
+    const [cbaEducationLevels, setCbaEducationLevels] = useState<{ educationCode: string; educationName: string }[]>([]);
+    const [employmentStatus, setEmploymentStatus] = useState('');
+    const [employmentStatusCode, setEmploymentStatusCode] = useState('');
+    const [cbaEmploymentStatuses, setCbaEmploymentStatuses] = useState<{ employmentCode: string; employmentDesc: string }[]>([]);
     const [mothersMaidenName, setMothersMaidenName] = useState('');
     const [mobileNumber, setMobileNumber] = useState('');
     const [email, setEmail] = useState('');
@@ -244,7 +331,125 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
     // Address
     const [stateOfOrigin, setStateOfOrigin] = useState('');
     const [stateOfResidence, setStateOfResidence] = useState('');
+    const [cbaStates, setCbaStates] = useState<{ stateCode: string; stateName: string }[]>([]);
+    const [residentialTown, setResidentialTown] = useState('');
+    const [residentialTownCode, setResidentialTownCode] = useState('');
+    const [cbaTowns, setCbaTowns] = useState<{ townCode: string; townName: string }[]>([]);
+    const [townsLoading, setTownsLoading] = useState(false);
     const [residentialStatus, setResidentialStatus] = useState('');
+
+    useEffect(() => {
+        let cancelled = false;
+        axios.get('/api/misc/states')
+            .then((res) => {
+                const states = Array.isArray(res.data?.states) ? res.data.states : [];
+                if (cancelled || states.length === 0) return;
+                setCbaStates(states);
+                const match = (saved: string) => {
+                    const key = saved.trim().toUpperCase().replace(/[^A-Z0-9]+/g, ' ').replace(/\s+/g, ' ').trim();
+                    if (!key) return saved;
+                    if (key === 'FCT' || key === 'ABUJA' || key === 'FCT ABUJA') return 'FEDERAL CAPITAL TERRITORY';
+                    return states.find((s: { stateName: string }) =>
+                        s.stateName.toUpperCase().replace(/\s+/g, ' ').trim() === key,
+                    )?.stateName || saved;
+                };
+                setStateOfOrigin((current) => match(current));
+                setStateOfResidence((current) => match(current));
+            })
+            .catch(() => undefined);
+        return () => { cancelled = true; };
+    }, []);
+
+    useEffect(() => {
+        let cancelled = false;
+        Promise.all([
+            axios.get('/api/misc/marital-statuses'),
+            axios.get('/api/misc/educational-levels'),
+            axios.get('/api/misc/employment-statuses'),
+            axios.get('/api/misc/religions'),
+            axios.get('/api/misc/relationships'),
+        ])
+            .then(([maritalRes, educationRes, employmentRes, religionRes, relationshipRes]) => {
+                if (cancelled) return;
+                const marital = Array.isArray(maritalRes.data?.statuses) ? maritalRes.data.statuses : [];
+                const levels = Array.isArray(educationRes.data?.levels) ? educationRes.data.levels : [];
+                const employment = Array.isArray(employmentRes.data?.statuses) ? employmentRes.data.statuses : [];
+                const religions = Array.isArray(religionRes.data?.religions) ? religionRes.data.religions : [];
+                const relationships = Array.isArray(relationshipRes.data?.relationships) ? relationshipRes.data.relationships : [];
+                if (marital.length > 0) setCbaMaritalStatuses(marital);
+                if (levels.length > 0) setCbaEducationLevels(levels);
+                if (employment.length > 0) setCbaEmploymentStatuses(employment);
+                if (religions.length > 0) setCbaReligions(religions);
+                if (relationships.length > 0) setCbaRelationships(relationships);
+            })
+            .catch(() => undefined);
+        return () => { cancelled = true; };
+    }, []);
+
+    useEffect(() => {
+        if (cbaMaritalStatuses.length === 0 || maritalStatusCode) return;
+        if (!maritalStatus.trim()) return;
+        const key = maritalStatus.trim().toUpperCase();
+        const row = cbaMaritalStatuses.find((m) =>
+            m.maritalStatusDesc.toUpperCase() === key
+            || (key === 'SINGLE' && m.maritalStatusDesc.toUpperCase().includes('SINGLE'))
+            || (key === 'MARRIED' && m.maritalStatusDesc.toUpperCase().includes('MARRIED'))
+            || (key === 'DIVORCED' && m.maritalStatusDesc.toUpperCase().includes('DIVORC')),
+        );
+        if (row) {
+            setMaritalStatusCode(row.maritalStatusCode);
+            setMaritalStatus(row.maritalStatusDesc);
+        }
+    }, [cbaMaritalStatuses, maritalStatus, maritalStatusCode]);
+
+    useEffect(() => {
+        if (cbaReligions.length === 0 || religionCode) return;
+        if (!religion.trim()) return;
+        const key = religion.trim().toUpperCase();
+        const row = cbaReligions.find((r) =>
+            r.religionDesc.toUpperCase() === key
+            || (key === 'OTHERS' && r.religionCode === '1')
+            || (key.includes('CHRIST') && r.religionCode === '1')
+            || (key.includes('ISLAM') && r.religionCode === '2'),
+        );
+        if (row) {
+            setReligionCode(row.religionCode);
+            setReligion(row.religionDesc);
+        }
+    }, [cbaReligions, religion, religionCode]);
+
+    useEffect(() => {
+        const stateValue = stateOfResidence.trim();
+        if (!stateValue || stateValue === 'N/A') {
+            setCbaTowns([]);
+            setTownsLoading(false);
+            return;
+        }
+        let cancelled = false;
+        setTownsLoading(true);
+        axios.get('/api/misc/towns', { params: { stateCode: stateValue } })
+            .then((res) => {
+                const towns = Array.isArray(res.data?.towns) ? res.data.towns : [];
+                if (cancelled) return;
+                setCbaTowns(towns);
+                setResidentialTownCode((current) => {
+                    const match = towns.find((town: { townCode: string; townName: string }) => town.townCode === current);
+                    if (match) {
+                        setResidentialTown(match.townName);
+                        return current;
+                    }
+                    return current;
+                });
+            })
+            .catch(() => {
+                if (!cancelled) setCbaTowns([]);
+            })
+            .finally(() => {
+                if (!cancelled) setTownsLoading(false);
+            });
+        return () => { cancelled = true; };
+    }, [stateOfResidence]);
+
     const [address, setAddress] = useState('');
 
     // Employment
@@ -301,12 +506,34 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
         proof_address: null
     });
 
+    const getLoanDocUrl = (docKey: string) => resolveLoanDocUrl(docKey, uploadedDocs, initialData);
+
     // Next of Kin
     const [nokName, setNokName] = useState('');
     const [nokRelationship, setNokRelationship] = useState('');
+    const [nokRelationshipCode, setNokRelationshipCode] = useState('');
+    const [cbaRelationships, setCbaRelationships] = useState<{ relationshipCode: string; relationshipDesc: string }[]>([]);
     const [nokAddress, setNokAddress] = useState('');
     const [nokPhoneNumber, setNokPhoneNumber] = useState('');
     const [nokCountryCode, setNokCountryCode] = useState('+234');
+
+    useEffect(() => {
+        if (cbaRelationships.length === 0 || nokRelationshipCode) return;
+        if (!nokRelationship.trim()) return;
+        const key = nokRelationship.trim().toUpperCase();
+        const alias: Record<string, string> = {
+            HUSBAND: '1', WIFE: '2', FATHER: '3', MOTHER: '4',
+            BROTHER: '6', SISTER: '6', SON: '6', DAUGHTER: '6', OTHER: '6',
+        };
+        const code = alias[key];
+        const row = code
+            ? cbaRelationships.find((r) => r.relationshipCode === code)
+            : cbaRelationships.find((r) => r.relationshipDesc.toUpperCase() === key);
+        if (row) {
+            setNokRelationshipCode(row.relationshipCode);
+            setNokRelationship(row.relationshipDesc);
+        }
+    }, [cbaRelationships, nokRelationship, nokRelationshipCode]);
 
     // References
     const [references, setReferences] = useState([
@@ -344,12 +571,14 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
             selectedProductOption,
             lockedLoanType,
             formData: {
-                loanType, productType, title, surname, firstName, middleName, gender, dob, religion,
-                maritalStatus, mothersMaidenName, mobileNumber, email, bvn, nin, preferredFirstName,
-                preferredSurname, preferredMiddleName, stateOfOrigin, stateOfResidence, residentialStatus,
+                loanType, productType, title, surname, firstName, middleName, gender, dob, religion, religionCode,
+                maritalStatus, maritalStatusCode, educationLevel, educationLevelCode,
+                employmentStatus, employmentStatusCode, mothersMaidenName, mobileNumber, email, bvn, nin, preferredFirstName,
+                preferredSurname, preferredMiddleName, stateOfOrigin, stateOfResidence, residentialTown,
+                residentialTownCode, residentialStatus,
                 address, mda, ippisNumber, staffId, monthlyIncome, amount, tenure, bankName, accountNumber,
                 accountName, casa, topUpAmount, buyOverAmount, buyOverCompanyName, buyOverAccountName,
-                buyOverAccountNumber, buyOverBankName, uploadedDocs, nokName, nokRelationship, nokAddress,
+                buyOverAccountNumber, buyOverBankName, uploadedDocs, nokName, nokRelationship, nokRelationshipCode, nokAddress,
                 nokPhoneNumber, nokCountryCode, references, showProductSelect
             },
             updatedAt: Date.now(),
@@ -365,12 +594,14 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
         isSavingDraftRef.current = true;
 
         const targetStep = typeof targetStepOverride === 'number' ? targetStepOverride : step;
-        const existingLoanId = dbLoanId || (loanId && !isNaN(Number(loanId)) ? Number(loanId) : null) || (typeof initialData?.id === 'number' ? initialData.id : null) || (initialDraft?.id && !isNaN(Number(initialDraft.id)) ? Number(initialDraft.id) : null);
+        const existingLoanId = resolveExistingLoanId(dbLoanId, loanId, initialData, initialDraft);
+        const applicantCustomerId = resolveApplicantCustomerId(initialData);
 
         try {
+            const preservePipeline = isPipelineLoanEdit(initialData, existingLoanId);
             const payload = {
                 id: existingLoanId || undefined,
-                status: 'draft',
+                ...(preservePipeline ? {} : { status: 'draft' as const }),
                 sub_step: targetStep,
                 step: targetStep,
                 loan_type: loanType,
@@ -383,7 +614,13 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
                 gender,
                 date_of_birth: dob,
                 religion,
+                religion_code: religionCode,
                 marital_status: maritalStatus,
+                marital_status_code: maritalStatusCode,
+                education_level: educationLevel,
+                education_level_code: educationLevelCode,
+                employment_status: employmentStatus,
+                employment_status_code: employmentStatusCode,
                 mothers_maiden_name: mothersMaidenName,
                 mobile_number: mobileNumber,
                 personal_email: email,
@@ -391,6 +628,8 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
                 nin,
                 state_of_origin: stateOfOrigin,
                 state_of_residence: stateOfResidence,
+                residential_town: residentialTown,
+                residential_town_code: residentialTownCode,
                 primary_home_address: address,
                 residential_status: residentialStatus,
                 mda_tertiary: mda,
@@ -404,21 +643,22 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
                 account_name: accountName,
                 casa,
                 topup_amount: parseFloat(topUpAmount) || 0,
-                govt_id_url: uploadedDocs.govt_id?.url || null,
-                work_id_url: uploadedDocs.work_id?.url || null,
-                payslip_url: uploadedDocs.payslip?.url || null,
-                selfie_verification_url: uploadedDocs.selfie?.url || null,
-                statement_of_account_url: uploadedDocs.bank_statement?.url || null,
-                proof_of_residence_url: uploadedDocs.proof_address?.url || null,
+                govt_id_url: getLoanDocUrl('govt_id'),
+                work_id_url: getLoanDocUrl('work_id'),
+                payslip_url: getLoanDocUrl('payslip'),
+                selfie_verification_url: getLoanDocUrl('selfie'),
+                statement_of_account_url: getLoanDocUrl('bank_statement'),
+                proof_of_residence_url: getLoanDocUrl('proof_address'),
                 nok_name: nokName,
                 nok_relationship: nokRelationship,
+                nok_relationship_code: nokRelationshipCode,
                 nok_address: nokAddress,
                 nok_phone_number: `${nokCountryCode}${nokPhoneNumber}`,
                 references,
                 ...(existingLoanId || initialData?.sales_officer_id
                     ? {}
                     : { sales_officer_id: user?.id || undefined }),
-                applicant_customer_id: initialData?.id || initialData?.customer_id || undefined,
+                ...(applicantCustomerId ? { applicant_customer_id: applicantCustomerId } : {}),
             };
 
             if (existingLoanId) {
@@ -434,6 +674,10 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
             }
         } catch (err: any) {
             console.error(`❌ [STAFF FORM DRAFT SAVE FAILED - SUB_STEP ${targetStep}]:`, err.response?.data || err.message);
+            const blockMessage = err.response?.data?.message;
+            if (err.response?.status === 403 && blockMessage) {
+                alert(blockMessage);
+            }
         } finally {
             isSavingDraftRef.current = false;
         }
@@ -460,7 +704,13 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
             if (fd.gender) setGender(fd.gender);
             if (fd.dob) setDob(fd.dob);
             if (fd.religion) setReligion(fd.religion);
+            if (fd.religionCode) setReligionCode(fd.religionCode);
             if (fd.maritalStatus) setMaritalStatus(fd.maritalStatus);
+            if (fd.maritalStatusCode) setMaritalStatusCode(fd.maritalStatusCode);
+            if (fd.educationLevel) setEducationLevel(fd.educationLevel);
+            if (fd.educationLevelCode) setEducationLevelCode(fd.educationLevelCode);
+            if (fd.employmentStatus) setEmploymentStatus(fd.employmentStatus);
+            if (fd.employmentStatusCode) setEmploymentStatusCode(fd.employmentStatusCode);
             if (fd.mothersMaidenName) setMothersMaidenName(fd.mothersMaidenName);
             if (fd.mobileNumber) setMobileNumber(fd.mobileNumber);
             if (fd.email) setEmail(fd.email);
@@ -472,6 +722,8 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
 
             if (fd.stateOfOrigin) setStateOfOrigin(fd.stateOfOrigin);
             if (fd.stateOfResidence) setStateOfResidence(fd.stateOfResidence);
+            if (fd.residentialTown) setResidentialTown(fd.residentialTown);
+            if (fd.residentialTownCode) setResidentialTownCode(fd.residentialTownCode);
             if (fd.residentialStatus) setResidentialStatus(fd.residentialStatus);
             if (fd.address) setAddress(fd.address);
 
@@ -497,6 +749,7 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
             if (fd.uploadedDocs) setUploadedDocs(fd.uploadedDocs);
             if (fd.nokName) setNokName(fd.nokName);
             if (fd.nokRelationship) setNokRelationship(fd.nokRelationship);
+            if (fd.nokRelationshipCode) setNokRelationshipCode(fd.nokRelationshipCode);
             if (fd.nokAddress) setNokAddress(fd.nokAddress);
             if (fd.nokPhoneNumber) setNokPhoneNumber(fd.nokPhoneNumber);
             if (fd.nokCountryCode) setNokCountryCode(fd.nokCountryCode);
@@ -506,7 +759,8 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
 
     // Populate form if initialData exists (Edit Mode) & no initialDraft is restoring
     useEffect(() => {
-        if (initialData && !initialDraft) {
+        if (initialData && !initialDraft && !initialDataHydratedRef.current) {
+            initialDataHydratedRef.current = true;
             const resumeStep = resolveResumeStepFromLoanData(initialData);
             setStep(resumeStep);
             if (resumeStep === 0 && initialData.product_type) {
@@ -524,7 +778,13 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
             setGender(initialData.gender || '');
             setDob(initialData.date_of_birth ? new Date(initialData.date_of_birth).toISOString().split('T')[0] : '');
             setReligion(initialData.religion || '');
+            setReligionCode(initialData.religion_code || '');
             setMaritalStatus(initialData.marital_status || '');
+            setMaritalStatusCode(initialData.marital_status_code || '');
+            setEducationLevel(initialData.education_level || '');
+            setEducationLevelCode(initialData.education_level_code || '');
+            setEmploymentStatus(initialData.employment_status || '');
+            setEmploymentStatusCode(initialData.employment_status_code || '');
             setMothersMaidenName(initialData.mothers_maiden_name || '');
             setMobileNumber(initialData.phone_number || initialData.mobile_number || '');
             setEmail(initialData.personal_email || '');
@@ -536,6 +796,8 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
 
             setStateOfOrigin(initialData.state_of_origin || '');
             setStateOfResidence(initialData.state_of_residence || '');
+            setResidentialTown(initialData.residential_town || '');
+            setResidentialTownCode(initialData.residential_town_code || '');
             setResidentialStatus(initialData.residential_status || '');
             setAddress(initialData.address || initialData.primary_home_address || '');
 
@@ -549,7 +811,11 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
             setLoanType(initialData.loan_type || 'new');
 
             // Populate New Fields
-            setCasa(initialData.casa ? String(initialData.casa).split('.')[0] : '');
+            const casaFromProfile =
+                initialData.casa
+                || initialData.casa_account_number
+                || initialData.profile_casa;
+            setCasa(casaFromProfile ? String(casaFromProfile).split('.')[0] : '');
             setTopUpAmount(initialData.topup_amount || '');
             setBuyOverAmount(initialData.buy_over_amount || '');
             setBuyOverCompanyName(initialData.buy_over_company_name || '');
@@ -557,15 +823,19 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
             setBuyOverAccountName(initialData.buy_over_company_account_name || '');
             setBuyOverAccountNumber(initialData.buy_over_company_account_number || '');
 
-            // Pre-fill documents references if URLs exist (visual only, real re-upload needed to change)
+            const toExistingDoc = (url?: string | null) =>
+                url && url !== SELFIE_DUMMY_URL
+                    ? { name: 'Existing Document', size: 'Unknown', url }
+                    : null;
+
+            // Pre-fill documents from saved loan URLs; keep any in-session uploads already in state
             setUploadedDocs(prev => ({
-                ...prev,
-                govt_id: initialData.govt_id_url ? { name: 'Existing Document', size: 'Unknown', url: initialData.govt_id_url } : null,
-                work_id: initialData.work_id_url ? { name: 'Existing Document', size: 'Unknown', url: initialData.work_id_url } : null,
-                payslip: initialData.payslip_url ? { name: 'Existing Document', size: 'Unknown', url: initialData.payslip_url } : null,
-                selfie: initialData.selfie_verification_url ? { name: 'Existing Document', size: 'Unknown', url: initialData.selfie_verification_url } : null,
-                bank_statement: initialData.statement_of_account_url ? { name: 'Existing Document', size: 'Unknown', url: initialData.statement_of_account_url } : null,
-                proof_address: initialData.proof_of_residence_url ? { name: 'Existing Document', size: 'Unknown', url: initialData.proof_of_residence_url } : null,
+                govt_id: prev.govt_id || toExistingDoc(initialData.govt_id_url),
+                work_id: prev.work_id || toExistingDoc(initialData.work_id_url),
+                payslip: prev.payslip || toExistingDoc(initialData.payslip_url),
+                selfie: prev.selfie || toExistingDoc(initialData.selfie_verification_url),
+                bank_statement: prev.bank_statement || toExistingDoc(initialData.statement_of_account_url),
+                proof_address: prev.proof_address || toExistingDoc(initialData.proof_of_residence_url),
             }));
 
             if (initialData.customer_references) {
@@ -577,6 +847,7 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
             // Populate NOK
             setNokName(initialData.nok_name || '');
             setNokRelationship(initialData.nok_relationship || '');
+            setNokRelationshipCode(initialData.nok_relationship_code || '');
             setNokAddress(initialData.nok_address || '');
             if (initialData.nok_phone_number) {
                 const phone = initialData.nok_phone_number;
@@ -685,7 +956,7 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
 
         const timeout = setTimeout(verifyAccount, 500);
         return () => clearTimeout(timeout);
-    }, [bankName, accountNumber, bankList]);
+    }, [bankName, accountNumber, bankList, firstName, surname]);
 
     // Auto-verify Buy Over bank account
     useEffect(() => {
@@ -764,8 +1035,8 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
         setErrors(prev => { const n = { ...prev }; delete n[field]; return n; });
     };
 
-    // File Upload Logic
     const uploadFile = async (id: string, file: File) => {
+        if (!validateFile(file)) return;
         // Prevent uploading the exact same file in multiple document slots within this application
         const isDuplicate = Object.entries(uploadedDocs).some(([slotId, doc]) => {
             if (slotId === id || !doc) return false;
@@ -782,7 +1053,8 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
         const formData = new FormData();
         formData.append('file', file);
         formData.append('document_type', id);
-        formData.append('loan_id', loanId || draftId); // Pass real loan ID in edit mode, or draft ID
+        const uploadLoanId = dbLoanId || (loanId && !isNaN(Number(loanId)) ? Number(loanId) : null) || draftId;
+        formData.append('loan_id', String(uploadLoanId));
 
         try {
             const response = await axios.post('/api/upload', formData, {
@@ -803,12 +1075,21 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
                 }
             });
 
+            const uploadedUrl =
+                response.data?.document?.file_url
+                || response.data?.url
+                || response.data?.document?.url;
+
+            if (!uploadedUrl) {
+                throw new Error('Upload succeeded but no file URL was returned.');
+            }
+
             setUploadedDocs(prev => ({
                 ...prev,
                 [id]: {
                     name: file.name,
                     size: `${(file.size / (1024 * 1024)).toFixed(2)} MB`,
-                    url: response.data.document.file_url
+                    url: uploadedUrl
                 }
             }));
 
@@ -849,6 +1130,8 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
         gender: 'Gender',
         dob: 'Date of Birth',
         maritalStatus: 'Marital Status',
+        educationLevel: 'Educational Level',
+        employmentStatus: 'Employment Status',
         religion: 'Religion',
         mobileNumber: 'Mobile Phone Number',
         email: 'Personal Email',
@@ -856,6 +1139,7 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
         nin: 'NIN (11 digits)',
         stateOfOrigin: 'State of Origin',
         stateOfResidence: 'State of Residence',
+        residentialTown: 'Residential Town',
         residentialStatus: 'Residential Status',
         address: 'Home Address',
         mda: 'MDA / Organization',
@@ -901,7 +1185,10 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
             if (!casa) newErrors.casa = "Required";
 
             if (loanType === 'topup' || loanType === 'add_on') {
-                if (!topUpAmount) newErrors.topUpAmount = "Required";
+                const topUp = parseFloat(topUpAmount);
+                if (!topUpAmount?.trim() || !Number.isFinite(topUp) || topUp <= 0) {
+                    newErrors.topUpAmount = "Enter an amount greater than zero";
+                }
             }
 
             // New Validation for Tenure & Bank Details
@@ -911,11 +1198,19 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
             } else if (!/^\d{10}$/.test(accountNumber)) {
                 newErrors.accountNumber = "Must be 10 digits";
             }
-            if (!accountName) newErrors.accountName = "Required";
-            if (bankVerificationResult && !bankVerificationResult.isMatch) newErrors.accountName = "Name mismatch";
-            if (isVerifyingBank) newErrors.accountNumber = "Verifying...";
+            if (isVerifyingBank) {
+                newErrors.accountNumber = "Wait for account verification to finish";
+            } else if (!accountName?.trim()) {
+                newErrors.accountName = "Required — pick bank and enter a valid 10-digit account number";
+            } else if (bankVerificationResult && !bankVerificationResult.isMatch) {
+                newErrors.accountName = "Account name does not match applicant name";
+            }
 
-            if (!uploadedDocs.payslip) newErrors.payslip = "Required";
+            if (uploadProcessing.payslip) {
+                newErrors.payslip = "Payslip upload still in progress";
+            } else if (!getLoanDocUrl('payslip')) {
+                newErrors.payslip = "Upload a recent payslip (PDF or image)";
+            }
 
         } else {
             // Standard Wizard Validation
@@ -924,8 +1219,9 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
                 if (!firstName.trim()) newErrors.firstName = "Required";
                 if (!gender) newErrors.gender = "Required";
                 if (!dob) newErrors.dob = "Required";
-                if (!maritalStatus) newErrors.maritalStatus = "Required";
-                if (!religion) newErrors.religion = "Required";
+                if (!maritalStatusCode) newErrors.maritalStatus = "Required";
+                if (!educationLevelCode) newErrors.educationLevel = "Required";
+                if (!religionCode) newErrors.religion = "Required";
 
                 if (!mobileNumber) newErrors.mobileNumber = "Required";
                 else if (mobileNumber.length < 10) newErrors.mobileNumber = "Invalid Number";
@@ -946,6 +1242,7 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
             if (stepToCheck === 1) { // Address
                 if (!stateOfOrigin) newErrors.stateOfOrigin = "Required";
                 if (!stateOfResidence || stateOfResidence === 'N/A') newErrors.stateOfResidence = "Required";
+                if (cbaTowns.length > 0 && !residentialTownCode) newErrors.residentialTown = "Required";
                 if (!residentialStatus) newErrors.residentialStatus = "Required";
                 if (!address.trim()) newErrors.address = "Required";
             }
@@ -958,6 +1255,7 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
                 if (isTertiary && !staffId) newErrors.staffId = "Required";
 
                 if (!monthlyIncome) newErrors.monthlyIncome = "Required";
+                if (!employmentStatusCode) newErrors.employmentStatus = "Required";
             }
 
             if (stepToCheck === 3) { // Loan
@@ -989,20 +1287,19 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
             }
 
             if (stepToCheck === 4) { // Documents
-                if (!uploadedDocs.govt_id) newErrors.govt_id = "Required";
-                if (!uploadedDocs.work_id) newErrors.work_id = "Required";
-                if (!uploadedDocs.payslip) newErrors.payslip = "Required";
-                if (!uploadedDocs.selfie) newErrors.selfie = "Required";
+                if (!getLoanDocUrl('govt_id')) newErrors.govt_id = "Required";
+                if (!getLoanDocUrl('work_id')) newErrors.work_id = "Required";
+                if (!getLoanDocUrl('payslip')) newErrors.payslip = "Required";
+                if (!getLoanDocUrl('selfie')) newErrors.selfie = "Required";
 
-                // Bank Statement required for > 500k
-                if ((parseFloat(amount) || 0) > 500000 && !uploadedDocs.bank_statement) {
+                if ((parseFloat(amount) || 0) > 500000 && !getLoanDocUrl('bank_statement')) {
                     newErrors.bank_statement = "Required for > ₦500k";
                 }
             }
 
             if (stepToCheck === 5) { // References
                 if (!nokName.trim()) newErrors.nokName = "Required";
-                if (!nokRelationship) newErrors.nokRelationship = "Required";
+                if (!nokRelationshipCode) newErrors.nokRelationship = "Required";
                 if (!nokPhoneNumber) {
                     newErrors.nokPhoneNumber = "Required";
                 } else if (nokPhoneNumber.length < 10) {
@@ -1146,9 +1443,8 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
     const handleSubmit = async () => {
         // Collect errors across all steps
         let accumulatedErrors: Record<string, string> = {};
-        const stepsToValidate = ['topup', 're-app', 'add_on'].includes(loanType)
-            ? [step]
-            : [0, 1, 2, 3, 4, 5];
+        const isSpecialLoanType = ['topup', 're-app', 'add_on'].includes(loanType);
+        const stepsToValidate = isSpecialLoanType ? [0] : [0, 1, 2, 3, 4, 5];
 
         for (const s of stepsToValidate) {
             const stepErrs = getStepErrors(s);
@@ -1169,16 +1465,25 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
                 return key;
             });
 
-            // Automatically navigate user directly to the missing step & expand accordion section
-            if (accumulatedErrors.surname || accumulatedErrors.firstName || accumulatedErrors.gender || accumulatedErrors.dob || accumulatedErrors.maritalStatus || accumulatedErrors.religion || accumulatedErrors.bvn || accumulatedErrors.nin) {
+            if (isSpecialLoanType) {
+                setStep(0);
+                setShowProductSelect(false);
+                window.requestAnimationFrame(() => {
+                    const firstKey = Object.keys(accumulatedErrors)[0];
+                    const el =
+                        document.querySelector(`[data-loan-field="${firstKey}"]`)
+                        ?? document.getElementById('special-loan-payslip');
+                    el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                });
+            } else if (accumulatedErrors.surname || accumulatedErrors.firstName || accumulatedErrors.gender || accumulatedErrors.dob || accumulatedErrors.maritalStatus || accumulatedErrors.educationLevel || accumulatedErrors.religion || accumulatedErrors.bvn || accumulatedErrors.nin) {
                 setStep(0);
                 setShowProductSelect(false);
                 setExpandedSection('identity');
-            } else if (accumulatedErrors.stateOfOrigin || accumulatedErrors.stateOfResidence || accumulatedErrors.residentialStatus || accumulatedErrors.address) {
+            } else if (accumulatedErrors.stateOfOrigin || accumulatedErrors.stateOfResidence || accumulatedErrors.residentialTown || accumulatedErrors.residentialStatus || accumulatedErrors.address) {
                 setStep(0);
                 setShowProductSelect(false);
                 setExpandedSection('address');
-            } else if (accumulatedErrors.mda || accumulatedErrors.ippisNumber || accumulatedErrors.staffId || accumulatedErrors.monthlyIncome) {
+            } else if (accumulatedErrors.mda || accumulatedErrors.ippisNumber || accumulatedErrors.staffId || accumulatedErrors.monthlyIncome || accumulatedErrors.employmentStatus) {
                 setStep(0);
                 setShowProductSelect(false);
                 setExpandedSection('employment');
@@ -1198,9 +1503,17 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
 
         setLoading(true);
         try {
+            const existingLoanIdForSubmitEarly =
+                dbLoanId ||
+                (loanId && !isNaN(Number(loanId)) ? Number(loanId) : null) ||
+                (typeof initialData?.id === 'number' ? initialData.id : null);
+            const preservePipelineOnSubmit = isPipelineLoanEdit(initialData, existingLoanIdForSubmitEarly);
+
             let payload: any = {
                 id: dbLoanId || loanId || undefined,
-                status: 'pending',
+                ...(preservePipelineOnSubmit
+                    ? {}
+                    : { status: 'pending' as const }),
                 sub_step: 6,
                 loan_type: loanType,
                 // Common Identity
@@ -1210,13 +1523,18 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
                 mobile_number: mobileNumber,
                 ippis_number: ippisNumber,
                 casa: casa, // Send as string ID
-                payslip_url: uploadedDocs.payslip?.url,
+                payslip_url: getLoanDocUrl('payslip'),
             };
 
             const existingLoanIdForSubmit = dbLoanId || (loanId && !isNaN(Number(loanId)) ? Number(loanId) : null) ||
                 (typeof initialData?.id === 'number' ? initialData.id : null);
             if (!existingLoanIdForSubmit && !initialData?.sales_officer_id) {
                 payload.sales_officer_id = user?.id || undefined;
+            }
+
+            const applicantCustomerId = resolveApplicantCustomerId(initialData);
+            if (applicantCustomerId) {
+                payload.applicant_customer_id = applicantCustomerId;
             }
 
             if (['topup', 're-app', 'add_on'].includes(loanType)) {
@@ -1240,7 +1558,13 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
                     gender,
                     date_of_birth: dob,
                     religion,
+                    religion_code: religionCode,
                     marital_status: maritalStatus,
+                marital_status_code: maritalStatusCode,
+                education_level: educationLevel,
+                education_level_code: educationLevelCode,
+                employment_status: employmentStatus,
+                employment_status_code: employmentStatusCode,
                     mothers_maiden_name: mothersMaidenName,
                     personal_email: email,
                     bvn,
@@ -1250,6 +1574,8 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
                     preferred_middle_name: preferredMiddleName,
                     state_of_origin: stateOfOrigin,
                     state_of_residence: stateOfResidence,
+                    residential_town: residentialTown,
+                    residential_town_code: residentialTownCode,
                     residential_status: residentialStatus,
                     primary_home_address: address,
                     mda_tertiary: mda,
@@ -1258,16 +1584,17 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
                     requested_loan_amount: parseFloat(amount) || 0,
                     loan_tenure_months: tenure,
 
-                    govt_id_url: uploadedDocs.govt_id?.url,
-                    work_id_url: uploadedDocs.work_id?.url,
-                    statement_of_account_url: uploadedDocs.bank_statement?.url,
-                    proof_of_residence_url: uploadedDocs.proof_address?.url,
-                    selfie_verification_url: uploadedDocs.selfie?.url,
+                    govt_id_url: getLoanDocUrl('govt_id'),
+                    work_id_url: getLoanDocUrl('work_id'),
+                    statement_of_account_url: getLoanDocUrl('bank_statement'),
+                    proof_of_residence_url: getLoanDocUrl('proof_address'),
+                    selfie_verification_url: getLoanDocUrl('selfie'),
                     references,
 
                     // Next of Kin
                     nok_name: nokName,
                     nok_relationship: nokRelationship,
+                nok_relationship_code: nokRelationshipCode,
                     nok_address: nokAddress,
                     nok_phone_number: `${nokCountryCode}${nokPhoneNumber}`,
 
@@ -1395,6 +1722,25 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
                 {/* Progress Indicator */}
                 {renderStepIndicator()}
 
+                {(() => {
+                    const eligibilityBanner = getEligibilityBanner(initialData?.loan_eligibility);
+                    if (!eligibilityBanner) return null;
+                    return (
+                        <div className={`mx-6 md:mx-8 mb-2 p-4 rounded-2xl border ${
+                            eligibilityBanner.tone === 'red'
+                                ? 'bg-rose-50 dark:bg-rose-950/30 border-rose-200 dark:border-rose-800'
+                                : 'bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800'
+                        }`}>
+                            <p className={`text-xs font-black uppercase tracking-wide ${eligibilityBanner.tone === 'red' ? 'text-rose-800 dark:text-rose-200' : 'text-amber-800 dark:text-amber-200'}`}>
+                                {eligibilityBanner.title}
+                            </p>
+                            <p className={`text-[11px] font-bold mt-1 leading-relaxed ${eligibilityBanner.tone === 'red' ? 'text-rose-700 dark:text-rose-300' : 'text-amber-700 dark:text-amber-300'}`}>
+                                {eligibilityBanner.message}
+                            </p>
+                        </div>
+                    );
+                })()}
+
                 {/* Content */}
                 <div className="flex-1 overflow-y-auto p-6 md:p-8 scrollbar-thin scrollbar-thumb-slate-200 dark:scrollbar-thumb-slate-800">
                     {/* --- SIMPLIFIED VIEW FOR SPECIAL LOANS --- */}
@@ -1436,7 +1782,7 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
                             <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
                                 <div className="md:col-span-4">
                                     <InputGroup label="Surname" required error={errors.surname}>
-                                        <input className="input-field" value={surname} onChange={e => { setSurname(e.target.value); clearError('surname'); }} placeholder="e.g. Doe" />
+                                        <input className="input-field" data-loan-field="surname" value={surname} onChange={e => { setSurname(e.target.value); clearError('surname'); }} placeholder="e.g. Doe" />
                                     </InputGroup>
                                 </div>
                                 <div className="md:col-span-4">
@@ -1464,13 +1810,19 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
                             <div className="p-6 bg-slate-50 dark:bg-slate-800/50 rounded-3xl border border-slate-100 dark:border-slate-800">
                                 <h4 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-widest mb-6 border-b border-slate-200 pb-2">Financial Details</h4>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                    <InputGroup label="CASA" error={errors.casa}>
-                                        <input className="input-field" value={casa} onChange={e => { setCasa(e.target.value); clearError('casa'); }} placeholder="Enter CASA" />
+                                    <InputGroup label="CASA (wallet account)" required error={errors.casa}>
+                                        <input
+                                            className="input-field"
+                                            data-loan-field="casa"
+                                            value={casa}
+                                            onChange={e => { setCasa(e.target.value); clearError('casa'); }}
+                                            placeholder="10-digit CASA from customer profile"
+                                        />
                                     </InputGroup>
 
                                     {(loanType === 'topup' || loanType === 'add_on' || loanType === 're-app') && (
                                         <InputGroup label="Top Up Amount (₦)" required error={errors.topUpAmount}>
-                                            <input type="number" className="input-field" value={topUpAmount} onChange={e => { setTopUpAmount(e.target.value); clearError('topUpAmount'); }} />
+                                            <input type="number" className="input-field" data-loan-field="topUpAmount" value={topUpAmount} onChange={e => { setTopUpAmount(e.target.value); clearError('topUpAmount'); }} />
                                         </InputGroup>
                                     )}
 
@@ -1617,7 +1969,7 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
                             </div>
 
                             {/* Documents (Payslip Only) */}
-                            <div className="p-6 bg-slate-50 dark:bg-slate-800/50 rounded-3xl border border-slate-100 dark:border-slate-800">
+                            <div id="special-loan-payslip" className="p-6 bg-slate-50 dark:bg-slate-800/50 rounded-3xl border border-slate-100 dark:border-slate-800" data-loan-field="payslip">
                                 <h4 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-widest mb-6 border-b border-slate-200 pb-2">Documents</h4>
                                 <FileUpload
                                     id="payslip"
@@ -1796,18 +2148,67 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
                                                 </div>
                                                 <div className="md:col-span-4">
                                                     <InputGroup label="Marital Status" required error={errors.maritalStatus}>
-                                                        <select className="input-field animate-none" value={maritalStatus} onChange={e => { setMaritalStatus(e.target.value); clearError('maritalStatus'); }}>
-                                                            <option value="">Select</option><option>Single</option><option>Married</option><option>Divorced</option>
+                                                        <select
+                                                            className="input-field animate-none"
+                                                            value={maritalStatusCode}
+                                                            onChange={e => {
+                                                                const code = e.target.value;
+                                                                const row = cbaMaritalStatuses.find((m) => m.maritalStatusCode === code);
+                                                                setMaritalStatusCode(code);
+                                                                setMaritalStatus(row?.maritalStatusDesc || '');
+                                                                clearError('maritalStatus');
+                                                            }}
+                                                        >
+                                                            <option value="">Select</option>
+                                                            {maritalStatusCode && !cbaMaritalStatuses.some((m) => m.maritalStatusCode === maritalStatusCode) && (
+                                                                <option value={maritalStatusCode}>{maritalStatus || maritalStatusCode}</option>
+                                                            )}
+                                                            {cbaMaritalStatuses.map((m) => (
+                                                                <option key={m.maritalStatusCode} value={m.maritalStatusCode}>{m.maritalStatusDesc}</option>
+                                                            ))}
+                                                        </select>
+                                                    </InputGroup>
+                                                </div>
+                                                <div className="md:col-span-4">
+                                                    <InputGroup label="Educational Level" required error={errors.educationLevel}>
+                                                        <select
+                                                            className="input-field animate-none"
+                                                            value={educationLevelCode}
+                                                            onChange={e => {
+                                                                const code = e.target.value;
+                                                                const row = cbaEducationLevels.find((l) => String(l.educationCode) === code);
+                                                                setEducationLevelCode(code);
+                                                                setEducationLevel(row?.educationName || '');
+                                                                clearError('educationLevel');
+                                                            }}
+                                                        >
+                                                            <option value="">Select</option>
+                                                            {cbaEducationLevels.map((l) => (
+                                                                <option key={l.educationCode} value={String(l.educationCode)}>{l.educationName}</option>
+                                                            ))}
                                                         </select>
                                                     </InputGroup>
                                                 </div>
                                                 <div className="md:col-span-4">
                                                     <InputGroup label="Religion" required error={errors.religion}>
-                                                        <select className="input-field animate-none" value={religion} onChange={e => { setReligion(e.target.value); clearError('religion'); }}>
+                                                        <select
+                                                            className="input-field animate-none"
+                                                            value={religionCode}
+                                                            onChange={e => {
+                                                                const code = e.target.value;
+                                                                const row = cbaReligions.find((r) => r.religionCode === code);
+                                                                setReligionCode(code);
+                                                                setReligion(row?.religionDesc || '');
+                                                                clearError('religion');
+                                                            }}
+                                                        >
                                                             <option value="">Select</option>
-                                                            <option>Christianity</option>
-                                                            <option>Islam</option>
-                                                            <option>Others</option>
+                                                            {religionCode && !cbaReligions.some((r) => r.religionCode === religionCode) && (
+                                                                <option value={religionCode}>{religion || religionCode}</option>
+                                                            )}
+                                                            {cbaReligions.map((r) => (
+                                                                <option key={r.religionCode} value={r.religionCode}>{r.religionDesc}</option>
+                                                            ))}
                                                         </select>
                                                     </InputGroup>
                                                 </div>
@@ -1864,13 +2265,33 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
                                                 <InputGroup label="State of Origin" required error={errors.stateOfOrigin}>
                                                     <select className="input-field animate-none" value={stateOfOrigin} onChange={e => { setStateOfOrigin(e.target.value); clearError('stateOfOrigin'); }}>
                                                         <option value="">Select State</option>
-                                                        {NIGERIAN_STATES.map(s => <option key={s} value={s}>{s}</option>)}
+                                                        {(cbaStates.length > 0 ? cbaStates.map((s) => s.stateName) : NIGERIAN_STATES).map(s => <option key={s} value={s}>{s}</option>)}
                                                     </select>
                                                 </InputGroup>
                                                 <InputGroup label="State of Residence" required error={errors.stateOfResidence}>
-                                                    <select className="input-field animate-none" value={stateOfResidence} onChange={e => { setStateOfResidence(e.target.value); clearError('stateOfResidence'); }}>
+                                                    <select className="input-field animate-none" value={stateOfResidence} onChange={e => { setStateOfResidence(e.target.value); setResidentialTown(''); setResidentialTownCode(''); clearError('stateOfResidence'); }}>
                                                         <option value="">Select State</option>
-                                                        {NIGERIAN_STATES.map(s => <option key={s} value={s}>{s}</option>)}
+                                                        {(cbaStates.length > 0 ? cbaStates.map((s) => s.stateName) : NIGERIAN_STATES).map(s => <option key={s} value={s}>{s}</option>)}
+                                                    </select>
+                                                </InputGroup>
+                                                <InputGroup label="Residential Town" required error={errors.residentialTown}>
+                                                    <select
+                                                        className="input-field animate-none"
+                                                        value={residentialTownCode}
+                                                        disabled={!stateOfResidence || townsLoading}
+                                                        onChange={e => {
+                                                            const code = e.target.value;
+                                                            const town = cbaTowns.find((item) => item.townCode === code);
+                                                            setResidentialTownCode(code);
+                                                            setResidentialTown(town?.townName || '');
+                                                            clearError('residentialTown');
+                                                        }}
+                                                    >
+                                                        <option value="">{!stateOfResidence ? 'Select state first' : townsLoading ? 'Loading towns…' : cbaTowns.length === 0 ? 'Town list unavailable' : 'Select Town'}</option>
+                                                        {residentialTownCode && !cbaTowns.some((town) => town.townCode === residentialTownCode) && (
+                                                            <option value={residentialTownCode}>{residentialTown || residentialTownCode}</option>
+                                                        )}
+                                                        {cbaTowns.map((town) => <option key={town.townCode} value={town.townCode}>{town.townName.trim()}</option>)}
                                                     </select>
                                                 </InputGroup>
                                                 <InputGroup label="Residential Status" required error={errors.residentialStatus}>
@@ -1914,6 +2335,24 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
                                                         error={errors.mda}
                                                     />
                                                 </div>
+                                                <InputGroup label="Employment Status" required error={errors.employmentStatus}>
+                                                    <select
+                                                        className="input-field animate-none"
+                                                        value={employmentStatusCode}
+                                                        onChange={e => {
+                                                            const code = e.target.value;
+                                                            const row = cbaEmploymentStatuses.find((s) => s.employmentCode === code);
+                                                            setEmploymentStatusCode(code);
+                                                            setEmploymentStatus(row?.employmentDesc || '');
+                                                            clearError('employmentStatus');
+                                                        }}
+                                                    >
+                                                        <option value="">Select</option>
+                                                        {cbaEmploymentStatuses.map((s) => (
+                                                            <option key={s.employmentCode} value={s.employmentCode}>{s.employmentDesc}</option>
+                                                        ))}
+                                                    </select>
+                                                </InputGroup>
                                                 <InputGroup label={`IPPIS Number ${TERTIARY_LIST.includes(mda) ? '(Optional)' : '*'}`} required={!TERTIARY_LIST.includes(mda)} error={errors.ippisNumber}>
                                                     <input className="input-field" value={ippisNumber} onChange={e => { setIppisNumber(e.target.value); clearError('ippisNumber'); }} placeholder="IPPIS Number" />
                                                 </InputGroup>
@@ -2265,19 +2704,22 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
                                             <InputGroup label="Relationship" required error={errors.nokRelationship}>
                                                 <select
                                                     className="input-field animate-none"
-                                                    value={nokRelationship}
-                                                    onChange={e => { setNokRelationship(e.target.value); if (errors.nokRelationship) setErrors(prev => { const n = { ...prev }; delete n.nokRelationship; return n; }); }}
+                                                    value={nokRelationshipCode}
+                                                    onChange={e => {
+                                                        const code = e.target.value;
+                                                        const row = cbaRelationships.find((r) => r.relationshipCode === code);
+                                                        setNokRelationshipCode(code);
+                                                        setNokRelationship(row?.relationshipDesc || '');
+                                                        if (errors.nokRelationship) setErrors(prev => { const n = { ...prev }; delete n.nokRelationship; return n; });
+                                                    }}
                                                 >
                                                     <option value="">Select Relationship</option>
-                                                    <option value="Husband">Husband</option>
-                                                    <option value="Wife">Wife</option>
-                                                    <option value="Brother">Brother</option>
-                                                    <option value="Sister">Sister</option>
-                                                    <option value="Mother">Mother</option>
-                                                    <option value="Father">Father</option>
-                                                    <option value="Son">Son</option>
-                                                    <option value="Daughter">Daughter</option>
-                                                    <option value="Other">Other</option>
+                                                    {nokRelationshipCode && !cbaRelationships.some((r) => r.relationshipCode === nokRelationshipCode) && (
+                                                        <option value={nokRelationshipCode}>{nokRelationship || nokRelationshipCode}</option>
+                                                    )}
+                                                    {cbaRelationships.map((r) => (
+                                                        <option key={r.relationshipCode} value={r.relationshipCode}>{r.relationshipDesc}</option>
+                                                    ))}
                                                 </select>
                                             </InputGroup>
                                             <InputGroup label="Phone Number" required error={errors.nokPhoneNumber}>
@@ -2527,6 +2969,7 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
                     background-color: #1e293b;
                 }
             `}</style>
+            {uploadSizeModal}
         </div>
     );
 };

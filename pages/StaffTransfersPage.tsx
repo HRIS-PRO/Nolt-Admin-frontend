@@ -109,6 +109,30 @@ const StaffTransfersPage: React.FC<StaffTransfersPageProps> = ({
     const [error, setError] = useState<string | null>(null);
     const [selectedTx, setSelectedTx] = useState<CbaTransaction | null>(null);
     const [drawerOpen, setDrawerOpen] = useState(false);
+    const [bankNamesByCode, setBankNamesByCode] = useState<Record<string, string>>({});
+
+    useEffect(() => {
+        void axios
+            .get('/api/staff/cba-transactions/nip-banks', { withCredentials: true })
+            .then((res) => {
+                const map: Record<string, string> = {};
+                for (const row of (res.data?.banks ?? []) as { code: string; name: string }[]) {
+                    if (row.code) map[row.code] = row.name;
+                }
+                setBankNamesByCode(map);
+            })
+            .catch(() => setBankNamesByCode({}));
+    }, []);
+
+    const formatBeneficiaryBank = useCallback(
+        (code: string) => {
+            const trimmed = code.trim();
+            if (!trimmed) return null;
+            const name = bankNamesByCode[trimmed];
+            return name ? `${name} (${trimmed})` : `Code ${trimmed}`;
+        },
+        [bankNamesByCode],
+    );
 
     const updateParams = useCallback(
         (patch: Record<string, string | null>, resetPage = false) => {
@@ -529,8 +553,8 @@ const StaffTransfersPage: React.FC<StaffTransfersPageProps> = ({
                                                 {tx.beneficiaryAccountNumber || '—'}
                                             </p>
                                             {tx.beneficiaryBankCode ? (
-                                                <p className="text-[10px] text-slate-400 mt-0.5">
-                                                    Bank {tx.beneficiaryBankCode}
+                                                <p className="text-[10px] text-slate-400 mt-0.5 line-clamp-2">
+                                                    {formatBeneficiaryBank(tx.beneficiaryBankCode)}
                                                 </p>
                                             ) : (
                                                 <p className="text-[10px] text-slate-400 mt-0.5">NOLT wallet</p>
@@ -620,6 +644,7 @@ const StaffTransfersPage: React.FC<StaffTransfersPageProps> = ({
                 transaction={selectedTx}
                 open={drawerOpen}
                 onClose={closeDrawer}
+                formatBankCode={formatBeneficiaryBank}
             />
         </StaffLayout>
     );

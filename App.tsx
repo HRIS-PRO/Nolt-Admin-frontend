@@ -36,6 +36,7 @@ import ClaimGiftPage from './pages/investment/ClaimGiftPage';
 import ProfilePage from './pages/ProfilePage';
 import StaffPromotionsPage from './pages/StaffPromotionsPage';
 import StaffMobileNotificationsPage from './pages/StaffMobileNotificationsPage';
+import StaffInvestmentCalendarPage from './pages/StaffInvestmentCalendarPage';
 import StaffTransfersPage from './pages/StaffTransfersPage';
 import StaffCalculatorPage from './pages/StaffCalculatorPage';
 import ProductsPage from './pages/ProductsPage';
@@ -508,7 +509,18 @@ const AppContent: React.FC = () => {
         } />
 
         {/* Staff Routes */}
-        <Route path="/staff/loans" element={
+        <Route path="/staff/loans" element={<Navigate to="/staff/loans/customer" replace />} />
+        <Route path="/staff/loans/mobile" element={
+          isLoading ? null : (user.isLoggedIn && user.role !== 'customer' ? (
+            <LoanQueuePage
+              user={user}
+              onLogout={handleLogoutRequest}
+              toggleTheme={toggleTheme}
+              theme={theme}
+            />
+          ) : <Navigate to="/login" />)
+        } />
+        <Route path="/staff/loans/customer" element={
           isLoading ? null : (user.isLoggedIn && user.role !== 'customer' ? (
             <LoanQueuePage
               user={user}
@@ -561,6 +573,16 @@ const AppContent: React.FC = () => {
         <Route path="/staff/mobile-notifications" element={
           isLoading ? null : (user.isLoggedIn && isSuperAdminRole(user.role) ? (
             <StaffMobileNotificationsPage
+              user={user}
+              onLogout={handleLogoutRequest}
+              toggleTheme={toggleTheme}
+              theme={theme}
+            />
+          ) : user.isLoggedIn ? <Navigate to="/staff-dashboard" /> : <Navigate to="/login" />)
+        } />
+        <Route path="/staff/investment-calendar" element={
+          isLoading ? null : (user.isLoggedIn && isSuperAdminRole(user.role) ? (
+            <StaffInvestmentCalendarPage
               user={user}
               onLogout={handleLogoutRequest}
               toggleTheme={toggleTheme}

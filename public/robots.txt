@@ -1,0 +1,9 @@
+# NOLT Management System — do not crawl or index
+User-agent: *
+Disallow: /
+
+User-agent: Googlebot
+Disallow: /
+
+User-agent: Bingbot
+Disallow: /

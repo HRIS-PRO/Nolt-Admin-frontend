@@ -6,6 +6,7 @@ import { useNavigate } from 'react-router-dom';
 import { maskValue } from '../utils/maskHelper';
 import SelfieVerificationCapture, { type SelfieVerificationSuccess } from '../components/SelfieVerificationCapture';
 import { apiUrl } from '@/lib/api-config';
+import { useNmsUploadSizeLimit } from '../hooks/useNmsUploadSizeLimit';
 
 const NIGERIAN_STATES = [
     "Abia", "Adamawa", "Akwa Ibom", "Anambra", "Bauchi", "Bayelsa", "Benue", "Borno", 
@@ -19,6 +20,7 @@ type TabType = 'security' | 'personal' | 'residential' | 'bank' | 'selfie';
 
 const ProfilePage: React.FC = () => {
     const navigate = useNavigate();
+    const { validateFile, modal: uploadSizeModal } = useNmsUploadSizeLimit();
     const [profile, setProfile] = useState<Partial<UserProfile>>({
         first_name: '',
         surname: '',
@@ -126,7 +128,7 @@ const ProfilePage: React.FC = () => {
                 setMessage({ type: 'success', text: "BVN verified! Your details have been pre-filled. Please review them in the next tabs." });
                 
                 // Smoothly transition to personal tab after a short delay
-                setTimeout(() => goToTab('personal'), 1500);
+                goToTab('personal');
             } else {
                 setMessage({ type: 'error', text: response.message || "BVN verification failed." });
             }
@@ -297,30 +299,38 @@ const ProfilePage: React.FC = () => {
             setProfile(response.profile);
 
             // Step 2: Register on Core Banking (POST /api/profile/register-cba)
+            let cbaReady = false;
             try {
                 const cbaRes = await profileService.registerCBA();
                 if (cbaRes.success) {
+                    cbaReady = true;
                     if (cbaRes.already_exists) {
                         setMessage({ type: 'success', text: `ℹ️ ${cbaRes.message}` });
                     } else {
                         setMessage({ type: 'success', text: `✅ ${cbaRes.message}` });
                     }
                 } else {
-                    // Profile saved but CBA failed — warn but don't block
                     setMessage({ type: 'error', text: `⚠️ Profile saved, but banking registration failed: ${cbaRes.message}. Please try saving again.` });
                 }
-            } catch (cbaErr: any) {
-                // CBA network error — profile is already saved, just warn
+            } catch {
                 setMessage({ type: 'error', text: "⚠️ Profile saved, but could not reach Core Banking. Please try saving again." });
             }
 
-            // Dispatch event to instruct App.tsx to refetch profile state from the DB immediately
             window.dispatchEvent(new Event('user-profile-updated'));
 
-            // Navigate back to dashboard
-            setTimeout(() => {
-                navigate('/dashboard');
-            }, 2500);
+            if (cbaReady) {
+                const refreshed = await profileService.getProfile();
+                const casa = refreshed.profile?.casa?.trim();
+                const selfie = refreshed.profile?.selfie_url?.trim();
+                if (refreshed.success && casa && selfie) {
+                    navigate('/dashboard');
+                } else if (cbaReady) {
+                    setMessage({
+                        type: 'success',
+                        text: 'Banking profile linked. Finish your selfie step if prompted, then open Dashboard from the menu.',
+                    });
+                }
+            }
         } catch (err: any) {
             console.error("[Profile] Update error:", err);
             const errMsg = err.response?.data?.message || err.message || "An error occurred";
@@ -736,6 +746,10 @@ const ProfilePage: React.FC = () => {
                                                         onChange={async (e) => {
                                                             if (e.target.files && e.target.files[0]) {
                                                                 const file = e.target.files[0];
+                                                                if (!validateFile(file)) {
+                                                                    e.target.value = '';
+                                                                    return;
+                                                                }
                                                                 const formData = new FormData();
                                                                 formData.append('file', file);
                                                                 formData.append('document_type', 'generic');
@@ -984,6 +998,7 @@ const ProfilePage: React.FC = () => {
                 />
             )}
         </AnimatePresence>
+        {uploadSizeModal}
         </>
     );
 };

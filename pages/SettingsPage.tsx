@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import StaffLayout from '../components/layouts/StaffLayout';
 import axios from 'axios';
 import { motion, AnimatePresence } from 'motion/react';
+import AgentCommissionSettings from '../components/settings/AgentCommissionSettings';
+import { isSuperAdminRole } from '../lib/staff-roles';
 
 interface SettingsPageProps {
     user: { name: string; email: string; avatar_url?: string; role?: string };
@@ -21,11 +23,16 @@ interface GLAccount {
 const SettingsPage: React.FC<SettingsPageProps> = ({ user, onLogout, toggleTheme, theme }) => {
     const userRole = user?.role?.toLowerCase();
     const isGLAuthorized = ['finance', 'super_admin', 'superadmin', 'admin'].includes(userRole || '');
+    const isSuperAdmin = isSuperAdminRole(user?.role);
     
     // Tabs state
-    const tabs = isGLAuthorized 
-        ? ['CHANGE PASSWORD', 'GL WRAPPER', 'INTEGRATIONS', 'API & WEBHOOKS'] 
-        : ['CHANGE PASSWORD', 'INTEGRATIONS', 'API & WEBHOOKS'];
+    const tabs = [
+        'CHANGE PASSWORD',
+        ...(isGLAuthorized ? ['GL WRAPPER'] : []),
+        ...(isSuperAdmin ? ['AGENT COMMISSIONS'] : []),
+        'INTEGRATIONS',
+        'API & WEBHOOKS',
+    ];
     const [activeTab, setActiveTab] = useState<string>('CHANGE PASSWORD');
 
     // Password fields states
@@ -546,6 +553,18 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ user, onLogout, toggleTheme
                                         </table>
                                     </div>
                                 </div>
+                            </motion.div>
+                        )}
+
+                        {activeTab === 'AGENT COMMISSIONS' && isSuperAdmin && (
+                            <motion.div
+                                key="agent-commissions"
+                                initial={{ opacity: 0, y: 15 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, y: -15 }}
+                                transition={{ duration: 0.3 }}
+                            >
+                                <AgentCommissionSettings />
                             </motion.div>
                         )}
 

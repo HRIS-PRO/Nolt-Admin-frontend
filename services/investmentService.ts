@@ -40,6 +40,10 @@ export const investmentService = {
     },
 
     uploadDocument: async (file: File, investmentId: number | string, docType: string) => {
+        const { NMS_MAX_UPLOAD_BYTES } = await import('../utils/nmsUploadLimits');
+        if (file.size > NMS_MAX_UPLOAD_BYTES) {
+            throw new Error('FILE_TOO_LARGE');
+        }
         const formData = new FormData();
         formData.append('file', file);
         if (typeof investmentId === 'string' && investmentId.startsWith('I-')) {

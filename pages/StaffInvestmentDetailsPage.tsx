@@ -2,12 +2,14 @@ import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useParams, useNavigate } from 'react-router-dom';
 import StaffLayout from '../components/layouts/StaffLayout';
+import { useNmsUploadSizeLimit } from '../hooks/useNmsUploadSizeLimit';
 import ActivityTimeline from '../components/ActivityTimeline';
 import axios from 'axios';
 import { getStatusStyles } from '../utils/statusStyles';
 import { formatDate } from '../utils/dateFormatter';
 import { formatCasaLabel } from '../utils/formatCasa';
 import { maskValue } from '../utils/maskHelper';
+import { canViewAgentCommission } from '../lib/staff-roles';
 
 interface StaffInvestmentDetailsPageProps {
     user: { id?: string | number; name: string; email: string; avatar_url?: string; role?: string };
@@ -106,6 +108,7 @@ const StaffInvestmentDetailsPage: React.FC<StaffInvestmentDetailsPageProps> = ({
     const [returnTargetStage, setReturnTargetStage] = useState<string>('');
     const [reason, setReason] = useState('');
     const [activePanel, setActivePanel] = useState<'overview' | 'manage' | 'activity'>('overview');
+    const { validateFile, modal: uploadSizeModal } = useNmsUploadSizeLimit();
 
     // ── KYC Tier State ───────────────────────────────────────────────────────
     const INV_TIER_LIMITS: Record<number, number> = { 1: 300_000, 2: 500_000, 3: Infinity };
@@ -211,6 +214,14 @@ const StaffInvestmentDetailsPage: React.FC<StaffInvestmentDetailsPageProps> = ({
         }
     }, [id, navigate]);
 
+    const warnIfCbaProfileSyncFailed = (sync: { succeeded?: boolean; message?: string } | null | undefined) => {
+        if (sync && sync.succeeded === false) {
+            alert(
+                `Saved in NMS, but core banking profile sync failed: ${sync.message || 'CreateAccountUpdate failed'}.`,
+            );
+        }
+    };
+
     const handleAction = async (action: 'approve' | 'reject' | 'return', targetStage?: string) => {
         if (action === 'reject' && !reason.trim()) {
             alert("Please provide a reason for rejection in the comment box.");
@@ -240,6 +251,7 @@ const StaffInvestmentDetailsPage: React.FC<StaffInvestmentDetailsPageProps> = ({
                     if (tierRes.data?.success) {
                         setInvCustomerKycTier(invSelectedTier);
                     }
+                    warnIfCbaProfileSyncFailed(tierRes.data?.cba_account_update);
                 } catch (tierError: any) {
                     alert(tierError.response?.data?.message || 'Tier upgrade failed. Cannot proceed.');
                     setIsActioning(false);
@@ -264,6 +276,7 @@ const StaffInvestmentDetailsPage: React.FC<StaffInvestmentDetailsPageProps> = ({
 
     const handleStaffUpload = async () => {
         if (!uploadFile || !id) return;
+        if (!validateFile(uploadFile)) return;
         setUploadLoading(true);
         const formData = new FormData();
         formData.append('file', uploadFile);
@@ -377,6 +390,7 @@ const StaffInvestmentDetailsPage: React.FC<StaffInvestmentDetailsPageProps> = ({
     };
 
     const handleFileUpload = async (file: File, type: 'signature' | 'indemnity') => {
+        if (type === 'indemnity' && !validateFile(file)) return;
         if (type === 'signature') {
             const reader = new FileReader();
             reader.onloadend = () => {
@@ -731,6 +745,28 @@ const StaffInvestmentDetailsPage: React.FC<StaffInvestmentDetailsPageProps> = ({
                 </div>
             </div>
 
+            {investment?.agent_commission_amount != null &&
+                canViewAgentCommission(user.role, user.id, investment.sales_officer_id) && (
+                <div className="mb-8 p-6 rounded-[24px] bg-indigo-500/5 border border-indigo-500/20 grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div>
+                        <p className="text-[10px] font-black uppercase tracking-widest text-indigo-500 mb-1">Agent commission</p>
+                        <p className="text-2xl font-black text-slate-900 dark:text-white">
+                            ₦{Number(investment.agent_commission_amount).toLocaleString()}
+                        </p>
+                    </div>
+                    <div>
+                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1">Rate / tier</p>
+                        <p className="font-bold text-slate-900 dark:text-white">
+                            {investment.agent_commission_percent}% — {investment.agent_commission_tier_name || 'Tier snapshot'}
+                        </p>
+                    </div>
+                    <div>
+                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1">Attributed officer</p>
+                        <p className="font-bold text-slate-900 dark:text-white">{investment.officer_name || '—'}</p>
+                    </div>
+                </div>
+            )}
+
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
                 <div className="lg:col-span-8 space-y-6">
                     <CollapsibleGroup 
@@ -1077,7 +1113,14 @@ const StaffInvestmentDetailsPage: React.FC<StaffInvestmentDetailsPageProps> = ({
                                                 <input 
                                                     id="staff-upload-input"
                                                     type="file" 
-                                                    onChange={(e) => setUploadFile(e.target.files?.[0] || null)}
+                                                    onChange={(e) => {
+                                                        const file = e.target.files?.[0];
+                                                        if (file && !validateFile(file)) {
+                                                            e.target.value = '';
+                                                            return;
+                                                        }
+                                                        setUploadFile(file || null);
+                                                    }}
                                                     className="flex-1 text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-purple-50 file:text-purple-700 hover:file:bg-purple-100 dark:file:bg-purple-900/40 dark:file:text-purple-300"
                                                 />
                                                 <button
@@ -1794,6 +1837,7 @@ const StaffInvestmentDetailsPage: React.FC<StaffInvestmentDetailsPageProps> = ({
                     document.body)}
                 </div>
             </div>
+            {uploadSizeModal}
         </StaffLayout>
     );
 };
