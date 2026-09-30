@@ -6,6 +6,7 @@ import DocumentsList from '../components/DocumentsList';
 import axios from 'axios';
 import SensitiveDataField from '../components/SensitiveDataField';
 import StaffLoanForm from '../components/StaffLoanForm';
+import LoanBankStatementInsights from '../components/loans/LoanBankStatementInsights';
 import { getStatusStyles } from '../utils/statusStyles';
 import { formatDate } from '../utils/dateFormatter';
 import { formatCasaLabel } from '../utils/formatCasa';
@@ -575,6 +576,12 @@ const ActionCard = ({ loan, userRole, onActionComplete }: { loan: any, userRole:
                         </div>
                     </div>
                 )}
+
+                {(stage === 'credit_check_1' || stage === 'credit_check_2') && loan.customer_id ? (
+                    <div className="mb-6">
+                        <LoanBankStatementInsights customerId={loan.customer_id} />
+                    </div>
+                ) : null}
 
                 {/* Sales Manager / Credit Officer Input */}
                 {(stage === 'credit_check_1' || stage === 'credit_check_2') && (
