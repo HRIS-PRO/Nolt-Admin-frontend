@@ -14,6 +14,7 @@ export interface CbaTransactionRow {
     transactionStatusCode: string;
     transactionTypeCode: string;
     beneficiaryAccountNumber: string;
+    beneficiaryAccountName?: string | null;
     beneficiaryBankCode: string;
     paymentGatewayError: string | null;
     extSessionID: string | null;
@@ -161,6 +162,14 @@ export function TransferTransactionDrawer({ transaction, open, onClose, formatBa
         if (!transaction) return 0;
         return Number(transaction.amount) + Number(transaction.fee || 0);
     }, [transaction]);
+
+    const beneficiaryName = useMemo(() => {
+        const fromTransfer = transaction?.beneficiaryAccountName?.trim();
+        if (fromTransfer) return fromTransfer;
+        const fromProfile = context?.destination?.profile?.fullName?.trim();
+        if (fromProfile) return fromProfile;
+        return '';
+    }, [transaction, context]);
 
     const destinationBankLabel = useMemo(() => {
         const code = transaction?.beneficiaryBankCode?.trim();
@@ -349,12 +358,15 @@ export function TransferTransactionDrawer({ transaction, open, onClose, formatBa
                                         Destination (beneficiary)
                                     </p>
                                     <p className="font-bold text-slate-900 dark:text-white text-sm mb-3">
-                                        {context?.destination?.profile?.fullName
-                                            ?? (context?.destination?.isInternalWallet
+                                        {beneficiaryName
+                                            || (context?.destination?.isInternalWallet
                                                 ? 'NOLT wallet customer'
                                                 : 'External beneficiary')}
                                     </p>
                                     <dl className="space-y-2 text-xs">
+                                        {beneficiaryName ? (
+                                            <Row label="Beneficiary name" value={beneficiaryName} />
+                                        ) : null}
                                         <Row
                                             label="Account"
                                             value={transaction.beneficiaryAccountNumber || '—'}
