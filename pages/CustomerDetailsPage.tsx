@@ -60,11 +60,6 @@ const CustomerDetailsPage: React.FC<CustomerDetailsPageProps> = ({ user, onLogou
   const [isBlacklisting, setIsBlacklisting] = useState(false);
   const [showBlacklistModal, setShowBlacklistModal] = useState(false);
   const [blacklistReason, setBlacklistReason] = useState('');
-  const [showRejectionModal, setShowRejectionModal] = useState(false);
-  const [rejectionMode, setRejectionMode] = useState<'lift' | 'shorten'>('lift');
-  const [rejectionAmount, setRejectionAmount] = useState('7');
-  const [rejectionUnit, setRejectionUnit] = useState<'days' | 'months'>('days');
-  const [isUpdatingRejection, setIsUpdatingRejection] = useState(false);
   const [mobileDevices, setMobileDevices] = useState<any[]>([]);
   const [activeMobileDeviceId, setActiveMobileDeviceId] = useState<string | null>(null);
   const [mobileDevicesLoading, setMobileDevicesLoading] = useState(false);
@@ -315,31 +310,10 @@ const CustomerDetailsPage: React.FC<CustomerDetailsPageProps> = ({ user, onLogou
   };
 
   const copyToClipboard = (text: string) => navigator.clipboard.writeText(text);
-  const handleAdjustRejection = async () => {
-    if (!id) return;
-    setIsUpdatingRejection(true);
-    try {
-      await axios.post(
-        API(`/api/staff/customers/${id}/rejection-cooldown`),
-        rejectionMode === 'lift'
-          ? { mode: 'lift' }
-          : { mode: 'shorten', amount: Number(rejectionAmount), unit: rejectionUnit },
-        { withCredentials: true },
-      );
-      setShowRejectionModal(false);
-      await fetchCustomerData();
-    } catch (e: any) {
-      alert(e.response?.data?.message || 'Could not update the rejection block.');
-    } finally {
-      setIsUpdatingRejection(false);
-    }
-  };
-
   const eligibilityBanner = getEligibilityBanner(loanEligibility);
   const canManageCustomerBlacklist = canManageBlacklist(user?.role);
   const canUnblacklist = canManageCustomerBlacklist && loanEligibility?.block_type === 'blacklist';
   const canBlacklist = canManageCustomerBlacklist && loanEligibility?.block_type !== 'blacklist' && !profile?.is_blacklisted;
-  const canAdjustRejection = canManageCustomerBlacklist && loanEligibility?.block_type === 'rejection_cooldown';
   const formatMoney = (n: number) =>
     new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN' }).format(n).replace('NGN', '₦');
 
@@ -563,14 +537,6 @@ const CustomerDetailsPage: React.FC<CustomerDetailsPageProps> = ({ user, onLogou
                     className="px-5 py-3 bg-white dark:bg-slate-900 text-rose-700 dark:text-rose-300 text-xs font-black uppercase rounded-xl border border-rose-200 dark:border-rose-700 hover:bg-rose-100 dark:hover:bg-rose-950/50 transition-colors"
                   >
                     Remove Blacklist
-                  </button>
-                )}
-                {canAdjustRejection && (
-                  <button
-                    onClick={() => setShowRejectionModal(true)}
-                    className="px-5 py-3 bg-white dark:bg-slate-900 text-amber-800 dark:text-amber-200 text-xs font-black uppercase rounded-xl border border-amber-300 dark:border-amber-700 hover:bg-amber-100 dark:hover:bg-amber-950/50 transition-colors"
-                  >
-                    Adjust rejection
                   </button>
                 )}
               </div>
@@ -1755,69 +1721,6 @@ const CustomerDetailsPage: React.FC<CustomerDetailsPageProps> = ({ user, onLogou
                 className="flex-1 py-3 rounded-xl bg-slate-900 hover:bg-black text-white text-xs font-black uppercase disabled:opacity-50"
               >
                 {isBlacklisting ? 'Processing…' : 'Confirm Blacklist'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {showRejectionModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-          <div className="bg-white dark:bg-slate-900 rounded-2xl w-full max-w-md shadow-2xl border border-slate-100 dark:border-slate-800 p-6 space-y-5">
-            <div>
-              <h3 className="text-xl font-black text-slate-900 dark:text-white">Adjust rejection block</h3>
-              <p className="text-sm text-slate-500 mt-1">
-                Lift the block so this customer can apply again, or shorten how long the rejection lasts.
-              </p>
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => setRejectionMode('lift')}
-                className={`py-3 rounded-xl text-xs font-black uppercase border ${rejectionMode === 'lift' ? 'bg-amber-500 text-white border-amber-500' : 'bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700'}`}
-              >
-                Lift now
-              </button>
-              <button
-                type="button"
-                onClick={() => setRejectionMode('shorten')}
-                className={`py-3 rounded-xl text-xs font-black uppercase border ${rejectionMode === 'shorten' ? 'bg-amber-500 text-white border-amber-500' : 'bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700'}`}
-              >
-                Shorten
-              </button>
-            </div>
-            {rejectionMode === 'shorten' && (
-              <div className="flex gap-3">
-                <input
-                  type="number"
-                  min={0}
-                  value={rejectionAmount}
-                  onChange={(e) => setRejectionAmount(e.target.value)}
-                  className="flex-1 p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm"
-                />
-                <select
-                  value={rejectionUnit}
-                  onChange={(e) => setRejectionUnit(e.target.value as 'days' | 'months')}
-                  className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm font-bold"
-                >
-                  <option value="days">Days</option>
-                  <option value="months">Months</option>
-                </select>
-              </div>
-            )}
-            <div className="flex gap-3">
-              <button
-                onClick={() => setShowRejectionModal(false)}
-                className="flex-1 py-3 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-black uppercase"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleAdjustRejection}
-                disabled={isUpdatingRejection || (rejectionMode === 'shorten' && rejectionAmount.trim() === '')}
-                className="flex-1 py-3 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-black uppercase disabled:opacity-50"
-              >
-                {isUpdatingRejection ? 'Saving…' : rejectionMode === 'lift' ? 'Lift rejection' : 'Save shorter block'}
               </button>
             </div>
           </div>
