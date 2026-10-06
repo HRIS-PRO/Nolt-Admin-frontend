@@ -198,6 +198,7 @@ const StaffTransfersPage: React.FC<StaffTransfersPageProps> = ({
                 tx.narration,
                 tx.accountNumber,
                 tx.beneficiaryAccountNumber,
+                tx.beneficiaryAccountName,
                 tx.customerId,
                 tx.transactionTypeCode,
                 tx.extSessionID,
@@ -250,6 +251,7 @@ const StaffTransfersPage: React.FC<StaffTransfersPageProps> = ({
             'Date',
             'Source Account',
             'Customer ID',
+            'Beneficiary Name',
             'Beneficiary Account',
             'Bank Code',
             'Amount',
@@ -263,6 +265,7 @@ const StaffTransfersPage: React.FC<StaffTransfersPageProps> = ({
             tx.transactionDate,
             tx.accountNumber,
             tx.customerId?.trim(),
+            tx.beneficiaryAccountName,
             tx.beneficiaryAccountNumber,
             tx.beneficiaryBankCode,
             tx.amount,
@@ -549,7 +552,10 @@ const StaffTransfersPage: React.FC<StaffTransfersPageProps> = ({
                                             {tx.customerId?.trim() || '—'}
                                         </td>
                                         <td className="px-4 py-4">
-                                            <p className="font-bold text-sm text-slate-900 dark:text-white font-mono">
+                                            <p className="font-bold text-sm text-slate-900 dark:text-white">
+                                                {tx.beneficiaryAccountName?.trim() || '—'}
+                                            </p>
+                                            <p className="font-mono text-[11px] text-slate-500 mt-0.5">
                                                 {tx.beneficiaryAccountNumber || '—'}
                                             </p>
                                             {tx.beneficiaryBankCode ? (
