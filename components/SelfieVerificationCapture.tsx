@@ -108,9 +108,15 @@ const SelfieVerificationCapture: React.FC<SelfieVerificationCaptureProps> = ({
       const result = await selfieVerificationService.verifySelfie(bvn, capturedImage, (context as 'profile' | 'vault') || 'vault');
       window.clearTimeout(stepTimer);
 
-      if (!result.success) {
+      const confidence = result.confidence ?? 0;
+      if (!result.success || confidence < 70) {
         setVerificationStep('error');
-        setVerificationError(result.message || 'Verification failed. Please try again.');
+        setVerificationError(
+          result.message
+            || (confidence > 0 && confidence < 70
+              ? `Face match too low (${confidence.toFixed(0)}%). Use your own BVN and a clear photo.`
+              : 'Verification failed. Please try again.'),
+        );
         return;
       }
 
@@ -122,7 +128,7 @@ const SelfieVerificationCapture: React.FC<SelfieVerificationCaptureProps> = ({
       try {
         onSuccess({
           selfieUrl: result.selfie_url || capturedImage,
-          confidence: result.confidence ?? 0,
+          confidence,
           lastSelfieVerifiedAt: result.last_selfie_verified_at,
         });
       } finally {
