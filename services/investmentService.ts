@@ -11,6 +11,7 @@ export const investmentService = {
             headers: {
                 'Content-Type': 'application/json',
             },
+            credentials: 'include',
             body: JSON.stringify(data),
         });
 
@@ -79,6 +80,7 @@ export const investmentService = {
 
         const response = await fetch(`${API_BASE_URL}/yield-rates/calculate?${queryParams}`, {
             method: 'GET',
+            credentials: 'include',
         });
 
         if (!response.ok) {
@@ -123,7 +125,9 @@ export const investmentService = {
     },
 
     getLatestInvestment: async () => {
-        const response = await fetch(`${API_BASE_URL}/investments/latest`);
+        const response = await fetch(`${API_BASE_URL}/investments/latest`, {
+            credentials: 'include',
+        });
         if (!response.ok) return null;
         return response.json();
     },
@@ -132,6 +136,7 @@ export const investmentService = {
         const response = await fetch(`${API_BASE_URL}/customer/verify-identity`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
             body: JSON.stringify({ 
                 bvn, 
                 selfie_url: selfieUrl,

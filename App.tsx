@@ -794,12 +794,16 @@ const AppContent: React.FC = () => {
         } />
 
         <Route path="/payroll-upload" element={
-          <PayrollUploadPage
-            user={user.isLoggedIn ? user : undefined}
-            onLogout={handleLogoutRequest}
-            toggleTheme={toggleTheme}
-            theme={theme}
-          />
+          isLoading ? null : (user.isLoggedIn && user.role !== 'customer' ? (
+            ALLOWED_BI_AND_REPORTS_ROLES.includes(user.role || '') ? (
+              <PayrollUploadPage
+                user={user}
+                onLogout={handleLogoutRequest}
+                toggleTheme={toggleTheme}
+                theme={theme}
+              />
+            ) : <Navigate to="/staff-dashboard" replace />
+          ) : <Navigate to="/login" replace />)
         } />
 
         {/* Default Redirect */}
