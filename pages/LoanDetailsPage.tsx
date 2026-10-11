@@ -7,6 +7,7 @@ import axios from 'axios';
 import SensitiveDataField from '../components/SensitiveDataField';
 import StaffLoanForm from '../components/StaffLoanForm';
 import LoanBankStatementInsights from '../components/loans/LoanBankStatementInsights';
+import LoanCrcBureauPanel from '../components/loans/LoanCrcBureauPanel';
 import { getStatusStyles } from '../utils/statusStyles';
 import { formatDate } from '../utils/dateFormatter';
 import { formatCasaLabel } from '../utils/formatCasa';
@@ -1263,7 +1264,7 @@ const LoanDetailsPage: React.FC<LoanDetailsPageProps> = ({ user, onLogout, toggl
     const [isLoading, setIsLoading] = useState(true);
     const [showEditModal, setShowEditModal] = useState(false);
     const [officers, setOfficers] = useState<any[]>([]);
-    const [activePanel, setActivePanel] = useState<'overview' | 'manage' | 'activity'>('overview');
+    const [activePanel, setActivePanel] = useState<'overview' | 'manage' | 'activity' | 'bureau'>('overview');
     
     // Indemnity Management State
     const [isProcessingIndemnity, setIsProcessingIndemnity] = useState(false);
@@ -1484,6 +1485,35 @@ const LoanDetailsPage: React.FC<LoanDetailsPageProps> = ({ user, onLogout, toggl
         { id: 'disbursed', label: 'Disbursed', icon: 'check_circle' }
     ];
     const loanQueuePath = isMobileApplication ? '/staff/loans/mobile' : '/staff/loans/customer';
+    const canRequestCrc = ['credit_officer', 'credit_manager', 'super_admin', 'superadmin'].includes(
+        user?.role?.toLowerCase() || '',
+    );
+    const tabClass = (panel: typeof activePanel) =>
+        `flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 ${activePanel === panel ? 'bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/50'}`;
+    const panelTabBar = (
+        <div className="bg-white dark:bg-[#1e293b] rounded-2xl p-2 border border-slate-200 dark:border-slate-800 shadow-sm flex items-center justify-between gap-1">
+            <button type="button" onClick={() => setActivePanel('overview')} className={tabClass('overview')}>
+                <span className="material-symbols-outlined text-[16px]">page_info</span>
+                Status
+            </button>
+            {['sales_manager', 'admin', 'super_admin', 'superadmin', 'customer_experience'].includes(user?.role?.toLowerCase() || '') && (
+                <button type="button" onClick={() => setActivePanel('manage')} className={tabClass('manage')}>
+                    <span className="material-symbols-outlined text-[16px]">tune</span>
+                    Manage
+                </button>
+            )}
+            <button type="button" onClick={() => setActivePanel('activity')} className={tabClass('activity')}>
+                <span className="material-symbols-outlined text-[16px]">history</span>
+                Activity
+            </button>
+            {isMobileApplication && (
+                <button type="button" onClick={() => setActivePanel('bureau')} className={tabClass('bureau')}>
+                    <span className="material-symbols-outlined text-[16px]">account_balance</span>
+                    Bureau
+                </button>
+            )}
+        </div>
+    );
     const currentStageId = loan.stage || 'submitted';
     const currentStageIndex = isDraft ? -1 : stages.findIndex(s => s.id === (currentStageId === 'credit_check' ? 'credit_check_1' : currentStageId));
     const activeIndex = isDraft ? -1 : (currentStageIndex === -1 ? 0 : currentStageIndex);
@@ -1662,6 +1692,16 @@ const LoanDetailsPage: React.FC<LoanDetailsPageProps> = ({ user, onLogout, toggl
             </div>
 
             <div className="grid grid-cols-1 xl:grid-cols-12 gap-8 items-start">
+                {isMobileApplication && (
+                    <div className="xl:col-span-12">{panelTabBar}</div>
+                )}
+
+                {activePanel === 'bureau' && isMobileApplication ? (
+                    <div className="xl:col-span-12">
+                        <LoanCrcBureauPanel loanId={Number(loan.id)} canRequest={canRequestCrc} />
+                    </div>
+                ) : (
+                <>
                 <div className="xl:col-span-8 space-y-8">
                     {/* Summary Card */}
                     <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 overflow-hidden">
@@ -2048,31 +2088,7 @@ const LoanDetailsPage: React.FC<LoanDetailsPageProps> = ({ user, onLogout, toggl
                 </div>
 
                 <div className="xl:col-span-4 space-y-6 sticky top-8">
-                    <div className="bg-white dark:bg-[#1e293b] rounded-2xl p-2 border border-slate-200 dark:border-slate-800 shadow-sm flex items-center justify-between gap-1">
-                        <button 
-                            onClick={() => setActivePanel('overview')} 
-                            className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 ${activePanel === 'overview' ? 'bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/50'}`}
-                        >
-                            <span className="material-symbols-outlined text-[16px]">page_info</span>
-                            Status
-                        </button>
-                        {['sales_manager', 'admin', 'super_admin', 'superadmin', 'customer_experience'].includes(user?.role?.toLowerCase() || '') && (
-                            <button 
-                                onClick={() => setActivePanel('manage')} 
-                                className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 ${activePanel === 'manage' ? 'bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/50'}`}
-                            >
-                                <span className="material-symbols-outlined text-[16px]">tune</span>
-                                Manage
-                            </button>
-                        )}
-                        <button 
-                            onClick={() => setActivePanel('activity')} 
-                            className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 ${activePanel === 'activity' ? 'bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/50'}`}
-                        >
-                            <span className="material-symbols-outlined text-[16px]">history</span>
-                            Activity
-                        </button>
-                    </div>
+                    {!isMobileApplication && panelTabBar}
 
                     {activePanel === 'overview' && (
                         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
@@ -2149,6 +2165,8 @@ const LoanDetailsPage: React.FC<LoanDetailsPageProps> = ({ user, onLogout, toggl
                         </div>
                     )}
                 </div>
+                </>
+                )}
             </div>
 
             {/* Edit Modal */}
