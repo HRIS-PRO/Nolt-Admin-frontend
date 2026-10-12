@@ -3,6 +3,7 @@ import StaffLayout from '../components/layouts/StaffLayout';
 import { useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import { formatDateTime } from '../utils/dateFormatter';
+import { staffPath } from '@/lib/api/staff-path';
 
 interface AuditTrailPageProps {
     user: { name: string; email: string; avatar_url?: string; role?: string };
@@ -23,7 +24,7 @@ const AuditTrailPage: React.FC<AuditTrailPageProps> = ({ user, onLogout, toggleT
     useEffect(() => {
         const fetchLogs = async () => {
             try {
-                let url = `/api/staff/audit-logs`;
+                let url = staffPath(`audit-logs`);
                 if (activeCategory !== 'ALL') {
                     url += `?event_category=${activeCategory}`;
                 }

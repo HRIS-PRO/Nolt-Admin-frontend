@@ -7,6 +7,7 @@ import { getStatusStyles } from '../utils/statusStyles';
 import { formatDate } from '../utils/dateFormatter';
 import { formatCasaLabel } from '../utils/formatCasa';
 import { motion, AnimatePresence } from 'motion/react';
+import { staffPath } from '@/lib/api/staff-path';
 
 interface LoanQueuePageProps {
     user: { name: string; email: string; avatar_url?: string; role?: string };
@@ -55,7 +56,7 @@ const LoanQueuePage: React.FC<LoanQueuePageProps> = ({ user, onLogout, toggleThe
     const fetchLoans = useCallback(async (opts?: { silent?: boolean }) => {
         if (!opts?.silent) setIsLoading(true);
         try {
-            const response = await axios.get(`${''}/api/staff/loans`, {
+            const response = await axios.get(staffPath(`loans`), {
                 params: {
                     search: searchQuery,
                     status: statusFilter,
@@ -94,7 +95,7 @@ const LoanQueuePage: React.FC<LoanQueuePageProps> = ({ user, onLogout, toggleThe
         if (['sales_manager', 'admin', 'super_admin', 'superadmin', 'customer_experience', 'marketing'].includes(user.role || '')) {
             try {
                 // Fetch specifically sales officers with a high limit to ensure we get them all
-                const response = await axios.get(`${''}/api/staff/users?role=sales_officer,sales_public_sector,sales_private_sector&limit=200`, { withCredentials: true });
+                const response = await axios.get(staffPath(`users?role=sales_officer,sales_public_sector,sales_private_sector&limit=200`), { withCredentials: true });
                 setOfficers(response.data.users.filter((u: any) => u.is_active));
             } catch (error) {
                 console.error("Failed to fetch officers", error);
@@ -136,7 +137,7 @@ const LoanQueuePage: React.FC<LoanQueuePageProps> = ({ user, onLogout, toggleThe
 
         setIsBulkApproving(true);
         try {
-            const response = await axios.post(`${''}/api/staff/loans/bulk-approve`, {
+            const response = await axios.post(staffPath(`loans/bulk-approve`), {
                 loanIds: financeSelection,
                 gl_account: bulkGL || null
             }, { withCredentials: true });
@@ -163,7 +164,7 @@ const LoanQueuePage: React.FC<LoanQueuePageProps> = ({ user, onLogout, toggleThe
     const handleAssignOfficer = async (loanId: string, officerId: string) => {
         if (!confirm("Are you sure you want to reassign this loan?")) return;
         try {
-            await axios.patch(`${''}/api/staff/loans/${loanId}/assign`, {
+            await axios.patch(staffPath(`loans/${loanId}/assign`), {
                 sales_officer_id: officerId
             }, { withCredentials: true });
 

@@ -6,6 +6,7 @@ import { UserState, Theme } from '../types';
 import { apiUrl } from '@/lib/api-config';
 import { canManageBlacklist, getEligibilityBanner, LoanEligibility } from '../utils/loanEligibility';
 import { useNmsUploadSizeLimit } from '../hooks/useNmsUploadSizeLimit';
+import { staffPath } from '@/lib/api/staff-path';
 
 interface CustomerDetailsPageProps {
   user: UserState;
@@ -111,7 +112,7 @@ const CustomerDetailsPage: React.FC<CustomerDetailsPageProps> = ({ user, onLogou
     setIsCbaLoading(true);
     setCbaError(null);
     try {
-      const res = await axios.get(API(`/api/staff/customers/${customerId}/cba-loans`), { withCredentials: true });
+      const res = await axios.get(API(staffPath(`customers/${customerId}/cba-loans`)), { withCredentials: true });
       if (res.data.success) {
         setCbaLoans(res.data.response || []);
       } else {
@@ -131,7 +132,7 @@ const CustomerDetailsPage: React.FC<CustomerDetailsPageProps> = ({ user, onLogou
     setIsCbaInvestmentsLoading(true);
     setCbaInvestmentsError(null);
     try {
-      const res = await axios.get(API(`/api/staff/customers/${customerId}/cba-investments`), { withCredentials: true });
+      const res = await axios.get(API(staffPath(`customers/${customerId}/cba-investments`)), { withCredentials: true });
       if (res.data.success) {
         setCbaInvestments(res.data.investments || []);
         setCbaInvestmentTotal(res.data.total);
@@ -153,7 +154,7 @@ const CustomerDetailsPage: React.FC<CustomerDetailsPageProps> = ({ user, onLogou
     
     setIsSendingPassword(true);
     try {
-      const res = await axios.post(API(`/api/staff/customers/${id}/send-password`), {}, { withCredentials: true });
+      const res = await axios.post(API(staffPath(`customers/${id}/send-password`)), {}, { withCredentials: true });
       alert(res.data.message);
       await fetchCustomerData();
     } catch (e: any) {
@@ -167,7 +168,7 @@ const CustomerDetailsPage: React.FC<CustomerDetailsPageProps> = ({ user, onLogou
     setMobileDevicesLoading(true);
     setMobileDevicesError(null);
     try {
-      const res = await axios.get(API(`/api/staff/customers/${customerId}/mobile-devices`), { withCredentials: true });
+      const res = await axios.get(API(staffPath(`customers/${customerId}/mobile-devices`)), { withCredentials: true });
       setMobileDevices(res.data.devices || []);
       setActiveMobileDeviceId(res.data.active_device_id ?? null);
     } catch (e: any) {
@@ -188,7 +189,7 @@ const CustomerDetailsPage: React.FC<CustomerDetailsPageProps> = ({ user, onLogou
     setIsRevokingMobileDevice(true);
     try {
       const res = await axios.post(
-        API(`/api/staff/customers/${id}/mobile-devices/revoke-active`),
+        API(staffPath(`customers/${id}/mobile-devices/revoke-active`)),
         { reason },
         { withCredentials: true },
       );
@@ -224,7 +225,7 @@ const CustomerDetailsPage: React.FC<CustomerDetailsPageProps> = ({ user, onLogou
 
     try {
       const response = await axios.post(
-        API('/api/staff/kyc/retry-cba-registration'),
+        API(staffPath('kyc/retry-cba-registration')),
         { userId: id },
         { withCredentials: true, timeout: CBA_TIMEOUT_MS, signal: controller.signal }
       );
@@ -256,7 +257,7 @@ const CustomerDetailsPage: React.FC<CustomerDetailsPageProps> = ({ user, onLogou
   const fetchCustomerData = async () => {
     setIsLoading(true);
     try {
-      const res = await axios.get(API(`/api/staff/customers/${id}`), { withCredentials: true });
+      const res = await axios.get(API(staffPath(`customers/${id}`)), { withCredentials: true });
       setProfile(res.data.profile);
       setLoanEligibility(res.data.loan_eligibility || res.data.profile?.loan_eligibility || null);
       setLoans(res.data.loans || []);
@@ -267,7 +268,7 @@ const CustomerDetailsPage: React.FC<CustomerDetailsPageProps> = ({ user, onLogou
 
   const fetchBalance = async (casa: string) => {
     try {
-      const r = await axios.get(API(`/api/staff/kyc/cba-balance/${casa}`), { withCredentials: true });
+      const r = await axios.get(API(staffPath(`kyc/cba-balance/${casa}`)), { withCredentials: true });
       if (r.data.success) setBalance(r.data.data.AvailableBalance ?? r.data.data.availableBalance);
     } catch {}
   };
@@ -281,7 +282,7 @@ const CustomerDetailsPage: React.FC<CustomerDetailsPageProps> = ({ user, onLogou
     setIsBlacklisting(true);
     try {
       await axios.post(
-        API(`/api/staff/customers/${id}/blacklist`),
+        API(staffPath(`customers/${id}/blacklist`)),
         { reason: blacklistReason.trim() },
         { withCredentials: true },
       );
@@ -300,7 +301,7 @@ const CustomerDetailsPage: React.FC<CustomerDetailsPageProps> = ({ user, onLogou
     setIsUnblacklisting(true);
     try {
       await axios.post(
-        API(`/api/staff/customers/${id}/unblacklist`),
+        API(staffPath(`customers/${id}/unblacklist`)),
         { reason: unblacklistReason.trim() || undefined },
         { withCredentials: true },
       );
@@ -320,7 +321,7 @@ const CustomerDetailsPage: React.FC<CustomerDetailsPageProps> = ({ user, onLogou
     setIsUpdatingRejection(true);
     try {
       await axios.post(
-        API(`/api/staff/customers/${id}/rejection-cooldown`),
+        API(staffPath(`customers/${id}/rejection-cooldown`)),
         rejectionMode === 'lift'
           ? { mode: 'lift' }
           : { mode: 'shorten', amount: Number(rejectionAmount), unit: rejectionUnit },
@@ -391,7 +392,7 @@ const CustomerDetailsPage: React.FC<CustomerDetailsPageProps> = ({ user, onLogou
         if (k === 'utility_bill_url' && v === '') { payload[k] = ''; return; }
         if (v !== '' && v !== null && v !== undefined) payload[k] = v;
       });
-      const res = await axios.put(API(`/api/staff/customers/${id}/profile`), payload, { withCredentials: true });
+      const res = await axios.put(API(staffPath(`customers/${id}/profile`)), payload, { withCredentials: true });
       const cbaSync = res.data?.cba_account_update;
       if (cbaSync && cbaSync.succeeded === false) {
         setSaveMsg({
@@ -1437,7 +1438,7 @@ const CustomerDetailsPage: React.FC<CustomerDetailsPageProps> = ({ user, onLogou
                     if (!window.confirm(`Are you sure you want to ${profile.is_active !== false ? 'freeze' : 'unfreeze'} this account?`)) return;
                     setIsTogglingFreeze(true);
                     try {
-                      const endpoint = profile.is_active !== false ? '/api/staff/revoke-access' : '/api/staff/unrevoke-access';
+                      const endpoint = profile.is_active !== false ? staffPath('revoke-access') : staffPath('unrevoke-access');
                       await axios.post(API(endpoint), { userId: id }, { withCredentials: true });
                       await fetchCustomerData();
                     } catch { alert('Failed to toggle account status.'); }

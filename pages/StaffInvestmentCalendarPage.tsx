@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
 import StaffLayout from '../components/layouts/StaffLayout';
 import { fieldClass, labelClass, panelClass, primaryBtnClass } from '../components/mobile/push-hub-styles';
+import { staffPath } from '@/lib/api/staff-path';
 
 interface HolidayTemplate {
     id: number;
@@ -101,9 +102,9 @@ export default function StaffInvestmentCalendarPage({
         setError(null);
         try {
             const [tplRes, cfgRes, previewRes] = await Promise.all([
-                axios.get(`/api/staff/investment-calendar/templates?year=${year}`, { withCredentials: true }),
-                axios.get('/api/staff/investment-calendar/config', { withCredentials: true }),
-                axios.get('/api/staff/investment-calendar/preview', { withCredentials: true }),
+                axios.get(staffPath(`investment-calendar/templates?year=${year}`), { withCredentials: true }),
+                axios.get(staffPath('investment-calendar/config'), { withCredentials: true }),
+                axios.get(staffPath('investment-calendar/preview'), { withCredentials: true }),
             ]);
             setTemplates(tplRes.data.templates ?? []);
             setDates(tplRes.data.dates ?? []);
@@ -129,7 +130,7 @@ export default function StaffInvestmentCalendarPage({
         setBusy(true);
         try {
             await axios.post(
-                '/api/staff/investment-calendar/templates',
+                staffPath('investment-calendar/templates'),
                 { name: newTemplateName.trim(), notes: newTemplateNotes.trim() || null },
                 { withCredentials: true },
             );
@@ -150,7 +151,7 @@ export default function StaffInvestmentCalendarPage({
         setBusy(true);
         try {
             await axios.post(
-                '/api/staff/investment-calendar/dates',
+                staffPath('investment-calendar/dates'),
                 {
                     template_id: assignTemplateId,
                     holiday_date: assignDate,
@@ -172,7 +173,7 @@ export default function StaffInvestmentCalendarPage({
         setBusy(true);
         try {
             await axios.put(
-                '/api/staff/investment-calendar/config',
+                staffPath('investment-calendar/config'),
                 {
                     timezone,
                     liquidation_cutoff_local_time: cutoff,
@@ -180,7 +181,7 @@ export default function StaffInvestmentCalendarPage({
                 },
                 { withCredentials: true },
             );
-            const previewRes = await axios.get('/api/staff/investment-calendar/preview', { withCredentials: true });
+            const previewRes = await axios.get(staffPath('investment-calendar/preview'), { withCredentials: true });
             setPreview(previewRes.data);
         } catch (err: unknown) {
             const msg = axios.isAxiosError(err) ? err.response?.data?.message : null;
@@ -194,7 +195,7 @@ export default function StaffInvestmentCalendarPage({
         setBusy(true);
         try {
             const res = await axios.post(
-                '/api/staff/investment-calendar/copy-year',
+                staffPath('investment-calendar/copy-year'),
                 { from_year: copyFromYear, to_year: copyToYear },
                 { withCredentials: true },
             );
@@ -478,7 +479,7 @@ export default function StaffInvestmentCalendarPage({
                                                                 onClick={async () => {
                                                                     if (!confirm(`Remove ${name} on ${row.holiday_date}?`)) return;
                                                                     await axios.delete(
-                                                                        `/api/staff/investment-calendar/dates/${row.id}`,
+                                                                        staffPath(`investment-calendar/dates/${row.id}`),
                                                                         { withCredentials: true },
                                                                     );
                                                                     await loadAll();
@@ -516,7 +517,7 @@ export default function StaffInvestmentCalendarPage({
                                                 onClick={async () => {
                                                     if (!confirm(`Delete "${t.name}" and all assigned dates?`)) return;
                                                     await axios.delete(
-                                                        `/api/staff/investment-calendar/templates/${t.id}`,
+                                                        staffPath(`investment-calendar/templates/${t.id}`),
                                                         { withCredentials: true },
                                                     );
                                                     await loadAll();

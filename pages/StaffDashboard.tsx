@@ -3,6 +3,7 @@ import StaffLayout from '../components/layouts/StaffLayout';
 import axios from 'axios';
 import { getStatusStyles } from '../utils/statusStyles';
 import { formatDate } from '../utils/dateFormatter';
+import { staffPath } from '@/lib/api/staff-path';
 
 interface StaffDashboardProps {
     user: { name: string; email: string; avatar_url?: string; role?: string; referral_code?: string };
@@ -31,7 +32,7 @@ const StaffDashboard: React.FC<StaffDashboardProps> = ({ user, onLogout, toggleT
             try {
                 const [statsRes, loansRes] = await Promise.all([
                     axios.get(`${''}/api/stats/dashboard`, { withCredentials: true }),
-                    axios.get(`${''}/api/staff/loans`, { withCredentials: true }) // Fetch ALL loans
+                    axios.get(staffPath(`loans`), { withCredentials: true }) // Fetch ALL loans
                 ]);
                 setStats(statsRes.data);
                 setLoans(loansRes.data.loans || []);

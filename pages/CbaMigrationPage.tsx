@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import StaffLayout from '../components/layouts/StaffLayout';
 import axios from 'axios';
+import { staffPath } from '@/lib/api/staff-path';
 
 interface CbaMigrationPageProps {
     user: { name: string; email: string; avatar_url?: string; role?: string };
@@ -63,7 +64,7 @@ const CbaMigrationPage: React.FC<CbaMigrationPageProps> = ({ user, onLogout, tog
     const fetchStatus = async () => {
         setIsLoadingStatus(true);
         try {
-            const res = await axios.get('/api/staff/admin/cba-migration-status', { withCredentials: true });
+            const res = await axios.get(staffPath('admin/cba-migration-status'), { withCredentials: true });
             setStatus(res.data);
         } catch (err: any) {
             setError(err.response?.data?.message || 'Failed to fetch migration status');
@@ -83,7 +84,7 @@ const CbaMigrationPage: React.FC<CbaMigrationPageProps> = ({ user, onLogout, tog
         setMigrationResults(null);
         setRollbackResults(null);
         try {
-            const res = await axios.post('/api/staff/admin/cba-migrate', { dryRun: true }, { withCredentials: true });
+            const res = await axios.post(staffPath('admin/cba-migrate'), { dryRun: true }, { withCredentials: true });
             setMigrationResults(res.data);
         } catch (err: any) {
             setError(err.response?.data?.message || 'Dry run failed');
@@ -101,7 +102,7 @@ const CbaMigrationPage: React.FC<CbaMigrationPageProps> = ({ user, onLogout, tog
         setMigrationResults(null);
         setRollbackResults(null);
         try {
-            const res = await axios.post('/api/staff/admin/cba-migrate', { dryRun: false }, { withCredentials: true });
+            const res = await axios.post(staffPath('admin/cba-migrate'), { dryRun: false }, { withCredentials: true });
             setMigrationResults(res.data);
             fetchStatus(); // Refresh status
         } catch (err: any) {
@@ -120,7 +121,7 @@ const CbaMigrationPage: React.FC<CbaMigrationPageProps> = ({ user, onLogout, tog
         setMigrationResults(null);
         setRollbackResults(null);
         try {
-            const res = await axios.post('/api/staff/admin/cba-rollback', {}, { withCredentials: true });
+            const res = await axios.post(staffPath('admin/cba-rollback'), {}, { withCredentials: true });
             setRollbackResults(res.data);
             fetchStatus(); // Refresh status
         } catch (err: any) {

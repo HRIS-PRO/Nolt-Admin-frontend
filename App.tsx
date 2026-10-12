@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { Suspense, useState, useEffect, useCallback, useMemo } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useSearchParams, useNavigate } from 'react-router-dom';
 import { UserState, LoanState, Theme, SavedDraft } from './types';
 import Navigation from './components/Navigation';
@@ -18,33 +18,36 @@ import OnboardingPage from './pages/auth/OnboardingPage';
 import ForgotPasswordPage from './pages/auth/ForgotPasswordPage';
 import ResetPasswordPage from './pages/auth/ResetPasswordPage';
 import RestrictedAccessPage from './pages/RestrictedAccessPage';
-import StaffDashboard from './pages/StaffDashboard';
 import StaffPlaceholderPage from './pages/StaffPlaceholderPage';
-import SettingsPage from './pages/SettingsPage';
-import LoanQueuePage from './pages/LoanQueuePage';
-import LoanDetailsPage from './pages/LoanDetailsPage';
-import UsersPage from './pages/UsersPage';
-import AuditTrailPage from './pages/AuditTrailPage';
 import axios from 'axios';
-import ReportsPage from './pages/ReportsPage';
-import CustomersPage from './pages/CustomersPage';
-import TimelineReportPage from './pages/TimelineReportPage';
-import StaffInvestmentsPage from './pages/StaffInvestmentsPage';
-import StaffInvestmentDetailsPage from './pages/StaffInvestmentDetailsPage';
+import {
+  AuditTrailPage,
+  CbaMigrationPage,
+  CustomerDetailsPage,
+  CustomersPage,
+  DemographyReportPage,
+  LoanDetailsPage,
+  LoanQueuePage,
+  PayrollUploadPage,
+  ProductsPage,
+  ReportsPage,
+  SettingsPage,
+  StaffCalculatorPage,
+  StaffDashboard,
+  StaffInvestmentCalendarPage,
+  StaffInvestmentDetailsPage,
+  StaffInvestmentsPage,
+  StaffMobileNotificationsPage,
+  StaffPromotionsPage,
+  StaffTransfersPage,
+  TimelineReportPage,
+  UsersPage,
+} from './routes/staff-lazy';
 import VerifyGiftPage from './pages/investment/VerifyGiftPage';
 import ClaimGiftPage from './pages/investment/ClaimGiftPage';
 import ProfilePage from './pages/ProfilePage';
-import StaffPromotionsPage from './pages/StaffPromotionsPage';
-import StaffMobileNotificationsPage from './pages/StaffMobileNotificationsPage';
-import StaffInvestmentCalendarPage from './pages/StaffInvestmentCalendarPage';
-import StaffTransfersPage from './pages/StaffTransfersPage';
-import StaffCalculatorPage from './pages/StaffCalculatorPage';
-import ProductsPage from './pages/ProductsPage';
 import LogoutWarningModal from './components/modals/LogoutWarningModal';
 import JointAcceptancePage from './pages/investment/JointAcceptancePage';
-import CustomerDetailsPage from './pages/CustomerDetailsPage';
-import CbaMigrationPage from './pages/CbaMigrationPage';
-import PayrollUploadPage from './pages/PayrollUploadPage';
 import { apiBase, apiUrl } from './lib/api-config';
 import { scheduleDeferredScripts } from './lib/deferred-scripts';
 import { isSuperAdminRole, normalizeStaffRole } from './lib/staff-roles';
@@ -439,6 +442,13 @@ const AppContent: React.FC = () => {
         onCancel={() => setShowLogoutModal(false)}
       />
 
+      <Suspense
+        fallback={
+          <div className="min-h-[40vh] flex items-center justify-center">
+            <div className="h-10 w-10 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+          </div>
+        }
+      >
       <Routes>
         {/* Auth Routes */}
         <Route path="/login" element={
@@ -810,6 +820,7 @@ const AppContent: React.FC = () => {
         <Route path="/restricted" element={<RestrictedAccessPage onLogout={handleLogoutRequest} />} />
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
+      </Suspense>
     </div>
   );
 };

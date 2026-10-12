@@ -10,6 +10,7 @@ import { formatDate } from '../utils/dateFormatter';
 import { formatCasaLabel } from '../utils/formatCasa';
 import { maskValue } from '../utils/maskHelper';
 import { canViewAgentCommission } from '../lib/staff-roles';
+import { staffPath } from '@/lib/api/staff-path';
 
 interface StaffInvestmentDetailsPageProps {
     user: { id?: string | number; name: string; email: string; avatar_url?: string; role?: string };
@@ -153,7 +154,7 @@ const StaffInvestmentDetailsPage: React.FC<StaffInvestmentDetailsPageProps> = ({
     const handleSaveBioData = async () => {
         setIsSavingBio(true);
         try {
-            await axios.put(`/api/staff/investments/${id}/bio`, bioEditData, { withCredentials: true });
+            await axios.put(staffPath(`investments/${id}/bio`), bioEditData, { withCredentials: true });
             alert("Bio data updated successfully");
             setShowBioEditModal(false);
             fetchInvestment();
@@ -167,7 +168,7 @@ const StaffInvestmentDetailsPage: React.FC<StaffInvestmentDetailsPageProps> = ({
 
     const fetchInvestment = async () => {
         try {
-            const response = await axios.get(`/api/staff/investments/${id}`, { withCredentials: true });
+            const response = await axios.get(staffPath(`investments/${id}`), { withCredentials: true });
             setInvestment(response.data);
             setDraftCASA(response.data.casa_account_number || '');
             const rawInt = response.data.interest_amount;
@@ -186,7 +187,7 @@ const StaffInvestmentDetailsPage: React.FC<StaffInvestmentDetailsPageProps> = ({
     const fetchOfficers = async () => {
         if (['sales_manager', 'admin', 'super_admin', 'superadmin', 'customer_experience', 'marketing'].includes(user.role || '')) {
             try {
-                const response = await axios.get(`/api/staff/users?role=sales_officer,sales_public_sector,sales_private_sector&limit=200`, { withCredentials: true });
+                const response = await axios.get(staffPath(`users?role=sales_officer,sales_public_sector,sales_private_sector&limit=200`), { withCredentials: true });
                 setOfficers(response.data.users.filter((u: any) => u.is_active));
             } catch (error) {
                 console.error("Failed to fetch officers", error);
@@ -197,7 +198,7 @@ const StaffInvestmentDetailsPage: React.FC<StaffInvestmentDetailsPageProps> = ({
     const handleAssignOfficer = async (officerId: string) => {
         if (!confirm("Are you sure you want to reassign this investment?")) return;
         try {
-            await axios.patch(`/api/staff/investments/${id}/assign`, {
+            await axios.patch(staffPath(`investments/${id}/assign`), {
                 sales_officer_id: officerId
             }, { withCredentials: true });
             await fetchInvestment();
@@ -239,7 +240,7 @@ const StaffInvestmentDetailsPage: React.FC<StaffInvestmentDetailsPageProps> = ({
             if (action === 'approve' && stage === 'submitted' && invSelectedTier !== invCustomerKycTier) {
                 try {
                     const tierRes = await axios.post(
-                        '/api/staff/upgrade-customer-tier',
+                        staffPath('upgrade-customer-tier'),
                         {
                             customer_id: investment.customer_id,
                             new_tier: invSelectedTier,
@@ -263,7 +264,7 @@ const StaffInvestmentDetailsPage: React.FC<StaffInvestmentDetailsPageProps> = ({
             if (action === 'return') {
                 payload.target_stage = targetStage;
             }
-            await axios.put(`/api/staff/investments/${id}/action`, payload, { withCredentials: true });
+            await axios.put(staffPath(`investments/${id}/action`), payload, { withCredentials: true });
             setReason('');
             await fetchInvestment();
         } catch (error: any) {
@@ -328,7 +329,7 @@ const StaffInvestmentDetailsPage: React.FC<StaffInvestmentDetailsPageProps> = ({
         if (!confirm(`Are you sure you want to ${action} this liquidation request?`)) return;
         setIsActioning(true);
         try {
-            await axios.post(`/api/staff/investments/${id}/liquidate-action`, { action, note: reason }, { withCredentials: true });
+            await axios.post(staffPath(`investments/${id}/liquidate-action`), { action, note: reason }, { withCredentials: true });
             setReason('');
             await fetchInvestment();
         } catch (error: any) {
@@ -342,7 +343,7 @@ const StaffInvestmentDetailsPage: React.FC<StaffInvestmentDetailsPageProps> = ({
     const handleFinanceUpdate = async (interest_amount: string) => {
         setIsActioning(true);
         try {
-            await axios.put(`/api/staff/investments/${id}/finance-fields`, { interest_amount }, { withCredentials: true });
+            await axios.put(staffPath(`investments/${id}/finance-fields`), { interest_amount }, { withCredentials: true });
             await fetchInvestment();
             alert("Finance fields updated successfully.");
         } catch (error: any) {
@@ -355,7 +356,7 @@ const StaffInvestmentDetailsPage: React.FC<StaffInvestmentDetailsPageProps> = ({
     const handleCASAUpdate = async (casa_account_number: string) => {
         setIsActioning(true);
         try {
-            await axios.put(`/api/staff/investments/${id}/casa`, { casa_account_number }, { withCredentials: true });
+            await axios.put(staffPath(`investments/${id}/casa`), { casa_account_number }, { withCredentials: true });
             await fetchInvestment();
             alert("CASA Account Number updated and customer notified.");
         } catch (error: any) {
@@ -376,7 +377,7 @@ const StaffInvestmentDetailsPage: React.FC<StaffInvestmentDetailsPageProps> = ({
             if (signatureBase64) payload.signature_base64 = signatureBase64;
             if (directIndemnityUrl) payload.indemnity_document_url = directIndemnityUrl;
 
-            await axios.post(`/api/staff/investments/${id}/indemnity`, payload, { withCredentials: true });
+            await axios.post(staffPath(`investments/${id}/indemnity`), payload, { withCredentials: true });
             await fetchInvestment();
             setSignatureBase64(null);
             setDirectIndemnityUrl(null);

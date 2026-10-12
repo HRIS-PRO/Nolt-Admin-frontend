@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import axios from 'axios';
+import { staffPath } from '@/lib/api/staff-path';
 
 type OverviewRow = { indicator: string; type: string; value: string };
 
@@ -59,7 +60,7 @@ export default function LoanCrcBureauPanel({
         setLoading(true);
         setError(null);
         try {
-            const res = await axios.get(`/api/staff/loans/${loanId}/crc`, { withCredentials: true });
+            const res = await axios.get(staffPath(`loans/${loanId}/crc`), { withCredentials: true });
             setData(res.data as CrcPayload);
         } catch {
             setError('Could not load the credit bureau tab.');
@@ -85,7 +86,7 @@ export default function LoanCrcBureauPanel({
         setError(null);
         try {
             const res = await axios.post(
-                `/api/staff/loans/${loanId}/crc`,
+                staffPath(`loans/${loanId}/crc`),
                 { force },
                 { withCredentials: true, timeout: 120000 },
             );

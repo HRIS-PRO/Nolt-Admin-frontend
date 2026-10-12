@@ -12,6 +12,7 @@ import { getStatusStyles } from '../utils/statusStyles';
 import { formatDate } from '../utils/dateFormatter';
 import { formatCasaLabel } from '../utils/formatCasa';
 import { useNmsUploadSizeLimit } from '../hooks/useNmsUploadSizeLimit';
+import { staffPath } from '@/lib/api/staff-path';
 import {
     canManageBlacklist,
     DEFAULT_REJECTION_COOLDOWN_DAYS,
@@ -207,7 +208,7 @@ const ActionCard = ({ loan, userRole, onActionComplete }: { loan: any, userRole:
     // e.g. "Public Sector Loan (IPPIS)" while the DB product custom_name is "Public Sector Loan".
     useEffect(() => {
         if (!loan.product_type) return;
-        axios.get('/api/staff/products/loans/active', { withCredentials: true })
+        axios.get(staffPath('products/loans/active'), { withCredentials: true })
             .then(res => {
                 const type = loan.product_type.toLowerCase();
                 const match = res.data.find((p: any) => {
@@ -290,7 +291,7 @@ const ActionCard = ({ loan, userRole, onActionComplete }: { loan: any, userRole:
             if (action === 'approve' && stage === 'customer_experience' && selectedTier !== customerKycTier) {
                 try {
                     const tierRes = await axios.post(
-                        '/api/staff/upgrade-customer-tier',
+                        staffPath('upgrade-customer-tier'),
                         {
                             customer_id: loan.customer_id,
                             new_tier: selectedTier,
@@ -346,7 +347,7 @@ const ActionCard = ({ loan, userRole, onActionComplete }: { loan: any, userRole:
             }
 
             const actionRes = await axios.post(
-                `/api/staff/loans/${loan.id}/action`,
+                staffPath(`loans/${loan.id}/action`),
                 payload,
                 { withCredentials: true }
             );
@@ -373,7 +374,7 @@ const ActionCard = ({ loan, userRole, onActionComplete }: { loan: any, userRole:
         setActionLoading(true);
         try {
             await axios.post(
-                `/api/staff/loans/${loan.id}/action`,
+                staffPath(`loans/${loan.id}/action`),
                 {
                     action: 'reject',
                     cx_rejection_reason: cxRejectionReason,
@@ -405,7 +406,7 @@ const ActionCard = ({ loan, userRole, onActionComplete }: { loan: any, userRole:
         setOverrideLoading(true);
         try {
             await axios.post(
-                `/api/staff/loans/${loan.id}/finance-disbursement-override`,
+                staffPath(`loans/${loan.id}/finance-disbursement-override`),
                 { gl_account: selectedGL, reason: reason.trim() || undefined },
                 { withCredentials: true },
             );
@@ -426,7 +427,7 @@ const ActionCard = ({ loan, userRole, onActionComplete }: { loan: any, userRole:
         setActionLoading(true);
         try {
             await axios.post(
-                `/api/staff/loans/${loan.id}/blacklist`,
+                staffPath(`loans/${loan.id}/blacklist`),
                 {
                     reason: blacklistReason.trim(),
                     customer_id: loan.customer_id,
@@ -867,7 +868,7 @@ const ActionCard = ({ loan, userRole, onActionComplete }: { loan: any, userRole:
                                     const val = e.target.value;
                                     setSelectedGL(val);
                                     try {
-                                        await axios.patch(`/api/staff/loans/${loan.id}/gl-account`, 
+                                        await axios.patch(staffPath(`loans/${loan.id}/gl-account`), 
                                             { gl_account: val || null }, 
                                             { withCredentials: true }
                                         );
@@ -1331,14 +1332,14 @@ const LoanDetailsPage: React.FC<LoanDetailsPageProps> = ({ user, onLogout, toggl
             if (signatureBase64) payload.signature_base64 = signatureBase64;
             if (directIndemnityUrl) payload.indemnity_document_url = directIndemnityUrl;
 
-            await axios.post(`/api/staff/loans/${id}/indemnity`, payload, { withCredentials: true });
+            await axios.post(staffPath(`loans/${id}/indemnity`), payload, { withCredentials: true });
             
             setSignatureBase64(null);
             setDirectIndemnityUrl(null);
             alert("Indemnity Agreement updated successfully.");
             
             // Refresh loan data
-            const response = await axios.get(`/api/staff/loans/${id}`, { withCredentials: true });
+            const response = await axios.get(staffPath(`loans/${id}`), { withCredentials: true });
             setLoan(response.data);
         } catch (error: any) {
             console.error("Indemnity processing failed:", error);
@@ -1351,7 +1352,7 @@ const LoanDetailsPage: React.FC<LoanDetailsPageProps> = ({ user, onLogout, toggl
     const fetchOfficers = async () => {
         if (['sales_manager', 'admin', 'super_admin', 'superadmin', 'customer_experience'].includes(user.role || '')) {
             try {
-                const response = await axios.get(`/api/staff/users?role=sales_officer,sales_public_sector,sales_private_sector&limit=200`, { withCredentials: true });
+                const response = await axios.get(staffPath(`users?role=sales_officer,sales_public_sector,sales_private_sector&limit=200`), { withCredentials: true });
                 setOfficers(response.data.users.filter((u: any) => u.is_active));
             } catch (error) {
                 console.error("Failed to fetch officers", error);
@@ -1362,11 +1363,11 @@ const LoanDetailsPage: React.FC<LoanDetailsPageProps> = ({ user, onLogout, toggl
     const handleAssignOfficer = async (officerId: string) => {
         if (!confirm("Are you sure you want to reassign this loan?")) return;
         try {
-            await axios.patch(`/api/staff/loans/${id}/assign`, {
+            await axios.patch(staffPath(`loans/${id}/assign`), {
                 sales_officer_id: officerId
             }, { withCredentials: true });
             // Refresh
-            const response = await axios.get(`/api/staff/loans/${id}`, { withCredentials: true });
+            const response = await axios.get(staffPath(`loans/${id}`), { withCredentials: true });
             setLoan(response.data);
             alert("Loan reassigned successfully");
         } catch (error: any) {
@@ -1377,7 +1378,7 @@ const LoanDetailsPage: React.FC<LoanDetailsPageProps> = ({ user, onLogout, toggl
     useEffect(() => {
         const fetchLoan = async () => {
             try {
-                const response = await axios.get(`/api/staff/loans/${id}`, { withCredentials: true });
+                const response = await axios.get(staffPath(`loans/${id}`), { withCredentials: true });
                 setLoan(response.data);
             } catch (error) {
                 console.error("Failed to fetch loan details", error);
@@ -1404,7 +1405,7 @@ const LoanDetailsPage: React.FC<LoanDetailsPageProps> = ({ user, onLogout, toggl
 
             const handleUpdate = (data: { id?: number | string; loanId?: number | string }) => {
                 if (String(data.id) === String(id) || String(data.loanId) === String(id)) {
-                    axios.get(`/api/staff/loans/${id}`, { withCredentials: true })
+                    axios.get(staffPath(`loans/${id}`), { withCredentials: true })
                         .then(res => setLoan(res.data))
                         .catch(console.error);
                 }
@@ -1412,7 +1413,7 @@ const LoanDetailsPage: React.FC<LoanDetailsPageProps> = ({ user, onLogout, toggl
 
             const handleDocUpload = (data: { loanId?: number | string; contextType?: string; contextId?: number | string }) => {
                 if (matchesLoan(data)) {
-                    axios.get(`/api/staff/loans/${id}`, { withCredentials: true })
+                    axios.get(staffPath(`loans/${id}`), { withCredentials: true })
                         .then(res => setLoan(res.data))
                         .catch(console.error);
                 }
@@ -1420,7 +1421,7 @@ const LoanDetailsPage: React.FC<LoanDetailsPageProps> = ({ user, onLogout, toggl
 
             const handleDocDelete = (data: { loanId?: number | string; contextType?: string; contextId?: number | string }) => {
                 if (matchesLoan(data)) {
-                    axios.get(`/api/staff/loans/${id}`, { withCredentials: true })
+                    axios.get(staffPath(`loans/${id}`), { withCredentials: true })
                         .then(res => setLoan(res.data))
                         .catch(console.error);
                 }
@@ -2098,7 +2099,7 @@ const LoanDetailsPage: React.FC<LoanDetailsPageProps> = ({ user, onLogout, toggl
                                 onActionComplete={() => {
                                     const fetchLoan = async () => {
                                         try {
-                                            const response = await axios.get(`/api/staff/loans/${id}`, { withCredentials: true });
+                                            const response = await axios.get(staffPath(`loans/${id}`), { withCredentials: true });
                                             setLoan(response.data);
                                         } catch (error) { console.error("Refresh failed", error); }
                                     };
@@ -2179,7 +2180,7 @@ const LoanDetailsPage: React.FC<LoanDetailsPageProps> = ({ user, onLogout, toggl
                     onClose={async () => {
                         setShowEditModal(false);
                         try {
-                            const response = await axios.get(`/api/staff/loans/${id}`, { withCredentials: true });
+                            const response = await axios.get(staffPath(`loans/${id}`), { withCredentials: true });
                             setLoan(response.data);
                         } catch (error) {
                             console.error('Failed to refresh loan after closing form', error);
@@ -2190,7 +2191,7 @@ const LoanDetailsPage: React.FC<LoanDetailsPageProps> = ({ user, onLogout, toggl
                         // Refresh logic
                         const fetchLoan = async () => {
                             try {
-                                const response = await axios.get(`/api/staff/loans/${id}`, { withCredentials: true });
+                                const response = await axios.get(staffPath(`loans/${id}`), { withCredentials: true });
                                 setLoan(response.data);
                             } catch (error) { console.error("Refresh failed", error); }
                         };

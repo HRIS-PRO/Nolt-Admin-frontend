@@ -3,6 +3,7 @@ import StaffLayout from '../components/layouts/StaffLayout';
 import { useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import { motion, AnimatePresence } from 'motion/react';
+import { staffPath } from '@/lib/api/staff-path';
 import {
     BarChart,
     Bar,
@@ -85,7 +86,7 @@ const TimelineReportPage: React.FC<TimelineReportPageProps> = ({ user, onLogout,
                 params.period = 'this_month';
             }
             const queryString = new URLSearchParams(params).toString();
-            const response = await axios.get(`/api/staff/reports/tat-summary?${queryString}`, { withCredentials: true });
+            const response = await axios.get(staffPath(`reports/tat-summary?${queryString}`), { withCredentials: true });
             if (response.data) {
                 setSummary(response.data.summary);
                 setDailyApprovals(response.data.dailyApprovals || []);
@@ -115,7 +116,7 @@ const TimelineReportPage: React.FC<TimelineReportPageProps> = ({ user, onLogout,
     const handleExportCsv = async () => {
         setIsExporting(true);
         try {
-            const endpoint = productType === 'LOAN' ? '/api/staff/loans/timeline-report/export-csv' : '/api/staff/investments/timeline-report/export-csv';
+            const endpoint = productType === 'LOAN' ? staffPath('loans/timeline-report/export-csv') : staffPath('investments/timeline-report/export-csv');
             const response = await axios.get(
                 `${endpoint}?search=${searchQuery}`,
                 { withCredentials: true, responseType: 'blob' }

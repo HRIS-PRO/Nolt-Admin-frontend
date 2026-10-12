@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
+import { staffPath } from '@/lib/api/staff-path';
 
 type Props = {
     customerId: number | null | undefined;
@@ -26,7 +27,7 @@ export default function LoanBankStatementInsights({ customerId }: Props) {
         if (!customerId) return;
         setLoading(true);
         void axios
-            .get(`/api/staff/customers/${customerId}/bank-statement`, { withCredentials: true })
+            .get(staffPath(`customers/${customerId}/bank-statement`), { withCredentials: true })
             .then((res) => setData(res.data as StatementPayload))
             .catch(() => setData({ found: false, statement: null }))
             .finally(() => setLoading(false));

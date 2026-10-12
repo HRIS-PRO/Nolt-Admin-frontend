@@ -1,3 +1,4 @@
+import { staffPath } from '@/lib/api/staff-path';
 
 import React, { useState, useMemo, useEffect } from 'react';
 import StaffLayout from '../components/layouts/StaffLayout';
@@ -59,7 +60,7 @@ const StaffCalculatorPage: React.FC<StaffCalculatorPageProps> = ({ user, onLogou
         && Boolean(selectedInvestment?.name?.toLowerCase().includes('vault'));
 
     useEffect(() => {
-        void axios.get('/api/staff/products/loans/active', { withCredentials: true }).then((res) => {
+        void axios.get(staffPath('products/loans/active'), { withCredentials: true }).then((res) => {
             const mapped: LoanCatalogItem[] = (res.data ?? []).map((p: Record<string, unknown>) => ({
                 id: String(p.id),
                 name: String(p.custom_name ?? 'Loan product'),
@@ -74,7 +75,7 @@ const StaffCalculatorPage: React.FC<StaffCalculatorPageProps> = ({ user, onLogou
                 setRate(mapped[0].interestRateMonthly * 12);
             }
         });
-        void axios.get('/api/staff/products/investments/active', { withCredentials: true }).then((res) => {
+        void axios.get(staffPath('products/investments/active'), { withCredentials: true }).then((res) => {
             const mapped: InvestmentCatalogItem[] = (res.data ?? []).map((p: Record<string, unknown>) => ({
                 id: String(p.id),
                 name: String(p.custom_name ?? 'Investment product'),

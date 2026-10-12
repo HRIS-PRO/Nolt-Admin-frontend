@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import MdaTertiarySelect, { TERTIARY_LIST } from './MdaTertiarySelect';
+import { staffPath } from '@/lib/api/staff-path';
 
 import { StaffLoanDraft } from '../types';
 import { storageService } from '../services/storageService';
@@ -662,7 +663,7 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
             };
 
             if (existingLoanId) {
-                const response = await axios.put(`/api/staff/loans/${existingLoanId}`, payload);
+                const response = await axios.put(staffPath(`loans/${existingLoanId}`), payload);
                 console.log(`💾 [STAFF FORM DRAFT UPDATED - SUB_STEP ${targetStep} (${steps[targetStep] || 'Loan Details'})]:`, response.data);
                 setDbLoanId(existingLoanId);
             } else {
@@ -905,7 +906,7 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
 
         const fetchActiveProducts = async () => {
             try {
-                const response = await axios.get('/api/staff/products/loans/active');
+                const response = await axios.get(staffPath('products/loans/active'));
                 setActiveProducts(response.data);
             } catch (error) {
                 console.error("Error fetching active products:", error);
@@ -1614,12 +1615,12 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
             const existingLoanId = dbLoanId || (loanId && !isNaN(Number(loanId)) ? Number(loanId) : null) || (typeof initialData?.id === 'number' ? initialData.id : null) || (initialDraft?.id && !isNaN(Number(initialDraft.id)) ? Number(initialDraft.id) : null);
             if (existingLoanId) {
                 // UPDATE Mode — always PUT to update the existing draft
-                const res = await axios.put(`/api/staff/loans/${existingLoanId}`, payload);
+                const res = await axios.put(staffPath(`loans/${existingLoanId}`), payload);
                 console.log("🚀 [FINAL LOAN APPLICATION UPDATE RESPONSE]:", res.data);
                 alert("Loan Application Updated Successfully!");
             } else {
                 // CREATE Mode — only if truly no existing loan ID
-                const res = await axios.post('/api/staff/loans/application', payload);
+                const res = await axios.post(staffPath('loans/application'), payload);
                 console.log("🚀 [FINAL LOAN APPLICATION SUBMISSION RESPONSE]:", res.data);
                 alert("Loan Application Created Successfully!");
             }

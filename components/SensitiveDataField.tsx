@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import axios from 'axios';
 import { maskValue } from '../utils/maskHelper';
+import { staffPath } from '@/lib/api/staff-path';
 
 interface SensitiveDataFieldProps {
     loanId: string | number;
@@ -34,7 +35,7 @@ const SensitiveDataField: React.FC<SensitiveDataFieldProps> = ({ loanId, field, 
 
         try {
             const response = await axios.post(
-                `/api/staff/loans/${loanId}/reveal`,
+                staffPath(`loans/${loanId}/reveal`),
                 { field },
                 { withCredentials: true }
             );

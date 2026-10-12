@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { formatDate, formatDateTime } from '../utils/dateFormatter';
+import { staffPath } from '@/lib/api/staff-path';
 
 interface Activity {
     id: string;
@@ -40,8 +41,8 @@ const ActivityTimeline: React.FC<ActivityTimelineProps> = ({ loanId, investmentI
                 
                 if (loanId) {
                     const [activitiesRes, commentsRes] = await Promise.all([
-                        axios.get(`/api/staff/loans/${loanId}/activities`, { withCredentials: true }),
-                        axios.get(`/api/staff/loans/${loanId}/comments`, { withCredentials: true })
+                        axios.get(staffPath(`loans/${loanId}/activities`), { withCredentials: true }),
+                        axios.get(staffPath(`loans/${loanId}/comments`), { withCredentials: true })
                     ]);
 
                     combined = [
@@ -49,7 +50,7 @@ const ActivityTimeline: React.FC<ActivityTimelineProps> = ({ loanId, investmentI
                         ...commentsRes.data.map((c: any) => ({ ...c, type: 'comment' }))
                     ];
                 } else if (investmentId) {
-                    const activitiesRes = await axios.get(`/api/staff/investments/${investmentId}/activities`, { withCredentials: true });
+                    const activitiesRes = await axios.get(staffPath(`investments/${investmentId}/activities`), { withCredentials: true });
                     
                     combined = [
                         ...activitiesRes.data.map((a: any) => ({ ...a, type: 'activity' }))
