@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
 import { motion, AnimatePresence } from 'motion/react';
+import { staffPath } from '@/lib/api/staff-path';
 import {
     AgentCommissionTier,
     formatNaira,
@@ -54,7 +55,7 @@ const AgentCommissionSettings: React.FC = () => {
     const fetchTiers = useCallback(async () => {
         setLoading(true);
         try {
-            const res = await axios.get('/api/staff/agent-commission-tiers', { withCredentials: true });
+            const res = await axios.get(staffPath('agent-commission-tiers'), { withCredentials: true });
             const rows = Array.isArray(res.data?.data) ? res.data.data : [];
             setTiers(rows.map((r: Record<string, unknown>) => parseTierFromApi(r)));
         } catch (err: any) {
@@ -130,12 +131,12 @@ const AgentCommissionSettings: React.FC = () => {
         setSaving(true);
         try {
             if (editingId) {
-                const res = await axios.put(`/api/staff/agent-commission-tiers/${editingId}`, payload, { withCredentials: true });
+                const res = await axios.put(staffPath(`agent-commission-tiers/${editingId}`), payload, { withCredentials: true });
                 const updated = parseTierFromApi(res.data.data);
                 setTiers((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
                 showBanner('success', 'Commission tier updated.');
             } else {
-                const res = await axios.post('/api/staff/agent-commission-tiers', payload, { withCredentials: true });
+                const res = await axios.post(staffPath('agent-commission-tiers'), payload, { withCredentials: true });
                 const created = parseTierFromApi(res.data.data);
                 setTiers((prev) => [...prev, created].sort((a, b) => a.tenure_days - b.tenure_days || a.min_investment - b.min_investment));
                 showBanner('success', 'Commission tier created.');
@@ -151,7 +152,7 @@ const AgentCommissionSettings: React.FC = () => {
     const handleDelete = async (tier: AgentCommissionTier) => {
         if (!window.confirm(`Remove tier "${tier.tier_name}"? This deactivates the rule (soft delete).`)) return;
         try {
-            await axios.delete(`/api/staff/agent-commission-tiers/${tier.id}`, { withCredentials: true });
+            await axios.delete(staffPath(`agent-commission-tiers/${tier.id}`), { withCredentials: true });
             setTiers((prev) => prev.filter((t) => t.id !== tier.id));
             showBanner('success', 'Tier removed.');
         } catch (err: any) {
@@ -162,7 +163,7 @@ const AgentCommissionSettings: React.FC = () => {
     const handleResetDefaults = async () => {
         if (!window.confirm('Replace all current tiers with the 8 default rules? Custom tiers will be archived.')) return;
         try {
-            const res = await axios.post('/api/staff/agent-commission-tiers/reset-defaults', {}, { withCredentials: true });
+            const res = await axios.post(staffPath('agent-commission-tiers/reset-defaults'), {}, { withCredentials: true });
             const rows = Array.isArray(res.data?.data) ? res.data.data : [];
             setTiers(rows.map((r: Record<string, unknown>) => parseTierFromApi(r)));
             showBanner('success', res.data?.message || 'Defaults restored.');

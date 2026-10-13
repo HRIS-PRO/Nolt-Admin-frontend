@@ -1,3 +1,4 @@
+import { staffPath } from '@/lib/api/staff-path';
 
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -103,7 +104,7 @@ const NewCustomerModal: React.FC<NewCustomerModalProps> = ({ isOpen, onClose, on
     setError(null);
     setShowBasicRetry(false);
     try {
-      const response = await axios.get(`/api/staff/kyc/lookup-bvn?bvn=${lookupVal}&mode=${mode}`);
+      const response = await axios.get(staffPath(`kyc/lookup-bvn?bvn=${lookupVal}&mode=${mode}`));
       if (response.data.success) {
         if (response.data.already_exists) {
           const custData = response.data.customer;
@@ -113,7 +114,7 @@ const NewCustomerModal: React.FC<NewCustomerModalProps> = ({ isOpen, onClose, on
           if (custData.casa) {
             setFetchingBalance(true);
             try {
-              const balRes = await axios.get(`/api/staff/kyc/cba-balance/${custData.casa}`);
+              const balRes = await axios.get(staffPath(`kyc/cba-balance/${custData.casa}`));
               if (balRes.data.success) {
                 setCbaBalance(balRes.data.data.AvailableBalance ?? balRes.data.data.availableBalance);
               }
@@ -257,7 +258,7 @@ const NewCustomerModal: React.FC<NewCustomerModalProps> = ({ isOpen, onClose, on
     }, CBA_TIMEOUT_MS);
 
     try {
-      const response = await axios.post('/api/staff/kyc/onboard-customer', payload, {
+      const response = await axios.post(staffPath('kyc/onboard-customer'), payload, {
         timeout: CBA_TIMEOUT_MS,
         signal: controller.signal
       });
@@ -275,7 +276,7 @@ const NewCustomerModal: React.FC<NewCustomerModalProps> = ({ isOpen, onClose, on
         if (custData.casa) {
           setFetchingBalance(true);
           try {
-            const balRes = await axios.get(`/api/staff/kyc/cba-balance/${custData.casa}`);
+            const balRes = await axios.get(staffPath(`kyc/cba-balance/${custData.casa}`));
             if (balRes.data.success) {
               setCbaBalance(balRes.data.data.AvailableBalance ?? balRes.data.data.availableBalance);
             }

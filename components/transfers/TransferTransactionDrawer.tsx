@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import axios from 'axios';
+import { staffPath } from '@/lib/api/staff-path';
 
 export interface CbaTransactionRow {
     id: number;
@@ -132,7 +133,7 @@ export function TransferTransactionDrawer({ transaction, open, onClose, formatBa
 
         setLoadingContext(true);
         axios
-            .get('/api/staff/cba-transactions/context', {
+            .get(staffPath('cba-transactions/context'), {
                 withCredentials: true,
                 params: {
                     accountNumber: transaction.accountNumber,

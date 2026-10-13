@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
 import { useSearchParams } from 'react-router-dom';
 import StaffLayout from '../components/layouts/StaffLayout';
+import { staffPath } from '@/lib/api/staff-path';
 import {
     TransferTransactionDrawer,
     type CbaTransactionRow,
@@ -113,7 +114,7 @@ const StaffTransfersPage: React.FC<StaffTransfersPageProps> = ({
 
     useEffect(() => {
         void axios
-            .get('/api/staff/cba-transactions/nip-banks', { withCredentials: true })
+            .get(staffPath('cba-transactions/nip-banks'), { withCredentials: true })
             .then((res) => {
                 const map: Record<string, string> = {};
                 for (const row of (res.data?.banks ?? []) as { code: string; name: string }[]) {
@@ -151,7 +152,7 @@ const StaffTransfersPage: React.FC<StaffTransfersPageProps> = ({
         setLoading(true);
         setError(null);
         try {
-            const res = await axios.get('/api/staff/cba-transactions', {
+            const res = await axios.get(staffPath('cba-transactions'), {
                 withCredentials: true,
                 params: {
                     accountNumber: accountNumber || undefined,

@@ -11,6 +11,7 @@ import { PaymentModal } from '../components/PaymentModal';
 import SelfieVerificationCapture, { type SelfieVerificationSuccess } from '../components/SelfieVerificationCapture';
 import { AnimatePresence } from 'motion/react';
 import { apiUrl } from '@/lib/api-config';
+import { paystackPublicKey } from '@/lib/paystackPublicKey';
 import { useNmsUploadSizeLimit } from '../hooks/useNmsUploadSizeLimit';
 
 interface InvestmentFlowProps {
@@ -826,7 +827,7 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
     if (!recipientEmail.includes('@')) return alert("Enter a valid recipient email");
     // @ts-ignore
     const handler = window.PaystackPop.setup({
-      key: import.meta.env.VITE_PAYSTACK_PUBLIC_KEY,
+      key: paystackPublicKey(),
       email: contactEmail || recipientEmail,
       amount: Math.round(parseFloat(amount) * 100),
       currency: 'NGN',
@@ -870,7 +871,7 @@ const InvestmentFlow: React.FC<InvestmentFlowProps> = ({ navigate, onComplete, f
     try {
       // @ts-ignore
       const handler = window.PaystackPop.setup({
-        key: import.meta.env.VITE_PAYSTACK_PUBLIC_KEY,
+        key: paystackPublicKey(),
         email: contactEmail,
         amount: Math.round(parseFloat(amount) * 100),
         currency: 'NGN',

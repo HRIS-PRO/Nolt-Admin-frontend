@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import axios from 'axios';
 import { motion, AnimatePresence } from 'motion/react';
 import NewCustomerModal from './modals/NewCustomerModal';
+import { staffPath } from '@/lib/api/staff-path';
 
 interface NewInvestmentLookupFlowProps {
     isOpen: boolean;
@@ -46,7 +47,7 @@ const NewInvestmentLookupFlow: React.FC<NewInvestmentLookupFlowProps> = ({
         setError(null);
         try {
             const param = lookupType === 'bvn' ? `bvn=${val}` : `casa=${val}`;
-            const response = await axios.get(`/api/staff/customers/lookup?${param}`);
+            const response = await axios.get(staffPath(`customers/lookup?${param}`));
 
             if (response.data.success) {
                 const customer = response.data.customer;
@@ -58,7 +59,7 @@ const NewInvestmentLookupFlow: React.FC<NewInvestmentLookupFlowProps> = ({
                     setCbaLoading(true);
                     try {
                         const invRes = await axios.get(
-                            `/api/staff/investments/cba-fixed-deposits?customerId=${customer.cba_customer_id}`,
+                            staffPath(`investments/cba-fixed-deposits?customerId=${customer.cba_customer_id}`),
                             { withCredentials: true }
                         );
                         setCbaInvestments(invRes.data?.data || []);

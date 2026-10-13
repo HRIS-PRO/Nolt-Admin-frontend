@@ -3,6 +3,7 @@ import StaffLayout from '../components/layouts/StaffLayout';
 import { useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import { motion, AnimatePresence } from 'motion/react';
+import { staffPath } from '@/lib/api/staff-path';
 import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell,
     PieChart, Pie,
@@ -103,7 +104,7 @@ const DemographyReportPage: React.FC<DemographyReportPageProps> = ({
                 params.period = 'this_month';
             }
             const queryString = new URLSearchParams(params).toString();
-            const res = await axios.get(`/api/staff/reports/demography?${queryString}`, { withCredentials: true });
+            const res = await axios.get(staffPath(`reports/demography?${queryString}`), { withCredentials: true });
             setData(res.data);
         } catch (error) {
             console.error('Failed to fetch demography data:', error);
@@ -125,7 +126,7 @@ const DemographyReportPage: React.FC<DemographyReportPageProps> = ({
                 params.endDate = format(dateRangeEnd, 'yyyy-MM-dd');
             }
             const queryString = new URLSearchParams(params).toString();
-            const response = await axios.get(`/api/staff/reports/demography/export-csv?${queryString}`, {
+            const response = await axios.get(staffPath(`reports/demography/export-csv?${queryString}`), {
                 withCredentials: true,
                 responseType: 'blob'
             });

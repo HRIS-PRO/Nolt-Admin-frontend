@@ -9,6 +9,7 @@ import NewInvestmentLookupFlow from '../components/NewInvestmentLookupFlow';
 import { apiUrl } from '@/lib/api-config';
 import AgentCommissionSummaryPanel from '../components/investments/AgentCommissionSummaryPanel';
 import { useNmsUploadSizeLimit } from '../hooks/useNmsUploadSizeLimit';
+import { staffPath } from '@/lib/api/staff-path';
 
 interface StaffInvestmentsPageProps {
     user: { name: string; email: string; avatar_url?: string; role?: string };
@@ -169,7 +170,7 @@ const StaffInvestmentsPage: React.FC<StaffInvestmentsPageProps> = ({ user, onLog
     useEffect(() => {
         const fetchInvestmentProducts = async () => {
             try {
-                const res = await fetch(apiUrl('/api/staff/products/investments/active'));
+                const res = await fetch(apiUrl(staffPath('products/investments/active')));
                 if (!res.ok) return;
                 const data = await res.json();
                 setInvestmentProducts(data);
@@ -198,7 +199,7 @@ const StaffInvestmentsPage: React.FC<StaffInvestmentsPageProps> = ({ user, onLog
             setRateLoading(true);
             try {
                 const res = await fetch(
-                    apiUrl(`/api/staff/investments/cba-rate?productCode=${productCode}&amount=${numericAmount}&duration=${numericDuration}`)
+                    apiUrl(staffPath(`investments/cba-rate?productCode=${productCode}&amount=${numericAmount}&duration=${numericDuration}`))
                 );
                 if (!res.ok) throw new Error('Rate fetch failed');
                 const data = await res.json();
@@ -255,7 +256,7 @@ const StaffInvestmentsPage: React.FC<StaffInvestmentsPageProps> = ({ user, onLog
     const fetchInvestments = async () => {
         try {
             setLoading(true);
-            const response = await axios.get('/api/staff/investments');
+            const response = await axios.get(staffPath('investments'));
             setAllInvestments(response.data);
         } catch (error) {
             console.error('Error fetching investments:', error);
@@ -274,7 +275,7 @@ const StaffInvestmentsPage: React.FC<StaffInvestmentsPageProps> = ({ user, onLog
     const fetchMobileInvestments = async () => {
         try {
             setLoading(true);
-            const response = await axios.get('/api/staff/investments/mobile', { withCredentials: true });
+            const response = await axios.get(staffPath('investments/mobile'), { withCredentials: true });
             setMobileInvestments(response.data);
         } catch (error) {
             console.error('Error fetching mobile investments:', error);
@@ -286,7 +287,7 @@ const StaffInvestmentsPage: React.FC<StaffInvestmentsPageProps> = ({ user, onLog
     const openMobileInvestmentDetail = async (id: number) => {
         try {
             setMobileDetailLoading(true);
-            const response = await axios.get(`/api/staff/investments/mobile/${id}`, { withCredentials: true });
+            const response = await axios.get(staffPath(`investments/mobile/${id}`), { withCredentials: true });
             setSelectedMobileInvestment(response.data);
         } catch (error) {
             console.error('Error fetching mobile investment detail:', error);
@@ -301,7 +302,7 @@ const StaffInvestmentsPage: React.FC<StaffInvestmentsPageProps> = ({ user, onLog
     const fetchOfficers = async () => {
         if (['sales_manager', 'admin', 'super_admin', 'superadmin', 'customer_experience'].includes(user.role || '')) {
             try {
-                const response = await axios.get(`/api/staff/users?role=sales_officer,sales_public_sector,sales_private_sector&limit=200`, { withCredentials: true });
+                const response = await axios.get(staffPath(`users?role=sales_officer,sales_public_sector,sales_private_sector&limit=200`), { withCredentials: true });
                 setOfficers(response.data.users.filter((u: any) => u.is_active));
             } catch (error) {
                 console.error("Failed to fetch officers", error);
@@ -313,7 +314,7 @@ const StaffInvestmentsPage: React.FC<StaffInvestmentsPageProps> = ({ user, onLog
         const isUnassign = officerId === 'unassign';
         if (!confirm(isUnassign ? "Are you sure you want to unassign this investment?" : "Are you sure you want to reassign this investment?")) return;
         try {
-            await axios.patch(`/api/staff/investments/${investmentId}/assign`, {
+            await axios.patch(staffPath(`investments/${investmentId}/assign`), {
                 sales_officer_id: isUnassign ? null : officerId
             }, { withCredentials: true });
 
@@ -689,7 +690,7 @@ const StaffInvestmentsPage: React.FC<StaffInvestmentsPageProps> = ({ user, onLog
                 receipt_url: wizardData.receiptUrl
             };
 
-            await axios.post('/api/staff/investments/application', payload);
+            await axios.post(staffPath('investments/application'), payload);
             setShowStaffApplicationFlow(false);
             resetWizardData();
             fetchInvestments();

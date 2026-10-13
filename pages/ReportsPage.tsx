@@ -3,6 +3,7 @@ import StaffLayout from '../components/layouts/StaffLayout';
 import axios from 'axios';
 import * as XLSX from 'xlsx';
 import { formatDate } from '../utils/dateFormatter';
+import { staffPath } from '@/lib/api/staff-path';
 
 interface ReportsPageProps {
     user: { name: string; email: string; avatar_url?: string; role?: string };
@@ -42,7 +43,7 @@ const ReportsPage: React.FC<ReportsPageProps> = ({ user, onLogout, toggleTheme, 
             if (startDate) params.startDate = startDate;
             if (endDate) params.endDate = endDate;
 
-            const response = await axios.get('/api/staff/reports', {
+            const response = await axios.get(staffPath('reports'), {
                 params,
                 withCredentials: true
             });
@@ -198,7 +199,7 @@ const ReportsPage: React.FC<ReportsPageProps> = ({ user, onLogout, toggleTheme, 
             if (startDate) params.startDate = startDate;
             if (endDate) params.endDate = endDate;
 
-            const response = await axios.get('/api/staff/reports', { params, withCredentials: true });
+            const response = await axios.get(staffPath('reports'), { params, withCredentials: true });
             const allReports = response.data.reports || response.data || [];
 
             if (!allReports || allReports.length === 0) {
@@ -296,7 +297,7 @@ const ReportsPage: React.FC<ReportsPageProps> = ({ user, onLogout, toggleTheme, 
             if (startDate) params.startDate = startDate;
             if (endDate) params.endDate = endDate;
 
-            const response = await axios.get('/api/staff/reports', { params, withCredentials: true });
+            const response = await axios.get(staffPath('reports'), { params, withCredentials: true });
             const allReports = response.data.reports || response.data || [];
 
             if (!allReports || allReports.length === 0) {

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { isAgentRole, isSuperAdminRole } from '../../lib/staff-roles';
+import { staffPath } from '@/lib/api/staff-path';
 
 type SummaryData = {
     investment_count: number;
@@ -29,7 +30,7 @@ const AgentCommissionSummaryPanel: React.FC<{
             setLoading(true);
             setError(null);
             try {
-                const res = await axios.get('/api/staff/agent-commissions/summary', {
+                const res = await axios.get(staffPath('agent-commissions/summary'), {
                     withCredentials: true,
                 });
                 if (!cancelled && res.data?.success) {

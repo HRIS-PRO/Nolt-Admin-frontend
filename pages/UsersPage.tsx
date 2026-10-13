@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import StaffLayout from '../components/layouts/StaffLayout';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import { staffPath } from '@/lib/api/staff-path';
 
 interface UsersPageProps {
     user: { name: string; email: string; avatar_url?: string; role?: string };
@@ -86,7 +87,7 @@ const UsersPage: React.FC<UsersPageProps> = ({ user, onLogout, toggleTheme, them
     const handleGenerateReferralCode = async (userId: number, prefix: OrgPrefix) => {
         setGeneratingReferralForId(userId);
         try {
-            const res = await axios.post(`${''}/api/staff/referral-code`, {
+            const res = await axios.post(staffPath(`referral-code`), {
                 userId,
                 prefix
             }, { withCredentials: true });
@@ -107,7 +108,7 @@ const UsersPage: React.FC<UsersPageProps> = ({ user, onLogout, toggleTheme, them
     const fetchUsers = async () => {
         setIsLoading(true);
         try {
-            const response = await axios.get(`${''}/api/staff/users`, {
+            const response = await axios.get(staffPath(`users`), {
                 params: {
                     page: currentPage,
                     limit: limit,
@@ -138,7 +139,7 @@ const UsersPage: React.FC<UsersPageProps> = ({ user, onLogout, toggleTheme, them
         if (accountOfficers.length > 0) return; // Already loaded
         setLoadingOfficers(true);
         try {
-            const res = await axios.get('/api/staff/account-officers', { withCredentials: true });
+            const res = await axios.get(staffPath('account-officers'), { withCredentials: true });
             setAccountOfficers(res.data.data || []);
         } catch (err) {
             console.error('Failed to fetch account officers:', err);
@@ -150,7 +151,7 @@ const UsersPage: React.FC<UsersPageProps> = ({ user, onLogout, toggleTheme, them
     const handleOfficerAssign = async (userId: number, officerCode: string | null, officerName: string | null) => {
         setAssigningOfficerForId(userId);
         try {
-            await axios.patch(`/api/staff/users/${userId}/officer`, {
+            await axios.patch(staffPath(`users/${userId}/officer`), {
                 officer_code: officerCode,
                 officer_name: officerName
             }, { withCredentials: true });
@@ -170,7 +171,7 @@ const UsersPage: React.FC<UsersPageProps> = ({ user, onLogout, toggleTheme, them
         e.preventDefault();
         setRecruiting(true);
         try {
-            await axios.post(`${''}/api/staff/invite`, inviteForm, { withCredentials: true });
+            await axios.post(staffPath(`invite`), inviteForm, { withCredentials: true });
             alert("Invitation sent successfully!");
             setShowInviteModal(false);
             setInviteForm({
@@ -200,7 +201,7 @@ const UsersPage: React.FC<UsersPageProps> = ({ user, onLogout, toggleTheme, them
         formData.append('file', bulkFile);
 
         try {
-            const res = await axios.post(`${''}/api/staff/bulk-invite`, formData, {
+            const res = await axios.post(staffPath(`bulk-invite`), formData, {
                 headers: { 'Content-Type': 'multipart/form-data' },
                 withCredentials: true
             });
@@ -218,7 +219,7 @@ const UsersPage: React.FC<UsersPageProps> = ({ user, onLogout, toggleTheme, them
     const handleRevoke = async (userId: number) => {
         if (!confirm("Are you sure you want to revoke access? They will no longer be able to log in.")) return;
         try {
-            await axios.post(`${''}/api/staff/revoke-access`, { userId }, { withCredentials: true });
+            await axios.post(staffPath(`revoke-access`), { userId }, { withCredentials: true });
             setUsers(users.map(u => u.id === userId ? { ...u, is_active: false } : u));
         } catch (error) {
             alert("Failed to revoke access");
@@ -227,7 +228,7 @@ const UsersPage: React.FC<UsersPageProps> = ({ user, onLogout, toggleTheme, them
 
     const handleGenerateReferral = async (userId: number) => {
         try {
-            const res = await axios.post(`${''}/api/staff/referral-code`, { userId }, { withCredentials: true });
+            const res = await axios.post(staffPath(`referral-code`), { userId }, { withCredentials: true });
             setUsers(users.map(u => u.id === userId ? { ...u, referral_code: res.data.referral_code } : u));
         } catch (error) {
             alert("Failed to generate code");
@@ -236,7 +237,7 @@ const UsersPage: React.FC<UsersPageProps> = ({ user, onLogout, toggleTheme, them
 
     const handleRoleUpdate = async (userId: number, newRole: string) => {
         try {
-            await axios.put(`${''}/api/staff/users/${userId}/role`, { role: newRole }, { withCredentials: true });
+            await axios.put(staffPath(`users/${userId}/role`), { role: newRole }, { withCredentials: true });
             setUsers(users.map(u => u.id === userId ? { ...u, role: newRole } : u));
             setEditingRoleId(null);
         } catch (error) {

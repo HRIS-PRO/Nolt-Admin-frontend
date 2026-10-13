@@ -6,6 +6,7 @@ import StaffLoanForm from './StaffLoanForm';
 import { storageService } from '../services/storageService';
 import { StaffLoanDraft } from '../types';
 import { getEligibilityBanner, LoanEligibility } from '../utils/loanEligibility';
+import { staffPath } from '@/lib/api/staff-path';
 
 interface NewLoanApplicationFlowProps {
     isOpen: boolean;
@@ -50,7 +51,7 @@ const NewLoanApplicationFlow: React.FC<NewLoanApplicationFlowProps> = ({ isOpen,
         setError(null);
         try {
             const param = lookupType === 'bvn' ? `bvn=${val}` : `casa=${val}`;
-            const response = await axios.get(`/api/staff/customers/lookup?${param}`);
+            const response = await axios.get(staffPath(`customers/lookup?${param}`));
 
             if (response.data.success) {
                 const cust = response.data.customer;

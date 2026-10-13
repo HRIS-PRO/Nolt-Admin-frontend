@@ -22,6 +22,10 @@
                 {
                     "key": "Permissions-Policy",
                     "value": "geolocation=(self \"https://identity.dojah.io\" \"https://widget.dojah.io\"), microphone=(self \"https://identity.dojah.io\" \"https://widget.dojah.io\"), camera=(self \"https://identity.dojah.io\" \"https://widget.dojah.io\")"
+                },
+                {
+                    "key": "Strict-Transport-Security",
+                    "value": "max-age=31536000; includeSubDomains"
                 }
             ]
         }

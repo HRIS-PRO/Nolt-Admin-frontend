@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { formatDate, formatDateTime } from '../../utils/dateFormatter';
 import { maskValue } from '../../utils/maskHelper';
+import { staffPath } from '@/lib/api/staff-path';
 
 interface CustomerDetailsDrawerProps {
     customerId: number | null;
@@ -88,7 +89,7 @@ const CustomerDetailsDrawer: React.FC<CustomerDetailsDrawerProps> = ({ customerI
     const fetchCbaLoans = async (id: number) => {
         setIsCbaLoading(true);
         try {
-            const res = await axios.get(`/api/staff/customers/${id}/cba-loans`, { withCredentials: true });
+            const res = await axios.get(staffPath(`customers/${id}/cba-loans`), { withCredentials: true });
             if (res.data.success) {
                 setCbaLoans(res.data.response || []);
             }
@@ -108,7 +109,7 @@ const CustomerDetailsDrawer: React.FC<CustomerDetailsDrawerProps> = ({ customerI
     const fetchDetails = async (id: number) => {
         setIsLoading(true);
         try {
-            const res = await axios.get(`/api/staff/customers/${id}`, { withCredentials: true });
+            const res = await axios.get(staffPath(`customers/${id}`), { withCredentials: true });
             setProfile(res.data.profile);
             setLoans(res.data.loans);
             setInvestments(res.data.investments || []);
@@ -125,7 +126,7 @@ const CustomerDetailsDrawer: React.FC<CustomerDetailsDrawerProps> = ({ customerI
         if (!window.confirm("Are you sure you want to approve these bank details?")) return;
 
         try {
-            const res = await axios.put(`/api/staff/customers/${customerId}/verify-bank`, {}, { withCredentials: true });
+            const res = await axios.put(staffPath(`customers/${customerId}/verify-bank`), {}, { withCredentials: true });
             if (res.data.success) {
                 alert("Bank details manually verified.");
                 setProfile({ ...profile, bank_verified: true });
@@ -142,7 +143,7 @@ const CustomerDetailsDrawer: React.FC<CustomerDetailsDrawerProps> = ({ customerI
 
         setIsApproving(true);
         try {
-            const res = await axios.patch(`/api/staff/kyc/approve-tier-3`, { customerId }, { withCredentials: true });
+            const res = await axios.patch(staffPath(`kyc/approve-tier-3`), { customerId }, { withCredentials: true });
             if (res.data.success) {
                 alert("Customer upgraded to Tier 3 successfully!");
                 setProfile({ ...profile, kyc_tier: 3, tier_3_status: 'verified' });
