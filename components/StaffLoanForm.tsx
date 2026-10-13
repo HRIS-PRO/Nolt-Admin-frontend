@@ -1509,10 +1509,13 @@ const StaffLoanForm: React.FC<StaffLoanFormProps> = ({
                 (loanId && !isNaN(Number(loanId)) ? Number(loanId) : null) ||
                 (typeof initialData?.id === 'number' ? initialData.id : null);
             const preservePipelineOnSubmit = isPipelineLoanEdit(initialData, existingLoanIdForSubmitEarly);
+            const stuckDraftInPipeline =
+                preservePipelineOnSubmit
+                && String(initialData?.status || '').toLowerCase() === 'draft';
 
             let payload: any = {
                 id: dbLoanId || loanId || undefined,
-                ...(preservePipelineOnSubmit
+                ...(preservePipelineOnSubmit && !stuckDraftInPipeline
                     ? {}
                     : { status: 'pending' as const }),
                 sub_step: 6,
