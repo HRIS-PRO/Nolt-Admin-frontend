@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { formatDate } from '../utils/dateFormatter';
+import { staffPath } from '@/lib/api/staff-path';
 
 interface Document {
     id: string;
@@ -20,7 +21,7 @@ const DocumentsList: React.FC<{ loanId: string | undefined; refreshTrigger?: num
         const fetchDocuments = async () => {
             if (!loanId) return;
             try {
-                const response = await axios.get(`${''}/api/staff/loans/${loanId}/documents`, { withCredentials: true });
+                const response = await axios.get(staffPath(`loans/${loanId}/documents`), { withCredentials: true });
                 setDocuments(response.data);
             } catch (error) {
                 console.error("Failed to fetch documents:", error);

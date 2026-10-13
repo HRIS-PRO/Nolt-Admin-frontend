@@ -1,5 +1,6 @@
 import React, { useRef, useState } from 'react';
 import axios from 'axios';
+import { staffPath } from '@/lib/api/staff-path';
 import {
     MOBILE_HOME_BANNER,
     bannerSpecHint,
@@ -51,7 +52,7 @@ const BannerImageUploader: React.FC<Props> = ({ value, onChange, disabled }) => 
         try {
             const form = new FormData();
             form.append('file', file);
-            const res = await axios.post('/api/staff/mobile-notifications/banners/upload-image', form, {
+            const res = await axios.post(staffPath('mobile-notifications/banners/upload-image'), form, {
                 withCredentials: true,
                 headers: { 'Content-Type': 'multipart/form-data' },
             });

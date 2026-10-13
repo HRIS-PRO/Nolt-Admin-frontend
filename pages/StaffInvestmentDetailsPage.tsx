@@ -2,12 +2,15 @@ import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useParams, useNavigate } from 'react-router-dom';
 import StaffLayout from '../components/layouts/StaffLayout';
+import { useNmsUploadSizeLimit } from '../hooks/useNmsUploadSizeLimit';
 import ActivityTimeline from '../components/ActivityTimeline';
 import axios from 'axios';
 import { getStatusStyles } from '../utils/statusStyles';
 import { formatDate } from '../utils/dateFormatter';
 import { formatCasaLabel } from '../utils/formatCasa';
 import { maskValue } from '../utils/maskHelper';
+import { canViewAgentCommission } from '../lib/staff-roles';
+import { staffPath } from '@/lib/api/staff-path';
 
 interface StaffInvestmentDetailsPageProps {
     user: { id?: string | number; name: string; email: string; avatar_url?: string; role?: string };
@@ -106,6 +109,7 @@ const StaffInvestmentDetailsPage: React.FC<StaffInvestmentDetailsPageProps> = ({
     const [returnTargetStage, setReturnTargetStage] = useState<string>('');
     const [reason, setReason] = useState('');
     const [activePanel, setActivePanel] = useState<'overview' | 'manage' | 'activity'>('overview');
+    const { validateFile, modal: uploadSizeModal } = useNmsUploadSizeLimit();
 
     // ── KYC Tier State ───────────────────────────────────────────────────────
     const INV_TIER_LIMITS: Record<number, number> = { 1: 300_000, 2: 500_000, 3: Infinity };
@@ -150,7 +154,7 @@ const StaffInvestmentDetailsPage: React.FC<StaffInvestmentDetailsPageProps> = ({
     const handleSaveBioData = async () => {
         setIsSavingBio(true);
         try {
-            await axios.put(`/api/staff/investments/${id}/bio`, bioEditData, { withCredentials: true });
+            await axios.put(staffPath(`investments/${id}/bio`), bioEditData, { withCredentials: true });
             alert("Bio data updated successfully");
             setShowBioEditModal(false);
             fetchInvestment();
@@ -164,7 +168,7 @@ const StaffInvestmentDetailsPage: React.FC<StaffInvestmentDetailsPageProps> = ({
 
     const fetchInvestment = async () => {
         try {
-            const response = await axios.get(`/api/staff/investments/${id}`, { withCredentials: true });
+            const response = await axios.get(staffPath(`investments/${id}`), { withCredentials: true });
             setInvestment(response.data);
             setDraftCASA(response.data.casa_account_number || '');
             const rawInt = response.data.interest_amount;
@@ -183,7 +187,7 @@ const StaffInvestmentDetailsPage: React.FC<StaffInvestmentDetailsPageProps> = ({
     const fetchOfficers = async () => {
         if (['sales_manager', 'admin', 'super_admin', 'superadmin', 'customer_experience', 'marketing'].includes(user.role || '')) {
             try {
-                const response = await axios.get(`/api/staff/users?role=sales_officer,sales_public_sector,sales_private_sector&limit=200`, { withCredentials: true });
+                const response = await axios.get(staffPath(`users?role=sales_officer,sales_public_sector,sales_private_sector&limit=200`), { withCredentials: true });
                 setOfficers(response.data.users.filter((u: any) => u.is_active));
             } catch (error) {
                 console.error("Failed to fetch officers", error);
@@ -194,7 +198,7 @@ const StaffInvestmentDetailsPage: React.FC<StaffInvestmentDetailsPageProps> = ({
     const handleAssignOfficer = async (officerId: string) => {
         if (!confirm("Are you sure you want to reassign this investment?")) return;
         try {
-            await axios.patch(`/api/staff/investments/${id}/assign`, {
+            await axios.patch(staffPath(`investments/${id}/assign`), {
                 sales_officer_id: officerId
             }, { withCredentials: true });
             await fetchInvestment();
@@ -210,6 +214,14 @@ const StaffInvestmentDetailsPage: React.FC<StaffInvestmentDetailsPageProps> = ({
             fetchOfficers();
         }
     }, [id, navigate]);
+
+    const warnIfCbaProfileSyncFailed = (sync: { succeeded?: boolean; message?: string } | null | undefined) => {
+        if (sync && sync.succeeded === false) {
+            alert(
+                `Saved in NMS, but core banking profile sync failed: ${sync.message || 'CreateAccountUpdate failed'}.`,
+            );
+        }
+    };
 
     const handleAction = async (action: 'approve' | 'reject' | 'return', targetStage?: string) => {
         if (action === 'reject' && !reason.trim()) {
@@ -228,7 +240,7 @@ const StaffInvestmentDetailsPage: React.FC<StaffInvestmentDetailsPageProps> = ({
             if (action === 'approve' && stage === 'submitted' && invSelectedTier !== invCustomerKycTier) {
                 try {
                     const tierRes = await axios.post(
-                        '/api/staff/upgrade-customer-tier',
+                        staffPath('upgrade-customer-tier'),
                         {
                             customer_id: investment.customer_id,
                             new_tier: invSelectedTier,
@@ -240,6 +252,7 @@ const StaffInvestmentDetailsPage: React.FC<StaffInvestmentDetailsPageProps> = ({
                     if (tierRes.data?.success) {
                         setInvCustomerKycTier(invSelectedTier);
                     }
+                    warnIfCbaProfileSyncFailed(tierRes.data?.cba_account_update);
                 } catch (tierError: any) {
                     alert(tierError.response?.data?.message || 'Tier upgrade failed. Cannot proceed.');
                     setIsActioning(false);
@@ -251,7 +264,7 @@ const StaffInvestmentDetailsPage: React.FC<StaffInvestmentDetailsPageProps> = ({
             if (action === 'return') {
                 payload.target_stage = targetStage;
             }
-            await axios.put(`/api/staff/investments/${id}/action`, payload, { withCredentials: true });
+            await axios.put(staffPath(`investments/${id}/action`), payload, { withCredentials: true });
             setReason('');
             await fetchInvestment();
         } catch (error: any) {
@@ -264,6 +277,7 @@ const StaffInvestmentDetailsPage: React.FC<StaffInvestmentDetailsPageProps> = ({
 
     const handleStaffUpload = async () => {
         if (!uploadFile || !id) return;
+        if (!validateFile(uploadFile)) return;
         setUploadLoading(true);
         const formData = new FormData();
         formData.append('file', uploadFile);
@@ -315,7 +329,7 @@ const StaffInvestmentDetailsPage: React.FC<StaffInvestmentDetailsPageProps> = ({
         if (!confirm(`Are you sure you want to ${action} this liquidation request?`)) return;
         setIsActioning(true);
         try {
-            await axios.post(`/api/staff/investments/${id}/liquidate-action`, { action, note: reason }, { withCredentials: true });
+            await axios.post(staffPath(`investments/${id}/liquidate-action`), { action, note: reason }, { withCredentials: true });
             setReason('');
             await fetchInvestment();
         } catch (error: any) {
@@ -329,7 +343,7 @@ const StaffInvestmentDetailsPage: React.FC<StaffInvestmentDetailsPageProps> = ({
     const handleFinanceUpdate = async (interest_amount: string) => {
         setIsActioning(true);
         try {
-            await axios.put(`/api/staff/investments/${id}/finance-fields`, { interest_amount }, { withCredentials: true });
+            await axios.put(staffPath(`investments/${id}/finance-fields`), { interest_amount }, { withCredentials: true });
             await fetchInvestment();
             alert("Finance fields updated successfully.");
         } catch (error: any) {
@@ -342,7 +356,7 @@ const StaffInvestmentDetailsPage: React.FC<StaffInvestmentDetailsPageProps> = ({
     const handleCASAUpdate = async (casa_account_number: string) => {
         setIsActioning(true);
         try {
-            await axios.put(`/api/staff/investments/${id}/casa`, { casa_account_number }, { withCredentials: true });
+            await axios.put(staffPath(`investments/${id}/casa`), { casa_account_number }, { withCredentials: true });
             await fetchInvestment();
             alert("CASA Account Number updated and customer notified.");
         } catch (error: any) {
@@ -363,7 +377,7 @@ const StaffInvestmentDetailsPage: React.FC<StaffInvestmentDetailsPageProps> = ({
             if (signatureBase64) payload.signature_base64 = signatureBase64;
             if (directIndemnityUrl) payload.indemnity_document_url = directIndemnityUrl;
 
-            await axios.post(`/api/staff/investments/${id}/indemnity`, payload, { withCredentials: true });
+            await axios.post(staffPath(`investments/${id}/indemnity`), payload, { withCredentials: true });
             await fetchInvestment();
             setSignatureBase64(null);
             setDirectIndemnityUrl(null);
@@ -377,6 +391,7 @@ const StaffInvestmentDetailsPage: React.FC<StaffInvestmentDetailsPageProps> = ({
     };
 
     const handleFileUpload = async (file: File, type: 'signature' | 'indemnity') => {
+        if (type === 'indemnity' && !validateFile(file)) return;
         if (type === 'signature') {
             const reader = new FileReader();
             reader.onloadend = () => {
@@ -731,6 +746,28 @@ const StaffInvestmentDetailsPage: React.FC<StaffInvestmentDetailsPageProps> = ({
                 </div>
             </div>
 
+            {investment?.agent_commission_amount != null &&
+                canViewAgentCommission(user.role, user.id, investment.sales_officer_id) && (
+                <div className="mb-8 p-6 rounded-[24px] bg-indigo-500/5 border border-indigo-500/20 grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div>
+                        <p className="text-[10px] font-black uppercase tracking-widest text-indigo-500 mb-1">Agent commission</p>
+                        <p className="text-2xl font-black text-slate-900 dark:text-white">
+                            ₦{Number(investment.agent_commission_amount).toLocaleString()}
+                        </p>
+                    </div>
+                    <div>
+                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1">Rate / tier</p>
+                        <p className="font-bold text-slate-900 dark:text-white">
+                            {investment.agent_commission_percent}% — {investment.agent_commission_tier_name || 'Tier snapshot'}
+                        </p>
+                    </div>
+                    <div>
+                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1">Attributed officer</p>
+                        <p className="font-bold text-slate-900 dark:text-white">{investment.officer_name || '—'}</p>
+                    </div>
+                </div>
+            )}
+
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
                 <div className="lg:col-span-8 space-y-6">
                     <CollapsibleGroup 
@@ -1077,7 +1114,14 @@ const StaffInvestmentDetailsPage: React.FC<StaffInvestmentDetailsPageProps> = ({
                                                 <input 
                                                     id="staff-upload-input"
                                                     type="file" 
-                                                    onChange={(e) => setUploadFile(e.target.files?.[0] || null)}
+                                                    onChange={(e) => {
+                                                        const file = e.target.files?.[0];
+                                                        if (file && !validateFile(file)) {
+                                                            e.target.value = '';
+                                                            return;
+                                                        }
+                                                        setUploadFile(file || null);
+                                                    }}
                                                     className="flex-1 text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-purple-50 file:text-purple-700 hover:file:bg-purple-100 dark:file:bg-purple-900/40 dark:file:text-purple-300"
                                                 />
                                                 <button
@@ -1794,6 +1838,7 @@ const StaffInvestmentDetailsPage: React.FC<StaffInvestmentDetailsPageProps> = ({
                     document.body)}
                 </div>
             </div>
+            {uploadSizeModal}
         </StaffLayout>
     );
 };

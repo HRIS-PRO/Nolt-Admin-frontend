@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import StaffLayout from '../components/layouts/StaffLayout';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import { staffPath } from '@/lib/api/staff-path';
 
 interface UsersPageProps {
     user: { name: string; email: string; avatar_url?: string; role?: string };
@@ -39,12 +40,54 @@ const UsersPage: React.FC<UsersPageProps> = ({ user, onLogout, toggleTheme, them
 
     // Referral Code Generation State
     const [generatingReferralForId, setGeneratingReferralForId] = useState<number | null>(null);
-    const [pendingOrgMap, setPendingOrgMap] = useState<Record<number, 'NT' | 'NI'>>({});
+    const [pendingOrgMap, setPendingOrgMap] = useState<Record<number, 'NT' | 'NI' | 'A'>>({});
+    const [switchingOrgForId, setSwitchingOrgForId] = useState<number | null>(null);
 
-    const handleGenerateReferralCode = async (userId: number, prefix: 'NT' | 'NI') => {
+    type OrgPrefix = 'NT' | 'NI' | 'A';
+
+    const resolveUserOrgPrefix = (u: { id: number; referral_code?: string | null; organization?: string | null }): '' | OrgPrefix => {
+        const code = u.referral_code?.trim();
+        if (code?.startsWith('NT')) return 'NT';
+        if (code?.startsWith('NI')) return 'NI';
+        if (code?.startsWith('A')) return 'A';
+        const org = (u.organization ?? '').toLowerCase();
+        if (org.includes('investment') || org === 'nolt_investment') return 'NI';
+        if (org.includes('agent')) return 'A';
+        if (org.includes('finance') || org === 'nolt_finance') return 'NT';
+        return pendingOrgMap[u.id] || '';
+    };
+
+    const orgPrefixLabel = (prefix: OrgPrefix) => {
+        if (prefix === 'NI') return 'Nolt Investment';
+        if (prefix === 'A') return 'Agent';
+        return 'Nolt Finance';
+    };
+
+    const handleOrgSelection = async (userId: number, val: '' | OrgPrefix, hasReferralCode: boolean) => {
+        if (!val) {
+            setPendingOrgMap((prev) => {
+                const next = { ...prev };
+                delete next[userId];
+                return next;
+            });
+            return;
+        }
+        if (hasReferralCode) {
+            setSwitchingOrgForId(userId);
+            try {
+                await handleGenerateReferralCode(userId, val);
+            } finally {
+                setSwitchingOrgForId(null);
+            }
+        } else {
+            setPendingOrgMap((prev) => ({ ...prev, [userId]: val }));
+        }
+    };
+
+    const handleGenerateReferralCode = async (userId: number, prefix: OrgPrefix) => {
         setGeneratingReferralForId(userId);
         try {
-            const res = await axios.post(`${''}/api/staff/referral-code`, {
+            const res = await axios.post(staffPath(`referral-code`), {
                 userId,
                 prefix
             }, { withCredentials: true });
@@ -65,7 +108,7 @@ const UsersPage: React.FC<UsersPageProps> = ({ user, onLogout, toggleTheme, them
     const fetchUsers = async () => {
         setIsLoading(true);
         try {
-            const response = await axios.get(`${''}/api/staff/users`, {
+            const response = await axios.get(staffPath(`users`), {
                 params: {
                     page: currentPage,
                     limit: limit,
@@ -96,7 +139,7 @@ const UsersPage: React.FC<UsersPageProps> = ({ user, onLogout, toggleTheme, them
         if (accountOfficers.length > 0) return; // Already loaded
         setLoadingOfficers(true);
         try {
-            const res = await axios.get('/api/staff/account-officers', { withCredentials: true });
+            const res = await axios.get(staffPath('account-officers'), { withCredentials: true });
             setAccountOfficers(res.data.data || []);
         } catch (err) {
             console.error('Failed to fetch account officers:', err);
@@ -108,7 +151,7 @@ const UsersPage: React.FC<UsersPageProps> = ({ user, onLogout, toggleTheme, them
     const handleOfficerAssign = async (userId: number, officerCode: string | null, officerName: string | null) => {
         setAssigningOfficerForId(userId);
         try {
-            await axios.patch(`/api/staff/users/${userId}/officer`, {
+            await axios.patch(staffPath(`users/${userId}/officer`), {
                 officer_code: officerCode,
                 officer_name: officerName
             }, { withCredentials: true });
@@ -128,10 +171,18 @@ const UsersPage: React.FC<UsersPageProps> = ({ user, onLogout, toggleTheme, them
         e.preventDefault();
         setRecruiting(true);
         try {
-            await axios.post(`${''}/api/staff/invite`, inviteForm, { withCredentials: true });
+            await axios.post(staffPath(`invite`), inviteForm, { withCredentials: true });
             alert("Invitation sent successfully!");
             setShowInviteModal(false);
-            setInviteForm({ email: '', full_name: '', role: 'staff', password: '', officer_code: '', officer_name: '' });
+            setInviteForm({
+                email: '',
+                full_name: '',
+                role: 'staff',
+                password: '',
+                officer_code: '',
+                officer_name: '',
+                organization: 'nolt_finance',
+            });
             setAccountOfficers([]); // Reset so next open re-fetches
             fetchUsers();
         } catch (error: any) {
@@ -150,7 +201,7 @@ const UsersPage: React.FC<UsersPageProps> = ({ user, onLogout, toggleTheme, them
         formData.append('file', bulkFile);
 
         try {
-            const res = await axios.post(`${''}/api/staff/bulk-invite`, formData, {
+            const res = await axios.post(staffPath(`bulk-invite`), formData, {
                 headers: { 'Content-Type': 'multipart/form-data' },
                 withCredentials: true
             });
@@ -168,7 +219,7 @@ const UsersPage: React.FC<UsersPageProps> = ({ user, onLogout, toggleTheme, them
     const handleRevoke = async (userId: number) => {
         if (!confirm("Are you sure you want to revoke access? They will no longer be able to log in.")) return;
         try {
-            await axios.post(`${''}/api/staff/revoke-access`, { userId }, { withCredentials: true });
+            await axios.post(staffPath(`revoke-access`), { userId }, { withCredentials: true });
             setUsers(users.map(u => u.id === userId ? { ...u, is_active: false } : u));
         } catch (error) {
             alert("Failed to revoke access");
@@ -177,7 +228,7 @@ const UsersPage: React.FC<UsersPageProps> = ({ user, onLogout, toggleTheme, them
 
     const handleGenerateReferral = async (userId: number) => {
         try {
-            const res = await axios.post(`${''}/api/staff/referral-code`, { userId }, { withCredentials: true });
+            const res = await axios.post(staffPath(`referral-code`), { userId }, { withCredentials: true });
             setUsers(users.map(u => u.id === userId ? { ...u, referral_code: res.data.referral_code } : u));
         } catch (error) {
             alert("Failed to generate code");
@@ -186,7 +237,7 @@ const UsersPage: React.FC<UsersPageProps> = ({ user, onLogout, toggleTheme, them
 
     const handleRoleUpdate = async (userId: number, newRole: string) => {
         try {
-            await axios.put(`${''}/api/staff/users/${userId}/role`, { role: newRole }, { withCredentials: true });
+            await axios.put(staffPath(`users/${userId}/role`), { role: newRole }, { withCredentials: true });
             setUsers(users.map(u => u.id === userId ? { ...u, role: newRole } : u));
             setEditingRoleId(null);
         } catch (error) {
@@ -331,36 +382,27 @@ const UsersPage: React.FC<UsersPageProps> = ({ user, onLogout, toggleTheme, them
                                     </td>
 
                                     <td className="p-6 py-4">
-                                        {u.organization === 'nolt_investment' || u.referral_code?.startsWith('NI') ? (
-                                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-purple-200 dark:border-purple-500/20 bg-purple-50 dark:bg-purple-500/10 text-purple-700 dark:text-purple-300 text-[11px] font-bold">
-                                                <span className="material-symbols-outlined text-xs">trending_up</span>
-                                                Nolt Investment
-                                            </span>
-                                        ) : u.organization === 'nolt_finance' || u.referral_code?.startsWith('NT') ? (
-                                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-blue-200 dark:border-blue-500/20 bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-300 text-[11px] font-bold">
-                                                <span className="material-symbols-outlined text-xs">account_balance</span>
-                                                Nolt Finance
-                                            </span>
-                                        ) : (
-                                            <div className="relative">
-                                                <select
-                                                    value={pendingOrgMap[u.id] || ''}
-                                                    onChange={(e) => {
-                                                        const val = e.target.value as 'NT' | 'NI' | '';
-                                                        if (val) {
-                                                            setPendingOrgMap(prev => ({ ...prev, [u.id]: val }));
-                                                        } else {
-                                                            setPendingOrgMap(prev => { const n = { ...prev }; delete n[u.id]; return n; });
-                                                        }
-                                                    }}
-                                                    className="appearance-none bg-white dark:bg-slate-800/80 border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-xl px-3 py-2 text-xs font-bold text-slate-500 dark:text-slate-400 outline-none cursor-pointer hover:border-blue-400 hover:text-blue-600 dark:hover:border-blue-500 dark:hover:text-blue-400 transition-all"
-                                                >
-                                                    <option value="">- Select Org -</option>
-                                                    <option value="NT">Nolt Finance (NT)</option>
-                                                    <option value="NI">Nolt Investment (NI)</option>
-                                                </select>
-                                            </div>
-                                        )}
+                                        <div className="relative min-w-[11rem]">
+                                            <select
+                                                value={resolveUserOrgPrefix(u)}
+                                                disabled={switchingOrgForId === u.id}
+                                                onChange={(e) => {
+                                                    const val = e.target.value as '' | OrgPrefix;
+                                                    void handleOrgSelection(u.id, val, Boolean(u.referral_code));
+                                                }}
+                                                className="w-full appearance-none bg-white dark:bg-slate-800/80 border-2 border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 text-xs font-bold text-slate-700 dark:text-slate-200 outline-none cursor-pointer hover:border-blue-400 dark:hover:border-blue-500 transition-all disabled:opacity-60"
+                                            >
+                                                <option value="">— Select org —</option>
+                                                <option value="NT">Nolt Finance (NT)</option>
+                                                <option value="NI">Nolt Investment (NI)</option>
+                                                <option value="A">Agent (A)</option>
+                                            </select>
+                                            {switchingOrgForId === u.id && (
+                                                <span className="absolute -bottom-5 left-0 text-[10px] text-slate-400 font-medium">
+                                                    Updating prefix…
+                                                </span>
+                                            )}
+                                        </div>
                                     </td>
                                     <td className="p-6 py-4">
                                         {editingRoleId === u.id ? (
@@ -406,7 +448,7 @@ const UsersPage: React.FC<UsersPageProps> = ({ user, onLogout, toggleTheme, them
                                                     const prefix = pendingOrgMap[u.id];
                                                     if (prefix) handleGenerateReferralCode(u.id, prefix);
                                                 }}
-                                                title={`Generate code for ${pendingOrgMap[u.id] === 'NT' ? 'Nolt Finance' : 'Nolt Investment'}`}
+                                                title={`Generate code for ${orgPrefixLabel(pendingOrgMap[u.id])}`}
                                                 className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-blue-600 hover:bg-blue-700 active:scale-95 text-white text-xs font-bold transition-all shadow-md shadow-blue-500/20 cursor-pointer animate-in fade-in"
                                             >
                                                 <span className="material-symbols-outlined text-sm">autorenew</span>
@@ -677,6 +719,7 @@ const UsersPage: React.FC<UsersPageProps> = ({ user, onLogout, toggleTheme, them
                                 >
                                     <option value="nolt_finance">Nolt Finance (NT)</option>
                                     <option value="nolt_investment">Nolt Investment (NI)</option>
+                                    <option value="agent">Agent (A)</option>
                                 </select>
                             </div>
 

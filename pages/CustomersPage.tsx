@@ -6,6 +6,7 @@ import NewCustomerModal from '../components/modals/NewCustomerModal';
 import { formatDate } from '../utils/dateFormatter';
 import { useNavigate } from 'react-router-dom';
 import { apiUrl } from '@/lib/api-config';
+import { staffPath } from '@/lib/api/staff-path';
 
 interface Customer {
     id: number;
@@ -80,7 +81,7 @@ const CustomersPage: React.FC<CustomersPageProps> = ({ user, onLogout, toggleThe
                 params.kyc_tier = 3;
             }
 
-            const res = await axios.get(`/api/staff/users`, {
+            const res = await axios.get(staffPath(`users`), {
                 params,
                 withCredentials: true
             });
@@ -130,7 +131,7 @@ const CustomersPage: React.FC<CustomersPageProps> = ({ user, onLogout, toggleThe
         setIsLoading(true);
         try {
             // Fetch ALL customers for export (matching search if any)
-            const res = await axios.get(apiUrl('/api/staff/users'), {
+            const res = await axios.get(apiUrl(staffPath('users')), {
                 params: {
                     role: 'customer',
                     page: 1,
@@ -224,7 +225,7 @@ const CustomersPage: React.FC<CustomersPageProps> = ({ user, onLogout, toggleThe
         try {
             // Trigger download
             const link = document.createElement("a");
-            link.href = `/api/staff/customers/export-zip${queryString}`;
+            link.href = staffPath(`customers/export-zip${queryString}`);
             link.setAttribute("download", `customers_export.zip`); // Browser might ignore this if content-disposition is set
             document.body.appendChild(link);
             link.click();

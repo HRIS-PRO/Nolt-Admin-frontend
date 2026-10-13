@@ -2,6 +2,9 @@ import React, { useState, useEffect } from 'react';
 import StaffLayout from '../components/layouts/StaffLayout';
 import axios from 'axios';
 import { motion, AnimatePresence } from 'motion/react';
+import AgentCommissionSettings from '../components/settings/AgentCommissionSettings';
+import { isSuperAdminRole } from '../lib/staff-roles';
+import { staffPath } from '@/lib/api/staff-path';
 
 interface SettingsPageProps {
     user: { name: string; email: string; avatar_url?: string; role?: string };
@@ -21,11 +24,16 @@ interface GLAccount {
 const SettingsPage: React.FC<SettingsPageProps> = ({ user, onLogout, toggleTheme, theme }) => {
     const userRole = user?.role?.toLowerCase();
     const isGLAuthorized = ['finance', 'super_admin', 'superadmin', 'admin'].includes(userRole || '');
+    const isSuperAdmin = isSuperAdminRole(user?.role);
     
     // Tabs state
-    const tabs = isGLAuthorized 
-        ? ['CHANGE PASSWORD', 'GL WRAPPER', 'INTEGRATIONS', 'API & WEBHOOKS'] 
-        : ['CHANGE PASSWORD', 'INTEGRATIONS', 'API & WEBHOOKS'];
+    const tabs = [
+        'CHANGE PASSWORD',
+        ...(isGLAuthorized ? ['GL WRAPPER'] : []),
+        ...(isSuperAdmin ? ['AGENT COMMISSIONS'] : []),
+        'INTEGRATIONS',
+        'API & WEBHOOKS',
+    ];
     const [activeTab, setActiveTab] = useState<string>('CHANGE PASSWORD');
 
     // Password fields states
@@ -96,7 +104,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ user, onLogout, toggleTheme
         setIsLoading(true);
 
         try {
-            await axios.post('/api/staff/change-password', {
+            await axios.post(staffPath('change-password'), {
                 oldPassword: form.oldPassword,
                 newPassword: form.newPassword
             }, { withCredentials: true });
@@ -549,6 +557,18 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ user, onLogout, toggleTheme
                             </motion.div>
                         )}
 
+                        {activeTab === 'AGENT COMMISSIONS' && isSuperAdmin && (
+                            <motion.div
+                                key="agent-commissions"
+                                initial={{ opacity: 0, y: 15 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, y: -15 }}
+                                transition={{ duration: 0.3 }}
+                            >
+                                <AgentCommissionSettings />
+                            </motion.div>
+                        )}
+
                         {activeTab === 'INTEGRATIONS' && (
                             <motion.div
                                 key="integrations"
@@ -783,9 +803,9 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ user, onLogout, toggleTheme
                                             <label className="block text-xs font-black uppercase tracking-widest text-slate-500">Payload Destination URL</label>
                                             <input 
                                                 type="url" 
-                                                defaultValue="https://api.yourdomain.com/webhooks/nolt"
-                                                className="w-full p-4 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 outline-none font-bold text-slate-900 dark:text-white placeholder:text-slate-400 focus:ring-2 ring-blue-500/25 transition-all text-sm"
-                                                placeholder="https://your-domain.com/webhook-endpoint"
+                                                disabled
+                                                className="w-full p-4 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 outline-none font-bold text-slate-900 dark:text-white placeholder:text-slate-400 text-sm opacity-70 cursor-not-allowed"
+                                                placeholder="Set your HTTPS webhook URL when this feature is enabled"
                                             />
                                         </div>
 
@@ -795,16 +815,11 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ user, onLogout, toggleTheme
                                                 <input 
                                                     type="password" 
                                                     readOnly 
-                                                    value="whsec_83jhs8d9hs8h2g7d8y28hd8has"
-                                                    className="w-full p-4 pr-12 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 outline-none font-bold text-slate-900 dark:text-white placeholder:text-slate-400 focus:ring-2 ring-blue-500/25 transition-all text-sm font-mono"
+                                                    disabled
+                                                    value=""
+                                                    className="w-full p-4 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 outline-none font-bold text-slate-900 dark:text-white placeholder:text-slate-400 text-sm font-mono opacity-70 cursor-not-allowed"
+                                                    placeholder="Generated when you save a webhook URL"
                                                 />
-                                                <button 
-                                                    type="button" 
-                                                    onClick={() => alert("Signing secret: whsec_83jhs8d9hs8h2g7d8y28hd8has")}
-                                                    className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-blue-500 transition-colors"
-                                                >
-                                                    <span className="material-symbols-outlined text-[20px]">visibility</span>
-                                                </button>
                                             </div>
                                         </div>
 
@@ -831,12 +846,9 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ user, onLogout, toggleTheme
                                         </div>
 
                                         <div className="flex items-center gap-4 pt-4">
-                                            <button 
-                                                onClick={() => alert("Webhook integration settings updated successfully!")}
-                                                className="px-6 py-3 bg-blue-600 text-white font-black uppercase tracking-[0.15em] text-xs rounded-xl shadow-lg shadow-blue-600/20 hover:bg-blue-700 transition-all"
-                                            >
-                                                Update Webhook Settings
-                                            </button>
+                                            <p className="text-xs text-slate-500 font-bold">
+                                                Outbound webhooks are not enabled in this environment. Contact engineering to register a destination URL.
+                                            </p>
                                         </div>
                                     </div>
                                 </div>

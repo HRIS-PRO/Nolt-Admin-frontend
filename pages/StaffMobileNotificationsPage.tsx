@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
 import StaffLayout from '../components/layouts/StaffLayout';
+import { staffPath } from '@/lib/api/staff-path';
 import {
     MobileBannerDesigner,
     emptyBannerForm,
@@ -131,12 +132,12 @@ const StaffMobileNotificationsPage: React.FC<StaffMobileNotificationsPageProps> 
     const [bannerForm, setBannerForm] = useState<BannerFormState>(emptyBannerForm);
 
     const fetchCampaigns = useCallback(async () => {
-        const res = await axios.get('/api/staff/mobile-notifications/campaigns', { withCredentials: true });
+        const res = await axios.get(staffPath('mobile-notifications/campaigns'), { withCredentials: true });
         setCampaigns(res.data.campaigns ?? []);
     }, []);
 
     const fetchBanners = useCallback(async () => {
-        const res = await axios.get('/api/staff/mobile-notifications/banners', { withCredentials: true });
+        const res = await axios.get(staffPath('mobile-notifications/banners'), { withCredentials: true });
         setBanners(res.data.banners ?? []);
     }, []);
 
@@ -200,12 +201,12 @@ const StaffMobileNotificationsPage: React.FC<StaffMobileNotificationsPageProps> 
 
             if (editingCampaignId) {
                 await axios.patch(
-                    `/api/staff/mobile-notifications/campaigns/${editingCampaignId}`,
+                    staffPath(`mobile-notifications/campaigns/${editingCampaignId}`),
                     payload,
                     { withCredentials: true },
                 );
             } else {
-                await axios.post('/api/staff/mobile-notifications/campaigns', payload, { withCredentials: true });
+                await axios.post(staffPath('mobile-notifications/campaigns'), payload, { withCredentials: true });
             }
 
             setCampaignForm(emptyCampaignForm);
@@ -242,7 +243,7 @@ const StaffMobileNotificationsPage: React.FC<StaffMobileNotificationsPageProps> 
         if (!window.confirm('Delete this campaign permanently?')) return;
         setSubmitting(true);
         try {
-            await axios.delete(`/api/staff/mobile-notifications/campaigns/${id}`, { withCredentials: true });
+            await axios.delete(staffPath(`mobile-notifications/campaigns/${id}`), { withCredentials: true });
             if (editingCampaignId === id) {
                 setEditingCampaignId(null);
                 setCampaignForm(emptyCampaignForm);
@@ -260,7 +261,7 @@ const StaffMobileNotificationsPage: React.FC<StaffMobileNotificationsPageProps> 
         if (!window.confirm('Broadcast this push to all mobile customers now?')) return;
         setSubmitting(true);
         try {
-            await axios.post(`/api/staff/mobile-notifications/campaigns/${id}/send`, {}, { withCredentials: true });
+            await axios.post(staffPath(`mobile-notifications/campaigns/${id}/send`), {}, { withCredentials: true });
             await fetchCampaigns();
         } catch {
             alert('Failed to send campaign.');
@@ -294,12 +295,12 @@ const StaffMobileNotificationsPage: React.FC<StaffMobileNotificationsPageProps> 
 
             if (editingBannerId) {
                 await axios.patch(
-                    `/api/staff/mobile-notifications/banners/${editingBannerId}`,
+                    staffPath(`mobile-notifications/banners/${editingBannerId}`),
                     payload,
                     { withCredentials: true },
                 );
             } else {
-                await axios.post('/api/staff/mobile-notifications/banners', payload, { withCredentials: true });
+                await axios.post(staffPath('mobile-notifications/banners'), payload, { withCredentials: true });
             }
 
             setBannerForm(emptyBannerForm);
@@ -326,7 +327,7 @@ const StaffMobileNotificationsPage: React.FC<StaffMobileNotificationsPageProps> 
         if (!window.confirm('Delete this banner permanently?')) return;
         setSubmitting(true);
         try {
-            await axios.delete(`/api/staff/mobile-notifications/banners/${id}`, { withCredentials: true });
+            await axios.delete(staffPath(`mobile-notifications/banners/${id}`), { withCredentials: true });
             if (editingBannerId === id) {
                 setEditingBannerId(null);
                 setBannerForm(emptyBannerForm);
@@ -347,7 +348,7 @@ const StaffMobileNotificationsPage: React.FC<StaffMobileNotificationsPageProps> 
     const toggleBannerActive = async (banner: Banner) => {
         try {
             await axios.patch(
-                `/api/staff/mobile-notifications/banners/${banner.id}`,
+                staffPath(`mobile-notifications/banners/${banner.id}`),
                 { is_active: !banner.is_active },
                 { withCredentials: true },
             );

@@ -11,6 +11,7 @@ export const investmentService = {
             headers: {
                 'Content-Type': 'application/json',
             },
+            credentials: 'include',
             body: JSON.stringify(data),
         });
 
@@ -40,6 +41,10 @@ export const investmentService = {
     },
 
     uploadDocument: async (file: File, investmentId: number | string, docType: string) => {
+        const { NMS_MAX_UPLOAD_BYTES } = await import('../utils/nmsUploadLimits');
+        if (file.size > NMS_MAX_UPLOAD_BYTES) {
+            throw new Error('FILE_TOO_LARGE');
+        }
         const formData = new FormData();
         formData.append('file', file);
         if (typeof investmentId === 'string' && investmentId.startsWith('I-')) {
@@ -75,6 +80,7 @@ export const investmentService = {
 
         const response = await fetch(`${API_BASE_URL}/yield-rates/calculate?${queryParams}`, {
             method: 'GET',
+            credentials: 'include',
         });
 
         if (!response.ok) {
@@ -119,7 +125,9 @@ export const investmentService = {
     },
 
     getLatestInvestment: async () => {
-        const response = await fetch(`${API_BASE_URL}/investments/latest`);
+        const response = await fetch(`${API_BASE_URL}/investments/latest`, {
+            credentials: 'include',
+        });
         if (!response.ok) return null;
         return response.json();
     },
@@ -128,6 +136,7 @@ export const investmentService = {
         const response = await fetch(`${API_BASE_URL}/customer/verify-identity`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
             body: JSON.stringify({ 
                 bvn, 
                 selfie_url: selfieUrl,

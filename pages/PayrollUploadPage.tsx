@@ -3,6 +3,7 @@ import StaffLayout from '../components/layouts/StaffLayout';
 import axios from 'axios';
 import { motion, AnimatePresence } from 'motion/react';
 import * as XLSX from 'xlsx';
+import { staffPath } from '@/lib/api/staff-path';
 
 const EXPECTED_COLUMNS = [
     { key: 'staff_id', label: 'Staff Id', aliases: ['staffid', 'staff_id', 'employeeid', 'employee_id', 'id'] },
@@ -246,7 +247,7 @@ const PayrollUploadPage: React.FC<PayrollUploadPageProps> = ({ user, onLogout, t
                     const batch = payload.slice(i * BATCH_SIZE, (i + 1) * BATCH_SIZE);
                     
                     try {
-                        const response = await axios.post('/api/staff/mda-payroll/upload-bulk-json', {
+                        const response = await axios.post(staffPath('mda-payroll/upload-bulk-json'), {
                             payrollData: batch,
                             isFirstBatch: i === 0
                         }, {
@@ -315,7 +316,7 @@ const PayrollUploadPage: React.FC<PayrollUploadPageProps> = ({ user, onLogout, t
     const fetchRecords = useCallback(async (pageNum: number, search: string) => {
         setIsLoadingRecords(true);
         try {
-            const response = await axios.get('/api/staff/mda-payroll', {
+            const response = await axios.get(staffPath('mda-payroll'), {
                 params: { page: pageNum, limit, search },
                 withCredentials: true
             });
@@ -362,7 +363,7 @@ const PayrollUploadPage: React.FC<PayrollUploadPageProps> = ({ user, onLogout, t
         }
 
         try {
-            const response = await axios.post('/api/staff/mda-payroll/manual', {
+            const response = await axios.post(staffPath('mda-payroll/manual'), {
                 ...manualForm,
                 gross_pay: Number(manualForm.gross_pay),
                 net_pay: Number(manualForm.net_pay),

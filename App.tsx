@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { Suspense, useState, useEffect, useCallback, useMemo } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useSearchParams, useNavigate } from 'react-router-dom';
 import { UserState, LoanState, Theme, SavedDraft } from './types';
 import Navigation from './components/Navigation';
@@ -18,35 +18,40 @@ import OnboardingPage from './pages/auth/OnboardingPage';
 import ForgotPasswordPage from './pages/auth/ForgotPasswordPage';
 import ResetPasswordPage from './pages/auth/ResetPasswordPage';
 import RestrictedAccessPage from './pages/RestrictedAccessPage';
-import StaffDashboard from './pages/StaffDashboard';
 import StaffPlaceholderPage from './pages/StaffPlaceholderPage';
-import SettingsPage from './pages/SettingsPage';
-import LoanQueuePage from './pages/LoanQueuePage';
-import LoanDetailsPage from './pages/LoanDetailsPage';
-import UsersPage from './pages/UsersPage';
-import AuditTrailPage from './pages/AuditTrailPage';
 import axios from 'axios';
-import ReportsPage from './pages/ReportsPage';
-import CustomersPage from './pages/CustomersPage';
-import TimelineReportPage from './pages/TimelineReportPage';
-import StaffInvestmentsPage from './pages/StaffInvestmentsPage';
-import StaffInvestmentDetailsPage from './pages/StaffInvestmentDetailsPage';
+import {
+  AuditTrailPage,
+  CbaMigrationPage,
+  CustomerDetailsPage,
+  CustomersPage,
+  DemographyReportPage,
+  LoanDetailsPage,
+  LoanQueuePage,
+  PayrollUploadPage,
+  ProductsPage,
+  ReportsPage,
+  SettingsPage,
+  StaffCalculatorPage,
+  StaffDashboard,
+  StaffInvestmentCalendarPage,
+  StaffInvestmentDetailsPage,
+  StaffInvestmentsPage,
+  StaffMobileNotificationsPage,
+  StaffPromotionsPage,
+  StaffTransfersPage,
+  TimelineReportPage,
+  UsersPage,
+} from './routes/staff-lazy';
 import VerifyGiftPage from './pages/investment/VerifyGiftPage';
 import ClaimGiftPage from './pages/investment/ClaimGiftPage';
 import ProfilePage from './pages/ProfilePage';
-import StaffPromotionsPage from './pages/StaffPromotionsPage';
-import StaffMobileNotificationsPage from './pages/StaffMobileNotificationsPage';
-import StaffTransfersPage from './pages/StaffTransfersPage';
-import StaffCalculatorPage from './pages/StaffCalculatorPage';
-import ProductsPage from './pages/ProductsPage';
 import LogoutWarningModal from './components/modals/LogoutWarningModal';
 import JointAcceptancePage from './pages/investment/JointAcceptancePage';
-import CustomerDetailsPage from './pages/CustomerDetailsPage';
-import CbaMigrationPage from './pages/CbaMigrationPage';
-import PayrollUploadPage from './pages/PayrollUploadPage';
 import { apiBase, apiUrl } from './lib/api-config';
 import { scheduleDeferredScripts } from './lib/deferred-scripts';
 import { isSuperAdminRole, normalizeStaffRole } from './lib/staff-roles';
+import { customerPostAuthPath, isCustomerProfileComplete } from './lib/customer-profile-gate';
 
 // Same-origin proxy: always send session cookies on API/auth requests.
 axios.defaults.withCredentials = true;
@@ -129,8 +134,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, user, isLoadi
   // Profile completion gate: customers must have selfie_url and casa before accessing the app.
   // Exception: skip if already on /profile to prevent an infinite redirect loop.
   if (user.role === 'customer') {
-    const isProfileComplete = user.profile?.selfie_url && user.profile?.casa;
-    if (!isProfileComplete && window.location.pathname !== '/profile') {
+    if (!isCustomerProfileComplete(user.profile) && window.location.pathname !== '/profile') {
       return <Navigate to="/profile" replace />;
     }
   }
@@ -205,16 +209,21 @@ const AppContent: React.FC = () => {
   const [showLogoutModal, setShowLogoutModal] = useState(false);
 
 
-  const refreshUser = useCallback(async () => {
+  const refreshUser = useCallback(async (): Promise<string | null> => {
     try {
       const cacheBust = Date.now();
-      const [meRes, profileRes] = await Promise.all([
-        axios.get(apiUrl(`/api/me?t=${cacheBust}`), { withCredentials: true }),
-        axios.get(apiUrl(`/api/profile?t=${cacheBust}`), { withCredentials: true }),
-      ]);
+      const meRes = await axios.get(apiUrl(`/api/me?t=${cacheBust}`), { withCredentials: true });
+      let profile: UserState['profile'];
+      try {
+        const profileRes = await axios.get(apiUrl(`/api/profile?t=${cacheBust}`), { withCredentials: true });
+        profile = profileRes.data?.profile || undefined;
+      } catch (profileErr) {
+        console.error('Failed to fetch profile (session still valid)', profileErr);
+        profile = undefined;
+      }
 
       const data = meRes.data;
-      setUser({
+      const nextUser: UserState = {
         id: data.id,
         email: data.email,
         name: data.full_name || data.name || 'User',
@@ -223,11 +232,13 @@ const AppContent: React.FC = () => {
         role: normalizeStaffRole(data.role) || data.role,
         new_comer: data.new_comer,
         referral_code: data.referral_code,
-        profile: profileRes.data?.profile || undefined
-      });
+        profile,
+      };
+      setUser(nextUser);
+      return customerPostAuthPath(nextUser);
     } catch (error) {
       console.error("Failed to fetch user", error);
-      // User remains logged out
+      return null;
     } finally {
       setIsLoading(false);
     }
@@ -290,8 +301,8 @@ const AppContent: React.FC = () => {
   useEffect(() => {
     if (searchParams.get('login') !== 'success') return;
 
-    refreshUser().finally(() => {
-      navigateRouter('/dashboard', { replace: true });
+    void refreshUser().then((path) => {
+      if (path) navigateRouter(path, { replace: true });
     });
   }, [searchParams, navigateRouter, refreshUser]);
 
@@ -431,31 +442,38 @@ const AppContent: React.FC = () => {
         onCancel={() => setShowLogoutModal(false)}
       />
 
+      <Suspense
+        fallback={
+          <div className="min-h-[40vh] flex items-center justify-center">
+            <div className="h-10 w-10 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+          </div>
+        }
+      >
       <Routes>
         {/* Auth Routes */}
         <Route path="/login" element={
-          (!isLoading && user.isLoggedIn) ? (user.new_comer ? <Navigate to="/onboarding" /> : <Navigate to="/dashboard" />) : (
+          (!isLoading && user.isLoggedIn) ? <Navigate to={customerPostAuthPath(user)} replace /> : (
             <AuthLayout>
               <LoginPage onLogin={handleLogin} />
             </AuthLayout>
           )
         } />
         <Route path="/register" element={
-          (!isLoading && user.isLoggedIn) ? <Navigate to="/dashboard" /> : (
+          (!isLoading && user.isLoggedIn) ? <Navigate to={customerPostAuthPath(user)} replace /> : (
             <AuthLayout>
               <RegisterPage />
             </AuthLayout>
           )
         } />
         <Route path="/register/:refCode" element={
-          (!isLoading && user.isLoggedIn) ? <Navigate to="/dashboard" /> : (
+          (!isLoading && user.isLoggedIn) ? <Navigate to={customerPostAuthPath(user)} replace /> : (
             <AuthLayout>
               <RegisterPage />
             </AuthLayout>
           )
         } />
         <Route path="/register/*" element={
-          (!isLoading && user.isLoggedIn) ? <Navigate to="/dashboard" /> : (
+          (!isLoading && user.isLoggedIn) ? <Navigate to={customerPostAuthPath(user)} replace /> : (
             <AuthLayout>
               <RegisterPage />
             </AuthLayout>
@@ -486,8 +504,8 @@ const AppContent: React.FC = () => {
                 try {
                   await axios.put(apiUrl('/api/onboarding-complete'), {}, { withCredentials: true });
                   // Update local state by refetching from backend to get referral code
-                  await refreshUser();
-                  navigateRouter('/dashboard');
+                  const path = await refreshUser();
+                  navigateRouter(path ?? '/profile');
                 } catch (e) {
                   console.error("Failed to complete onboarding", e);
                 }
@@ -508,7 +526,18 @@ const AppContent: React.FC = () => {
         } />
 
         {/* Staff Routes */}
-        <Route path="/staff/loans" element={
+        <Route path="/staff/loans" element={<Navigate to="/staff/loans/customer" replace />} />
+        <Route path="/staff/loans/mobile" element={
+          isLoading ? null : (user.isLoggedIn && user.role !== 'customer' ? (
+            <LoanQueuePage
+              user={user}
+              onLogout={handleLogoutRequest}
+              toggleTheme={toggleTheme}
+              theme={theme}
+            />
+          ) : <Navigate to="/login" />)
+        } />
+        <Route path="/staff/loans/customer" element={
           isLoading ? null : (user.isLoggedIn && user.role !== 'customer' ? (
             <LoanQueuePage
               user={user}
@@ -561,6 +590,16 @@ const AppContent: React.FC = () => {
         <Route path="/staff/mobile-notifications" element={
           isLoading ? null : (user.isLoggedIn && isSuperAdminRole(user.role) ? (
             <StaffMobileNotificationsPage
+              user={user}
+              onLogout={handleLogoutRequest}
+              toggleTheme={toggleTheme}
+              theme={theme}
+            />
+          ) : user.isLoggedIn ? <Navigate to="/staff-dashboard" /> : <Navigate to="/login" />)
+        } />
+        <Route path="/staff/investment-calendar" element={
+          isLoading ? null : (user.isLoggedIn && isSuperAdminRole(user.role) ? (
+            <StaffInvestmentCalendarPage
               user={user}
               onLogout={handleLogoutRequest}
               toggleTheme={toggleTheme}
@@ -693,7 +732,7 @@ const AppContent: React.FC = () => {
 
         <Route path="/profile" element={
           <ProtectedRoute user={user} isLoading={isLoading} theme={theme} onLogout={handleLogoutRequest} onToggleTheme={toggleTheme}>
-            <ProfilePage />
+            <ProfilePage onProfileUpdated={refreshUser} />
           </ProtectedRoute>
         } />
 
@@ -765,18 +804,23 @@ const AppContent: React.FC = () => {
         } />
 
         <Route path="/payroll-upload" element={
-          <PayrollUploadPage
-            user={user.isLoggedIn ? user : undefined}
-            onLogout={handleLogoutRequest}
-            toggleTheme={toggleTheme}
-            theme={theme}
-          />
+          isLoading ? null : (user.isLoggedIn && user.role !== 'customer' ? (
+            ALLOWED_BI_AND_REPORTS_ROLES.includes(user.role || '') ? (
+              <PayrollUploadPage
+                user={user}
+                onLogout={handleLogoutRequest}
+                toggleTheme={toggleTheme}
+                theme={theme}
+              />
+            ) : <Navigate to="/staff-dashboard" replace />
+          ) : <Navigate to="/login" replace />)
         } />
 
         {/* Default Redirect */}
         <Route path="/restricted" element={<RestrictedAccessPage onLogout={handleLogoutRequest} />} />
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
+      </Suspense>
     </div>
   );
 };

@@ -1,12 +1,13 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import StaffLayout from '../components/layouts/StaffLayout';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import NewLoanApplicationFlow from '../components/NewLoanApplicationFlow';
 import { getStatusStyles } from '../utils/statusStyles';
 import { formatDate } from '../utils/dateFormatter';
 import { formatCasaLabel } from '../utils/formatCasa';
 import { motion, AnimatePresence } from 'motion/react';
+import { staffPath } from '@/lib/api/staff-path';
 
 interface LoanQueuePageProps {
     user: { name: string; email: string; avatar_url?: string; role?: string };
@@ -17,6 +18,10 @@ interface LoanQueuePageProps {
 
 const LoanQueuePage: React.FC<LoanQueuePageProps> = ({ user, onLogout, toggleTheme, theme }) => {
     const navigate = useNavigate();
+    const location = useLocation();
+    const loanSource: 'mobile' | 'customer' = location.pathname.includes('/staff/loans/mobile')
+        ? 'mobile'
+        : 'customer';
     const [searchParams, setSearchParams] = useSearchParams();
     const searchQuery = searchParams.get('search') || '';
     const statusFilter = searchParams.get('status') || '';
@@ -32,6 +37,13 @@ const LoanQueuePage: React.FC<LoanQueuePageProps> = ({ user, onLogout, toggleThe
     const [loans, setLoans] = useState<any[]>([]);
     const [officers, setOfficers] = useState<any[]>([]);
     const [totalLoans, setTotalLoans] = useState(0);
+    const [queueStats, setQueueStats] = useState({
+        total_count: 0,
+        total_volume: 0,
+        pending_count: 0,
+        disbursed_count: 0,
+        approved_today_count: 0,
+    });
     const [isLoading, setIsLoading] = useState(true);
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
     const [selectedLoans, setSelectedLoans] = useState<number[]>([]);
@@ -44,7 +56,7 @@ const LoanQueuePage: React.FC<LoanQueuePageProps> = ({ user, onLogout, toggleThe
     const fetchLoans = useCallback(async (opts?: { silent?: boolean }) => {
         if (!opts?.silent) setIsLoading(true);
         try {
-            const response = await axios.get(`${''}/api/staff/loans`, {
+            const response = await axios.get(staffPath(`loans`), {
                 params: {
                     search: searchQuery,
                     status: statusFilter,
@@ -53,18 +65,22 @@ const LoanQueuePage: React.FC<LoanQueuePageProps> = ({ user, onLogout, toggleThe
                     date_from: dateFrom,
                     date_to: dateTo,
                     page: currentPage,
-                    limit: itemsPerPage
+                    limit: itemsPerPage,
+                    source: loanSource,
                 },
                 withCredentials: true
             });
             setLoans(response.data.loans);
             setTotalLoans(response.data.total);
+            if (response.data.stats) {
+                setQueueStats(response.data.stats);
+            }
         } catch (error) {
             console.error("Failed to fetch loans", error);
         } finally {
             if (!opts?.silent) setIsLoading(false);
         }
-    }, [searchQuery, statusFilter, stageFilter, officerFilter, dateFrom, dateTo, currentPage, itemsPerPage]);
+    }, [searchQuery, statusFilter, stageFilter, officerFilter, dateFrom, dateTo, currentPage, itemsPerPage, loanSource]);
 
     const refetchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -79,7 +95,7 @@ const LoanQueuePage: React.FC<LoanQueuePageProps> = ({ user, onLogout, toggleThe
         if (['sales_manager', 'admin', 'super_admin', 'superadmin', 'customer_experience', 'marketing'].includes(user.role || '')) {
             try {
                 // Fetch specifically sales officers with a high limit to ensure we get them all
-                const response = await axios.get(`${''}/api/staff/users?role=sales_officer,sales_public_sector,sales_private_sector&limit=200`, { withCredentials: true });
+                const response = await axios.get(staffPath(`users?role=sales_officer,sales_public_sector,sales_private_sector&limit=200`), { withCredentials: true });
                 setOfficers(response.data.users.filter((u: any) => u.is_active));
             } catch (error) {
                 console.error("Failed to fetch officers", error);
@@ -121,7 +137,7 @@ const LoanQueuePage: React.FC<LoanQueuePageProps> = ({ user, onLogout, toggleThe
 
         setIsBulkApproving(true);
         try {
-            const response = await axios.post(`${''}/api/staff/loans/bulk-approve`, {
+            const response = await axios.post(staffPath(`loans/bulk-approve`), {
                 loanIds: financeSelection,
                 gl_account: bulkGL || null
             }, { withCredentials: true });
@@ -148,7 +164,7 @@ const LoanQueuePage: React.FC<LoanQueuePageProps> = ({ user, onLogout, toggleThe
     const handleAssignOfficer = async (loanId: string, officerId: string) => {
         if (!confirm("Are you sure you want to reassign this loan?")) return;
         try {
-            await axios.patch(`${''}/api/staff/loans/${loanId}/assign`, {
+            await axios.patch(staffPath(`loans/${loanId}/assign`), {
                 sales_officer_id: officerId
             }, { withCredentials: true });
 
@@ -286,13 +302,14 @@ const LoanQueuePage: React.FC<LoanQueuePageProps> = ({ user, onLogout, toggleThe
     })();
 
     const stats = [
-        { label: 'Total Volume', value: `₦${Number(loans.reduce((acc, curr) => acc + (Number(curr.requested_loan_amount) || 0), 0)).toLocaleString()}`, icon: 'payments', color: 'blue' },
-        { label: 'Pending Review', value: loans.filter(l => l.status === 'pending').length, icon: 'pending_actions', color: 'orange' },
-        { label: 'Approved Today', value: loans.filter(l => l.status === 'approved' && formatDate(l.updated_at) === formatDate(new Date().toISOString())).length, icon: 'verified', color: 'emerald' },
-        { label: 'Disbursed', value: loans.filter(l => l.status === 'disbursed').length, icon: 'account_balance_wallet', color: 'purple' },
+        { label: 'Applications', value: queueStats.total_count.toLocaleString(), icon: 'folder_open', color: 'slate' },
+        { label: 'Total Volume', value: `₦${Number(queueStats.total_volume).toLocaleString()}`, icon: 'payments', color: 'blue' },
+        { label: 'Pending Review', value: queueStats.pending_count.toLocaleString(), icon: 'pending_actions', color: 'orange' },
+        { label: 'Approved Today', value: queueStats.approved_today_count.toLocaleString(), icon: 'verified', color: 'emerald' },
+        { label: 'Disbursed', value: queueStats.disbursed_count.toLocaleString(), icon: 'account_balance_wallet', color: 'purple' },
     ];
 
-    const STAGE_ORDER = ['onboarding', 'sales', 'customer_experience', 'credit_check_1', 'credit_check_2', 'internal_audit', 'finance', 'disbursed'];
+    const STAGE_ORDER = ['onboarding', 'sales', 'customer_experience', 'credit_check_1', 'credit_check_2', 'customer_disbursement_offer', 'internal_audit', 'finance', 'disbursed'];
 
     const getStageProgress = (stage: string) => {
         const index = STAGE_ORDER.indexOf(stage);
@@ -310,14 +327,17 @@ const LoanQueuePage: React.FC<LoanQueuePageProps> = ({ user, onLogout, toggleThe
                 <div className="flex flex-col md:flex-row justify-between md:items-center gap-6 mb-8">
                     <div>
                         <h1 className="text-4xl font-black text-slate-900 dark:text-white tracking-tight leading-tight">
-                            Loan Queue
+                            {loanSource === 'mobile' ? 'Mobile loans' : 'Customer loans'}
                         </h1>
                         <p className="text-slate-500 dark:text-slate-400 font-medium mt-1">
-                            Operational control center for lending pipeline and risk management.
+                            {loanSource === 'mobile'
+                                ? 'Self-serve applications from the NOLT mobile app — read-only in staff UI, starting at Credit I.'
+                                : 'Staff-created and assisted applications from the NMS pipeline.'}
                         </p>
                     </div>
                     <div className="flex flex-wrap gap-3">
-                        {(['sales_officer', 'sales_public_sector', 'sales_private_sector'].includes(user.role) ||
+                        {loanSource === 'customer' &&
+                        (['sales_officer', 'sales_public_sector', 'sales_private_sector'].includes(user.role) ||
  user.role === 'admin' || user.role === 'super_admin') && (
                             <motion.button
                                 whileHover={{ scale: 1.02 }}
@@ -333,7 +353,7 @@ const LoanQueuePage: React.FC<LoanQueuePageProps> = ({ user, onLogout, toggleThe
                 </div>
 
                 {/* Stats Grid — always 2-col on mobile, 4-col on desktop */}
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 mb-6 md:mb-8">
+                <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 md:gap-4 mb-6 md:mb-8">
                     {stats.map((stat, i) => (
                         <motion.div
                             key={stat.label}
@@ -617,10 +637,16 @@ const LoanQueuePage: React.FC<LoanQueuePageProps> = ({ user, onLogout, toggleThe
                                                                 )}
                                                             </div>
                                                             {/* Promotion Source Badge */}
-                                                            {loan.promotion_source && (
+                                                                {loan.promotion_source && (
                                                                 <div className="flex items-center gap-1.5 mt-1.5 px-2 py-1 rounded-lg bg-amber-500/10 border border-amber-500/25 w-fit">
                                                                     <span className="material-symbols-outlined text-amber-500 text-[11px] leading-none">campaign</span>
                                                                     <span className="text-[9px] font-black uppercase tracking-widest text-amber-600 dark:text-amber-400 leading-none">via {loan.promotion_source}</span>
+                                                                </div>
+                                                            )}
+                                                            {loan.finance_bulk_disburse_failed && loan.stage === 'finance' && (
+                                                                <div className="flex items-center gap-1.5 mt-1.5 px-2 py-1 rounded-lg bg-red-500/10 border border-red-500/25 w-fit" title="Bulk disburse failed — use override on loan detail">
+                                                                    <span className="material-symbols-outlined text-red-500 text-[11px] leading-none">warning</span>
+                                                                    <span className="text-[9px] font-black uppercase tracking-widest text-red-600 dark:text-red-400 leading-none">Bulk disburse failed</span>
                                                                 </div>
                                                             )}
                                                         </div>
@@ -637,13 +663,13 @@ const LoanQueuePage: React.FC<LoanQueuePageProps> = ({ user, onLogout, toggleThe
                                                 <td className="p-6">
                                                     <div className="w-40">
                                                         <div className="flex justify-between items-center mb-1.5">
-                                                            <span className="text-[10px] font-black uppercase tracking-wider text-slate-900 dark:text-white">{loan.stage?.replace('_', ' ') || 'Onboarding'}</span>
-                                                            <span className="text-[10px] font-bold text-slate-400">{Math.round(getStageProgress(loan.stage || 'onboarding'))}%</span>
+                                                            <span className="text-[10px] font-black uppercase tracking-wider text-slate-900 dark:text-white">{loan.status === 'draft' ? 'Draft' : (loan.stage?.replace('_', ' ') || 'Onboarding')}</span>
+                                                            <span className="text-[10px] font-bold text-slate-400">{loan.status === 'draft' ? 0 : Math.round(getStageProgress(loan.stage || 'onboarding'))}%</span>
                                                         </div>
                                                         <div className="h-1.5 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden border border-slate-200 dark:border-slate-700/50">
                                                             <motion.div
                                                                 initial={{ width: 0 }}
-                                                                animate={{ width: `${getStageProgress(loan.stage || 'onboarding')}%` }}
+                                                                animate={{ width: `${loan.status === 'draft' ? 0 : getStageProgress(loan.stage || 'onboarding')}%` }}
                                                                 className={`h-full rounded-full ${loan.status === 'rejected' ? 'bg-rose-500' : 'bg-gradient-to-r from-blue-600 to-indigo-600 shadow-[0_0_8px_rgba(37,99,235,0.4)]'}`}
                                                             />
                                                         </div>

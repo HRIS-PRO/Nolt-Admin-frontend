@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import axios from 'axios';
+import { staffPath } from '@/lib/api/staff-path';
 
 export interface CbaTransactionRow {
     id: number;
@@ -43,6 +44,7 @@ interface TransactionContext {
         isInternalWallet: boolean;
         accountNumber: string | null;
         bankCode: string | null;
+        bankName?: string | null;
         bankLabel: string;
         profile: { fullName?: string; tierLevel?: number; casa?: string } | null;
     };
@@ -56,6 +58,8 @@ type Props = {
     transaction: CbaTransactionRow | null;
     open: boolean;
     onClose: () => void;
+    /** Resolve NIP code → "BANK (code)" using staff nip-banks list (fallback if context API label is stale). */
+    formatBankCode?: (code: string) => string | null;
 };
 
 function formatNaira(amount: number): string {
@@ -105,7 +109,7 @@ function copyText(text: string) {
     void navigator.clipboard.writeText(text);
 }
 
-export function TransferTransactionDrawer({ transaction, open, onClose }: Props) {
+export function TransferTransactionDrawer({ transaction, open, onClose, formatBankCode }: Props) {
     const [tab, setTab] = useState<DrawerTab>('overview');
     const [context, setContext] = useState<TransactionContext | null>(null);
     const [loadingContext, setLoadingContext] = useState(false);
@@ -129,7 +133,7 @@ export function TransferTransactionDrawer({ transaction, open, onClose }: Props)
 
         setLoadingContext(true);
         axios
-            .get('/api/staff/cba-transactions/context', {
+            .get(staffPath('cba-transactions/context'), {
                 withCredentials: true,
                 params: {
                     accountNumber: transaction.accountNumber,
@@ -158,6 +162,22 @@ export function TransferTransactionDrawer({ transaction, open, onClose }: Props)
         if (!transaction) return 0;
         return Number(transaction.amount) + Number(transaction.fee || 0);
     }, [transaction]);
+
+    const destinationBankLabel = useMemo(() => {
+        const code = transaction?.beneficiaryBankCode?.trim();
+        if (!code) return context?.destination?.bankLabel ?? '—';
+
+        const fromClient = formatBankCode?.(code) ?? null;
+        if (fromClient && !fromClient.startsWith('Code ')) return fromClient;
+
+        const name = context?.destination?.bankName?.trim();
+        if (name) return `${name} (${code})`;
+
+        const apiLabel = context?.destination?.bankLabel;
+        if (apiLabel && !/^External bank \(code /i.test(apiLabel)) return apiLabel;
+
+        return fromClient ?? apiLabel ?? `Code ${code}`;
+    }, [transaction, context, formatBankCode]);
 
     const ledgerEntries = useMemo(() => {
         if (!transaction) return [];
@@ -341,12 +361,16 @@ export function TransferTransactionDrawer({ transaction, open, onClose }: Props)
                                             value={transaction.beneficiaryAccountNumber || '—'}
                                             mono
                                         />
-                                        <Row label="Bank / rail" value={context?.destination?.bankLabel ?? '—'} />
+                                        <Row label="Bank / rail" value={destinationBankLabel} />
                                         {context?.destination?.profile?.tierLevel != null ? (
                                             <Row label="KYC tier" value={`Tier ${context.destination.profile.tierLevel}`} />
                                         ) : null}
                                         {transaction.beneficiaryBankCode ? (
-                                            <Row label="NIP bank code" value={transaction.beneficiaryBankCode} mono />
+                                            <Row
+                                                label="NIP bank code"
+                                                value={transaction.beneficiaryBankCode}
+                                                mono
+                                            />
                                         ) : null}
                                     </dl>
                                 </div>
