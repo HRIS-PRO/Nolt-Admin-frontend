@@ -732,7 +732,7 @@ const AppContent: React.FC = () => {
 
         <Route path="/profile" element={
           <ProtectedRoute user={user} isLoading={isLoading} theme={theme} onLogout={handleLogoutRequest} onToggleTheme={toggleTheme}>
-            <ProfilePage />
+            <ProfilePage onProfileUpdated={refreshUser} />
           </ProtectedRoute>
         } />
 

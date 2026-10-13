@@ -18,7 +18,12 @@ const NIGERIAN_STATES = [
 
 type TabType = 'security' | 'personal' | 'residential' | 'bank' | 'selfie';
 
-const ProfilePage: React.FC = () => {
+type ProfilePageProps = {
+    /** Refreshes App-level user state; resolves to the route the session should land on. */
+    onProfileUpdated?: () => Promise<string | null>;
+};
+
+const ProfilePage: React.FC<ProfilePageProps> = ({ onProfileUpdated }) => {
     const navigate = useNavigate();
     const { validateFile, modal: uploadSizeModal } = useNmsUploadSizeLimit();
     const [profile, setProfile] = useState<Partial<UserProfile>>({
@@ -316,15 +321,16 @@ const ProfilePage: React.FC = () => {
                 setMessage({ type: 'error', text: "⚠️ Profile saved, but could not reach Core Banking. Please try saving again." });
             }
 
-            window.dispatchEvent(new Event('user-profile-updated'));
+            // The /dashboard guard reads App-level user state, so it must be refreshed
+            // before navigating or the stale profile bounces us back to /profile.
+            const nextPath = onProfileUpdated
+                ? await onProfileUpdated()
+                : (window.dispatchEvent(new Event('user-profile-updated')), null);
 
             if (cbaReady) {
-                const refreshed = await profileService.getProfile();
-                const casa = refreshed.profile?.casa?.trim();
-                const selfie = refreshed.profile?.selfie_url?.trim();
-                if (refreshed.success && casa && selfie) {
+                if (nextPath === '/dashboard') {
                     navigate('/dashboard');
-                } else if (cbaReady) {
+                } else {
                     setMessage({
                         type: 'success',
                         text: 'Banking profile linked. Finish your selfie step if prompted, then open Dashboard from the menu.',
